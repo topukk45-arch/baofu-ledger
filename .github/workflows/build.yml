@@ -1,0 +1,42 @@
+name: 构建安卓 APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 安装 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 同步网页到原生工程
+        run: npx cap sync android
+
+      - name: 编译 APK（debug，可直接安装）
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: 上传 APK 产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: baofu-ledger-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
