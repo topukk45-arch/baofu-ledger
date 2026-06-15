@@ -1,0 +1,12 @@
+{
+  "name": "baofu-ledger",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  },
+  "dependencies": {
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/android": "^6.2.0"
+  }
+}

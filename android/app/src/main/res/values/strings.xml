@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">早日暴富记账本</string>
+    <string name="title_activity_main">早日暴富记账本</string>
+    <string name="package_name">com.baofu.ledger</string>
+    <string name="custom_url_scheme">com.baofu.ledger</string>
+</resources>

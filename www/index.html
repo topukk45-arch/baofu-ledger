@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>早日暴富记账本</title>
+
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft Yahei", sans-serif; }
+
+        body { background:#fdf8e8; padding:20px; position:relative; overflow-x:hidden; }
+
+        body::before {
+            content:""; position:fixed; top:0; left:0; width:100%; height:100%;
+            background-image:
+                radial-gradient(2px 2px at 20px 30px, #ffd700, transparent),
+                radial-gradient(2px 2px at 60px 70px, #ffe488, transparent),
+                radial-gradient(1px 1px at 50px 50px, #fff5cc, transparent),
+                radial-gradient(2px 2px at 130px 80px, #ffd700, transparent),
+                radial-gradient(1px 1px at 90px 10px, #ffe488, transparent);
+            background-repeat:repeat; background-size:200px 200px;
+            opacity:0.4; pointer-events:none; z-index:-1; animation:shine 8s linear infinite;
+        }
+        @keyframes shine { 0%{background-position:0 0;} 100%{background-position:200px 200px;} }
+
+        .container {
+            max-width:760px; margin:0 auto;
+            background:linear-gradient(135deg, #fff9e6 0%, #fff1c1 100%);
+            border:1px solid #e6c200; border-radius:16px; padding:30px;
+            box-shadow:0 4px 18px rgba(212,175,55,0.35);
+        }
+
+        @media (max-width: 600px) {
+            body { padding:10px; }
+            .container { padding:18px 14px; border-radius:14px; }
+        }
+
+        /* 登录页：让金色卡片在视口内垂直居中（仅登录态生效，不影响登录后会变长的主界面） */
+        body.login-mode { display:flex; flex-direction:column; min-height:100vh; }
+        body.login-mode .container { margin:auto; width:100%; }
+        @media (max-width: 600px) {
+            /* 手机端登录框上下内边距收一点，配合居中更稳 */
+            body.login-mode .login-box { padding:30px 0; }
+        }
+
+        h2 { text-align:center; color:#b8860b; margin-bottom:30px; font-weight:600;
+             letter-spacing:3px; text-shadow:0 0 6px rgba(255,215,0,0.5); }
+
+        .login-box { text-align:center; padding:50px 0; }
+        .login-input { padding:12px 16px; width:240px; border:1px solid #d4af37;
+            border-radius:8px; font-size:16px; margin-bottom:20px; outline:none;
+            transition:0.3s; background:#fffdf0; }
+        .login-input:focus { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+        .login-btn { padding:12px 32px; border:none; border-radius:8px; font-size:16px;
+            cursor:pointer; transition:0.3s; background:linear-gradient(135deg,#d4af37,#b8860b); color:#fff; }
+        .login-btn:hover { background:linear-gradient(135deg,#e6c200,#c9960c); box-shadow:0 0 10px rgba(255,215,0,0.5); }
+
+        /* 最近账号 */
+        .recent-users { margin-top:28px; }
+        .recent-users .recent-title { color:#b89b4a; font-size:13px; margin-bottom:12px; letter-spacing:1px; }
+        .recent-list { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+        .user-chip { display:flex; align-items:center; gap:8px; padding:8px 14px 8px 8px;
+            background:#fffdf0; border:1px solid #e6d080; border-radius:30px; cursor:pointer;
+            transition:0.2s; color:#8b6914; font-size:14px; }
+        .user-chip:hover { border-color:#ffd700; box-shadow:0 0 10px rgba(255,215,0,0.4); transform:translateY(-1px); }
+        .user-chip .avatar { width:30px; height:30px; border-radius:50%; flex:0 0 30px;
+            display:flex; align-items:center; justify-content:center; color:#fff; font-weight:600;
+            font-size:15px; background:linear-gradient(135deg,#d4af37,#b8860b); }
+        .user-chip .u-del { border:none; background:transparent; color:#c9b87a; cursor:pointer;
+            font-size:16px; line-height:1; padding:0 0 0 2px; }
+        .user-chip .u-del:hover { color:#b8860b; }
+
+        .main-box { display:none; }
+
+        .user-info { display:flex; justify-content:space-between; align-items:center;
+            margin-bottom:25px; padding-bottom:15px; border-bottom:1px solid #e6d080; }
+        .user-info h3 { color:#a07500; }
+        .logout { padding:6px 15px; background:linear-gradient(135deg,#d4af37,#b8860b);
+            color:#fff; border:none; border-radius:6px; cursor:pointer; transition:0.3s; }
+        .logout:hover { box-shadow:0 0 8px rgba(255,215,0,0.4); }
+        .user-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .edit-name { background:linear-gradient(135deg,#e6c86a,#cfa53e); }
+
+        .archive-bar, .io-bar { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+        .io-bar { margin-bottom:25px; }
+        .archive-bar select {
+            flex:1; min-width:140px; padding:12px; border:1px solid #d4af37;
+            border-radius:8px; font-size:14px; outline:none; background:#fffdf0;
+            color:#8b6914; cursor:pointer; }
+        .archive-bar select:focus { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+
+        .mini-btn { padding:10px 14px; border:none; border-radius:8px; cursor:pointer;
+            font-size:13px; transition:0.3s; background:#ffe488; color:#5c4500; white-space:nowrap; }
+        .mini-btn:hover { filter:brightness(1.05); box-shadow:0 0 8px rgba(255,215,0,0.4); }
+        .mini-btn.gold { background:linear-gradient(135deg,#d4af37,#b8860b); color:#fff; }
+        .io-bar .mini-btn { flex:1; text-align:center; }
+
+        .form-box { display:flex; flex-direction:column; gap:12px; margin-bottom:18px; }
+        .form-box input, .form-box select {
+            padding:12px; border:1px solid #d4af37; border-radius:8px; font-size:14px;
+            outline:none; transition:0.3s; background:#fffdf0; }
+        .form-box input:focus, .form-box select:focus { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+
+        /* 自定义金色下拉：统一手机/电脑样式，避免系统全屏面板 */
+        .cs-wrap { position:relative; display:inline-block; }
+        .cs-wrap.cs-block { display:block; width:100%; }
+        .cs-native { position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
+        .cs-display {
+            display:flex; align-items:center; justify-content:space-between; gap:8px;
+            width:100%; padding:12px; border:1px solid #d4af37; border-radius:8px;
+            background:#fffdf0; color:#8b6914; font-size:14px; cursor:pointer;
+            transition:border-color .25s, box-shadow .25s; user-select:none; }
+        .cs-display:hover { border-color:#e6c200; }
+        .cs-wrap.open .cs-display { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+        .cs-display .cs-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .cs-display .cs-arrow { flex:0 0 auto; color:#c9a23a; transition:transform .25s; font-size:12px; }
+        .cs-wrap.open .cs-display .cs-arrow { transform:rotate(180deg); }
+        .cs-panel {
+            position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:1200;
+            background:#fffdf3; border:1px solid #e6c86a; border-radius:10px;
+            box-shadow:0 6px 20px rgba(212,175,55,0.35);
+            max-height:240px; overflow-y:auto; padding:4px; display:none; }
+        .cs-wrap.open .cs-panel { display:block; }
+        .cs-opt { padding:10px 12px; border-radius:7px; cursor:pointer; color:#8b6914;
+            font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .cs-opt:hover { background:#fff5cc; }
+        .cs-opt.sel { background:linear-gradient(135deg,#d4af37,#b8860b); color:#fff; }
+        /* 让自定义下拉在各布局里占据原 select 的位置 */
+        .archive-bar .cs-wrap { flex:1; min-width:140px; }
+        .type-row .cs-wrap { flex:0 0 42%; }
+        .cat-row .cs-wrap { flex:1; }
+        .edit-dialog .cs-wrap { display:block; width:100%; margin:8px 0; }
+        .filter-bar .cs-wrap { min-width:120px; }
+        .dt-time .cs-wrap { flex:1; width:100%; }
+        .dt-time .cs-display { padding:8px 10px; }
+
+
+        /* 备注多行框：可纵向拖拽缩放，内容多时内部滚动，不撑爆弹窗 */
+        .remark-area {
+            width:100%; padding:12px; border:1px solid #d4af37; border-radius:8px;
+            font-size:14px; font-family:inherit; outline:none; transition:border-color .3s, box-shadow .3s;
+            background:#fffdf0; resize:vertical; min-height:46px; max-height:220px;
+            overflow-y:auto; line-height:1.5; }
+        .remark-area:focus { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+        .edit-dialog .remark-area { margin:8px 0; }
+
+        .cat-row { display:flex; gap:8px; }
+        .cat-row select { flex:1; cursor:pointer; }
+
+        /* 收入/支出选择行 */
+        .type-row { display:flex; gap:8px; }
+        .type-row select { flex:0 0 42%; cursor:pointer;
+            padding:12px; border:1px solid #d4af37; border-radius:8px; font-size:14px;
+            outline:none; background:#fffdf0; transition:0.3s; }
+        .type-row input { flex:1; }
+        .type-row select:focus { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+
+        /* 收支标签与正负金额颜色 */
+        .io-tag { display:inline-block; border-radius:10px; padding:2px 9px; font-size:13px; }
+        .io-in  { background:#e3f3e0; border:1px solid #b9e0b0; color:#3a7a2e; }
+        .io-out { background:#fbe6e0; border:1px solid #f0c2b4; color:#b5482e; }
+        .pos { color:#3a7a2e; }
+        .neg { color:#b5482e; }
+
+        .add-btn { padding:12px; background:linear-gradient(135deg,#d4af37,#b8860b);
+            color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:15px; transition:0.3s; }
+        .add-btn:hover { background:linear-gradient(135deg,#e6c200,#c9960c); box-shadow:0 0 10px rgba(255,215,0,0.5); }
+
+        .filter-bar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+        .filter-bar label { color:#a07500; font-size:14px; }
+        .filter-bar select { padding:8px 10px; border:1px solid #d4af37; border-radius:6px;
+            background:#fffdf0; color:#8b6914; outline:none; cursor:pointer; }
+
+        .summary { text-align:center; color:#a07500; font-size:14px; margin-bottom:6px; }
+        .summary b { color:#b8860b; font-size:16px; }
+
+        .cat-stats { text-align:center; color:#a07500; font-size:13px; margin-bottom:12px; }
+        .cat-stats .chip { display:inline-block; background:#fff5cc; border:1px solid #ffe488;
+            border-radius:12px; padding:3px 10px; margin:3px; color:#8b6914; }
+
+        table { width:100%; border-collapse:collapse; margin-top:10px; }
+        th, td { padding:12px 8px; text-align:center; border:1px solid #e6d080; font-size:14px; }
+        th { background:linear-gradient(135deg,#fff5cc,#ffe899); color:#8b6914; }
+
+        /* 手机端：表格变卡片 */
+        @media (max-width: 600px) {
+            table, tbody, tr, td { display:block; width:100%; }
+            thead { display:none; }                      /* 隐藏表头 */
+            table { border:none; margin-top:6px; }
+            tbody tr {
+                background:#fffdf3; border:1px solid #e6c86a; border-radius:12px;
+                box-shadow:0 2px 8px rgba(212,175,55,0.18);
+                margin-bottom:14px; padding:6px 4px; overflow:hidden;
+            }
+            tbody td {
+                display:flex; justify-content:space-between; align-items:center; gap:10px;
+                border:none; border-bottom:1px dashed #ecdca0;
+                padding:10px 14px; text-align:right; font-size:14px;
+            }
+            tbody td:last-child { border-bottom:none; }
+            /* 左侧标签 */
+            tbody td::before {
+                content:attr(data-label);
+                font-weight:600; color:#a07500; text-align:left;
+                flex:0 0 auto; white-space:nowrap;
+            }
+            /* 操作按钮一行居右 */
+            tbody td.ops-cell { justify-content:flex-end; }
+            tbody td.ops-cell .operate-btn { padding:7px 14px; font-size:14px; }
+            /* 空记录提示：去掉标签、居中 */
+            tbody td.empty-tip { display:block; text-align:center; }
+            tbody td.empty-tip::before { content:none; }
+            tbody tr:has(td.empty-tip) { box-shadow:none; border-style:dashed; }
+        }
+
+        .cat-tag { display:inline-block; background:#fff5cc; border:1px solid #ffe488;
+            border-radius:10px; padding:2px 9px; color:#8b6914; font-size:13px; }
+
+        .remark-view { color:#b8860b; cursor:pointer; border-bottom:1px dashed #d4af37; }
+        .remark-view:hover { color:#a07500; }
+        .remark-empty { color:#bdb083; }
+        .ask-msg { white-space:pre-wrap; word-break:break-word; }
+
+        .operate-btn { padding:5px 10px; margin:0 3px; border:none; border-radius:4px;
+            cursor:pointer; font-size:13px; transition:0.2s; }
+        .edit { background:#ffe488; color:#5c4500; }
+        .del { background:linear-gradient(135deg,#d4af37,#b8860b); color:#fff; }
+        .operate-btn:hover { filter:brightness(1.1); }
+
+        .mask { position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.3); display:none; align-items:center; justify-content:center; z-index:999; }
+        .edit-dialog { background:linear-gradient(135deg,#fff9e6,#fff1c1); padding:25px;
+            border:1px solid #d4af37; border-radius:12px; width:90%; max-width:400px;
+            max-height:88vh; overflow-y:auto;
+            box-shadow:0 4px 20px rgba(212,175,55,0.4); }
+        .edit-dialog h3 { margin-bottom:15px; text-align:center; color:#b8860b; }
+        .edit-dialog input, .edit-dialog select { width:100%; margin:8px 0; padding:10px;
+            border:1px solid #d4af37; border-radius:6px; outline:none; background:#fffdf0; }
+        .dialog-btn { display:flex; gap:10px; margin-top:15px; }
+        .save { flex:1; padding:10px; background:linear-gradient(135deg,#d4af37,#b8860b);
+            color:#fff; border:none; border-radius:6px; cursor:pointer; }
+        .cancel { flex:1; padding:10px; background:#e6d080; color:#5c4500; border:none;
+            border-radius:6px; cursor:pointer; }
+
+        .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
+        .cat-item { display:flex; justify-content:space-between; align-items:center;
+            padding:8px 10px; border:1px solid #e6d080; border-radius:6px; margin-bottom:6px;
+            background:#fffdf0; color:#8b6914; }
+        .cat-item button { border:none; background:#d4af37; color:#fff; border-radius:4px;
+            padding:3px 9px; cursor:pointer; font-size:12px; }
+        .cat-add-row { display:flex; gap:8px; margin-top:8px; }
+        .cat-add-row input { flex:1; margin:0; }
+
+        .empty-tip { text-align:center; padding:30px; color:#a07500; }
+
+        /* 自定义时间选择器 */
+        .dt-input { cursor:pointer; }
+        .dt-dialog { background:linear-gradient(135deg,#fff9e6,#fff1c1); padding:20px;
+            border:1px solid #d4af37; border-radius:14px; width:92%; max-width:340px;
+            max-height:90vh; overflow-y:auto;
+            box-shadow:0 6px 24px rgba(212,175,55,0.45); }
+        .dt-preview { text-align:center; font-size:18px; color:#b8860b; font-weight:600;
+            margin-bottom:14px; letter-spacing:1px; text-shadow:0 0 6px rgba(255,215,0,0.4); }
+        .dt-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .dt-head span { color:#8b6914; font-weight:600; }
+        .dt-nav { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer;
+            background:#ffe488; color:#5c4500; font-size:18px; line-height:1; transition:0.2s; }
+        .dt-nav:hover { filter:brightness(1.06); }
+        .dt-week { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px; }
+        .dt-week span { text-align:center; font-size:12px; color:#b89b4a; padding:4px 0; }
+        .dt-days { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+        .dt-day { text-align:center; padding:8px 0; border-radius:8px; cursor:pointer;
+            font-size:14px; color:#8b6914; transition:0.15s; }
+        .dt-day:hover { background:#fff5cc; }
+        .dt-day.muted { color:#d8cfa6; cursor:default; }
+        .dt-day.muted:hover { background:transparent; }
+        .dt-day.today { border:1px solid #d4af37; }
+        .dt-day.selected { background:linear-gradient(135deg,#d4af37,#b8860b); color:#fff; font-weight:600; }
+        .dt-time { display:flex; align-items:flex-end; gap:10px; margin:14px 0 4px; }
+        .dt-time-col { display:flex; flex-direction:column; gap:4px; flex:1; }
+        .dt-time-col label { font-size:12px; color:#b89b4a; }
+        .dt-time select { padding:8px; border:1px solid #d4af37; border-radius:8px;
+            background:#fffdf0; color:#8b6914; outline:none; cursor:pointer; }
+        .dt-now { padding:8px 12px; border:none; border-radius:8px; cursor:pointer;
+            background:#ffe488; color:#5c4500; font-size:13px; white-space:nowrap; transition:0.2s; }
+        .dt-now:hover { filter:brightness(1.06); }
+
+        /* 自定义确认/输入弹窗 */
+        .ask-dialog { max-width:360px; }
+        .ask-msg { color:#8b6914; text-align:center; margin:6px 0 4px; line-height:1.6; font-size:15px;
+            max-height:55vh; overflow-y:auto; }
+        #askInput { width:100%; margin:12px 0 4px; padding:12px; border:1px solid #d4af37;
+            border-radius:8px; outline:none; background:#fffdf0; font-size:15px; font-family:inherit; }
+        #askInput:focus { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+        .ask-err { color:#c0392b; font-size:13px; margin:4px 0 0; text-align:center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-box" id="loginBox">
+            <h2>早日暴富记账本</h2>
+            <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
+            <br>
+            <button class="login-btn" id="loginBtn">登录</button>
+            <div class="recent-users" id="recentUsers"></div>
+        </div>
+
+        <div class="main-box" id="mainBox">
+            <div class="user-info">
+                <h3 id="nowUser">当前用户：</h3>
+                <div class="user-actions">
+                    <button class="logout edit-name" id="editNameBtn">修改用户名</button>
+                    <button class="logout" id="logoutBtn">退出登录</button>
+                </div>
+            </div>
+
+            <div class="archive-bar">
+                <select id="archiveSelect"></select>
+                <button class="mini-btn gold" id="newArchive">新建存档</button>
+                <button class="mini-btn" id="renameArchive">重命名</button>
+                <button class="mini-btn" id="delArchive">删除存档</button>
+            </div>
+
+            <div class="io-bar">
+                <button class="mini-btn gold" id="exportBtn">导出存档</button>
+                <button class="mini-btn gold" id="importBtn">导入存档</button>
+                <input type="file" id="importFile" accept=".json" style="display:none">
+            </div>
+
+            <div class="form-box">
+                <input type="text" id="billTime" placeholder="选择记账时间" readonly class="dt-input">
+                <div class="type-row">
+                    <select id="billType">
+                        <option value="expense" selected>支出（花销）</option>
+                        <option value="income">收入（存入）</option>
+                    </select>
+                    <input type="number" step="0.01" min="0" id="billMoney" placeholder="输入金额（正数）">
+                </div>
+                <div class="cat-row">
+                    <select id="billCat"></select>
+                    <button class="mini-btn" id="manageCat">管理分类</button>
+                </div>
+                <textarea id="billRemark" class="remark-area" placeholder="备注（可拖右下角调整大小，最多 5000 字）" maxlength="5000" rows="2"></textarea>
+                <button class="add-btn" id="addBill">添加记录</button>
+            </div>
+
+            <div class="filter-bar">
+                <label>按分类筛选：</label>
+                <select id="filterCat"><option value="__all">全部</option></select>
+            </div>
+
+            <div class="summary" id="summary"></div>
+            <div class="cat-stats" id="catStats"></div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>记账时间</th>
+                        <th>收支</th>
+                        <th>金额(元)</th>
+                        <th>分类</th>
+                        <th>结余(元)</th>
+                        <th>备注</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="billList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mask" id="editMask">
+        <div class="edit-dialog">
+            <h3>修改账单</h3>
+            <input type="text" id="editTime" placeholder="选择记账时间" readonly class="dt-input">
+            <select id="editType">
+                <option value="income">收入（存入）</option>
+                <option value="expense">支出（花销）</option>
+            </select>
+            <input type="number" step="0.01" min="0" id="editMoney" placeholder="输入金额（正数）">
+            <select id="editCat"></select>
+            <textarea id="editRemark" class="remark-area" placeholder="备注（可拖右下角调整大小，最多 5000 字）" maxlength="5000" rows="2"></textarea>
+            <div class="dialog-btn">
+                <button class="save" id="saveEdit">保存</button>
+                <button class="cancel" id="cancelEdit">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="mask" id="catMask">
+        <div class="edit-dialog">
+            <h3>管理分类</h3>
+            <div class="cat-list" id="catList"></div>
+            <div class="cat-add-row">
+                <input type="text" id="newCatName" placeholder="新分类名称（最多 8 字）" maxlength="8">
+                <button class="mini-btn gold" id="addCatBtn">添加</button>
+            </div>
+            <p id="catErr" class="ask-err" style="display:none"></p>
+            <div class="dialog-btn">
+                <button class="cancel" id="closeCat">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义时间选择器 -->
+    <div class="mask" id="dtMask">
+        <div class="dt-dialog">
+            <div class="dt-preview" id="dtPreview">2026-01-01 00:00</div>
+            <div class="dt-head">
+                <button class="dt-nav" id="dtPrevMonth">‹</button>
+                <span id="dtMonthLabel">2026年01月</span>
+                <button class="dt-nav" id="dtNextMonth">›</button>
+            </div>
+            <div class="dt-week">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div class="dt-days" id="dtDays"></div>
+            <div class="dt-time">
+                <div class="dt-time-col">
+                    <label>时</label>
+                    <select id="dtHour"></select>
+                </div>
+                <div class="dt-time-col">
+                    <label>分</label>
+                    <select id="dtMin"></select>
+                </div>
+                <button class="dt-now" id="dtNow">此刻</button>
+            </div>
+            <div class="dialog-btn">
+                <button class="save" id="dtConfirm">确认</button>
+                <button class="cancel" id="dtCancel">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义确认 / 输入 弹窗 -->
+    <div class="mask" id="askMask">
+        <div class="edit-dialog ask-dialog">
+            <h3 id="askTitle">提示</h3>
+            <p id="askMsg" class="ask-msg"></p>
+            <input type="text" id="askInput" style="display:none">
+            <p id="askErr" class="ask-err" style="display:none"></p>
+            <div class="dialog-btn">
+                <button class="save" id="askOk">确定</button>
+                <button class="cancel" id="askCancel">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = '';
+        let currentArchive = '';
+
+        const DEFAULT_CATS = ['未分类', '餐饮', '购物', '转账', '工资', '红包', '其他'];
+
+        const $ = id => document.getElementById(id);
+        const loginBox=$('loginBox'), mainBox=$('mainBox'), nowUser=$('nowUser');
+        const logoutBtn=$('logoutBtn'), billList=$('billList');
+        const billTime=$('billTime'), billMoney=$('billMoney'), billRemark=$('billRemark'), billCat=$('billCat'), billType=$('billType');
+        const addBill=$('addBill'), editMask=$('editMask');
+        const editTime=$('editTime'), editMoney=$('editMoney'), editRemark=$('editRemark'), editCat=$('editCat'), editType=$('editType');
+        const saveEdit=$('saveEdit'), cancelEdit=$('cancelEdit');
+        const userNameInput=$('userNameInput'), loginBtn=$('loginBtn');
+        const archiveSelect=$('archiveSelect'), filterCat=$('filterCat');
+
+        // ===== 自定义 确认 / 输入 弹窗 =====
+        const askMask=$('askMask'), askTitle=$('askTitle'), askMsg=$('askMsg'),
+              askInput=$('askInput'), askOk=$('askOk'), askCancel=$('askCancel');
+        let askResolve=null, askMode='confirm';
+
+        const askErr=$('askErr');
+        let askValidate=null;
+        function showAskErr(msg){
+            askErr.textContent=msg;
+            askErr.style.display = msg ? 'block' : 'none';
+        }
+
+        function closeAsk(result){
+            askMask.style.display='none';
+            askErr.style.display='none';
+            const r=askResolve; askResolve=null; askValidate=null;
+            if(r) r(result);
+        }
+        askOk.addEventListener('click', ()=>{
+            if(askMode==='prompt'){
+                const v=askInput.value.trim();
+                if(v===''){ showAskErr('内容不能为空'); return; }
+                if(askValidate){
+                    const err=askValidate(v);   // 返回错误文案则拦截，返回空则通过
+                    if(err){ showAskErr(err); return; }
+                }
+                closeAsk(v);
+            } else closeAsk(true);
+        });
+        askCancel.addEventListener('click', ()=>closeAsk(askMode==='prompt'?null:false));
+        // 禁止点击遮罩外部关闭，避免误触丢失输入；仅按钮可关闭
+        askInput.addEventListener('keydown', e=>{ if(e.key==='Enter') askOk.click(); });
+        askInput.addEventListener('input', ()=>{ if(askErr.style.display!=='none') showAskErr(''); });
+
+        // 确认框：回调式
+        function customConfirm(msg, onOk, title){
+            askMode='confirm';
+            askTitle.textContent=title||'确认操作';
+            askMsg.textContent=msg;
+            askMsg.style.display='';
+            askMsg.style.textAlign='';
+            askInput.style.display='none';
+            askCancel.style.display='';
+            askResolve=(r)=>{ if(r && onOk) onOk(); };
+            askMask.style.display='flex';
+        }
+        // 输入框：回调式。validate(value) 返回错误文案则在弹窗内提示且不关闭，返回空则通过
+        function customPrompt(msg, defVal, onOk, title, validate, opts){
+            opts = opts || {};
+            askMode='prompt';
+            askTitle.textContent=title||'请输入';
+            // msg 为空则隐藏正文，避免与标题重复
+            if(msg){ askMsg.textContent=msg; askMsg.style.display=''; }
+            else { askMsg.textContent=''; askMsg.style.display='none'; }
+            askInput.style.display='block';
+            askInput.value=defVal||'';
+            askInput.placeholder = opts.placeholder || '';
+            if(opts.maxlen){ askInput.setAttribute('maxlength', opts.maxlen); }
+            else { askInput.removeAttribute('maxlength'); }
+            askCancel.style.display='';
+            askErr.style.display='none';
+            askValidate=validate||null;
+            askResolve=(r)=>{ if(r!==null && onOk) onOk(r); };
+            askMask.style.display='flex';
+            setTimeout(()=>{ askInput.focus(); askInput.select(); }, 50);
+        }
+        // 信息弹窗：只有“确定”，可选标题；用于替代 alert 和“查看备注”
+        function customAlert(msg, title, align){
+            askMode='alert';
+            askTitle.textContent=title||'提示';
+            askMsg.textContent=msg;
+            askMsg.style.display='';
+            askMsg.style.textAlign = (align==='left') ? 'left' : '';
+            askInput.style.display='none';
+            askCancel.style.display='none';
+            askResolve=null;
+            askMask.style.display='flex';
+        }
+
+        // 金额规范化：返回 {ok:true, val} 或 {ok:false, why}，why 用于给出对症提示
+        function normMoney(raw){
+            const n = Number(raw);
+            if(!isFinite(n)) return { ok:false, why:'请输入正确的金额数字～' };  // NaN / Infinity
+            if(n > 99999999) return { ok:false, why:'金额太大啦，确认一下没多打几个 0？' };  // 上限挡手滑
+            const val = Math.round(n * 100) / 100;  // 先对齐到分
+            if(val <= 0) return { ok:false, why:'金额要大于 0 哦～' };  // 含 0、负数、以及 0.001 这类四舍五入后归零的值
+            return { ok:true, val };
+        }
+
+        // 字符数：按 Unicode 码点计（一个汉字算 1）
+        function charLen(s){ return Array.from(s).length; }
+        function charSlice(s, n){ return Array.from(s).slice(0, n).join(''); }
+        // HTML 转义，防止备注/名称里的特殊字符破坏页面
+        function escapeHtml(s){
+            return String(s).replace(/[&<>"']/g, c => ({
+                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+            }[c]));
+        }
+
+        function storeKey(){ return `store_${currentUser}`; }
+
+        let __idSeq = 0;
+        function genId(){ return 'r' + Date.now().toString(36) + (__idSeq++).toString(36) + Math.floor(Math.random()*1000); }
+
+        function normArchive(a){
+            if (Array.isArray(a)) a = { records:a, cats:DEFAULT_CATS.slice() };
+            if (!a.records) a.records = [];
+            if (!a.cats || !a.cats.length) a.cats = DEFAULT_CATS.slice();
+            a.records.forEach(r => {
+                if (!r.cat) r.cat = '未分类';
+                if (!r.id) r.id = genId();
+                if (!r.type) r.type = 'income';   // 旧记录无收支类型，默认按收入
+            });
+            return a;
+        }
+
+        function loadStore(){
+            const raw = localStorage.getItem(storeKey());
+            let store;
+            if (raw) { try { store = JSON.parse(raw); } catch(e) { store = null; } }
+            if (!store) {
+                const old = localStorage.getItem(`billData_${currentUser}`);
+                const arr = old ? JSON.parse(old) : [];
+                store = { archives:{ '默认存档':{ records:arr, cats:DEFAULT_CATS.slice() } }, last:'默认存档' };
+            }
+            Object.keys(store.archives).forEach(k => { store.archives[k] = normArchive(store.archives[k]); });
+            return store;
+        }
+        function saveStore(store){ localStorage.setItem(storeKey(), JSON.stringify(store)); }
+        function curArchive(store){ return store.archives[currentArchive]; }
+
+        loginBtn.addEventListener('click', ()=>login());
+        userNameInput.addEventListener('keydown', e => { if(e.key==='Enter') login(); });
+
+        // ===== 账号索引（用于登录页最近账号）=====
+        function getUsers(){
+            try { return JSON.parse(localStorage.getItem('users_index')||'[]'); }
+            catch(e){ return []; }
+        }
+        function recordUser(name){
+            let list=getUsers().filter(u=>u!==name);
+            list.unshift(name);              // 最近用的排最前
+            localStorage.setItem('users_index', JSON.stringify(list));
+        }
+        function removeUser(name){
+            const list=getUsers().filter(u=>u!==name);
+            localStorage.setItem('users_index', JSON.stringify(list));
+        }
+        function renderRecentUsers(){
+            const box=$('recentUsers');
+            const list=getUsers();
+            if(!list.length){ box.innerHTML=''; return; }
+            box.innerHTML='<div class="recent-title">最近账号（点击直接进入）</div>';
+            const wrap=document.createElement('div'); wrap.className='recent-list';
+            list.forEach(name=>{
+                const chip=document.createElement('div'); chip.className='user-chip';
+                chip.title='点击进入';
+                const av=document.createElement('div'); av.className='avatar';
+                av.textContent=name.slice(0,1).toUpperCase();
+                const label=document.createElement('span'); label.textContent=name;
+                const del=document.createElement('button'); del.className='u-del'; del.textContent='×';
+                del.title='从列表移除（不会删除账本数据）';
+                del.onclick=(e)=>{
+                    e.stopPropagation();
+                    customConfirm(`将「${name}」从最近账号列表移除？（账本数据不会删除，重新输入名字仍可进入）`, ()=>{
+                        removeUser(name); renderRecentUsers();
+                    }, '移除账号');
+                };
+                chip.appendChild(av); chip.appendChild(label); chip.appendChild(del);
+                chip.onclick=()=>login(name);
+                wrap.appendChild(chip);
+            });
+            box.appendChild(wrap);
+        }
+
+        function login(presetName){
+            const name = (presetName!==undefined ? presetName : userNameInput.value).trim();
+            if(!name){ customAlert('请输入姓名！'); return; }
+            if(charLen(name) > 8){ customAlert('姓名最多 8 个字～'); return; }
+            currentUser = name;
+            recordUser(name);
+            const store = loadStore();
+            saveStore(store);
+            currentArchive = store.last || Object.keys(store.archives)[0];
+            loginBox.style.display='none';
+            mainBox.style.display='block';
+            document.body.classList.remove('login-mode');
+            nowUser.innerText = `当前用户：${name}`;
+            refreshArchiveSelect();
+            refreshCatSelectors();
+            setDtInput(billTime, nowDtValue());   // 进入主界面即默认当前时间
+            renderBill();
+        }
+
+        logoutBtn.addEventListener('click', () => {
+            currentUser=''; currentArchive='';
+            userNameInput.value='';
+            mainBox.style.display='none';
+            loginBox.style.display='block';
+            document.body.classList.add('login-mode');
+            renderRecentUsers();
+        });
+
+        // 修改用户名：把当前账号连同其全部存档数据迁移到新名字下
+        $('editNameBtn').addEventListener('click', () => {
+            const oldName=currentUser;
+            customPrompt('', oldName, (newName)=>{
+                if(newName===oldName) return;
+                // 迁移数据：store_old -> store_new
+                const data=localStorage.getItem(`store_${oldName}`);
+                if(data!==null){ localStorage.setItem(`store_${newName}`, data); }
+                localStorage.removeItem(`store_${oldName}`);
+                // 更新账号索引：移除旧名、加入新名（保持在最前）
+                let list=getUsers().filter(u=>u!==oldName && u!==newName);
+                list.unshift(newName);
+                localStorage.setItem('users_index', JSON.stringify(list));
+                // 更新当前状态与界面
+                currentUser=newName;
+                nowUser.innerText=`当前用户：${newName}`;
+                // 数据迁移后必须重新加载界面，否则仍显示旧视图直到刷新
+                const store=loadStore();
+                currentArchive = store.last || Object.keys(store.archives)[0];
+                refreshArchiveSelect(); refreshCatSelectors(); renderBill();
+                customAlert(`用户名已改为「${newName}」`);
+            }, '修改用户名', (newName)=>{
+                if(newName===oldName) return '';
+                if(charLen(newName) > 8) return '用户名最多 8 个字～';
+                // 已存在同名且有数据的账号，不允许覆盖
+                if(localStorage.getItem(`store_${newName}`)!==null) return '该用户名已存在，换一个吧';
+                return '';
+            }, { placeholder:'输入新用户名（最多 8 字，数据会一并迁移）', maxlen:8 });
+        });
+
+        function refreshArchiveSelect(){
+            const store = loadStore();
+            archiveSelect.innerHTML='';
+            Object.keys(store.archives).forEach(name => {
+                const opt=document.createElement('option');
+                opt.value=name; opt.textContent=name;
+                if(name===currentArchive) opt.selected=true;
+                archiveSelect.appendChild(opt);
+            });
+        }
+        archiveSelect.addEventListener('change', () => {
+            currentArchive = archiveSelect.value;
+            const store=loadStore(); store.last=currentArchive; saveStore(store);
+            refreshCatSelectors(); renderBill();
+        });
+        $('newArchive').addEventListener('click', () => {
+            customPrompt('', '', (name)=>{
+                const store=loadStore();
+                store.archives[name]={ records:[], cats:DEFAULT_CATS.slice() };
+                store.last=name; saveStore(store); currentArchive=name;
+                refreshArchiveSelect(); refreshCatSelectors(); renderBill();
+            }, '新建存档', (name)=>{
+                if(charLen(name) > 16) return '存档名最多 16 个字～';
+                if(loadStore().archives[name]) return '该存档名已存在';
+                return '';
+            }, { placeholder:'输入存档名称（最多 16 字）', maxlen:16 });
+        });
+        $('renameArchive').addEventListener('click', () => {
+            customPrompt('', currentArchive, (name)=>{
+                if(name===currentArchive) return;
+                const store=loadStore();
+                store.archives[name]=store.archives[currentArchive];
+                delete store.archives[currentArchive];
+                currentArchive=name; store.last=name; saveStore(store);
+                refreshArchiveSelect(); renderBill();
+            }, '重命名存档', (name)=>{
+                if(name===currentArchive) return '';
+                if(charLen(name) > 16) return '存档名最多 16 个字～';
+                if(loadStore().archives[name]) return '该存档名已存在';
+                return '';
+            }, { placeholder:'输入新存档名（最多 16 字）', maxlen:16 });
+        });
+        $('delArchive').addEventListener('click', () => {
+            const store=loadStore();
+            if(Object.keys(store.archives).length<=1){ customAlert('至少保留一个存档！'); return; }
+            customConfirm(`确定删除存档「${currentArchive}」吗？此操作不可恢复。`, ()=>{
+                const s=loadStore();
+                delete s.archives[currentArchive];
+                currentArchive=Object.keys(s.archives)[0];
+                s.last=currentArchive; saveStore(s);
+                refreshArchiveSelect(); refreshCatSelectors(); renderBill();
+            }, '删除存档');
+        });
+
+        $('exportBtn').addEventListener('click', () => {
+            const store=loadStore(); const a=curArchive(store);
+            const payload={ app:'早日暴富记账本', user:currentUser, archive:currentArchive,
+                cats:a.cats, data:a.records, exportedAt:new Date().toLocaleString() };
+            const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+            const url=URL.createObjectURL(blob);
+            const el=document.createElement('a');
+            el.href=url; el.download=`记账存档_${currentArchive}_${Date.now()}.json`; el.click();
+            URL.revokeObjectURL(url);
+        });
+        $('importBtn').addEventListener('click', () => $('importFile').click());
+        $('importFile').addEventListener('change', e => {
+            const file=e.target.files[0]; if(!file) return;
+            const reader=new FileReader();
+            reader.onload=ev=>{
+                try{
+                    const parsed=JSON.parse(ev.target.result);
+                    const records=Array.isArray(parsed)?parsed:parsed.data;
+                    if(!Array.isArray(records)) throw new Error('bad');
+                    records.forEach(r=>{ if(!r.cat) r.cat='未分类'; });
+                    let cats=(parsed && parsed.cats && parsed.cats.length)?parsed.cats:DEFAULT_CATS.slice();
+                    let name=(parsed.archive||'导入存档');
+                    const store=loadStore();
+                    let finalName=name, n=1;
+                    while(store.archives[finalName]) finalName=`${name}(${n++})`;
+                    store.archives[finalName]={ records, cats };
+                    store.last=finalName; saveStore(store); currentArchive=finalName;
+                    refreshArchiveSelect(); refreshCatSelectors(); renderBill();
+                    customAlert(`导入成功！已存为存档「${finalName}」`);
+                }catch(err){ customAlert('导入失败：文件格式不正确'); }
+                $('importFile').value='';
+            };
+            reader.readAsText(file);
+        });
+
+        function getCats(){ return curArchive(loadStore()).cats; }
+        function fillSelect(sel, cats, selected){
+            sel.innerHTML='';
+            cats.forEach(c=>{
+                const o=document.createElement('option');
+                o.value=c; o.textContent=c;
+                if(c===selected) o.selected=true;
+                sel.appendChild(o);
+            });
+        }
+        function refreshCatSelectors(){
+            const cats=getCats();
+            fillSelect(billCat, cats, cats[0]);
+            const cur=filterCat.value;
+            filterCat.innerHTML='<option value="__all">全部</option>';
+            cats.forEach(c=>{
+                const o=document.createElement('option'); o.value=c; o.textContent=c;
+                filterCat.appendChild(o);
+            });
+            if([...filterCat.options].some(o=>o.value===cur)) filterCat.value=cur;
+        }
+        filterCat.addEventListener('change', renderBill);
+
+        $('manageCat').addEventListener('click', openCatManager);
+        $('closeCat').addEventListener('click', ()=>{ $('catMask').style.display='none'; });
+        function showCatErr(msg){
+            const el=$('catErr');
+            el.textContent=msg||'';
+            el.style.display = msg ? 'block' : 'none';
+        }
+        $('newCatName').addEventListener('input', ()=>showCatErr(''));
+        $('addCatBtn').addEventListener('click', () => {
+            const name=$('newCatName').value.trim();
+            if(!name){ showCatErr('请输入分类名'); return; }
+            if(charLen(name) > 8){ showCatErr('分类名最多 8 个字～'); return; }
+            const store=loadStore(); const a=curArchive(store);
+            if(a.cats.includes(name)){ showCatErr('该分类已存在'); return; }
+            a.cats.push(name); saveStore(store);
+            $('newCatName').value=''; showCatErr('');
+            refreshCatSelectors(); openCatManager(); renderBill();
+        });
+        function openCatManager(){
+            showCatErr('');
+            const store=loadStore(); const a=curArchive(store);
+            const list=$('catList'); list.innerHTML='';
+            a.cats.forEach(c=>{
+                const div=document.createElement('div'); div.className='cat-item';
+                const span=document.createElement('span'); span.textContent=c;
+                const wrap=document.createElement('div');
+                const rn=document.createElement('button'); rn.textContent='改名'; rn.style.marginRight='6px';
+                rn.onclick=()=>renameCat(c);
+                const del=document.createElement('button'); del.textContent='删除';
+                del.onclick=()=>deleteCat(c);
+                wrap.appendChild(rn); wrap.appendChild(del);
+                div.appendChild(span); div.appendChild(wrap);
+                list.appendChild(div);
+            });
+            $('catMask').style.display='flex';
+        }
+        function renameCat(oldName){
+            customPrompt('', oldName, (name)=>{
+                if(name===oldName) return;
+                const store=loadStore(); const a=curArchive(store);
+                a.cats=a.cats.map(c=>c===oldName?name:c);
+                a.records.forEach(r=>{ if(r.cat===oldName) r.cat=name; });
+                saveStore(store);
+                refreshCatSelectors(); openCatManager(); renderBill();
+            }, '重命名分类', (name)=>{
+                if(name===oldName) return '';
+                if(charLen(name) > 8) return '分类名最多 8 个字～';
+                if(curArchive(loadStore()).cats.includes(name)) return '该分类已存在';
+                return '';
+            }, { placeholder:'输入新分类名（最多 8 字）', maxlen:8 });
+        }
+        function deleteCat(name){
+            const store=loadStore(); const a=curArchive(store);
+            if(a.cats.length<=1){ customAlert('至少保留一个分类！'); return; }
+            const used=a.records.filter(r=>r.cat===name).length;
+            const tip=used>0?`有 ${used} 条记录使用该分类，删除后将归为「未分类」。`:'';
+            customConfirm(`确定删除分类「${name}」吗？${tip}`, ()=>{
+                const s=loadStore(); const ar=curArchive(s);
+                ar.cats=ar.cats.filter(c=>c!==name);
+                if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
+                ar.records.forEach(r=>{ if(r.cat===name) r.cat='未分类'; });
+                saveStore(s);
+                refreshCatSelectors(); openCatManager(); renderBill();
+            }, '删除分类');
+        }
+
+        function getUserData(){ return curArchive(loadStore()).records; }
+        function saveUserData(data){
+            const store=loadStore(); curArchive(store).records=data;
+            store.last=currentArchive; saveStore(store);
+        }
+
+        // ===== 自定义时间选择器 =====
+        const dtMask=$('dtMask'), dtDays=$('dtDays'), dtMonthLabel=$('dtMonthLabel');
+        const dtHour=$('dtHour'), dtMin=$('dtMin'), dtPreview=$('dtPreview');
+        let dtTargetInput=null;   // 当前正在编辑哪个输入框
+        let dtView={ year:new Date().getFullYear(), month:new Date().getMonth() };  // month 0-11，当前显示的月份
+        let dtSel={ y:null, m:null, d:null }; // 选中的日期
+
+        // 填充时分下拉
+        for(let h=0; h<24; h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0'); dtHour.appendChild(o); }
+        for(let m=0; m<60; m++){ const o=document.createElement('option'); o.value=m; o.textContent=String(m).padStart(2,'0'); dtMin.appendChild(o); }
+
+        function pad(n){ return String(n).padStart(2,'0'); }
+
+        // 解析 input 现有值 "YYYY-MM-DDTHH:mm" -> Date 部件；无值则用当前时间
+        function parseInputDt(val){
+            const m = val && val.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+            if(m) return { y:+m[1], mo:+m[2]-1, d:+m[3], h:+m[4], mi:+m[5] };
+            const now=new Date();
+            return { y:now.getFullYear(), mo:now.getMonth(), d:now.getDate(), h:now.getHours(), mi:now.getMinutes() };
+        }
+
+        function openDtPicker(input){
+            dtTargetInput=input;
+            const p=parseInputDt(getDtInput(input));
+            dtView={ year:p.y, month:p.mo };
+            dtSel={ y:p.y, m:p.mo, d:p.d };
+            dtHour.value=p.h; dtMin.value=p.mi;
+            renderDtDays();
+            updateDtPreview();
+            dtMask.style.display='flex';
+        }
+
+        function renderDtDays(){
+            dtMonthLabel.textContent=`${dtView.year}年${pad(dtView.month+1)}月`;
+            dtDays.innerHTML='';
+            const first=new Date(dtView.year, dtView.month, 1);
+            // 周一为起始：getDay() 0=周日
+            let lead=(first.getDay()+6)%7;
+            const daysInMonth=new Date(dtView.year, dtView.month+1, 0).getDate();
+            const today=new Date();
+            for(let i=0;i<lead;i++){ const e=document.createElement('div'); e.className='dt-day muted'; dtDays.appendChild(e); }
+            for(let d=1; d<=daysInMonth; d++){
+                const el=document.createElement('div'); el.className='dt-day'; el.textContent=d;
+                if(today.getFullYear()===dtView.year && today.getMonth()===dtView.month && today.getDate()===d) el.classList.add('today');
+                if(dtSel.y===dtView.year && dtSel.m===dtView.month && dtSel.d===d) el.classList.add('selected');
+                el.onclick=()=>{
+                    dtSel={ y:dtView.year, m:dtView.month, d:d };
+                    renderDtDays(); updateDtPreview();
+                };
+                dtDays.appendChild(el);
+            }
+        }
+
+        function updateDtPreview(){
+            if(dtSel.d==null){ dtPreview.textContent='请选择日期'; return; }
+            dtPreview.textContent=`${dtSel.y}-${pad(dtSel.m+1)}-${pad(dtSel.d)} ${pad(dtHour.value)}:${pad(dtMin.value)}`;
+        }
+
+        $('dtPrevMonth').onclick=()=>{
+            dtView.month--; if(dtView.month<0){ dtView.month=11; dtView.year--; } renderDtDays();
+        };
+        $('dtNextMonth').onclick=()=>{
+            dtView.month++; if(dtView.month>11){ dtView.month=0; dtView.year++; } renderDtDays();
+        };
+        dtHour.onchange=updateDtPreview;
+        dtMin.onchange=updateDtPreview;
+        $('dtNow').onclick=()=>{
+            const now=new Date();
+            dtView={ year:now.getFullYear(), month:now.getMonth() };
+            dtSel={ y:now.getFullYear(), m:now.getMonth(), d:now.getDate() };
+            dtHour.value=now.getHours(); dtMin.value=now.getMinutes();
+            renderDtDays(); updateDtPreview();
+        };
+        function closeDtPicker(){ dtMask.style.display='none'; dtTargetInput=null; }
+        $('dtCancel').onclick=closeDtPicker;
+        // 禁止点击遮罩外部关闭，仅按钮可关闭
+        $('dtConfirm').onclick=()=>{
+            if(dtSel.d==null){ customAlert('请先选择日期！'); return; }
+            const val=`${dtSel.y}-${pad(dtSel.m+1)}-${pad(dtSel.d)}T${pad(dtHour.value)}:${pad(dtMin.value)}`;
+            if(dtTargetInput){
+                setDtInput(dtTargetInput, val);
+            }
+            closeDtPicker();
+        };
+
+        // 给时间输入框赋值：dataset.value 存规范格式(带T，逻辑用)，显示框去掉T更美观
+        // 传空则同时清空
+        function setDtInput(input, val){
+            if(!val){ input.value=''; input.dataset.value=''; return; }
+            input.dataset.value=val;
+            input.value=val.replace('T',' ');
+        }
+        // 读取时间输入框的规范值（带T），供保存逻辑使用
+        function getDtInput(input){ return input.dataset.value || input.value.replace(' ','T'); }
+        // 当前时刻的规范格式 YYYY-MM-DDTHH:mm
+        function nowDtValue(){
+            const n=new Date();
+            return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}T${pad(n.getHours())}:${pad(n.getMinutes())}`;
+        }
+
+        // 绑定两个时间输入框
+        billTime.addEventListener('click', ()=>openDtPicker(billTime));
+        editTime.addEventListener('click', ()=>openDtPicker(editTime));
+
+        function renderBill(){
+            const filterVal=filterCat.value;
+            // 结余必须基于「全部记录」累计，否则筛选时结余列会误导（这正是账对不上的根源）
+            // 先对全部记录按时间正序，算出每笔的真实账户累计结余
+            const allAsc=getUserData().slice()
+                .sort((a,b)=>new Date(a.time)-new Date(b.time));
+
+            let running=0;
+            const balanceMap={};   // id -> 该笔之后的真实账户累计结余
+            allAsc.forEach(item=>{
+                const amt=Number(item.money||0);
+                running += (item.type==='expense' ? -amt : amt);
+                balanceMap[item.id]=running;
+            });
+
+            // 再按筛选条件取出要显示的子集（仍保持时间正序）
+            const asc=allAsc.filter(r=> filterVal==='__all' ? true : r.cat===filterVal);
+
+            billList.innerHTML='';
+            if(asc.length===0){
+                billList.innerHTML='<tr><td colspan="7" class="empty-tip">暂无记账记录</td></tr>';
+                $('summary').innerText=''; $('catStats').innerHTML='';
+                return;
+            }
+
+            // 汇总：收入/支出/结余。结余始终为全账户净额，不随筛选变化
+            let totalIn=0, totalOut=0;
+            allAsc.forEach(item=>{
+                const amt=Number(item.money||0);
+                if(item.type==='expense') totalOut+=amt; else totalIn+=amt;
+            });
+            const net=totalIn-totalOut;
+
+            // 筛选状态下额外提示当前筛选子集的收支，避免「为什么数字对不上」的疑惑
+            const filtering = filterVal!=='__all';
+            let filterLine='';
+            if(filtering){
+                let fIn=0, fOut=0;
+                asc.forEach(item=>{ const amt=Number(item.money||0); if(item.type==='expense') fOut+=amt; else fIn+=amt; });
+                filterLine = `　|　筛选「${escapeHtml(filterVal)}」：收入 <b class="pos">${fIn.toFixed(2)}</b> 支出 <b class="neg">${fOut.toFixed(2)}</b>`;
+            }
+            $('summary').innerHTML=
+                `共 <b>${allAsc.length}</b> 条　`+
+                `收入 <b class="pos">${totalIn.toFixed(2)}</b>　`+
+                `支出 <b class="neg">${totalOut.toFixed(2)}</b>　`+
+                `结余 <b>${net.toFixed(2)}</b> 元`+
+                filterLine;
+
+            // 分类统计：始终基于全部记录，按收支净额（收入加、支出减）
+            const byCat={};
+            allAsc.forEach(r=>{
+                const amt=Number(r.money||0)*(r.type==='expense'?-1:1);
+                byCat[r.cat]=(byCat[r.cat]||0)+amt;
+            });
+            $('catStats').innerHTML = Object.keys(byCat)
+                .map(c=>`<span class="chip">${escapeHtml(c)}：${byCat[c].toFixed(2)} 元</span>`).join('');
+
+            // 显示按时间倒序（最新在上）；结余取自全账户累计
+            asc.slice().reverse().forEach(item=>{
+                const balance=balanceMap[item.id];
+                const isExp = item.type==='expense';
+                const amt=Number(item.money||0);
+                const typeTag = isExp
+                    ? '<span class="io-tag io-out">支出</span>'
+                    : '<span class="io-tag io-in">收入</span>';
+                const amtCell = `<span class="${isExp?'neg':'pos'}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
+
+                const remarkFull = item.remark || '';
+                let remarkCell;
+                if(!remarkFull){
+                    remarkCell = '<span class="remark-empty">无</span>';
+                } else {
+                    const shown = escapeHtml(charSlice(remarkFull, 5)) + (charLen(remarkFull) > 5 ? '…' : '');
+                    remarkCell = `<span class="remark-view" onclick="viewRemark('${item.id}')" title="点击查看完整备注">${shown}</span>`;
+                }
+                const tr=document.createElement('tr');
+                tr.innerHTML=`
+                    <td data-label="记账时间">${item.time.replace('T',' ')}</td>
+                    <td data-label="收支">${typeTag}</td>
+                    <td data-label="金额">${amtCell}</td>
+                    <td data-label="分类"><span class="cat-tag">${escapeHtml(item.cat||'未分类')}</span></td>
+                    <td data-label="结余">${balance.toFixed(2)}</td>
+                    <td data-label="备注">${remarkCell}</td>
+                    <td data-label="操作" class="ops-cell">
+                        <button class="operate-btn edit" onclick="openEdit('${item.id}')">修改</button>
+                        <button class="operate-btn del" onclick="delBill('${item.id}')">删除</button>
+                    </td>`;
+                billList.appendChild(tr);
+            });
+        }
+
+        addBill.addEventListener('click', () => {
+            const time=getDtInput(billTime), money=billMoney.value;
+            const cat=billCat.value, remark=billRemark.value.trim();
+            const type=billType.value;
+            if(!time || money===''){ customAlert('请填写完整时间和金额！'); return; }
+            const m = normMoney(money);
+            if(!m.ok){ customAlert(m.why); return; }
+            const data=getUserData();
+            data.push({ id:genId(), time, money:m.val, cat, remark, type });
+            saveUserData(data);
+            // 金额/备注清空，时间重置为「此刻」方便连续记账
+            billMoney.value=''; billRemark.value=''; billType.value='expense';
+            setDtInput(billTime, nowDtValue());
+            renderBill();
+        });
+
+        window.delBill=function(id){
+            customConfirm('确定要删除这条记录吗？', ()=>{
+                const data=getUserData().filter(r=>r.id!==id);
+                saveUserData(data); renderBill();
+            });
+        };
+
+        window.viewRemark=function(id){
+            const item=getUserData().find(r=>r.id===id);
+            if(!item) return;
+            customAlert(item.remark || '（无备注）', '备注详情', 'left');
+        };
+
+        let editId=null;
+        window.openEdit=function(id){
+            editId=id;
+            const item=getUserData().find(r=>r.id===id);
+            if(!item){ customAlert('未找到该记录'); return; }
+            setDtInput(editTime, item.time); editMoney.value=item.money; editRemark.value=item.remark||'';
+            editType.value=item.type||'income';
+            fillSelect(editCat, getCats(), item.cat||'未分类');
+            editMask.style.display='flex';
+        };
+        cancelEdit.addEventListener('click', ()=>{ editMask.style.display='none'; editId=null; });
+        // 禁止点击遮罩外部关闭，仅按钮可关闭
+        saveEdit.addEventListener('click', () => {
+            const time=getDtInput(editTime), money=editMoney.value;
+            const cat=editCat.value, remark=editRemark.value.trim();
+            const type=editType.value;
+            if(!time || money===''){ customAlert('时间和金额不能为空！'); return; }
+            const m = normMoney(money);
+            if(!m.ok){ customAlert(m.why); return; }
+            const data=getUserData();
+            const idx=data.findIndex(r=>r.id===editId);
+            if(idx>=0){ data[idx]={ id:editId, time, money:m.val, cat, remark, type }; saveUserData(data); }
+            editMask.style.display='none';
+            renderBill();
+        });
+
+        // ===== 自定义金色下拉：包裹原生 select，保留全部 value/事件逻辑 =====
+        function enhanceSelect(sel){
+            if(!sel || sel.dataset.csReady) return;
+            sel.dataset.csReady='1';
+
+            const wrap=document.createElement('div');
+            wrap.className='cs-wrap';
+            if(getComputedStyle(sel).display==='block' || sel.style.width==='100%') wrap.classList.add('cs-block');
+            sel.parentNode.insertBefore(wrap, sel);
+            wrap.appendChild(sel);
+            sel.classList.add('cs-native');
+
+            const display=document.createElement('div');
+            display.className='cs-display';
+            display.innerHTML='<span class="cs-text"></span><span class="cs-arrow">▼</span>';
+            const panel=document.createElement('div');
+            panel.className='cs-panel';
+            wrap.appendChild(display);
+            wrap.appendChild(panel);
+
+            const textEl=display.querySelector('.cs-text');
+
+            function buildPanel(){
+                panel.innerHTML='';
+                Array.from(sel.options).forEach(opt=>{
+                    const o=document.createElement('div');
+                    o.className='cs-opt'+(opt.value===sel.value?' sel':'');
+                    o.textContent=opt.textContent;
+                    o.onclick=(e)=>{
+                        e.stopPropagation();
+                        if(sel.value!==opt.value){
+                            sel.value=opt.value;
+                            sel.dispatchEvent(new Event('change', {bubbles:true}));
+                        }
+                        syncDisplay();
+                        close();
+                    };
+                    panel.appendChild(o);
+                });
+            }
+            function syncDisplay(){
+                const cur=sel.options[sel.selectedIndex];
+                textEl.textContent=cur?cur.textContent:'';
+                panel.querySelectorAll('.cs-opt').forEach((el,i)=>{
+                    el.classList.toggle('sel', sel.options[i] && sel.options[i].value===sel.value);
+                });
+            }
+            function open(){
+                // 关闭其它打开的下拉
+                document.querySelectorAll('.cs-wrap.open').forEach(w=>{ if(w!==wrap) w.classList.remove('open'); });
+                buildPanel(); wrap.classList.add('open');
+                const selEl=panel.querySelector('.cs-opt.sel');
+                if(selEl) selEl.scrollIntoView({block:'nearest'});
+            }
+            function close(){ wrap.classList.remove('open'); }
+            display.onclick=(e)=>{ e.stopPropagation(); wrap.classList.contains('open')?close():open(); };
+
+            // 选项变化（如分类/存档动态重建）时重建并同步
+            const mo=new MutationObserver(()=>{ buildPanel(); syncDisplay(); });
+            mo.observe(sel, {childList:true});
+
+            // 当代码用 sel.value=... 赋值时，同步显示
+            const proto=Object.getPrototypeOf(sel);
+            const desc=Object.getOwnPropertyDescriptor(proto,'value');
+            if(desc && desc.set){
+                Object.defineProperty(sel,'value',{
+                    get(){ return desc.get.call(this); },
+                    set(v){ desc.set.call(this, v); syncDisplay(); },
+                    configurable:true
+                });
+            }
+            sel.addEventListener('change', syncDisplay);
+
+            buildPanel(); syncDisplay();
+        }
+
+        // 点击空白处关闭所有自定义下拉
+        document.addEventListener('click', ()=>{ document.querySelectorAll('.cs-wrap.open').forEach(w=>w.classList.remove('open')); });
+
+        // 初始化页面里所有原生下拉
+        ['archiveSelect','filterCat','billType','billCat','editType','editCat','dtHour','dtMin']
+            .forEach(id=>{ const el=$(id); if(el) enhanceSelect(el); });
+
+        // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====
+        (function(){
+            const masks=Array.from(document.querySelectorAll('.mask'));
+            let savedScrollY=0, locked=false;
+
+            function anyMaskOpen(){
+                return masks.some(m=>{
+                    const d=getComputedStyle(m).display;
+                    return d && d!=='none';
+                });
+            }
+            function lock(){
+                if(locked) return;
+                savedScrollY=window.scrollY || window.pageYOffset || 0;
+                document.body.style.position='fixed';
+                document.body.style.top=`-${savedScrollY}px`;
+                document.body.style.left='0';
+                document.body.style.right='0';
+                document.body.style.width='100%';
+                locked=true;
+            }
+            function unlock(){
+                if(!locked) return;
+                document.body.style.position='';
+                document.body.style.top='';
+                document.body.style.left='';
+                document.body.style.right='';
+                document.body.style.width='';
+                window.scrollTo(0, savedScrollY);
+                locked=false;
+            }
+            function update(){ anyMaskOpen()?lock():unlock(); }
+
+            // 监听每个弹窗的显示状态变化
+            masks.forEach(m=>{
+                new MutationObserver(update).observe(m, {attributes:true, attributeFilter:['style']});
+            });
+
+            // 弹窗内列表（可滚动区域）到顶/到底时，阻止滚动冒泡到背景，进一步防穿透
+            document.querySelectorAll('.cat-list, .ask-msg, .edit-dialog, .dt-dialog').forEach(el=>{
+                el.addEventListener('touchmove', e=>{ e.stopPropagation(); }, {passive:true});
+            });
+        })();
+
+        // 页面初始化：渲染登录页最近账号
+        document.body.classList.add('login-mode');
+        renderRecentUsers();
+    </script>
+
+</body>
+</html>
