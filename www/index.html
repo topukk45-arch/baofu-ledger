@@ -166,6 +166,25 @@
             color:#fff; border:none; border-radius:8px; cursor:pointer; font-size:15px; transition:0.3s; }
         .add-btn:hover { background:linear-gradient(135deg,#e6c200,#c9960c); box-shadow:0 0 10px rgba(255,215,0,0.5); }
 
+        /* 右下角悬浮记账按钮 */
+        .fab { position:fixed; right:20px; z-index:900;
+            bottom:calc(20px + env(safe-area-inset-bottom));
+            width:60px; height:60px; border-radius:50%; border:none; cursor:pointer;
+            background:linear-gradient(135deg,#e6c200,#b8860b); color:#fff;
+            font-size:34px; line-height:60px; text-align:center; padding:0;
+            box-shadow:0 4px 14px rgba(184,134,11,0.55); transition:0.2s; display:none; }
+        .fab:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(184,134,11,0.65); }
+        .fab:active { transform:scale(0.94); }
+
+        /* 分页控件 */
+        .pager { display:flex; align-items:center; justify-content:center; gap:14px;
+            margin-top:16px; flex-wrap:wrap; }
+        .pager button { padding:8px 16px; border:1px solid #d4af37; border-radius:8px;
+            background:#fffdf0; color:#8b6914; cursor:pointer; font-size:14px; transition:0.2s; }
+        .pager button:hover:not(:disabled) { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+        .pager button:disabled { opacity:0.4; cursor:not-allowed; }
+        .pager .page-info { color:#a07500; font-size:14px; }
+
         .filter-bar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
         .filter-bar label { color:#a07500; font-size:14px; }
         .filter-bar select { padding:8px 10px; border:1px solid #d4af37; border-radius:6px;
@@ -327,23 +346,6 @@
                 <input type="file" id="importFile" accept=".json" style="display:none">
             </div>
 
-            <div class="form-box">
-                <input type="text" id="billTime" placeholder="选择记账时间" readonly class="dt-input">
-                <div class="type-row">
-                    <select id="billType">
-                        <option value="expense" selected>支出（花销）</option>
-                        <option value="income">收入（存入）</option>
-                    </select>
-                    <input type="number" step="0.01" min="0" id="billMoney" placeholder="输入金额（正数）">
-                </div>
-                <div class="cat-row">
-                    <select id="billCat"></select>
-                    <button class="mini-btn" id="manageCat">管理分类</button>
-                </div>
-                <textarea id="billRemark" class="remark-area" placeholder="备注（可拖右下角调整大小，最多 5000 字）" maxlength="5000" rows="2"></textarea>
-                <button class="add-btn" id="addBill">添加记录</button>
-            </div>
-
             <div class="filter-bar">
                 <label>按分类筛选：</label>
                 <select id="filterCat"><option value="__all">全部</option></select>
@@ -366,6 +368,37 @@
                 </thead>
                 <tbody id="billList"></tbody>
             </table>
+
+            <div class="pager" id="pager"></div>
+        </div>
+    </div>
+
+    <!-- 右下角悬浮记账按钮 -->
+    <button class="fab" id="fabAdd" title="记一笔">＋</button>
+
+    <!-- 记账弹窗 -->
+    <div class="mask" id="addMask">
+        <div class="edit-dialog">
+            <h3>记一笔</h3>
+            <div class="form-box">
+                <input type="text" id="billTime" placeholder="选择记账时间" readonly class="dt-input">
+                <div class="type-row">
+                    <select id="billType">
+                        <option value="expense" selected>支出（花销）</option>
+                        <option value="income">收入（存入）</option>
+                    </select>
+                    <input type="number" step="0.01" min="0" id="billMoney" placeholder="输入金额（正数）">
+                </div>
+                <div class="cat-row">
+                    <select id="billCat"></select>
+                    <button class="mini-btn" id="manageCat">管理分类</button>
+                </div>
+                <textarea id="billRemark" class="remark-area" placeholder="备注（可拖右下角调整大小，最多 5000 字）" maxlength="5000" rows="2"></textarea>
+                <button class="add-btn" id="addBill">添加记录</button>
+            </div>
+            <div class="dialog-btn">
+                <button class="cancel" id="closeAdd">关闭</button>
+            </div>
         </div>
     </div>
 
@@ -450,6 +483,9 @@
     <script>
         let currentUser = '';
         let currentArchive = '';
+
+        const PAGE_SIZE = 15;   // 每页条数
+        let curPage = 1;
 
         const DEFAULT_CATS = ['未分类', '餐饮', '购物', '转账', '工资', '红包', '其他'];
 
@@ -650,6 +686,7 @@
             loginBox.style.display='none';
             mainBox.style.display='block';
             document.body.classList.remove('login-mode');
+            $('fabAdd').style.display='block';
             nowUser.innerText = `当前用户：${name}`;
             refreshArchiveSelect();
             refreshCatSelectors();
@@ -663,6 +700,7 @@
             mainBox.style.display='none';
             loginBox.style.display='block';
             document.body.classList.add('login-mode');
+            $('fabAdd').style.display='none';
             renderRecentUsers();
         });
 
@@ -709,7 +747,7 @@
         archiveSelect.addEventListener('change', () => {
             currentArchive = archiveSelect.value;
             const store=loadStore(); store.last=currentArchive; saveStore(store);
-            refreshCatSelectors(); renderBill();
+            curPage=1; refreshCatSelectors(); renderBill();
         });
         $('newArchive').addEventListener('click', () => {
             customPrompt('', '', (name)=>{
@@ -750,16 +788,52 @@
             }, '删除存档');
         });
 
-        $('exportBtn').addEventListener('click', () => {
+        $('exportBtn').addEventListener('click', async () => {
             const store=loadStore(); const a=curArchive(store);
             const payload={ app:'早日暴富记账本', user:currentUser, archive:currentArchive,
                 cats:a.cats, data:a.records, exportedAt:new Date().toLocaleString() };
-            const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
-            const url=URL.createObjectURL(blob);
-            const el=document.createElement('a');
-            el.href=url; el.download=`记账存档_${currentArchive}_${Date.now()}.json`; el.click();
-            URL.revokeObjectURL(url);
+            const json=JSON.stringify(payload,null,2);
+            const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;
+
+            // 在 App（安卓 WebView）里，<a download> 无效，改用 Capacitor 文件+分享插件
+            const cap = window.Capacitor;
+            if(cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Filesystem){
+                try{
+                    const { Filesystem, Share } = cap.Plugins;
+                    const res = await Filesystem.writeFile({
+                        path: fileName, data: json, directory: 'CACHE', encoding: 'utf8'
+                    });
+                    if(Share && Share.share){
+                        await Share.share({ title:'记账存档', text:fileName, url:res.uri, dialogTitle:'导出存档' });
+                    } else {
+                        customAlert(`已导出到应用缓存：\n${fileName}`, '导出成功', 'left');
+                    }
+                    return;
+                }catch(err){
+                    // 分享被取消不算失败，直接返回；其它错误走复制兜底
+                    if(String(err && err.message||err).toLowerCase().includes('cancel')) return;
+                    showExportCopy(json);
+                    return;
+                }
+            }
+
+            // 浏览器：正常下载
+            try{
+                const blob=new Blob([json],{type:'application/json'});
+                const url=URL.createObjectURL(blob);
+                const el=document.createElement('a');
+                el.href=url; el.download=fileName; el.click();
+                URL.revokeObjectURL(url);
+            }catch(err){
+                showExportCopy(json);
+            }
         });
+        // 兜底：弹出存档内容供手动复制
+        function showExportCopy(json){
+            customPrompt('下载不可用，已为你准备好存档内容，请全选复制保存到记事本/文件：', json, ()=>{}, '导出存档（复制）', null, { placeholder:'' });
+            // 把输入框换成多行更好读
+            setTimeout(()=>{ const i=$('askInput'); if(i){ i.select(); } }, 80);
+        }
         $('importBtn').addEventListener('click', () => $('importFile').click());
         $('importFile').addEventListener('change', e => {
             const file=e.target.files[0]; if(!file) return;
@@ -806,7 +880,7 @@
             });
             if([...filterCat.options].some(o=>o.value===cur)) filterCat.value=cur;
         }
-        filterCat.addEventListener('change', renderBill);
+        filterCat.addEventListener('change', ()=>{ curPage=1; renderBill(); });
 
         $('manageCat').addEventListener('click', openCatManager);
         $('closeCat').addEventListener('click', ()=>{ $('catMask').style.display='none'; });
@@ -1005,7 +1079,7 @@
             billList.innerHTML='';
             if(asc.length===0){
                 billList.innerHTML='<tr><td colspan="7" class="empty-tip">暂无记账记录</td></tr>';
-                $('summary').innerText=''; $('catStats').innerHTML='';
+                $('summary').innerText=''; $('catStats').innerHTML=''; $('pager').innerHTML='';
                 return;
             }
 
@@ -1042,7 +1116,16 @@
                 .map(c=>`<span class="chip">${escapeHtml(c)}：${byCat[c].toFixed(2)} 元</span>`).join('');
 
             // 显示按时间倒序（最新在上）；结余取自全账户累计
-            asc.slice().reverse().forEach(item=>{
+            const desc = asc.slice().reverse();
+
+            // 分页：只渲染当前页，结余/汇总仍按全部记录计算
+            const totalPages = Math.max(1, Math.ceil(desc.length / PAGE_SIZE));
+            if(curPage > totalPages) curPage = totalPages;
+            if(curPage < 1) curPage = 1;
+            const start = (curPage - 1) * PAGE_SIZE;
+            const pageItems = desc.slice(start, start + PAGE_SIZE);
+
+            pageItems.forEach(item=>{
                 const balance=balanceMap[item.id];
                 const isExp = item.type==='expense';
                 const amt=Number(item.money||0);
@@ -1073,7 +1156,39 @@
                     </td>`;
                 billList.appendChild(tr);
             });
+
+            renderPager(totalPages);
         }
+
+        // 渲染分页控件（≤1 页时不显示）
+        function renderPager(totalPages){
+            const box=$('pager');
+            if(totalPages<=1){ box.innerHTML=''; return; }
+            box.innerHTML='';
+            const prev=document.createElement('button');
+            prev.textContent='‹ 上一页'; prev.disabled = curPage<=1;
+            prev.onclick=()=>{ curPage--; renderBill(); scrollListTop(); };
+            const info=document.createElement('span');
+            info.className='page-info'; info.textContent=`第 ${curPage} / ${totalPages} 页`;
+            const next=document.createElement('button');
+            next.textContent='下一页 ›'; next.disabled = curPage>=totalPages;
+            next.onclick=()=>{ curPage++; renderBill(); scrollListTop(); };
+            box.appendChild(prev); box.appendChild(info); box.appendChild(next);
+        }
+        // 翻页后让列表顶部对齐，避免停在半截
+        function scrollListTop(){
+            const t=document.querySelector('table');
+            if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
+        }
+
+        // ===== 悬浮按钮：打开/关闭记账弹窗 =====
+        const addMask=$('addMask');
+        $('fabAdd').addEventListener('click', ()=>{
+            setDtInput(billTime, nowDtValue());   // 每次打开都默认当前时间
+            addMask.style.display='flex';
+            setTimeout(()=>billMoney.focus(), 60);
+        });
+        $('closeAdd').addEventListener('click', ()=>{ addMask.style.display='none'; });
 
         addBill.addEventListener('click', () => {
             const time=getDtInput(billTime), money=billMoney.value;
@@ -1085,10 +1200,12 @@
             const data=getUserData();
             data.push({ id:genId(), time, money:m.val, cat, remark, type });
             saveUserData(data);
-            // 金额/备注清空，时间重置为「此刻」方便连续记账
+            // 金额/备注清空，时间重置为「此刻」方便连续记账；弹窗保持打开
             billMoney.value=''; billRemark.value=''; billType.value='expense';
             setDtInput(billTime, nowDtValue());
+            curPage = 1;            // 新记录在最前，回到第 1 页才看得到
             renderBill();
+            billMoney.focus();
         });
 
         window.delBill=function(id){
