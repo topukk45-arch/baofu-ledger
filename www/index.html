@@ -8,7 +8,33 @@
     <style>
         * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft Yahei", sans-serif; }
 
+        /* ===== 去网页味：让它更像原生 App ===== */
+        /* 点击不再出现蓝色/灰色高亮方块 */
+        * { -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+        /* 按钮、标签、可点元素不可选中文字，避免长按选字/出现文本光标 */
+        button, .mini-btn, .link-btn, .cs-display, .cs-opt, .dt-day, .dt-nav,
+        .fab, .pager button, .user-chip, label, h3, .io-tag, .remark-view, .cat-tag {
+            -webkit-user-select:none; user-select:none;
+        }
+        /* 备注、输入框仍允许选中文字 */
+        input, textarea { -webkit-user-select:text; user-select:text; }
+        /* 去掉聚焦时的浏览器默认蓝色描边（保留我们自己的金色高亮） */
+        button:focus, button:focus-visible, select:focus-visible,
+        .cs-display:focus, .cs-display:focus-visible { outline:none; }
+        /* 输入框去除 iOS 默认圆角阴影、统一字号防止聚焦时页面缩放 */
+        input, textarea, select, button { -webkit-appearance:none; appearance:none; }
+        input, textarea { font-size:16px; }
+        /* 滚动更顺滑，去掉移动端下拉回弹露白 */
+        html { overscroll-behavior:none; -webkit-text-size-adjust:100%; }
+
         body { background:#fdf8e8; padding:20px; position:relative; overflow-x:hidden; }
+
+        /* 按下时的轻微回弹，让点击有原生般的反馈 */
+        .mini-btn:active, .add-btn:active, .save:active, .cancel:active,
+        .pager button:active, .login-btn:active, .archive-bar select:active,
+        .cs-display:active, .dt-now:active, .link-btn:active {
+            transform:scale(0.96); transition:transform .05s;
+        }
 
         body::before {
             content:""; position:fixed; top:0; left:0; width:100%; height:100%;
