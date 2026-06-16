@@ -84,6 +84,12 @@
             cursor:pointer; transition:0.3s; background:linear-gradient(135deg,#d4af37,#b8860b); color:#fff; }
         .login-btn:hover { background:linear-gradient(135deg,#e6c200,#c9960c); box-shadow:0 0 10px rgba(255,215,0,0.5); }
 
+        /* 登录页：从文件导入存档（次要按钮，弱于登录按钮） */
+        .login-import-row { margin-top:16px; }
+        .login-import-btn { padding:9px 20px; border:1px solid #e0c45a; border-radius:8px;
+            font-size:14px; cursor:pointer; transition:0.25s; background:#fffdf0; color:#a07d1a; }
+        .login-import-btn:hover { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.35); color:#8b6914; }
+
         /* 最近账号 */
         .recent-users { margin-top:28px; }
         .recent-users .recent-title { color:#b89b4a; font-size:13px; margin-bottom:12px; letter-spacing:1px; }
@@ -358,6 +364,10 @@
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
+            <div class="login-import-row">
+                <button class="login-import-btn" id="loginImportBtn">从文件导入存档</button>
+                <input type="file" id="loginImportFile" accept=".json" style="display:none">
+            </div>
             <div class="recent-users" id="recentUsers"></div>
         </div>
 
@@ -688,6 +698,40 @@
         loginBtn.addEventListener('click', ()=>login());
         userNameInput.addEventListener('keydown', e => { if(e.key==='Enter') login(); });
 
+        // ===== 登录页：从文件导入存档（先选文件，再指定要导入到哪个账号）=====
+        $('loginImportBtn').addEventListener('click', ()=> $('loginImportFile').click());
+        $('loginImportFile').addEventListener('change', e => {
+            const file=e.target.files[0]; if(!file) return;
+            const reader=new FileReader();
+            reader.onload=ev=>{
+                const text=ev.target.result;
+                // 先校验文件本身能不能解析，避免输完名字才报错
+                try{ const t=JSON.parse(text); const arr=Array.isArray(t)?t:t.data; if(!Array.isArray(arr)) throw 0; }
+                catch(_){ customAlert('导入失败：文件格式不正确'); $('loginImportFile').value=''; return; }
+
+                const preset=userNameInput.value.trim();
+                customPrompt('把这份存档导入到哪个账号？（不存在会自动创建）', preset, (acct)=>{
+                    acct=acct.trim();
+                    try{
+                        const finalName=importArchiveFromText(text, acct);
+                        recordUser(acct);            // 让该账号出现在最近账号里
+                        renderRecentUsers();
+                        customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。\n现在进入该账号吗？`, ()=>{
+                            login(acct);             // 进入后会自动定位到 last（即刚导入的存档）
+                        }, '导入成功', { okText:'立即进入', cancelText:'稍后' });
+                    }catch(err){ customAlert('导入失败：文件格式不正确'); }
+                }, '导入到账号', (acct)=>{
+                    acct=acct.trim();
+                    if(!acct) return '请输入账号名';
+                    if(charLen(acct) > 8) return '账号名最多 8 个字～';
+                    return '';
+                }, { placeholder:'输入账号名（最多 8 字）', maxlen:8 });
+
+                $('loginImportFile').value='';
+            };
+            reader.readAsText(file);
+        });
+
         // ===== 账号索引（用于登录页最近账号）=====
         function getUsers(){
             try { return JSON.parse(localStorage.getItem('users_index')||'[]'); }
@@ -895,22 +939,63 @@
             // 把输入框换成多行更好读
             setTimeout(()=>{ const i=$('askInput'); if(i){ i.select(); } }, 80);
         }
+        // 校验并清洗导入的单条记录：金额非正数/非法、类型非法都会被拒，避免脏数据污染结余
+        function sanitizeImportedRecords(records){
+            const out=[];
+            for(const r of records){
+                if(!r || typeof r!=='object') continue;
+                const m=normMoney(r.money);
+                if(!m.ok) continue;                       // 金额非法直接丢弃这条
+                const type = (r.type==='expense'||r.type==='income') ? r.type : 'income';
+                let time = (typeof r.time==='string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(r.time))
+                    ? r.time : nowDtValue();               // 时间非法则补为当前时刻
+                let cat = (typeof r.cat==='string' && r.cat.trim()) ? r.cat.trim() : '未分类';
+                let remark = (typeof r.remark==='string') ? r.remark.slice(0,5000) : '';
+                out.push({ id:genId(), time, money:m.val, cat, remark, type });
+            }
+            return out;
+        }
+
+        // 核心导入逻辑：解析文本 → 清洗 → 存为目标用户名下的新存档。返回最终存档名或抛错。
+        function importArchiveFromText(text, targetUser){
+            const parsed=JSON.parse(text);   // 解析失败由调用方 catch
+            const rawRecords=Array.isArray(parsed)?parsed:parsed.data;
+            if(!Array.isArray(rawRecords)) throw new Error('bad');
+            const records=sanitizeImportedRecords(rawRecords);
+
+            // 分类：清洗去空、去重，确保含「未分类」
+            let cats=(parsed && Array.isArray(parsed.cats) && parsed.cats.length)
+                ? parsed.cats.map(c=>String(c).trim()).filter(Boolean)
+                : DEFAULT_CATS.slice();
+            cats=[...new Set(cats)];
+            if(!cats.includes('未分类')) cats.unshift('未分类');
+            // 把记录里用到、但分类表没有的分类补进去
+            records.forEach(r=>{ if(!cats.includes(r.cat)) cats.push(r.cat); });
+
+            // 存档名清洗：去空、限长，重名自动加序号
+            let name=(parsed && typeof parsed.archive==='string' && parsed.archive.trim())
+                ? parsed.archive.trim().slice(0,16) : '导入存档';
+
+            // 切到目标用户后再读写其 store
+            const prevUser=currentUser;
+            currentUser=targetUser;
+            const store=loadStore();
+            let finalName=name, n=1;
+            while(store.archives[finalName]) finalName=`${name}(${n++})`;
+            store.archives[finalName]={ records, cats };
+            store.last=finalName; saveStore(store);
+            currentUser=prevUser;   // 还原，由调用方决定是否真正登录
+            return finalName;
+        }
+
         $('importBtn').addEventListener('click', () => $('importFile').click());
         $('importFile').addEventListener('change', e => {
             const file=e.target.files[0]; if(!file) return;
             const reader=new FileReader();
             reader.onload=ev=>{
                 try{
-                    const parsed=JSON.parse(ev.target.result);
-                    const records=Array.isArray(parsed)?parsed:parsed.data;
-                    if(!Array.isArray(records)) throw new Error('bad');
-                    records.forEach(r=>{ if(!r.cat) r.cat='未分类'; });
-                    let cats=(parsed && parsed.cats && parsed.cats.length)?parsed.cats:DEFAULT_CATS.slice();
-                    let name=(parsed.archive||'导入存档');
+                    const finalName=importArchiveFromText(ev.target.result, currentUser);
                     const store=loadStore();
-                    let finalName=name, n=1;
-                    while(store.archives[finalName]) finalName=`${name}(${n++})`;
-                    store.archives[finalName]={ records, cats };
                     store.last=finalName; saveStore(store); currentArchive=finalName;
                     refreshArchiveSelect(); refreshCatSelectors(); renderBill();
                     customAlert(`导入成功！已存为存档「${finalName}」`);
@@ -981,13 +1066,16 @@
         }
         function renameCat(oldName){
             customPrompt('', oldName, (name)=>{
-                if(name===oldName) return;
+                name=name.trim();
+                if(!name || name===oldName) return;
                 const store=loadStore(); const a=curArchive(store);
                 a.cats=a.cats.map(c=>c===oldName?name:c);
                 a.records.forEach(r=>{ if(r.cat===oldName) r.cat=name; });
                 saveStore(store);
                 refreshCatSelectors(); openCatManager(); renderBill();
             }, '重命名分类', (name)=>{
+                name=name.trim();
+                if(!name) return '分类名不能为空';
                 if(name===oldName) return '';
                 if(charLen(name) > 8) return '分类名最多 8 个字～';
                 if(curArchive(loadStore()).cats.includes(name)) return '该分类已存在';
