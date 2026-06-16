@@ -29,11 +29,14 @@
 
         body { background:#fdf8e8; padding:20px; position:relative; overflow-x:hidden; }
 
-        /* 按下时的轻微回弹，让点击有原生般的反馈 */
-        .mini-btn:active, .add-btn:active, .save:active, .cancel:active,
-        .pager button:active, .login-btn:active, .archive-bar select:active,
-        .cs-display:active, .dt-now:active, .link-btn:active {
-            transform:scale(0.96); transition:transform .05s;
+        /* 按下时的轻微回弹，让点击有原生般的反馈（.pressed 由 JS 在 touch 时切换，WebView 里可靠） */
+        .mini-btn.pressed, .add-btn.pressed, .save.pressed, .cancel.pressed,
+        .pager button.pressed, .login-btn.pressed, .archive-bar select.pressed,
+        .cs-display.pressed, .dt-now.pressed, .link-btn.pressed, .fab.pressed,
+        .bill-actions button.pressed, .dt-day.pressed, .user-chip.pressed,
+        .io-bar .mini-btn.pressed, .cat-item button.pressed, .operate-btn.pressed,
+        .logout.pressed, .ask-dialog button.pressed {
+            transform:scale(0.95); filter:brightness(0.95); transition:transform .04s, filter .04s;
         }
 
         body::before {
@@ -847,26 +850,32 @@
             const json=JSON.stringify(payload,null,2);
             const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;
 
-            // 在 App（安卓 WebView）里，<a download> 无效，改用 Capacitor 文件+分享插件
+            // 在 App（安卓 WebView）里，<a download> 无效，改用 Capacitor 文件插件直接存到手机
             const cap = window.Capacitor;
             if(cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Filesystem){
-                try{
-                    const { Filesystem, Share } = cap.Plugins;
-                    const res = await Filesystem.writeFile({
-                        path: fileName, data: json, directory: 'CACHE', encoding: 'utf8'
-                    });
-                    if(Share && Share.share){
-                        await Share.share({ title:'记账存档', text:fileName, url:res.uri, dialogTitle:'导出存档' });
-                    } else {
-                        customAlert(`已导出到应用缓存：\n${fileName}`, '导出成功', 'left');
-                    }
-                    return;
-                }catch(err){
-                    // 分享被取消不算失败，直接返回；其它错误走复制兜底
-                    if(String(err && err.message||err).toLowerCase().includes('cancel')) return;
-                    showExportCopy(json);
-                    return;
+                const { Filesystem } = cap.Plugins;
+                // 依次尝试真实存在的目录枚举（Capacitor v6）：文档→外部→数据，哪个成功用哪个
+                const targets = [
+                    { directory:'DOCUMENTS', label:'手机「文档 / Documents」文件夹' },
+                    { directory:'EXTERNAL',  label:'应用外部存储目录' },
+                    { directory:'DATA',      label:'应用内部存储目录' }
+                ];
+                for(const t of targets){
+                    try{
+                        await Filesystem.writeFile({
+                            path: fileName,
+                            data: json,
+                            directory: t.directory,
+                            encoding: 'utf8',
+                            recursive: true
+                        });
+                        customAlert(`已保存到${t.label}：\n${fileName}\n\n可用手机自带「文件管理」找到它。`, '导出成功', 'left');
+                        return;
+                    }catch(err){ /* 换下一个目录再试 */ }
                 }
+                // 全部失败：复制兜底
+                showExportCopy(json);
+                return;
             }
 
             // 浏览器：正常下载
@@ -1440,6 +1449,31 @@
         // 页面初始化：渲染登录页最近账号
         document.body.classList.add('login-mode');
         renderRecentUsers();
+
+        // ===== 点击按下反馈：用事件委托给可点元素加 .pressed（WebView 里 :active 不稳，故用 JS）=====
+        (function(){
+            const SEL = 'button, .mini-btn, .link-btn, .cs-display, .dt-day, .dt-now, '
+                      + '.pager button, .user-chip, .login-btn, .add-btn, .save, .cancel, '
+                      + '.operate-btn, .logout, .cat-item button, .archive-bar select';
+            let cur=null;
+            function press(e){
+                const t=e.target.closest(SEL);
+                if(!t || t.disabled) return;
+                cur=t; t.classList.add('pressed');
+            }
+            function release(){
+                if(cur){ cur.classList.remove('pressed'); cur=null; }
+            }
+            // 触摸优先；同时挂 pointer/mouse 兼容电脑与混合设备
+            document.addEventListener('touchstart', press, {passive:true});
+            document.addEventListener('touchend', release, {passive:true});
+            document.addEventListener('touchcancel', release, {passive:true});
+            document.addEventListener('pointerdown', press, {passive:true});
+            document.addEventListener('pointerup', release, {passive:true});
+            document.addEventListener('pointercancel', release, {passive:true});
+            // 滚动时若手指离开按钮，确保还原
+            document.addEventListener('scroll', release, {passive:true, capture:true});
+        })();
     </script>
 
 </body>
