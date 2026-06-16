@@ -95,11 +95,19 @@
         .mini-btn.gold { background:linear-gradient(135deg,#d4af37,#b8860b); color:#fff; }
         .io-bar .mini-btn { flex:1; text-align:center; }
 
-        .form-box { display:flex; flex-direction:column; gap:12px; margin-bottom:18px; }
+        .form-box { display:flex; flex-direction:column; gap:14px; margin-bottom:18px; }
         .form-box input, .form-box select {
             padding:12px; border:1px solid #d4af37; border-radius:8px; font-size:14px;
             outline:none; transition:0.3s; background:#fffdf0; }
         .form-box input:focus, .form-box select:focus { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,0.4); }
+
+        /* 表单字段分组：标签 + 控件，让弹窗结构清晰不杂乱 */
+        .field { display:flex; flex-direction:column; gap:6px; }
+        .field-label { font-size:12.5px; color:#a07d1a; font-weight:600; padding-left:2px; }
+        .field-label-row { display:flex; align-items:center; justify-content:space-between; }
+        .link-btn { background:none; border:none; color:#b8860b; font-size:12.5px; cursor:pointer;
+            padding:2px 4px; text-decoration:underline; text-underline-offset:2px; transition:0.2s; }
+        .link-btn:hover { color:#8b6914; }
 
         /* 自定义金色下拉：统一手机/电脑样式，避免系统全屏面板 */
         .cs-wrap { position:relative; display:inline-block; }
@@ -381,19 +389,31 @@
         <div class="edit-dialog">
             <h3>记一笔</h3>
             <div class="form-box">
-                <input type="text" id="billTime" placeholder="选择记账时间" readonly class="dt-input">
-                <div class="type-row">
-                    <select id="billType">
-                        <option value="expense" selected>支出（花销）</option>
-                        <option value="income">收入（存入）</option>
-                    </select>
-                    <input type="number" step="0.01" min="0" id="billMoney" placeholder="输入金额（正数）">
+                <div class="field">
+                    <label class="field-label">记账时间</label>
+                    <input type="text" id="billTime" placeholder="选择记账时间" readonly class="dt-input">
                 </div>
-                <div class="cat-row">
+                <div class="field">
+                    <label class="field-label">收支与金额</label>
+                    <div class="type-row">
+                        <select id="billType">
+                            <option value="expense" selected>支出（花销）</option>
+                            <option value="income">收入（存入）</option>
+                        </select>
+                        <input type="number" step="0.01" min="0" id="billMoney" placeholder="输入金额（正数）">
+                    </div>
+                </div>
+                <div class="field">
+                    <div class="field-label-row">
+                        <label class="field-label">分类</label>
+                        <button class="link-btn" id="manageCat">管理分类</button>
+                    </div>
                     <select id="billCat"></select>
-                    <button class="mini-btn" id="manageCat">管理分类</button>
                 </div>
-                <textarea id="billRemark" class="remark-area" placeholder="备注（可拖右下角调整大小，最多 5000 字）" maxlength="5000" rows="2"></textarea>
+                <div class="field">
+                    <label class="field-label">备注（选填）</label>
+                    <textarea id="billRemark" class="remark-area" placeholder="可拖右下角调整大小，最多 5000 字" maxlength="5000" rows="2"></textarea>
+                </div>
                 <button class="add-btn" id="addBill">添加记录</button>
             </div>
             <div class="dialog-btn">
@@ -533,8 +553,9 @@
         askInput.addEventListener('keydown', e=>{ if(e.key==='Enter') askOk.click(); });
         askInput.addEventListener('input', ()=>{ if(askErr.style.display!=='none') showAskErr(''); });
 
-        // 确认框：回调式
-        function customConfirm(msg, onOk, title){
+        // 确认框：回调式。opts.okText / opts.cancelText 可自定义按钮文字
+        function customConfirm(msg, onOk, title, opts){
+            opts = opts || {};
             askMode='confirm';
             askTitle.textContent=title||'确认操作';
             askMsg.textContent=msg;
@@ -542,7 +563,12 @@
             askMsg.style.textAlign='';
             askInput.style.display='none';
             askCancel.style.display='';
-            askResolve=(r)=>{ if(r && onOk) onOk(); };
+            askOk.textContent = opts.okText || '确定';
+            askCancel.textContent = opts.cancelText || '取消';
+            askResolve=(r)=>{
+                askOk.textContent='确定'; askCancel.textContent='取消';   // 用完恢复默认，避免影响其它弹窗
+                if(r && onOk) onOk();
+            };
             askMask.style.display='flex';
         }
         // 输入框：回调式。validate(value) 返回错误文案则在弹窗内提示且不关闭，返回空则通过
@@ -1183,11 +1209,21 @@
 
         // ===== 悬浮按钮：打开/关闭记账弹窗 =====
         const addMask=$('addMask');
-        $('fabAdd').addEventListener('click', ()=>{
-            setDtInput(billTime, nowDtValue());   // 每次打开都默认当前时间
+        // 把记账表单恢复到「空白初始态」：空金额/空备注、支出、未分类、时间为此刻
+        function resetBillForm(){
+            billMoney.value='';
+            billRemark.value='';
+            billType.value='expense';
+            const cats=getCats();
+            billCat.value = cats.includes('未分类') ? '未分类' : cats[0];
+            setDtInput(billTime, nowDtValue());
+        }
+        function openAddModal(){
+            resetBillForm();
             addMask.style.display='flex';
             setTimeout(()=>billMoney.focus(), 60);
-        });
+        }
+        $('fabAdd').addEventListener('click', openAddModal);
         $('closeAdd').addEventListener('click', ()=>{ addMask.style.display='none'; });
 
         addBill.addEventListener('click', () => {
@@ -1200,12 +1236,13 @@
             const data=getUserData();
             data.push({ id:genId(), time, money:m.val, cat, remark, type });
             saveUserData(data);
-            // 金额/备注清空，时间重置为「此刻」方便连续记账；弹窗保持打开
-            billMoney.value=''; billRemark.value=''; billType.value='expense';
-            setDtInput(billTime, nowDtValue());
             curPage = 1;            // 新记录在最前，回到第 1 页才看得到
             renderBill();
-            billMoney.focus();
+            // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
+            addMask.style.display='none';
+            customConfirm('已记下这一笔，要再记一笔吗？', ()=>{
+                openAddModal();     // 重新打开，且为全新空白表单（不带上次数据）
+            }, '记账成功', { okText:'再记一笔', cancelText:'关闭' });
         });
 
         window.delBill=function(id){
