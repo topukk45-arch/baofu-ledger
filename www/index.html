@@ -27,6 +27,8 @@
             --c-on-primary:#fff;      /* 主色上的文字（白） */
             --c-primary-mid:#e6c200;  /* 渐变起始/次要描边 */
             --c-shadow-rgb:212,175,55;/* 阴影/光晕用的主色 RGB */
+            --c-pos:#3a7a2e;          /* 收入/正值（语义色，固定） */
+            --c-neg:#b5482e;          /* 支出/负值（语义色，固定） */
         }
 
         * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft Yahei", sans-serif; }
@@ -233,14 +235,116 @@
         .add-btn:hover { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.5); }
 
         /* 右下角悬浮记账按钮 */
-        .fab { position:fixed; right:20px; z-index:900;
-            bottom:calc(20px + env(safe-area-inset-bottom));
-            width:60px; height:60px; border-radius:50%; border:none; cursor:pointer;
+        /* 固定在记账页底部、标签栏上方的「记一笔」常驻按钮 */
+        .add-bar { position:fixed; left:12px; right:12px; z-index:900;
+            bottom:calc(60px + env(safe-area-inset-bottom));
+            height:50px; border:none; border-radius:14px; cursor:pointer;
             background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); color:var(--c-on-primary);
-            font-size:34px; line-height:60px; text-align:center; padding:0;
-            box-shadow:0 4px 14px rgba(var(--c-shadow-rgb),0.55); transition:0.2s; display:none; }
-        .fab:hover { transform:translateY(-2px); box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.65); }
-        .fab:active { transform:scale(0.94); }
+            font-size:17px; font-weight:bold; display:none; align-items:center; justify-content:center; gap:6px;
+            box-shadow:0 4px 14px rgba(var(--c-shadow-rgb),0.45); transition:0.15s; }
+        .add-bar .add-bar-plus { font-size:24px; line-height:1; }
+        .add-bar:active { transform:scale(0.98); }
+        @media (min-width:761px){ .add-bar { left:50%; transform:translateX(-50%); width:480px; right:auto; } .add-bar:active{ transform:translateX(-50%) scale(0.98);} }
+
+        /* 回到顶部按钮：滚动后出现，位于「记一笔」条上方右侧 */
+        .to-top { position:fixed; right:16px; z-index:910;
+            bottom:calc(122px + env(safe-area-inset-bottom));
+            width:44px; height:44px; border-radius:50%; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-primary-dark);
+            font-size:22px; line-height:1; cursor:pointer; padding:0;
+            box-shadow:0 3px 12px rgba(var(--c-shadow-rgb),0.3);
+            opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
+        .to-top.show { opacity:1; pointer-events:auto; }
+        .to-top:active { transform:scale(0.92); }
+
+        /* ===== 底部标签栏 ===== */
+        .tab-bar { position:fixed; left:0; right:0; bottom:0; z-index:950;
+            display:flex; background:var(--c-surface-2);
+            border-top:1px solid var(--c-border);
+            padding-bottom:env(safe-area-inset-bottom);
+            box-shadow:0 -2px 12px rgba(var(--c-shadow-rgb),0.18); }
+        .tab-btn { flex:1; border:none; background:transparent; cursor:pointer;
+            padding:9px 0 8px; display:flex; flex-direction:column; align-items:center; gap:2px;
+            color:var(--c-text-soft); transition:0.15s; }
+        .tab-btn .tab-ico { font-size:21px; line-height:1; }
+        .tab-btn .tab-txt { font-size:12px; }
+        .tab-btn.active { color:var(--c-primary-dark); }
+        .tab-btn.active .tab-txt { font-weight:bold; }
+        /* 主界面给底栏留出空间，避免最后内容被遮住 */
+        body:not(.login-mode) .container { padding-bottom:84px; }
+        /* 记账页底部还有「记一笔」常驻条，需再多留空间（确保翻页器不被遮住） */
+        body.tab-ledger:not(.login-mode) .container { padding-bottom:165px; }
+
+        /* ===== 设置页 ===== */
+        .set-group { margin-bottom:20px; }
+        .set-group-title { color:var(--c-text-soft); font-size:13px; margin:0 4px 8px; }
+        .set-item { width:100%; display:flex; justify-content:space-between; align-items:center;
+            background:var(--c-surface); border:1px solid var(--c-border); border-radius:10px;
+            padding:14px 16px; margin-bottom:8px; cursor:pointer; font-size:15px;
+            color:var(--c-text); transition:0.15s; }
+        .set-item:hover { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.25); }
+        .set-item .set-arrow { color:var(--c-text-soft); font-size:18px; }
+        .set-item.set-danger { color:var(--c-neg, #d05a52); }
+        .set-item.set-danger .set-arrow { color:var(--c-neg, #d05a52); }
+        .set-item.set-static { cursor:default; }
+        .set-item.set-static:hover { border-color:var(--c-border); box-shadow:none; }
+        .seg { display:flex; border:1px solid var(--c-border-mid); border-radius:9px; overflow:hidden; }
+        .seg button { border:none; background:transparent; cursor:pointer; padding:6px 12px;
+            font-size:13px; color:var(--c-text-soft); transition:0.12s; }
+        .seg button.on { background:var(--c-primary); color:var(--c-on-primary); font-weight:bold; }
+
+        /* ===== 统计页 ===== */
+        .stat-card { background:var(--c-surface); border:1px solid var(--c-border);
+            border-radius:14px; padding:14px; margin-bottom:12px; }
+        .stat-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+        .stat-cal-head span { font-size:16px; font-weight:bold; color:var(--c-text); }
+        .stat-week { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:5px; }
+        .stat-week span { text-align:center; font-size:11px; color:var(--c-text-soft); }
+        .stat-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+        .stat-cal .day { aspect-ratio:1; border-radius:8px; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; border:1px solid transparent; }
+        .stat-cal .day .dn { font-size:12px; color:var(--c-text); }
+        .stat-cal .day .da { font-size:9px; font-weight:bold; line-height:1.1; }
+        .stat-cal .day.has { background:var(--c-chip); border-color:var(--c-border); cursor:pointer; }
+        .stat-cal .day.has:active { transform:scale(0.93); }
+        .stat-cal .day.sel { background:var(--c-primary); }
+        .stat-cal .day.sel .dn, .stat-cal .day.sel .da { color:var(--c-on-primary); }
+        .stat-cal .day.today .dn { text-decoration:underline; }
+        .stat-cal-tip { text-align:center; font-size:11px; color:var(--c-text-soft); margin-top:8px; }
+
+        .stat-month-row { display:flex; gap:10px; margin-bottom:12px; }
+        .stat-month-box { flex:1; background:var(--c-card-1); border:1px solid var(--c-border);
+            border-radius:12px; padding:12px; text-align:center; }
+        .smb-label { font-size:12px; color:var(--c-text-soft); margin-bottom:4px; }
+        .smb-val { font-size:20px; font-weight:bold; }
+
+        .stat-day-title { font-size:15px; font-weight:bold; color:var(--c-text); margin-bottom:12px; }
+        .stat-day-title .sdt-sub { display:block; font-size:13px; font-weight:normal; color:var(--c-text-soft); margin-top:4px; }
+        .stat-day-title .sdt-sub b { font-size:14px; }
+        .stat-pie-row { display:flex; gap:12px; align-items:center; }
+        .stat-pie-holder { width:140px; height:140px; flex-shrink:0; }
+        .stat-cat-list { flex:1; min-width:0; }
+        .stat-cat-list .sc-item { display:flex; align-items:center; justify-content:space-between;
+            padding:5px 0; font-size:13px; border-bottom:1px dashed var(--c-border); }
+        .stat-cat-list .sc-item:last-child { border-bottom:none; }
+        .sc-name { display:flex; align-items:center; gap:6px; min-width:0; color:var(--c-text); }
+        .sc-dot { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+        .sc-amt { font-weight:bold; white-space:nowrap; }
+
+        .stat-bar-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+        .stat-bar-title { font-size:14px; font-weight:bold; color:var(--c-text); }
+        .stat-bar-hint { font-size:11px; color:var(--c-text-soft); }
+        .stat-peak-hint { font-size:11px; color:var(--c-text-soft); margin-bottom:8px; }
+        .stat-bar-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .stat-bar-inner { height:170px; }
+        .stat-day-empty { text-align:center; color:var(--c-text-soft); font-size:13px; padding:18px 10px; }
+        /* 时段明细弹窗 */
+        .hd-list { margin-bottom:8px; }
+        .hd-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px dashed var(--c-border); }
+        .hd-row:last-child { border-bottom:none; }
+        .hd-time { color:var(--c-text); font-size:14px; min-width:46px; }
+        .hd-amt { margin-left:auto; font-weight:bold; font-size:14px; }
+        .hd-sum { text-align:right; font-size:13px; color:var(--c-text-soft); padding-top:6px; border-top:1px solid var(--c-border); }
 
         /* 分页控件 */
         .pager { display:flex; align-items:center; justify-content:center; gap:14px;
@@ -256,8 +360,20 @@
         .filter-bar select { padding:8px 10px; border:1px solid var(--c-primary); border-radius:6px;
             background:var(--c-surface); color:var(--c-primary-deep); outline:none; cursor:pointer; }
 
-        .summary { text-align:center; color:var(--c-text); font-size:14px; margin-bottom:6px; }
-        .summary b { color:var(--c-primary-dark); font-size:16px; }
+        /* 上栏：全局总览（中性卡片底，始终显示） */
+        .summary-overall { text-align:center; color:var(--c-text); font-size:14px;
+            background:var(--c-card-1); border:1px solid var(--c-border);
+            border-radius:12px; padding:9px 12px; margin-bottom:8px; }
+        .summary-overall b { color:var(--c-primary-dark); font-size:16px; }
+        /* 下栏：当前筛选小计（主题浅色底 + 左上角分类角标，仅筛选时显示） */
+        .summary-filter { display:flex; align-items:center; gap:10px;
+            background:var(--c-chip); border:1px solid var(--c-border-mid);
+            border-radius:12px; padding:8px 12px; margin-bottom:10px;
+            color:var(--c-text); font-size:14px; }
+        .summary-filter .filter-badge { flex-shrink:0; background:var(--c-primary);
+            color:var(--c-on-primary); font-size:13px; font-weight:bold;
+            padding:3px 11px; border-radius:9px; }
+        .summary-filter .filter-nums b { color:var(--c-primary-dark); font-size:15px; }
 
         .cat-stats { text-align:center; color:var(--c-text); font-size:13px; margin-bottom:12px; }
         .cat-stats .chip { display:inline-block; background:var(--c-chip); border:1px solid var(--c-accent-soft);
@@ -411,57 +527,146 @@
         </div>
 
         <div class="main-box" id="mainBox">
-            <div class="user-info">
-                <h3 id="nowUser">当前用户：</h3>
-                <div class="user-actions">
-                    <button class="logout edit-name" id="themeBtn">外观</button>
-                    <button class="logout edit-name" id="editNameBtn">修改用户名</button>
-                    <button class="logout" id="logoutBtn">退出登录</button>
+            <!-- ========== 页面1：记账（账单+记账） ========== -->
+            <div class="tab-page" id="pageLedger">
+                <div class="user-info">
+                    <h3 id="nowUser">当前用户：</h3>
+                </div>
+
+                <div class="archive-bar">
+                    <select id="archiveSelect"></select>
+                    <button class="mini-btn gold" id="newArchive">新建存档</button>
+                    <button class="mini-btn" id="renameArchive">重命名</button>
+                    <button class="mini-btn" id="delArchive">删除存档</button>
+                </div>
+
+                <div class="filter-bar">
+                    <label>按分类筛选：</label>
+                    <select id="filterCat"><option value="__all">全部</option></select>
+                </div>
+
+                <div class="summary-overall" id="summaryOverall"></div>
+                <div class="summary-filter" id="summaryFilter" style="display:none"></div>
+                <div class="cat-stats" id="catStats"></div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>记账时间</th>
+                            <th>收支</th>
+                            <th>金额(元)</th>
+                            <th>分类</th>
+                            <th>结余(元)</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="billList"></tbody>
+                </table>
+
+                <div class="pager" id="pager"></div>
+            </div>
+
+            <!-- ========== 页面2：统计 ========== -->
+            <div class="tab-page" id="pageStats" style="display:none">
+                <div class="user-info"><h3>统计分析</h3></div>
+
+                <!-- 日历 -->
+                <div class="stat-card">
+                    <div class="stat-cal-head">
+                        <button class="dt-nav" id="statPrevM">‹</button>
+                        <span id="statMonthLabel">2026年01月</span>
+                        <button class="dt-nav" id="statNextM">›</button>
+                    </div>
+                    <div class="stat-week">
+                        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                    </div>
+                    <div class="stat-cal" id="statCal"></div>
+                    <div class="stat-cal-tip">点有底色的日期，查看当天分析</div>
+                </div>
+
+                <!-- 当月收支 -->
+                <div class="stat-month-row">
+                    <div class="stat-month-box">
+                        <div class="smb-label">当月收入</div>
+                        <div class="smb-val pos" id="statMonthIn">+0.00</div>
+                    </div>
+                    <div class="stat-month-box">
+                        <div class="smb-label">当月支出</div>
+                        <div class="smb-val neg" id="statMonthOut">−0.00</div>
+                    </div>
+                </div>
+
+                <!-- 当日分析 -->
+                <div class="stat-day-wrap" id="statDayWrap" style="display:none">
+                    <div class="stat-card">
+                        <div class="stat-day-title" id="statDayTitle"></div>
+                        <div class="stat-pie-row">
+                            <div class="stat-pie-holder" id="statPie"></div>
+                            <div class="stat-cat-list" id="statCatList"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-bar-head">
+                            <span class="stat-bar-title">消费时间分布</span>
+                        </div>
+                        <div class="stat-peak-hint" id="statPeakHint"></div>
+                        <div class="stat-bar-scroll" id="statBarScroll">
+                            <div class="stat-bar-inner" id="statBarInner"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-day-empty" id="statDayEmpty">选择上方有记录的日期，查看当天的分类与时间分析</div>
+            </div>
+
+            <!-- ========== 页面3：设置 ========== -->
+            <div class="tab-page" id="pageSettings" style="display:none">
+                <div class="user-info"><h3>设置</h3></div>
+
+                <div class="set-group">
+                    <div class="set-group-title">账户</div>
+                    <button class="set-item" id="themeBtn"><span>外观主题</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="editNameBtn"><span>修改用户名</span><span class="set-arrow">›</span></button>
+                    <button class="set-item set-danger" id="logoutBtn"><span>退出登录</span><span class="set-arrow">›</span></button>
+                </div>
+
+                <div class="set-group">
+                    <div class="set-group-title">偏好</div>
+                    <div class="set-item set-static">
+                        <span>默认进入页面</span>
+                        <div class="seg" id="defaultTabSeg">
+                            <button data-v="stats">统计</button>
+                            <button data-v="ledger">记账</button>
+                            <button data-v="settings">设置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="set-group">
+                    <div class="set-group-title">存档管理</div>
+                    <button class="set-item" id="exportBtn"><span>导出存档（备份）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="importBtn"><span>导入存档</span><span class="set-arrow">›</span></button>
+                    <input type="file" id="importFile" accept=".json" style="display:none">
                 </div>
             </div>
-
-            <div class="archive-bar">
-                <select id="archiveSelect"></select>
-                <button class="mini-btn gold" id="newArchive">新建存档</button>
-                <button class="mini-btn" id="renameArchive">重命名</button>
-                <button class="mini-btn" id="delArchive">删除存档</button>
-            </div>
-
-            <div class="io-bar">
-                <button class="mini-btn gold" id="exportBtn">导出存档</button>
-                <button class="mini-btn gold" id="importBtn">导入存档</button>
-                <input type="file" id="importFile" accept=".json" style="display:none">
-            </div>
-
-            <div class="filter-bar">
-                <label>按分类筛选：</label>
-                <select id="filterCat"><option value="__all">全部</option></select>
-            </div>
-
-            <div class="summary" id="summary"></div>
-            <div class="cat-stats" id="catStats"></div>
-
-            <table>
-                <thead>
-                    <tr>
-                        <th>记账时间</th>
-                        <th>收支</th>
-                        <th>金额(元)</th>
-                        <th>分类</th>
-                        <th>结余(元)</th>
-                        <th>备注</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="billList"></tbody>
-            </table>
-
-            <div class="pager" id="pager"></div>
         </div>
-    </div>
+
+        <!-- 底部标签栏 -->
+        <nav class="tab-bar" id="tabBar" style="display:none">
+            <button class="tab-btn" data-tab="stats">
+                <span class="tab-ico">▦</span><span class="tab-txt">统计</span>
+            </button>
+            <button class="tab-btn active" data-tab="ledger">
+                <span class="tab-ico">▤</span><span class="tab-txt">记账</span>
+            </button>
+            <button class="tab-btn" data-tab="settings">
+                <span class="tab-ico">⚙</span><span class="tab-txt">设置</span>
+            </button>
+        </nav>
 
     <!-- 右下角悬浮记账按钮 -->
-    <button class="fab" id="fabAdd" title="记一笔">＋</button>
+    <button class="add-bar" id="fabAdd" title="记一笔"><span class="add-bar-plus">＋</span> 记一笔</button>
+    <button class="to-top" id="toTopBtn" title="回到顶部" aria-label="回到顶部">↑</button>
 
     <!-- 记账弹窗 -->
     <div class="mask" id="addMask">
@@ -608,6 +813,7 @@
     <script>
         let currentUser = '';
         let currentArchive = '';
+        let currentTab = 'ledger';
 
         const PAGE_SIZE = 15;   // 每页条数
         let curPage = 1;
@@ -697,10 +903,10 @@
             setTimeout(()=>{ askInput.focus(); askInput.select(); }, 50);
         }
         // 信息弹窗：只有“确定”，可选标题；用于替代 alert 和“查看备注”
-        function customAlert(msg, title, align){
+        function customAlert(msg, title, align, isHtml){
             askMode='alert';
             askTitle.textContent=title||'提示';
-            askMsg.textContent=msg;
+            if(isHtml){ askMsg.innerHTML=msg; } else { askMsg.textContent=msg; }
             askMsg.style.display='';
             askMsg.style.textAlign = (align==='left') ? 'left' : '';
             askInput.style.display='none';
@@ -845,24 +1051,28 @@
             if(charLen(name) > 8){ customAlert('姓名最多 8 个字～'); return; }
             currentUser = name;
             recordUser(name);
+            localStorage.setItem('app_logged_in_user', name);   // 记住当前登录用户，下次自动进入
             const store = loadStore();
             saveStore(store);
             currentArchive = store.last || Object.keys(store.archives)[0];
             loginBox.style.display='none';
             mainBox.style.display='block';
+            $('tabBar').style.display='flex';
             document.body.classList.remove('login-mode');
-            $('fabAdd').style.display='block';
             nowUser.innerText = `当前用户：${name}`;
             refreshArchiveSelect();
             refreshCatSelectors();
             setDtInput(billTime, nowDtValue());   // 进入主界面即默认当前时间
             renderBill();
+            switchTab(getDefaultTab());   // 按用户设置进入默认页（默认记账）
         }
 
         logoutBtn.addEventListener('click', () => {
             currentUser=''; currentArchive='';
+            localStorage.removeItem('app_logged_in_user');   // 退出后不再自动登录
             userNameInput.value='';
             mainBox.style.display='none';
+            $('tabBar').style.display='none';
             loginBox.style.display='block';
             document.body.classList.add('login-mode');
             $('fabAdd').style.display='none';
@@ -912,7 +1122,7 @@
         archiveSelect.addEventListener('change', () => {
             currentArchive = archiveSelect.value;
             const store=loadStore(); store.last=currentArchive; saveStore(store);
-            curPage=1; refreshCatSelectors(); renderBill();
+            curPage=1; statSelDay=null; refreshCatSelectors(); refreshAllViews();
         });
         $('newArchive').addEventListener('click', () => {
             customPrompt('', '', (name)=>{
@@ -1168,6 +1378,12 @@
             const store=loadStore(); curArchive(store).records=data;
             store.last=currentArchive; saveStore(store);
         }
+        // 数据变更后统一刷新：账单页总是刷新；统计页若正在显示也立即重算，
+        // 避免「新增/删除记录后切到统计页数字没更新」的问题
+        function refreshAllViews(){
+            renderBill();
+            if(currentTab==='stats') renderStats();
+        }
 
         // ===== 自定义时间选择器 =====
         const dtMask=$('dtMask'), dtDays=$('dtDays'), dtMonthLabel=$('dtMonthLabel');
@@ -1294,7 +1510,7 @@
             billList.innerHTML='';
             if(asc.length===0){
                 billList.innerHTML='<tr><td colspan="7" class="empty-tip">暂无记账记录</td></tr>';
-                $('summary').innerText=''; $('catStats').innerHTML=''; $('pager').innerHTML='';
+                $('summaryOverall').innerHTML=''; $('summaryFilter').style.display='none'; $('catStats').innerHTML=''; $('pager').innerHTML='';
                 return;
             }
 
@@ -1308,18 +1524,23 @@
 
             // 筛选状态下额外提示当前筛选子集的收支，避免「为什么数字对不上」的疑惑
             const filtering = filterVal!=='__all';
-            let filterLine='';
-            if(filtering){
-                let fIn=0, fOut=0;
-                asc.forEach(item=>{ const amt=Number(item.money||0); if(item.type==='expense') fOut+=amt; else fIn+=amt; });
-                filterLine = `　|　筛选「${escapeHtml(filterVal)}」：收入 <b class="pos">${fIn.toFixed(2)}</b> 支出 <b class="neg">${fOut.toFixed(2)}</b>`;
-            }
-            $('summary').innerHTML=
+            $('summaryOverall').innerHTML=
                 `共 <b>${allAsc.length}</b> 条　`+
                 `收入 <b class="pos">${totalIn.toFixed(2)}</b>　`+
                 `支出 <b class="neg">${totalOut.toFixed(2)}</b>　`+
-                `结余 <b>${net.toFixed(2)}</b> 元`+
-                filterLine;
+                `结余 <b>${net.toFixed(2)}</b> 元`;
+
+            const fBar=$('summaryFilter');
+            if(filtering){
+                let fIn=0, fOut=0;
+                asc.forEach(item=>{ const amt=Number(item.money||0); if(item.type==='expense') fOut+=amt; else fIn+=amt; });
+                fBar.innerHTML=
+                    `<span class="filter-badge">${escapeHtml(filterVal)}</span>`+
+                    `<span class="filter-nums">收入 <b class="pos">${fIn.toFixed(2)}</b>　支出 <b class="neg">${fOut.toFixed(2)}</b></span>`;
+                fBar.style.display='flex';
+            } else {
+                fBar.style.display='none';
+            }
 
             // 分类统计：始终基于全部记录，按收支净额（收入加、支出减）
             const byCat={};
@@ -1354,7 +1575,7 @@
                 if(!remarkFull){
                     remarkCell = '<span class="remark-empty">无</span>';
                 } else {
-                    const shown = escapeHtml(charSlice(remarkFull, 5)) + (charLen(remarkFull) > 5 ? '…' : '');
+                    const shown = escapeHtml(charSlice(remarkFull, 10)) + (charLen(remarkFull) > 10 ? '…' : '');
                     remarkCell = `<span class="remark-view" onclick="viewRemark('${item.id}')" title="点击查看完整备注">${shown}</span>`;
                 }
                 const tr=document.createElement('tr');
@@ -1426,7 +1647,7 @@
             data.push({ id:genId(), time, money:m.val, cat, remark, type });
             saveUserData(data);
             curPage = 1;            // 新记录在最前，回到第 1 页才看得到
-            renderBill();
+            refreshAllViews();
             // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
             addMask.style.display='none';
             customConfirm('已记下这一笔，要再记一笔吗？', ()=>{
@@ -1437,7 +1658,7 @@
         window.delBill=function(id){
             customConfirm('确定要删除这条记录吗？', ()=>{
                 const data=getUserData().filter(r=>r.id!==id);
-                saveUserData(data); renderBill();
+                saveUserData(data); refreshAllViews();
             });
         };
 
@@ -1470,7 +1691,7 @@
             const idx=data.findIndex(r=>r.id===editId);
             if(idx>=0){ data[idx]={ id:editId, time, money:m.val, cat, remark, type }; saveUserData(data); }
             editMask.style.display='none';
-            renderBill();
+            refreshAllViews();
         });
 
         // ===== 自定义金色下拉：包裹原生 select，保留全部 value/事件逻辑 =====
@@ -1600,9 +1821,7 @@
             });
         })();
 
-        // 页面初始化：渲染登录页最近账号
-        document.body.classList.add('login-mode');
-        renderRecentUsers();
+        // 页面初始化逻辑见脚本末尾 initApp()（在所有函数与外观主题就绪后执行）
 
         // ===== 外观：主题色（全局，所有账号共用，存 localStorage）=====
         (function(){
@@ -1758,6 +1977,335 @@
             // 滚动时若手指离开按钮，确保还原
             document.addEventListener('scroll', release, {passive:true, capture:true});
         })();
+        // ============================================================
+        // ===== 底部标签切换 =====
+        // ============================================================
+        // 默认进入页面（存全局偏好，所有用户共用此设置）
+        function getDefaultTab(){
+            const v=localStorage.getItem('app_default_tab');
+            return (v==='stats'||v==='ledger'||v==='settings') ? v : 'ledger';
+        }
+        function setDefaultTab(v){ localStorage.setItem('app_default_tab', v); }
+
+        function switchTab(tab){
+            currentTab=tab;
+            $('pageLedger').style.display   = tab==='ledger'   ? 'block':'none';
+            $('pageStats').style.display    = tab==='stats'    ? 'block':'none';
+            $('pageSettings').style.display = tab==='settings' ? 'block':'none';
+            // 记账按钮只在记账页显示
+            $('fabAdd').style.display = tab==='ledger' ? 'flex':'none';
+            if(tab!=='ledger'){ const tt=$('toTopBtn'); if(tt) tt.classList.remove('show'); }
+            document.body.classList.toggle('tab-ledger', tab==='ledger');
+            document.querySelectorAll('.tab-btn').forEach(b=>{
+                b.classList.toggle('active', b.dataset.tab===tab);
+            });
+            if(tab==='stats') renderStats();
+            window.scrollTo({top:0});
+        }
+        document.querySelectorAll('.tab-btn').forEach(b=>{
+            b.addEventListener('click', ()=>switchTab(b.dataset.tab));
+        });
+
+        // 回到顶部：滚动超过一屏且在记账页时显示
+        (function(){
+            const btn=$('toTopBtn');
+            function onScroll(){
+                const show = currentTab==='ledger' && (window.scrollY||document.documentElement.scrollTop) > 400;
+                btn.classList.toggle('show', show);
+            }
+            window.addEventListener('scroll', onScroll, {passive:true});
+            btn.addEventListener('click', ()=>{ window.scrollTo({top:0, behavior:'smooth'}); });
+            onScroll();
+        })();
+
+        // 默认进入页面：分段选择器
+        (function(){
+            const seg=$('defaultTabSeg');
+            function paint(){
+                const cur=getDefaultTab();
+                seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===cur));
+            }
+            seg.querySelectorAll('button').forEach(b=>{
+                b.addEventListener('click', ()=>{ setDefaultTab(b.dataset.v); paint(); });
+            });
+            paint();
+        })();
+
+        // ============================================================
+        // ===== 统计模块（纯手写 SVG，跟随外观主题变量） =====
+        // ============================================================
+        let statYear, statMonth;     // 当前查看的年/月（month: 0-11）
+        let statSelDay=null;         // 当前选中的日（1-31）
+
+        // 读取 CSS 变量当前值，让 SVG 颜色跟着外观走
+        function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+        // —— 统计页自带的颜色工具（独立于外观系统的私有函数，避免作用域报错） ——
+        function statHexToRgb(h){ h=(h||'').replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join('');
+            if(h.length<6) h='d4af37';
+            return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) }; }
+        function statRgbToHsl(r,g,b){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h,s,l=(mx+mn)/2;
+            if(mx===mn){h=s=0;}else{const d=mx-mn; s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+                switch(mx){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4;}h/=6;}
+            return { h:h*360, s:s*100, l:l*100 }; }
+        function statHslToHex(h,s,l){ h=(h%360+360)%360; s=Math.max(0,Math.min(100,s))/100; l=Math.max(0,Math.min(100,l))/100;
+            const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2; let r,g,b;
+            if(h<60)[r,g,b]=[c,x,0];else if(h<120)[r,g,b]=[x,c,0];else if(h<180)[r,g,b]=[0,c,x];
+            else if(h<240)[r,g,b]=[0,x,c];else if(h<300)[r,g,b]=[x,0,c];else[r,g,b]=[c,0,x];
+            const f=v=>Math.round(Math.max(0,Math.min(255,(v+m)*255))).toString(16).padStart(2,'0');
+            return '#'+f(r)+f(g)+f(b); }
+
+        // 为当月每个分类分配稳定颜色：基于主题色在色相环上均匀散开，保证跟随主题
+        function catColor(idx, total){
+            const base=cssVar('--c-primary')||'#d4af37';
+            const {r,g,b}=statHexToRgb(base);
+            const {h,s}=statRgbToHsl(r,g,b);
+            const hue=(h + idx*(360/Math.max(total,1))) % 360;
+            return statHslToHex(hue, Math.max(s,45), 50);
+        }
+
+        function statRecords(){
+            // 统计基于当前存档的全部记录
+            return getUserData().slice();
+        }
+
+        function renderStats(){
+            if(statYear===undefined){
+                const now=new Date();
+                statYear=now.getFullYear(); statMonth=now.getMonth();
+            }
+            renderStatCalendar();
+        }
+
+        function renderStatCalendar(){
+            $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
+            const recs=statRecords();
+
+            // 按「日」聚合当月净额，并记录哪天有数据
+            const dayNet={}, dayHas={};
+            recs.forEach(r=>{
+                const d=new Date(r.time);
+                if(d.getFullYear()===statYear && d.getMonth()===statMonth){
+                    const day=d.getDate();
+                    const amt=Number(r.money||0)*(r.type==='expense'?-1:1);
+                    dayNet[day]=(dayNet[day]||0)+amt;
+                    dayHas[day]=true;
+                }
+            });
+
+            // 当月收入/支出汇总
+            let mIn=0, mOut=0;
+            recs.forEach(r=>{
+                const d=new Date(r.time);
+                if(d.getFullYear()===statYear && d.getMonth()===statMonth){
+                    const amt=Number(r.money||0);
+                    if(r.type==='expense') mOut+=amt; else mIn+=amt;
+                }
+            });
+            $('statMonthIn').textContent='+'+mIn.toFixed(2);
+            $('statMonthOut').textContent='−'+mOut.toFixed(2);
+
+            // 画日历格子
+            const firstDow=new Date(statYear, statMonth, 1).getDay();   // 0=周日
+            const daysInMonth=new Date(statYear, statMonth+1, 0).getDate();
+            const today=new Date();
+            const isThisMonth = today.getFullYear()===statYear && today.getMonth()===statMonth;
+
+            const grid=$('statCal'); grid.innerHTML='';
+            for(let i=0;i<firstDow;i++){ grid.appendChild(document.createElement('div')); }
+            for(let day=1; day<=daysInMonth; day++){
+                const cell=document.createElement('div');
+                cell.className='day';
+                const has=!!dayHas[day];
+                if(has) cell.classList.add('has');
+                if(isThisMonth && today.getDate()===day) cell.classList.add('today');
+                if(statSelDay===day && has) cell.classList.add('sel');
+
+                let inner=`<div class="dn">${day}</div>`;
+                if(has){
+                    const n=dayNet[day];
+                    const col = n>=0 ? 'var(--c-pos,#2f7d57)' : 'var(--c-neg,#d05a52)';
+                    inner+=`<div class="da" style="color:${col}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
+                }
+                cell.innerHTML=inner;
+                if(has){
+                    cell.addEventListener('click', ()=>{ statSelDay=day; renderStatCalendar(); renderStatDay(day); });
+                }
+                grid.appendChild(cell);
+            }
+
+            // 若已选中某天且该天仍在本月有数据，刷新当日分析；否则隐藏
+            if(statSelDay && dayHas[statSelDay]){
+                renderStatDay(statSelDay);
+            } else {
+                statSelDay=null;
+                $('statDayWrap').style.display='none';
+                $('statDayEmpty').style.display='block';
+            }
+        }
+
+        function renderStatDay(day){
+            const recs=statRecords().filter(r=>{
+                const d=new Date(r.time);
+                return d.getFullYear()===statYear && d.getMonth()===statMonth && d.getDate()===day;
+            });
+            $('statDayEmpty').style.display='none';
+            $('statDayWrap').style.display='block';
+            $('statDayTitle').textContent=`${statYear}-${pad(statMonth+1)}-${pad(day)} · 当日支出分析`;
+
+            // —— 当日支出按分类聚合 ——
+            const byCat={};
+            recs.forEach(r=>{ if(r.type==='expense'){ const amt=Number(r.money||0); byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt; } });
+            const cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
+            const vals=cats.map(c=>byCat[c]);
+            const colors=cats.map((_,i)=>catColor(i, cats.length));
+
+            // 饼图：有支出就画占比；当天无支出则提示
+            if(cats.length){
+                $('statPie').innerHTML = buildDonutSVG(vals, colors);
+                $('statCatList').innerHTML = cats.map((c,i)=>
+                    `<div class="sc-item">
+                        <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span>${escapeHtml(c)}</span>
+                        <span class="sc-amt neg">−${byCat[c].toFixed(2)}</span>
+                    </div>`).join('');
+            } else {
+                $('statPie').innerHTML = '<div style="font-size:12px;color:var(--c-text-soft);text-align:center;padding-top:54px;">当日无支出</div>';
+                $('statCatList').innerHTML = '<div style="font-size:13px;color:var(--c-text-soft);">这天没有支出记录</div>';
+            }
+
+            // —— 当日按小时支出 ——
+            const hours=new Array(24).fill(0);
+            const hourRecs={};   // 小时 -> 该小时的支出记录数组
+            recs.forEach(r=>{ if(r.type==='expense'){ const h=new Date(r.time).getHours(); hours[h]+=Number(r.money||0); (hourRecs[h]=hourRecs[h]||[]).push(r); } });
+            renderHourBars(hours, hourRecs);
+        }
+
+        // 手写甜甜圈饼图
+        function buildDonutSVG(vals, colors){
+            const total=vals.reduce((a,b)=>a+b,0);
+            if(total<=0) return '';
+            const cx=70, cy=70, r=58, rin=33;
+            let ang=-Math.PI/2;   // 从顶端开始
+            let paths='';
+            vals.forEach((v,i)=>{
+                const frac=v/total;
+                const a2=ang + frac*Math.PI*2;
+                // 单一扇形若占满整圈，用两段避免 arc 退化
+                if(frac>=0.9999){
+                    paths+=`<circle cx="${cx}" cy="${cy}" r="${(r+rin)/2}" fill="none" stroke="${colors[i]}" stroke-width="${r-rin}"/>`;
+                } else {
+                    const x1=cx+r*Math.cos(ang),   y1=cy+r*Math.sin(ang);
+                    const x2=cx+r*Math.cos(a2),    y2=cy+r*Math.sin(a2);
+                    const xi2=cx+rin*Math.cos(a2), yi2=cy+rin*Math.sin(a2);
+                    const xi1=cx+rin*Math.cos(ang),yi1=cy+rin*Math.sin(ang);
+                    const large=frac>0.5?1:0;
+                    paths+=`<path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} L${xi2.toFixed(2)},${yi2.toFixed(2)} A${rin},${rin} 0 ${large} 0 ${xi1.toFixed(2)},${yi1.toFixed(2)} Z" fill="${colors[i]}"/>`;
+                }
+                ang=a2;
+            });
+            return `<svg viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="当日支出分类占比">${paths}</svg>`;
+        }
+
+        // 手写柱状图（24 小时，可横向滚动，自动定位高峰，点击看该时段明细）
+        let statHourRecs={};   // 供点击明细使用：小时 -> 记录数组
+        function renderHourBars(hours, hourRecs){
+            statHourRecs = hourRecs || {};
+            const max=Math.max(...hours, 1);
+            const colW=30, gap=6, padL=4, padBottom=22, padTop=8;
+            const innerW=padL*2 + hours.length*colW + (hours.length-1)*gap;
+            const H=170, plotH=H-padBottom-padTop;
+            const barCol=cssVar('--c-primary')||'#d4af37';
+            const emptyCol=cssVar('--c-chip')||'#fff5cc';
+            const txtCol=cssVar('--c-text-soft')||'#888';
+            const onBar=cssVar('--c-on-primary')||'#fff';
+
+            let bars='';
+            let peak=0, peakV=-1;
+            hours.forEach((v,h)=>{ if(v>peakV){ peakV=v; peak=h; } });
+
+            hours.forEach((v,h)=>{
+                const x=padL + h*(colW+gap);
+                const bh=v>0 ? Math.max(3, (v/max)*plotH) : 0;
+                const y=padTop+plotH-bh;
+                if(v>0){
+                    // 整根柱子包一个可点击的 group
+                    let cell=`<rect x="${x}" y="${y}" width="${colW}" height="${bh}" rx="4" fill="${barCol}"/>`;
+                    const label=v.toFixed(0);
+                    // 金额放进柱子内部（柱子够高时），否则放柱子上方
+                    if(bh>=18){
+                        cell+=`<text x="${x+colW/2}" y="${y+13}" text-anchor="middle" font-size="9" fill="${onBar}">${label}</text>`;
+                    } else {
+                        cell+=`<text x="${x+colW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${txtCol}">${label}</text>`;
+                    }
+                    // 透明热区，扩大点击范围（含柱子上方空白），方便手指点
+                    bars+=`<g style="cursor:pointer" onclick="showHourDetail(${h})">`
+                        + `<rect x="${x}" y="${padTop}" width="${colW}" height="${plotH}" fill="transparent"/>`
+                        + cell + `</g>`;
+                } else {
+                    bars+=`<rect x="${x}" y="${padTop+plotH-3}" width="${colW}" height="3" rx="1.5" fill="${emptyCol}"/>`;
+                }
+                bars+=`<text x="${x+colW/2}" y="${H-7}" text-anchor="middle" font-size="9" fill="${txtCol}">${h}</text>`;
+            });
+
+            $('statBarInner').innerHTML=
+                `<svg viewBox="0 0 ${innerW} ${H}" width="${innerW}" height="${H}" role="img" aria-label="当日按小时支出，可横向滑动，点柱子看该时段明细">${bars}</svg>`;
+
+            const peakHour = peakV>0 ? peak : null;
+            $('statPeakHint').textContent = peakHour!==null
+                ? `消费高峰在 ${peakHour}:00 前后`
+                : '这天没有支出，无时间分布';
+
+            // 自动滚动定位到高峰
+            const scroll=$('statBarScroll');
+            setTimeout(()=>{
+                if(peakHour===null){ scroll.scrollLeft=0; return; }
+                const center=padL + peakHour*(colW+gap) + colW/2;
+                scroll.scrollLeft=Math.max(0, center - scroll.clientWidth/2);
+            }, 30);
+        }
+
+        // 点击某个时段的柱子，弹出该小时的消费明细（时间 / 分类 / 金额）
+        window.showHourDetail=function(h){
+            const list=(statHourRecs[h]||[]).slice()
+                .sort((a,b)=>new Date(a.time)-new Date(b.time));
+            if(!list.length) return;
+            const rows=list.map(r=>{
+                const t=r.time.replace('T',' ').slice(11,16);
+                const amt=Number(r.money||0);
+                return `<div class="hd-row">`
+                    + `<span class="hd-time">${t}</span>`
+                    + `<span class="cat-tag">${escapeHtml(r.cat||'未分类')}</span>`
+                    + `<span class="hd-amt neg">−${amt.toFixed(2)}</span>`
+                    + `</div>`;
+            }).join('');
+            const sum=list.reduce((s,r)=> s + (r.type==='expense' ? Number(r.money||0) : 0), 0);
+            const html=`<div class="hd-list">${rows}</div>`
+                + `<div class="hd-sum">该时段合计支出 <b class="neg">−${sum.toFixed(2)}</b> 元</div>`;
+            customAlert(html, `${pad(h)}:00 – ${pad(h)}:59 消费明细`, 'left', true);
+        };
+
+        // 统计页月份切换
+        $('statPrevM').addEventListener('click', ()=>{
+            statMonth--; if(statMonth<0){ statMonth=11; statYear--; }
+            statSelDay=null; renderStatCalendar();
+        });
+        $('statNextM').addEventListener('click', ()=>{
+            statMonth++; if(statMonth>11){ statMonth=0; statYear++; }
+            statSelDay=null; renderStatCalendar();
+        });
+
+        // ===== 页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页 =====
+        (function initApp(){
+            const remembered=localStorage.getItem('app_logged_in_user');
+            if(remembered && localStorage.getItem(`store_${remembered}`)!==null){
+                login(remembered);   // 自动登录，按设置进入默认页
+            } else {
+                if(remembered) localStorage.removeItem('app_logged_in_user');
+                document.body.classList.add('login-mode');
+                renderRecentUsers();
+            }
+        })();
+
     </script>
 
 </body>
