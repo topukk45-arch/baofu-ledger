@@ -270,6 +270,11 @@
         .tab-btn .tab-txt { font-size:12px; }
         .tab-btn.active { color:var(--c-primary-dark); }
         .tab-btn.active .tab-txt { font-weight:bold; }
+        /* 键盘弹出时，隐藏会被顶起的常驻底栏与悬浮按钮 */
+        body.kb-open .tab-bar,
+        body.kb-open .add-bar,
+        body.kb-open .to-top { display:none !important; }
+
         /* 主界面给底栏留出空间，避免最后内容被遮住 */
         body:not(.login-mode) .container { padding-bottom:84px; }
         /* 记账页底部还有「记一笔」常驻条，需再多留空间（确保翻页器不被遮住） */
@@ -445,6 +450,8 @@
 
         .mask { position:fixed; top:0; left:0; width:100%; height:100%;
             background:rgba(0,0,0,0.3); display:none; align-items:center; justify-content:center; z-index:999; }
+        /* 键盘弹出时，弹窗钉在可视区内并平滑过渡，避免被顶一下 */
+        .mask.kb-follow { align-items:flex-start; transition:padding-top 0.2s ease; }
         .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
             border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
             max-height:88vh; overflow-y:auto;
@@ -705,7 +712,7 @@
                             <option value="expense" selected>支出（花销）</option>
                             <option value="income">收入（存入）</option>
                         </select>
-                        <input type="number" step="0.01" min="0" id="billMoney" placeholder="输入金额（正数）">
+                        <input type="text" inputmode="decimal" id="billMoney" class="money-input" placeholder="输入金额（正数）">
                     </div>
                 </div>
                 <div class="field">
@@ -735,7 +742,7 @@
                 <option value="income">收入（存入）</option>
                 <option value="expense">支出（花销）</option>
             </select>
-            <input type="number" step="0.01" min="0" id="editMoney" placeholder="输入金额（正数）">
+            <input type="text" inputmode="decimal" id="editMoney" class="money-input" placeholder="输入金额（正数）">
             <select id="editCat"></select>
             <textarea id="editRemark" class="remark-area" placeholder="备注（可拖右下角调整大小，最多 5000 字）" maxlength="5000" rows="2"></textarea>
             <div class="dialog-btn">
@@ -849,6 +856,41 @@
     </div>
 
     <script>
+        // ===== 软键盘检测：弹出时隐藏底栏/悬浮按钮 + 平滑居中弹窗，避免被顶起 =====
+        (function(){
+            const vv = window.visualViewport;
+            if(!vv) return; // 不支持则不处理，保持原样
+            let baseH = vv.height;
+            function layoutMasks(kb){
+                document.querySelectorAll('.mask').forEach(m=>{
+                    if(getComputedStyle(m).display==='none'){ m.classList.remove('kb-follow'); m.style.paddingTop=''; m.style.height=''; return; }
+                    if(kb){
+                        // 在可视区(vv.height)内居中弹窗，超出则顶部留 12px
+                        const dlg=m.firstElementChild;
+                        const dh=dlg?dlg.offsetHeight:0;
+                        const pad=Math.max(12, (vv.height-dh)/2);
+                        m.classList.add('kb-follow');
+                        m.style.height=vv.height+'px';
+                        m.style.paddingTop=pad+'px';
+                    }else{
+                        m.classList.remove('kb-follow');
+                        m.style.height='';
+                        m.style.paddingTop='';
+                    }
+                });
+            }
+            function onResize(){
+                const shrunk = (baseH - vv.height) > 120;
+                document.body.classList.toggle('kb-open', shrunk);
+                if(!shrunk) baseH = vv.height; // 键盘收起后更新基准（应对横竖屏切换）
+                layoutMasks(shrunk);
+            }
+            vv.addEventListener('resize', onResize);
+            // 暴露给打开弹窗时主动调用，规避部分 webview resize 事件延迟
+            window.__relayoutMasks = ()=>layoutMasks((baseH - vv.height) > 120);
+        })();
+
+
         let currentUser = '';
         let currentArchive = '';
         let currentTab = 'ledger';
@@ -864,6 +906,32 @@
         const billTime=$('billTime'), billMoney=$('billMoney'), billRemark=$('billRemark'), billCat=$('billCat'), billType=$('billType');
         const addBill=$('addBill'), editMask=$('editMask');
         const editTime=$('editTime'), editMoney=$('editMoney'), editRemark=$('editRemark'), editCat=$('editCat'), editType=$('editType');
+
+        // ===== 金额输入过滤：只放行数字和一个小数点，小数最多两位 =====
+        function sanitizeMoney(v){
+            v = v.replace(/[^\d.]/g, '');          // 去掉数字和点以外的字符
+            const i = v.indexOf('.');
+            if(i !== -1){                           // 只保留第一个小数点
+                v = v.slice(0, i+1) + v.slice(i+1).replace(/\./g, '');
+            }
+            const p = v.split('.');
+            if(p[1] !== undefined) v = p[0] + '.' + p[1].slice(0, 2); // 小数最多两位
+            return v;
+        }
+        document.querySelectorAll('.money-input').forEach(el=>{
+            el.addEventListener('input', ()=>{
+                const start = el.selectionStart;
+                const before = el.value;
+                const after = sanitizeMoney(before);
+                if(after !== before){
+                    el.value = after;
+                    // 尽量维持光标位置（删掉了几个字符就回退几位）
+                    const delta = before.length - after.length;
+                    const pos = Math.max(0, (start||after.length) - delta);
+                    try{ el.setSelectionRange(pos, pos); }catch(e){}
+                }
+            });
+        });
         const saveEdit=$('saveEdit'), cancelEdit=$('cancelEdit');
         const userNameInput=$('userNameInput'), loginBtn=$('loginBtn');
         const archiveSelect=$('archiveSelect'), filterCat=$('filterCat');
@@ -1398,6 +1466,7 @@
             }, { placeholder:'输入新分类名（最多 8 字）', maxlen:8 });
         }
         function deleteCat(name){
+            if(name==='未分类'){ customAlert('「未分类」是保留分类，不能删除哦～'); return; }
             const store=loadStore(); const a=curArchive(store);
             if(a.cats.length<=1){ customAlert('至少保留一个分类！'); return; }
             const used=a.records.filter(r=>r.cat===name).length;
@@ -1533,7 +1602,12 @@
             // 结余必须基于「全部记录」累计，否则筛选时结余列会误导（这正是账对不上的根源）
             // 先对全部记录按时间正序，算出每笔的真实账户累计结余
             const allAsc=getUserData().slice()
-                .sort((a,b)=>new Date(a.time)-new Date(b.time));
+                .sort((a,b)=>{
+                    const t=new Date(a.time)-new Date(b.time);
+                    if(t!==0) return t;
+                    // 时间精度仅到分钟，同分钟多笔用 id 作次级键，保证累计结余顺序与显示一致
+                    return a.id<b.id ? -1 : a.id>b.id ? 1 : 0;
+                });
 
             let running=0;
             const balanceMap={};   // id -> 该笔之后的真实账户累计结余
@@ -1670,6 +1744,8 @@
             resetBillForm();
             addMask.style.display='flex';
             setTimeout(()=>billMoney.focus(), 60);
+            // 键盘弹起后补一次重排，消除首次位移（resize 事件也会处理，这里是兜底）
+            setTimeout(()=>{ window.__relayoutMasks && window.__relayoutMasks(); }, 350);
         }
         $('fabAdd').addEventListener('click', openAddModal);
         $('closeAdd').addEventListener('click', ()=>{ addMask.style.display='none'; });
