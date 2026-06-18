@@ -422,7 +422,7 @@
             }
             /* 操作按钮一行居右 */
             tbody td.ops-cell { justify-content:flex-end; }
-            tbody td.ops-cell .operate-btn { padding:7px 14px; font-size:14px; }
+            tbody td.ops-cell .operate-btn { padding:10px 20px; font-size:15px; margin:0 4px; }
             /* 空记录提示：去掉标签、居中 */
             tbody td.empty-tip { display:block; text-align:center; }
             tbody td.empty-tip::before { content:none; }
@@ -457,6 +457,9 @@
             color:var(--c-on-primary); border:none; border-radius:6px; cursor:pointer; }
         .cancel { flex:1; padding:10px; background:var(--c-border); color:#5c4500; border:none;
             border-radius:6px; cursor:pointer; }
+        .edit-del-btn { width:100%; margin-top:10px; padding:9px; background:none; border:none;
+            color:#b5482e; font-size:13px; cursor:pointer; border-radius:6px; transition:0.2s; }
+        .edit-del-btn:hover { background:rgba(181,72,46,0.08); }
 
         .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
         .cat-item { display:flex; justify-content:space-between; align-items:center;
@@ -557,7 +560,8 @@
 
                 <div class="filter-bar">
                     <label>按分类筛选：</label>
-                    <select id="filterCat"><option value="__all">全部</option></select>
+                    <button class="mini-btn" id="manageCatMain" style="margin-left:auto;">管理分类</button>
+                    <select id="filterCat" style="width:100%;"><option value="__all">全部</option></select>
                 </div>
 
                 <div class="summary-overall" id="summaryOverall"></div>
@@ -682,7 +686,7 @@
         </nav>
 
     <!-- 右下角悬浮记账按钮 -->
-    <button class="add-bar" id="fabAdd" title="记一笔"><span class="add-bar-plus">＋</span> 记一笔</button>
+    <button class="add-bar" id="fabAdd" title="记一笔">记一笔</button>
     <button class="to-top" id="toTopBtn" title="回到顶部" aria-label="回到顶部">↑</button>
 
     <!-- 记账弹窗 -->
@@ -738,6 +742,7 @@
                 <button class="save" id="saveEdit">保存</button>
                 <button class="cancel" id="cancelEdit">取消</button>
             </div>
+            <button class="edit-del-btn" id="deleteInEdit">删除这条记录</button>
         </div>
     </div>
 
@@ -1338,6 +1343,7 @@
         filterCat.addEventListener('change', ()=>{ curPage=1; renderBill(); });
 
         $('manageCat').addEventListener('click', openCatManager);
+        $('manageCatMain').addEventListener('click', openCatManager);
         $('closeCat').addEventListener('click', ()=>{ $('catMask').style.display='none'; });
         function showCatErr(msg){
             const el=$('catErr');
@@ -1619,9 +1625,8 @@
                     <td data-label="分类"><span class="cat-tag">${escapeHtml(item.cat||'未分类')}</span></td>
                     <td data-label="结余">${balance.toFixed(2)}</td>
                     <td data-label="备注">${remarkCell}</td>
-                    <td data-label="操作" class="ops-cell">
+                    <td data-label="" class="ops-cell">
                         <button class="operate-btn edit" onclick="openEdit('${item.id}')">修改</button>
-                        <button class="operate-btn del" onclick="delBill('${item.id}')">删除</button>
                     </td>`;
                 billList.appendChild(tr);
             });
@@ -1712,6 +1717,16 @@
             editMask.style.display='flex';
         };
         cancelEdit.addEventListener('click', ()=>{ editMask.style.display='none'; editId=null; });
+        $('deleteInEdit').addEventListener('click', ()=>{
+            const id=editId;
+            if(id==null) return;
+            customConfirm('确定要删除这条记录吗？', ()=>{
+                const data=getUserData().filter(r=>r.id!==id);
+                saveUserData(data);
+                editMask.style.display='none'; editId=null;
+                refreshAllViews();
+            }, '删除记录');
+        });
         // 禁止点击遮罩外部关闭，仅按钮可关闭
         saveEdit.addEventListener('click', () => {
             const time=getDtInput(editTime), money=editMoney.value;
@@ -1757,12 +1772,14 @@
                     o.textContent=opt.textContent;
                     o.onclick=(e)=>{
                         e.stopPropagation();
-                        if(sel.value!==opt.value){
-                            sel.value=opt.value;
-                            sel.dispatchEvent(new Event('change', {bubbles:true}));
-                        }
+                        const changed = sel.value!==opt.value;
+                        if(changed) sel.value=opt.value;
                         syncDisplay();
                         close();
+                        if(changed){
+                            // 先收起面板，再派发 change，避免 change 触发的重建把面板卡在展开态
+                            setTimeout(()=>{ sel.dispatchEvent(new Event('change', {bubbles:true})); }, 0);
+                        }
                     };
                     panel.appendChild(o);
                 });
