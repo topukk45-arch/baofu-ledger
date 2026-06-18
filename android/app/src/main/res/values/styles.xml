@@ -7,12 +7,16 @@
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <!-- 窗口根背景钉成米黄：键盘弹起/换输入法时露出的间隙不再是白色 -->
+        <item name="android:windowBackground">@color/appWindowBackground</item>
     </style>
 
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
-        <item name="android:background">@null</item>
+        <!-- 由 @null 改为米黄：原 @null 会让窗口露出系统默认（白）底 -->
+        <item name="android:background">@color/appWindowBackground</item>
+        <item name="android:windowBackground">@color/appWindowBackground</item>
     </style>
 
 

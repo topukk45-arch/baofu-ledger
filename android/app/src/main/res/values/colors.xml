@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 全局窗口背景：与网页主题默认底色一致的米黄。
+         键盘弹起/切换不同高度输入法时，WebView 与键盘之间可能露出窗口背景，
+         把它钉成米黄可避免露出刺眼的白条（"白图"）。 -->
+    <color name="appWindowBackground">#FDF8E8</color>
+
+    <!-- 主题主色（styles.xml 引用，补齐定义以确保任何环境都能编译） -->
+    <color name="colorPrimary">#D4AF37</color>
+    <color name="colorPrimaryDark">#B8860B</color>
+    <color name="colorAccent">#FFD700</color>
+</resources>
