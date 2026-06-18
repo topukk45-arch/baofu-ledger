@@ -448,13 +448,18 @@
         .del { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
         .operate-btn:hover { filter:brightness(1.1); }
 
-        .mask { position:fixed; top:0; left:0; width:100%; height:100%;
-            background:rgba(0,0,0,0.3); display:none; align-items:center; justify-content:center; z-index:999; }
-        /* 键盘弹出时，弹窗钉在可视区内并平滑过渡，避免被顶一下 */
-        .mask.kb-follow { align-items:flex-start; transition:padding-top 0.2s ease; }
+        /* 弹窗顶部对齐 + 固定上边距：位置不依赖可视区高度，键盘弹出/收起时弹窗几乎不动，
+           从根上消除「先居中再被键盘顶一下」的闪动。height 用 dvh，键盘弹出时浏览器自动收缩，
+           弹窗仍完整落在可视区内。 */
+        .mask { position:fixed; top:0; left:0; width:100%;
+            height:100vh; height:100dvh;
+            background:rgba(0,0,0,0.3); display:none;
+            align-items:flex-start; justify-content:center; z-index:999;
+            padding-top:6vh; padding-bottom:16px;
+            overflow-y:auto; -webkit-overflow-scrolling:touch; }
         .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
             border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
-            max-height:88vh; overflow-y:auto;
+            max-height:80vh; max-height:80dvh; overflow-y:auto;
             box-shadow:0 4px 20px rgba(var(--c-shadow-rgb),0.4); }
         .edit-dialog h3 { margin-bottom:15px; text-align:center; color:var(--c-primary-dark); }
         .edit-dialog input, .edit-dialog select { width:100%; margin:8px 0; padding:10px;
@@ -856,38 +861,29 @@
     </div>
 
     <script>
-        // ===== 软键盘检测：弹出时隐藏底栏/悬浮按钮 + 平滑居中弹窗，避免被顶起 =====
+        // ===== 软键盘检测：弹出时隐藏底栏/悬浮按钮 =====
+        // 弹窗定位已交给 CSS（顶部对齐 + 固定边距 + dvh 高度），键盘弹出时弹窗几乎不动，
+        // 因此这里不再对弹窗做任何位置重算（那正是「闪一下」的来源）。
         (function(){
             const vv = window.visualViewport;
             if(!vv) return; // 不支持则不处理，保持原样
             let baseH = vv.height;
-            function layoutMasks(kb){
+            // 兜底：少数不支持 dvh 的旧 webview，键盘弹出时 100vh 不会收缩，
+            // 这里只同步 .mask 的高度（不改对齐/不改 padding），弹窗仍顶部对齐、不产生位移。
+            function syncMaskHeight(kb){
                 document.querySelectorAll('.mask').forEach(m=>{
-                    if(getComputedStyle(m).display==='none'){ m.classList.remove('kb-follow'); m.style.paddingTop=''; m.style.height=''; return; }
-                    if(kb){
-                        // 在可视区(vv.height)内居中弹窗，超出则顶部留 12px
-                        const dlg=m.firstElementChild;
-                        const dh=dlg?dlg.offsetHeight:0;
-                        const pad=Math.max(12, (vv.height-dh)/2);
-                        m.classList.add('kb-follow');
-                        m.style.height=vv.height+'px';
-                        m.style.paddingTop=pad+'px';
-                    }else{
-                        m.classList.remove('kb-follow');
-                        m.style.height='';
-                        m.style.paddingTop='';
-                    }
+                    if(getComputedStyle(m).display==='none'){ m.style.height=''; return; }
+                    m.style.height = kb ? vv.height+'px' : '';
                 });
             }
             function onResize(){
                 const shrunk = (baseH - vv.height) > 120;
                 document.body.classList.toggle('kb-open', shrunk);
                 if(!shrunk) baseH = vv.height; // 键盘收起后更新基准（应对横竖屏切换）
-                layoutMasks(shrunk);
+                syncMaskHeight(shrunk);
             }
             vv.addEventListener('resize', onResize);
-            // 暴露给打开弹窗时主动调用，规避部分 webview resize 事件延迟
-            window.__relayoutMasks = ()=>layoutMasks((baseH - vv.height) > 120);
+            window.__relayoutMasks = ()=>syncMaskHeight((baseH - vv.height) > 120);
         })();
 
 
