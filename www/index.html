@@ -876,111 +876,51 @@
     </div>
 
     <script>
-        // ===== 软键盘处理（自适应：resize 模式 / pan 模式） =====
-        // 背景：adjustPan 模式下键盘把整个 WebView 上推，底部空出的一帧会露出窗口白底（白带）。
-        // 根治是改用 adjustResize + @capacitor/keyboard 插件：WebView 被压缩而非上推，底部不再露白。
+        // ===== 软键盘处理（极简、稳健版） =====
+        // 关键教训：之前"先把弹窗设透明、等键盘信号再淡入"的做法，会在键盘弹起、WebView 重排的
+        // 那一帧里露出透明弹窗下的底部空白 —— 这正是"先白图、后弹窗"的真正来源。
         //
-        // 本段自动判别运行环境：
-        //   · 检测到 @capacitor/keyboard 插件（即已按 resize 方案打包）→ 走「resize 模式」：
-        //     交给原生压缩 + CSS 的 100dvh 自适应，并用 keyboardWillShow/Hide 提前切换状态类，
-        //     不再强制 mask 高度（强制会与原生压缩打架）。
-        //   · 未检测到插件（纯浏览器 / 仍是 adjustPan 包）→ 走「pan 模式」：保持原有 visualViewport
-        //     逻辑，行为与之前完全一致，确保不会比现在更糟。
+        // 现在的策略：弹窗一律【直接、不透明】显示，绝不留透明帧。键盘让位完全交给原生层
+        // （AndroidManifest 的 adjustResize + Keyboard 插件 resize:native）：键盘弹起时 WebView
+        // 被压缩、不上推，弹窗靠 CSS 的 100dvh 自然落在键盘上方。
+        //
+        // 这里的 JS 只做一件事：用浏览器原生的 visualViewport 检测键盘开/关，借此隐藏底栏与
+        // 悬浮按钮，并给极旧 webview 兜底 mask 高度。不依赖任何 Capacitor 插件的 JS 引用
+        // （纯 HTML 项目里 window.Capacitor.Plugins.Keyboard 不一定存在，依赖它会判断失灵）。
         (function(){
             const vv = window.visualViewport;
 
-            // —— 判定是否处于 resize 模式（装了 Keyboard 插件即认为按 resize 方案打的包）——
-            const cap = window.Capacitor;
-            const kbPlugin = (cap && cap.Plugins && cap.Plugins.Keyboard) ? cap.Plugins.Keyboard : null;
-            const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
-            const resizeMode = !!(kbPlugin && isNative);
-
-            // resize 模式下：mask 高度交给 CSS 的 100dvh 自适应，这里不强制（避免与原生压缩冲突）。
-            // pan 模式下：保留对不支持 dvh 的旧 webview 的高度兜底。
+            // 兜底：极旧、不支持 dvh 的 webview 在键盘弹起时 100dvh 不收缩，这里同步 mask 高度。
+            // 现代 webview（含本 App 的 adjustResize）下 dvh 会自动收缩，这步是无害的双保险。
             function syncMaskHeight(kb){
-                if(resizeMode || !vv) return;            // resize 模式不插手高度
+                if(!vv) return;
                 document.querySelectorAll('.mask').forEach(m=>{
                     if(getComputedStyle(m).display==='none'){ m.style.height=''; return; }
                     m.style.height = kb ? vv.height+'px' : '';
                 });
             }
 
-            // 统一的「键盘开/关」状态切换：隐藏底栏/悬浮按钮等
-            function setKbOpen(open){
-                document.body.classList.toggle('kb-open', open);
-                syncMaskHeight(open);
-            }
-
-            if(resizeMode){
-                // —— resize 模式：用插件事件提前、可靠地切换状态（早于 visualViewport，赶在白帧前）——
-                try{
-                    kbPlugin.addListener && kbPlugin.addListener('keyboardWillShow', ()=> setKbOpen(true));
-                    kbPlugin.addListener && kbPlugin.addListener('keyboardDidHide',  ()=> setKbOpen(false));
-                }catch(e){ /* 插件事件不可用时下面的 vv 兜底仍会接管 */ }
-                // 兜底：仍监听 visualViewport，双保险（某些机型插件事件缺失）
-                if(vv){
-                    let baseH = vv.height;
-                    vv.addEventListener('resize', ()=>{
-                        const shrunk = (baseH - vv.height) > 120;
-                        document.body.classList.toggle('kb-open', shrunk);
-                        if(!shrunk) baseH = vv.height;
-                    });
-                }
-                window.__relayoutMasks = ()=>{};   // resize 模式无需重排
-            } else if(vv){
-                // —— pan 模式：保持原有逻辑（与之前完全一致）——
+            if(vv){
                 let baseH = vv.height;
-                function onResize(){
-                    const shrunk = (baseH - vv.height) > 120;
+                vv.addEventListener('resize', ()=>{
+                    const shrunk = (baseH - vv.height) > 120;   // 可视区明显变矮 = 键盘弹起
                     document.body.classList.toggle('kb-open', shrunk);
-                    if(!shrunk) baseH = vv.height; // 键盘收起后更新基准（应对横竖屏切换）
+                    if(!shrunk) baseH = vv.height;               // 键盘收起后更新基准（应对横竖屏切换）
                     syncMaskHeight(shrunk);
-                }
-                vv.addEventListener('resize', onResize);
+                });
                 window.__relayoutMasks = ()=>syncMaskHeight((baseH - vv.height) > 120);
             } else {
-                // 既非 resize、又无 visualViewport：什么都不做，保持原样
                 window.__relayoutMasks = ()=>{};
             }
 
-            // 打开「记一笔」弹窗。分两种模式：
-            //
-            // · resize 模式（adjustResize + Keyboard 插件）：WebView 被压缩、不上推，弹窗直接显示即可
-            //   稳定落在键盘上方。绝不能再玩「先透明、后淡入」——那会让键盘弹起、WebView 压缩重排的
-            //   那一帧里弹窗仍是透明的，于是露出底部白块（这正是「先白图、后弹窗」的真正原因）。
-            //   所以这里直接 flex 显示弹窗、再聚焦输入框，全程不透明、无白帧。
-            //
-            // · pan 模式（无插件）：保留原「先弹键盘、后淡入弹窗」策略，避免弹窗被上推时位移闪动。
+            // 打开「记一笔」弹窗：直接、不透明地显示，随后聚焦输入框触发键盘。
+            // 全程没有透明帧 → 没有白图。键盘让位由原生 adjustResize 处理。
             window.__openModalAfterKeyboard = function(mask, focusEl){
                 const dlg = mask.firstElementChild;
-
-                if(resizeMode){
-                    // resize：弹窗直接、不透明地显示，随后聚焦触发键盘，由原生压缩自然让位，无白帧
-                    if(dlg){ dlg.style.opacity = '1'; }
-                    mask.style.display = 'flex';
-                    setTimeout(()=>{ try{ focusEl && focusEl.focus(); }catch(e){} }, 50);
-                    return;
-                }
-
-                // —— 以下为 pan 模式：先透明显示、键盘就位后淡入 ——
+                if(dlg){ dlg.style.opacity = '1'; dlg.style.transition = ''; }
                 mask.style.display = 'flex';
-                if(dlg){ dlg.style.opacity = '0'; }      // 弹窗先隐形（遮罩背景已可见）
-                setTimeout(()=>{ try{ focusEl && focusEl.focus(); }catch(e){} }, 30);
-
-                let done = false;
-                function reveal(){
-                    if(done) return; done = true;
-                    if(vv) vv.removeEventListener('resize', onKb);
-                    if(dlg){
-                        dlg.style.transition = 'opacity 0.18s ease';
-                        dlg.style.opacity = '1';
-                        setTimeout(()=>{ dlg.style.transition=''; }, 220);
-                    }
-                }
-                const startH = vv ? vv.height : 0;
-                function onKb(){ if(vv && (startH - vv.height > 120)) reveal(); }
-                if(vv) vv.addEventListener('resize', onKb);
-                setTimeout(reveal, 450);
+                // 稍等一拍再聚焦，让弹窗先完成绘制，键盘随后弹起，不抢在绘制前造成空帧
+                setTimeout(()=>{ try{ focusEl && focusEl.focus(); }catch(e){} }, 50);
             };
         })();
 
