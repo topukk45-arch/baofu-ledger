@@ -1083,7 +1083,16 @@
         function storeKey(){ return `store_${currentUser}`; }
 
         let __idSeq = 0;
-        function genId(){ return 'r' + Date.now().toString(36) + (__idSeq++).toString(36) + Math.floor(Math.random()*1000); }
+        // 生成定长、可按字符串直接比较先后的 id：
+        //   r + 13位毫秒时间戳 + 6位自增序列 + 4位随机
+        // 各段都补零定长，故字符串比较结果与时间顺序一致；自增序列保证同毫秒内不重复，
+        // 末尾随机进一步降低多端/导入时的碰撞概率。
+        function genId(){
+            const ts=String(Date.now()).padStart(13,'0');
+            const seq=String((__idSeq++) % 1000000).padStart(6,'0');
+            const rnd=String(Math.floor(Math.random()*10000)).padStart(4,'0');
+            return 'r'+ts+seq+rnd;
+        }
 
         function normArchive(a){
             if (Array.isArray(a)) a = { records:a, cats:DEFAULT_CATS.slice() };
@@ -1130,13 +1139,17 @@
                 customPrompt('把这份存档导入到哪个账号？（不存在会自动创建）', preset, (acct)=>{
                     acct=acct.trim();
                     try{
-                        const finalName=importArchiveFromText(text, acct);
+                        const { finalName, stats }=importArchiveFromText(text, acct);
                         recordUser(acct);            // 让该账号出现在最近账号里
                         renderRecentUsers();
-                        customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。\n现在进入该账号吗？`, ()=>{
+                        customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。${importFixSuffix(stats)}\n\n现在进入该账号吗？`, ()=>{
                             login(acct);             // 进入后会自动定位到 last（即刚导入的存档）
                         }, '导入成功', { okText:'立即进入', cancelText:'稍后' });
-                    }catch(err){ customAlert('导入失败：文件格式不正确'); }
+                    }catch(err){
+                        customAlert(err && err.message==='empty'
+                            ? '导入失败：文件里没有有效记录'
+                            : '导入失败：文件格式不正确');
+                    }
                 }, '导入到账号', (acct)=>{
                     acct=acct.trim();
                     if(!acct) return '请输入账号名';
@@ -1243,7 +1256,7 @@
                 // 数据迁移后必须重新加载界面，否则仍显示旧视图直到刷新
                 const store=loadStore();
                 currentArchive = store.last || Object.keys(store.archives)[0];
-                refreshArchiveSelect(); refreshCatSelectors(); renderBill();
+                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
                 customAlert(`用户名已改为「${newName}」`);
             }, '修改用户名', (newName)=>{
                 if(newName===oldName) return '';
@@ -1274,7 +1287,7 @@
                 const store=loadStore();
                 store.archives[name]={ records:[], cats:DEFAULT_CATS.slice() };
                 store.last=name; saveStore(store); currentArchive=name;
-                refreshArchiveSelect(); refreshCatSelectors(); renderBill();
+                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '新建存档', (name)=>{
                 if(charLen(name) > 16) return '存档名最多 16 个字～';
                 if(loadStore().archives[name]) return '该存档名已存在';
@@ -1288,7 +1301,7 @@
                 store.archives[name]=store.archives[currentArchive];
                 delete store.archives[currentArchive];
                 currentArchive=name; store.last=name; saveStore(store);
-                refreshArchiveSelect(); renderBill();
+                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '重命名存档', (name)=>{
                 if(name===currentArchive) return '';
                 if(charLen(name) > 16) return '存档名最多 16 个字～';
@@ -1304,7 +1317,7 @@
                 delete s.archives[currentArchive];
                 currentArchive=Object.keys(s.archives)[0];
                 s.last=currentArchive; saveStore(s);
-                refreshArchiveSelect(); refreshCatSelectors(); renderBill();
+                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '删除存档');
         });
 
@@ -1360,29 +1373,50 @@
             // 把输入框换成多行更好读
             setTimeout(()=>{ const i=$('askInput'); if(i){ i.select(); } }, 80);
         }
-        // 校验并清洗导入的单条记录：金额非正数/非法、类型非法都会被拒，避免脏数据污染结余
+        // 校验并清洗导入的单条记录：金额非正数/非法、类型非法都会被拒，避免脏数据污染结余。
+        // 返回 { records, stats }，stats 记录做了哪些「静默修正」，供导入后如实提示用户。
         function sanitizeImportedRecords(records){
             const out=[];
+            const stats={ dropped:0, timeFixed:0, typeFilled:0 };
+            const reFull=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;          // 恰好到分钟
+            const reWithSec=/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):\d{2}/; // 带秒/毫秒，可安全截断
             for(const r of records){
-                if(!r || typeof r!=='object') continue;
+                if(!r || typeof r!=='object'){ stats.dropped++; continue; }
                 const m=normMoney(r.money);
-                if(!m.ok) continue;                       // 金额非法直接丢弃这条
-                const type = (r.type==='expense'||r.type==='income') ? r.type : 'income';
-                let time = (typeof r.time==='string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(r.time))
-                    ? r.time : nowDtValue();               // 时间非法则补为当前时刻
+                if(!m.ok){ stats.dropped++; continue; }              // 金额非法直接丢弃这条
+
+                // 类型：仅接受 expense/income，缺失或非法补为 income 并计数
+                let type, mSec;
+                if(r.type==='expense'||r.type==='income'){ type=r.type; }
+                else { type='income'; stats.typeFilled++; }
+
+                // 时间：完整分钟格式直接用；带秒/毫秒则截断到分钟（不算改写）；
+                //       其余一律补为当前时刻并计数（这才是真正改变了数据语义的情况）
+                let time;
+                if(typeof r.time==='string' && reFull.test(r.time)){
+                    time=r.time;
+                } else if(typeof r.time==='string' && (mSec=r.time.match(reWithSec))){
+                    time=mSec[1];
+                } else {
+                    time=nowDtValue(); stats.timeFixed++;
+                }
+
                 let cat = (typeof r.cat==='string' && r.cat.trim()) ? r.cat.trim() : '未分类';
                 let remark = (typeof r.remark==='string') ? r.remark.slice(0,5000) : '';
                 out.push({ id:genId(), time, money:m.val, cat, remark, type });
             }
-            return out;
+            return { records:out, stats };
         }
 
-        // 核心导入逻辑：解析文本 → 清洗 → 存为目标用户名下的新存档。返回最终存档名或抛错。
+        // 核心导入逻辑：解析文本 → 清洗 → 存为目标用户名下的新存档。
+        // 返回 { finalName, stats } 或抛错；stats 用于导入后提示静默修正情况。
         function importArchiveFromText(text, targetUser){
             const parsed=JSON.parse(text);   // 解析失败由调用方 catch
             const rawRecords=Array.isArray(parsed)?parsed:parsed.data;
             if(!Array.isArray(rawRecords)) throw new Error('bad');
-            const records=sanitizeImportedRecords(rawRecords);
+            const { records, stats }=sanitizeImportedRecords(rawRecords);
+            // 一条有效记录都没有：视为无效文件，避免悄悄建一个空存档
+            if(records.length===0) throw new Error('empty');
 
             // 分类：清洗去空、去重，确保含「未分类」
             let cats=(parsed && Array.isArray(parsed.cats) && parsed.cats.length)
@@ -1406,7 +1440,17 @@
             store.archives[finalName]={ records, cats };
             store.last=finalName; saveStore(store);
             currentUser=prevUser;   // 还原，由调用方决定是否真正登录
-            return finalName;
+            return { finalName, stats };
+        }
+
+        // 把清洗统计拼成一句人类可读的提示尾巴（没有任何修正则返回空串）
+        function importFixSuffix(stats){
+            if(!stats) return '';
+            const parts=[];
+            if(stats.timeFixed>0)  parts.push(`${stats.timeFixed} 条时间格式异常，已改为导入时刻`);
+            if(stats.typeFilled>0) parts.push(`${stats.typeFilled} 条缺收支类型，已默认按收入`);
+            if(stats.dropped>0)    parts.push(`${stats.dropped} 条金额无效，已跳过`);
+            return parts.length ? `\n\n注意：其中 ${parts.join('；')}。` : '';
         }
 
         $('importBtn').addEventListener('click', () => $('importFile').click());
@@ -1415,12 +1459,16 @@
             const reader=new FileReader();
             reader.onload=ev=>{
                 try{
-                    const finalName=importArchiveFromText(ev.target.result, currentUser);
+                    const { finalName, stats }=importArchiveFromText(ev.target.result, currentUser);
                     const store=loadStore();
                     store.last=finalName; saveStore(store); currentArchive=finalName;
-                    refreshArchiveSelect(); refreshCatSelectors(); renderBill();
-                    customAlert(`导入成功！已存为存档「${finalName}」`);
-                }catch(err){ customAlert('导入失败：文件格式不正确'); }
+                    refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
+                    customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}`, '导入成功', 'left');
+                }catch(err){
+                    customAlert(err && err.message==='empty'
+                        ? '导入失败：文件里没有有效记录'
+                        : '导入失败：文件格式不正确');
+                }
                 $('importFile').value='';
             };
             reader.readAsText(file);
@@ -1466,7 +1514,7 @@
             if(a.cats.includes(name)){ showCatErr('该分类已存在'); return; }
             a.cats.push(name); saveStore(store);
             $('newCatName').value=''; showCatErr('');
-            refreshCatSelectors(); openCatManager(); renderBill();
+            refreshCatSelectors(); openCatManager(); refreshAllViews();
         });
         function openCatManager(){
             showCatErr('');
@@ -1494,7 +1542,7 @@
                 a.cats=a.cats.map(c=>c===oldName?name:c);
                 a.records.forEach(r=>{ if(r.cat===oldName) r.cat=name; });
                 saveStore(store);
-                refreshCatSelectors(); openCatManager(); renderBill();
+                refreshCatSelectors(); openCatManager(); refreshAllViews();
             }, '重命名分类', (name)=>{
                 name=name.trim();
                 if(!name) return '分类名不能为空';
@@ -1516,7 +1564,7 @@
                 if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
                 ar.records.forEach(r=>{ if(r.cat===name) r.cat='未分类'; });
                 saveStore(s);
-                refreshCatSelectors(); openCatManager(); renderBill();
+                refreshCatSelectors(); openCatManager(); refreshAllViews();
             }, '删除分类');
         }
 
@@ -1639,21 +1687,27 @@
         function renderBill(){
             const filterVal=filterCat.value;
             // 结余必须基于「全部记录」累计，否则筛选时结余列会误导（这正是账对不上的根源）
-            // 先对全部记录按时间正序，算出每笔的真实账户累计结余
-            const allAsc=getUserData().slice()
+            // 先对全部记录按时间正序，算出每笔的真实账户累计结余。
+            // 时间精度仅到分钟，同分钟多笔用「记录在存储数组里的原始顺序」作次级键——
+            // 它天然稳定且唯一，不依赖 id 的字符串大小（旧 id 不定长，字符串比较会乱序）。
+            const raw=getUserData();
+            const allAsc=raw
+                .map((r,origIdx)=>({ r, origIdx }))
                 .sort((a,b)=>{
-                    const t=new Date(a.time)-new Date(b.time);
+                    const t=new Date(a.r.time)-new Date(b.r.time);
                     if(t!==0) return t;
-                    // 时间精度仅到分钟，同分钟多笔用 id 作次级键，保证累计结余顺序与显示一致
-                    return a.id<b.id ? -1 : a.id>b.id ? 1 : 0;
-                });
+                    return a.origIdx-b.origIdx;
+                })
+                .map(x=>x.r);
 
             let running=0;
-            const balanceMap={};   // id -> 该笔之后的真实账户累计结余
+            // 把每笔的累计结余直接挂在「排序后的记录对象」上（__bal）。
+            // 后续筛选/反转/分页都带着同一对象走，渲染时按对象取值，不经过 id 查表，
+            // 因此旧数据里即便存在偶发重复 id 也绝不会互相覆盖、算错结余。
             allAsc.forEach(item=>{
                 const amt=Number(item.money||0);
                 running += (item.type==='expense' ? -amt : amt);
-                balanceMap[item.id]=running;
+                item.__bal=running;
             });
 
             // 再按筛选条件取出要显示的子集（仍保持时间正序）
@@ -1714,7 +1768,7 @@
             const pageItems = desc.slice(start, start + PAGE_SIZE);
 
             pageItems.forEach(item=>{
-                const balance=balanceMap[item.id];
+                const balance=item.__bal;
                 const isExp = item.type==='expense';
                 const amt=Number(item.money||0);
                 const typeTag = isExp
@@ -1811,13 +1865,6 @@
                 openAddModal();     // 重新打开，且为全新空白表单（不带上次数据）
             }, '记账成功', { okText:'再记一笔', cancelText:'关闭' });
         });
-
-        window.delBill=function(id){
-            customConfirm('确定要删除这条记录吗？', ()=>{
-                const data=getUserData().filter(r=>r.id!==id);
-                saveUserData(data); refreshAllViews();
-            });
-        };
 
         window.viewRemark=function(id){
             const item=getUserData().find(r=>r.id===id);
