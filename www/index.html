@@ -448,15 +448,13 @@
         .del { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
         .operate-btn:hover { filter:brightness(1.1); }
 
-        /* 弹窗顶部对齐 + 固定上边距：位置不依赖可视区高度，键盘弹出/收起时弹窗几乎不动，
-           从根上消除「先居中再被键盘顶一下」的闪动。height 用 dvh，键盘弹出时浏览器自动收缩，
-           弹窗仍完整落在可视区内。 */
+        /* 弹窗在可视区内居中。height 用 dvh：键盘弹出时浏览器自动把它收缩到键盘上方，
+           居中点随之上移，因此「先弹键盘、后显示弹窗」时，弹窗一次性出现在最终居中位置，全程不动。 */
         .mask { position:fixed; top:0; left:0; width:100%;
             height:100vh; height:100dvh;
             background:rgba(0,0,0,0.3); display:none;
-            align-items:flex-start; justify-content:center; z-index:999;
-            padding-top:6vh; padding-bottom:16px;
-            overflow-y:auto; -webkit-overflow-scrolling:touch; }
+            align-items:center; justify-content:center; z-index:999;
+            padding:16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
         .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
             border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
             max-height:80vh; max-height:80dvh; overflow-y:auto;
@@ -884,6 +882,34 @@
             }
             vv.addEventListener('resize', onResize);
             window.__relayoutMasks = ()=>syncMaskHeight((baseH - vv.height) > 120);
+
+            // 「键盘先出来，弹窗再出现」：先把遮罩显示但弹窗本体透明，聚焦输入框触发键盘，
+            // 等键盘弹起、可视区稳定后再淡入弹窗，使弹窗一次性出现在最终居中位置，全程不闪。
+            window.__openModalAfterKeyboard = function(mask, focusEl){
+                const dlg = mask.firstElementChild;
+                const startH = vv.height;
+                mask.style.display = 'flex';
+                if(dlg){ dlg.style.opacity = '0'; }      // 弹窗先隐形（遮罩背景已可见）
+                // 聚焦输入框触发软键盘
+                setTimeout(()=>{ try{ focusEl && focusEl.focus(); }catch(e){} }, 30);
+
+                let done = false;
+                function reveal(){
+                    if(done) return; done = true;
+                    vv.removeEventListener('resize', onKb);
+                    if(dlg){
+                        // 用一次淡入让弹窗柔和出现（此时键盘已就位、居中点已稳定）
+                        dlg.style.transition = 'opacity 0.18s ease';
+                        dlg.style.opacity = '1';
+                        setTimeout(()=>{ dlg.style.transition=''; }, 220);
+                    }
+                }
+                // 键盘弹起（可视区明显变矮）即认为就位，显示弹窗
+                function onKb(){ if(startH - vv.height > 120) reveal(); }
+                vv.addEventListener('resize', onKb);
+                // 兜底：450ms 内键盘没弹出（桌面/聚焦失败等），也直接显示，避免一直透明
+                setTimeout(reveal, 450);
+            };
         })();
 
 
@@ -1738,10 +1764,14 @@
         }
         function openAddModal(){
             resetBillForm();
-            addMask.style.display='flex';
-            setTimeout(()=>billMoney.focus(), 60);
-            // 键盘弹起后补一次重排，消除首次位移（resize 事件也会处理，这里是兜底）
-            setTimeout(()=>{ window.__relayoutMasks && window.__relayoutMasks(); }, 350);
+            if(window.__openModalAfterKeyboard){
+                // 键盘先出来，弹窗再淡入（消除被键盘顶起的闪动）
+                window.__openModalAfterKeyboard(addMask, billMoney);
+            } else {
+                // 不支持 visualViewport 的环境：保持原行为
+                addMask.style.display='flex';
+                setTimeout(()=>billMoney.focus(), 60);
+            }
         }
         $('fabAdd').addEventListener('click', openAddModal);
         $('closeAdd').addEventListener('click', ()=>{ addMask.style.display='none'; });
