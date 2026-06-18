@@ -298,6 +298,18 @@
             border-radius:14px; padding:14px; margin-bottom:12px; }
         .stat-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
         .stat-cal-head span { font-size:16px; font-weight:bold; color:var(--c-text); }
+        #statMonthLabel { cursor:pointer; padding:4px 12px; border-radius:9px; border:1px solid var(--c-border); }
+        #statMonthLabel:active { background:var(--c-chip); }
+        /* 年月选择器 */
+        .ym-year-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+        .ym-year-row span { font-size:18px; font-weight:bold; color:var(--c-text); }
+        .ym-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+        .ym-grid button { padding:12px 0; border:1px solid var(--c-border); border-radius:10px;
+            background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer; position:relative; transition:0.12s; }
+        .ym-grid button.cur { background:var(--c-primary); color:var(--c-on-primary); font-weight:bold; border-color:var(--c-primary); }
+        .ym-grid button.has::after { content:''; position:absolute; top:6px; right:6px;
+            width:6px; height:6px; border-radius:50%; background:var(--c-accent); }
+        .ym-grid button.cur.has::after { background:var(--c-on-primary); }
         .stat-week { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:5px; }
         .stat-week span { text-align:center; font-size:11px; color:var(--c-text-soft); }
         .stat-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
@@ -376,6 +388,9 @@
         .summary-filter .filter-nums b { color:var(--c-primary-dark); font-size:15px; }
 
         .cat-stats { text-align:center; color:var(--c-text); font-size:13px; margin-bottom:12px; }
+        .bill-head { font-size:16px; font-weight:bold; color:var(--c-primary-dark);
+            padding:4px 2px 8px; border-bottom:2px solid var(--c-border); margin-bottom:4px;
+            scroll-margin-top:12px; }
         .cat-stats .chip { display:inline-block; background:var(--c-chip); border:1px solid var(--c-accent-soft);
             border-radius:12px; padding:3px 10px; margin:3px; color:var(--c-primary-deep); }
 
@@ -548,6 +563,8 @@
                 <div class="summary-overall" id="summaryOverall"></div>
                 <div class="summary-filter" id="summaryFilter" style="display:none"></div>
                 <div class="cat-stats" id="catStats"></div>
+
+                <div class="bill-head" id="billHead">账单</div>
 
                 <table>
                     <thead>
@@ -806,6 +823,22 @@
             <div class="dialog-btn">
                 <button class="save" id="askOk">确定</button>
                 <button class="cancel" id="askCancel">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计页：年月选择器 -->
+    <div class="mask" id="ymMask">
+        <div class="edit-dialog">
+            <div class="ym-year-row">
+                <button class="dt-nav" id="ymPrevY">‹</button>
+                <span id="ymYearLabel">2026</span>
+                <button class="dt-nav" id="ymNextY">›</button>
+            </div>
+            <div class="ym-grid" id="ymGrid"></div>
+            <div class="dialog-btn">
+                <button class="save" id="ymToCurrent">回到当月</button>
+                <button class="cancel" id="ymCancel">取消</button>
             </div>
         </div>
     </div>
@@ -1613,7 +1646,7 @@
         }
         // 翻页后让列表顶部对齐，避免停在半截
         function scrollListTop(){
-            const t=document.querySelector('table');
+            const t=$('billHead') || document.querySelector('table');
             if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
         }
 
@@ -2000,7 +2033,9 @@
                 b.classList.toggle('active', b.dataset.tab===tab);
             });
             if(tab==='stats') renderStats();
-            window.scrollTo({top:0});
+            // 切换标签后回到顶部：延到布局完成后执行，避免在 display 切换同帧里失效
+            window.scrollTo(0,0);
+            requestAnimationFrame(()=>{ window.scrollTo(0,0); document.documentElement.scrollTop=0; document.body.scrollTop=0; });
         }
         document.querySelectorAll('.tab-btn').forEach(b=>{
             b.addEventListener('click', ()=>switchTab(b.dataset.tab));
@@ -2293,6 +2328,50 @@
             statMonth++; if(statMonth>11){ statMonth=0; statYear++; }
             statSelDay=null; renderStatCalendar();
         });
+
+        // ===== 年月选择器 =====
+        (function(){
+            const mask=$('ymMask'), grid=$('ymGrid'), yearLabel=$('ymYearLabel');
+            let pickYear;   // 选择器里临时浏览的年份
+
+            // 找出某年里有记账记录的月份集合（用于打点标记）
+            function monthsWithData(year){
+                const set=new Set();
+                statRecords().forEach(r=>{
+                    const d=new Date(r.time);
+                    if(d.getFullYear()===year) set.add(d.getMonth());
+                });
+                return set;
+            }
+            function paint(){
+                yearLabel.textContent=pickYear;
+                const has=monthsWithData(pickYear);
+                const now=new Date();
+                grid.innerHTML='';
+                for(let m=0;m<12;m++){
+                    const b=document.createElement('button');
+                    b.textContent=(m+1)+'月';
+                    if(pickYear===statYear && m===statMonth) b.classList.add('cur');
+                    if(has.has(m)) b.classList.add('has');
+                    b.onclick=()=>{
+                        statYear=pickYear; statMonth=m; statSelDay=null;
+                        mask.style.display='none'; renderStatCalendar();
+                    };
+                    grid.appendChild(b);
+                }
+            }
+            function open(){ pickYear=statYear; paint(); mask.style.display='flex'; }
+
+            $('statMonthLabel').addEventListener('click', open);
+            $('ymPrevY').addEventListener('click', ()=>{ pickYear--; paint(); });
+            $('ymNextY').addEventListener('click', ()=>{ pickYear++; paint(); });
+            $('ymCancel').addEventListener('click', ()=>{ mask.style.display='none'; });
+            $('ymToCurrent').addEventListener('click', ()=>{
+                const now=new Date();
+                statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null;
+                mask.style.display='none'; renderStatCalendar();
+            });
+        })();
 
         // ===== 页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页 =====
         (function initApp(){
