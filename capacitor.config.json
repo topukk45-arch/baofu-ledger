@@ -3,7 +3,8 @@
   "appName": "早日暴富记账本",
   "webDir": "www",
   "android": {
-    "allowMixedContent": false
+    "allowMixedContent": false,
+    "backgroundColor": "#fdf8e8"
   },
   "plugins": {
     "Keyboard": {
