@@ -1,9 +1,7 @@
 name: 构建安卓 APK
-
 on:
   push:
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,7 +26,16 @@ jobs:
       - name: 同步网页到原生工程
         run: npx cap sync android
 
-      - name: 编译 APK（debug，可直接安装）
+      - name: 还原签名 keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/baofu.keystore"
+
+      - name: 编译 APK（固定签名，可覆盖升级）
+        env:
+          KEYSTORE_FILE: ${{ runner.temp }}/baofu.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           cd android
           chmod +x gradlew
