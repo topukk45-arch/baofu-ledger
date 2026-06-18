@@ -876,35 +876,78 @@
     </div>
 
     <script>
-        // ===== 软键盘检测：弹出时隐藏底栏/悬浮按钮 =====
-        // 弹窗定位已交给 CSS（顶部对齐 + 固定边距 + dvh 高度），键盘弹出时弹窗几乎不动，
-        // 因此这里不再对弹窗做任何位置重算（那正是「闪一下」的来源）。
+        // ===== 软键盘处理（自适应：resize 模式 / pan 模式） =====
+        // 背景：adjustPan 模式下键盘把整个 WebView 上推，底部空出的一帧会露出窗口白底（白带）。
+        // 根治是改用 adjustResize + @capacitor/keyboard 插件：WebView 被压缩而非上推，底部不再露白。
+        //
+        // 本段自动判别运行环境：
+        //   · 检测到 @capacitor/keyboard 插件（即已按 resize 方案打包）→ 走「resize 模式」：
+        //     交给原生压缩 + CSS 的 100dvh 自适应，并用 keyboardWillShow/Hide 提前切换状态类，
+        //     不再强制 mask 高度（强制会与原生压缩打架）。
+        //   · 未检测到插件（纯浏览器 / 仍是 adjustPan 包）→ 走「pan 模式」：保持原有 visualViewport
+        //     逻辑，行为与之前完全一致，确保不会比现在更糟。
         (function(){
             const vv = window.visualViewport;
-            if(!vv) return; // 不支持则不处理，保持原样
-            let baseH = vv.height;
-            // 兜底：少数不支持 dvh 的旧 webview，键盘弹出时 100vh 不会收缩，
-            // 这里只同步 .mask 的高度（不改对齐/不改 padding），弹窗仍顶部对齐、不产生位移。
+
+            // —— 判定是否处于 resize 模式（装了 Keyboard 插件即认为按 resize 方案打的包）——
+            const cap = window.Capacitor;
+            const kbPlugin = (cap && cap.Plugins && cap.Plugins.Keyboard) ? cap.Plugins.Keyboard : null;
+            const isNative = !!(cap && cap.isNativePlatform && cap.isNativePlatform());
+            const resizeMode = !!(kbPlugin && isNative);
+
+            // resize 模式下：mask 高度交给 CSS 的 100dvh 自适应，这里不强制（避免与原生压缩冲突）。
+            // pan 模式下：保留对不支持 dvh 的旧 webview 的高度兜底。
             function syncMaskHeight(kb){
+                if(resizeMode || !vv) return;            // resize 模式不插手高度
                 document.querySelectorAll('.mask').forEach(m=>{
                     if(getComputedStyle(m).display==='none'){ m.style.height=''; return; }
                     m.style.height = kb ? vv.height+'px' : '';
                 });
             }
-            function onResize(){
-                const shrunk = (baseH - vv.height) > 120;
-                document.body.classList.toggle('kb-open', shrunk);
-                if(!shrunk) baseH = vv.height; // 键盘收起后更新基准（应对横竖屏切换）
-                syncMaskHeight(shrunk);
+
+            // 统一的「键盘开/关」状态切换：隐藏底栏/悬浮按钮等
+            function setKbOpen(open){
+                document.body.classList.toggle('kb-open', open);
+                syncMaskHeight(open);
             }
-            vv.addEventListener('resize', onResize);
-            window.__relayoutMasks = ()=>syncMaskHeight((baseH - vv.height) > 120);
+
+            if(resizeMode){
+                // —— resize 模式：用插件事件提前、可靠地切换状态（早于 visualViewport，赶在白帧前）——
+                try{
+                    kbPlugin.addListener && kbPlugin.addListener('keyboardWillShow', ()=> setKbOpen(true));
+                    kbPlugin.addListener && kbPlugin.addListener('keyboardDidHide',  ()=> setKbOpen(false));
+                }catch(e){ /* 插件事件不可用时下面的 vv 兜底仍会接管 */ }
+                // 兜底：仍监听 visualViewport，双保险（某些机型插件事件缺失）
+                if(vv){
+                    let baseH = vv.height;
+                    vv.addEventListener('resize', ()=>{
+                        const shrunk = (baseH - vv.height) > 120;
+                        document.body.classList.toggle('kb-open', shrunk);
+                        if(!shrunk) baseH = vv.height;
+                    });
+                }
+                window.__relayoutMasks = ()=>{};   // resize 模式无需重排
+            } else if(vv){
+                // —— pan 模式：保持原有逻辑（与之前完全一致）——
+                let baseH = vv.height;
+                function onResize(){
+                    const shrunk = (baseH - vv.height) > 120;
+                    document.body.classList.toggle('kb-open', shrunk);
+                    if(!shrunk) baseH = vv.height; // 键盘收起后更新基准（应对横竖屏切换）
+                    syncMaskHeight(shrunk);
+                }
+                vv.addEventListener('resize', onResize);
+                window.__relayoutMasks = ()=>syncMaskHeight((baseH - vv.height) > 120);
+            } else {
+                // 既非 resize、又无 visualViewport：什么都不做，保持原样
+                window.__relayoutMasks = ()=>{};
+            }
 
             // 「键盘先出来，弹窗再出现」：先把遮罩显示但弹窗本体透明，聚焦输入框触发键盘，
             // 等键盘弹起、可视区稳定后再淡入弹窗，使弹窗一次性出现在最终居中位置，全程不闪。
+            // 两种模式通用：resize 下可视区稳定得更快，淡入同样自然。
             window.__openModalAfterKeyboard = function(mask, focusEl){
                 const dlg = mask.firstElementChild;
-                const startH = vv.height;
                 mask.style.display = 'flex';
                 if(dlg){ dlg.style.opacity = '0'; }      // 弹窗先隐形（遮罩背景已可见）
                 // 聚焦输入框触发软键盘
@@ -913,7 +956,8 @@
                 let done = false;
                 function reveal(){
                     if(done) return; done = true;
-                    vv.removeEventListener('resize', onKb);
+                    if(vv) vv.removeEventListener('resize', onKb);
+                    if(kbCleanup) kbCleanup();
                     if(dlg){
                         // 用一次淡入让弹窗柔和出现（此时键盘已就位、居中点已稳定）
                         dlg.style.transition = 'opacity 0.18s ease';
@@ -921,10 +965,23 @@
                         setTimeout(()=>{ dlg.style.transition=''; }, 220);
                     }
                 }
-                // 键盘弹起（可视区明显变矮）即认为就位，显示弹窗
-                function onKb(){ if(startH - vv.height > 120) reveal(); }
-                vv.addEventListener('resize', onKb);
-                // 兜底：450ms 内键盘没弹出（桌面/聚焦失败等），也直接显示，避免一直透明
+
+                // resize 模式：优先用插件的 keyboardDidShow 作为「键盘就位」信号（最可靠）
+                let kbCleanup = null;
+                if(resizeMode && kbPlugin && kbPlugin.addListener){
+                    try{
+                        const h = kbPlugin.addListener('keyboardDidShow', ()=> reveal());
+                        // addListener 返回 Promise<PluginListenerHandle>，记下用于清理
+                        kbCleanup = ()=>{ Promise.resolve(h).then(handle=>{ try{ handle && handle.remove && handle.remove(); }catch(e){} }); };
+                    }catch(e){ kbCleanup = null; }
+                }
+
+                // visualViewport 兜底信号：可视区明显变矮即认为键盘就位
+                const startH = vv ? vv.height : 0;
+                function onKb(){ if(vv && (startH - vv.height > 120)) reveal(); }
+                if(vv) vv.addEventListener('resize', onKb);
+
+                // 最终兜底：450ms 内没收到任何信号（桌面/聚焦失败等），也直接显示，避免一直透明
                 setTimeout(reveal, 450);
             };
         })();
