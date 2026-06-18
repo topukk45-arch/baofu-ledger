@@ -3,7 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#fdf8e8">
+    <meta name="color-scheme" content="light">
     <title>早日暴富记账本</title>
+    <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成米黄，从源头消除白闪。
+         不依赖 CSS 变量，避免极早期合成时变量尚未解析。 -->
+    <style>
+        html { background-color:#fdf8e8 !important; color-scheme:light; }
+        html, body { background-color:#fdf8e8; }
+    </style>
 
     <style>
         /* ===== 主题色变量：换肤只需改这几个，全站跟着变 =====
@@ -50,9 +58,19 @@
         input, textarea, select, button { -webkit-appearance:none; appearance:none; }
         input, textarea { font-size:16px; }
         /* 滚动更顺滑，去掉移动端下拉回弹露白 */
-        html { overscroll-behavior:none; -webkit-text-size-adjust:100%; }
+        html {
+            background: var(--c-bg);
+            overscroll-behavior:none;
+            -webkit-text-size-adjust:100%;
+        }
 
-        body { background:var(--c-bg); padding:20px; position:relative; overflow-x:hidden; }
+        body {
+            background: var(--c-bg);
+            min-height: 100dvh;
+            padding:20px;
+            position:relative;
+            overflow-x:hidden;
+        }
 
         /* 按下时的轻微回弹，让点击有原生般的反馈（.pressed 由 JS 在 touch 时切换，WebView 里可靠） */
         .mini-btn.pressed, .add-btn.pressed, .save.pressed, .cancel.pressed,
@@ -90,7 +108,7 @@
         }
 
         /* 登录页：让金色卡片在视口内垂直居中（仅登录态生效，不影响登录后会变长的主界面） */
-        body.login-mode { display:flex; flex-direction:column; min-height:100vh; }
+        body.login-mode { display:flex; flex-direction:column; min-height:100dvh; }
         body.login-mode .container { margin:auto; width:100%; }
         @media (max-width: 600px) {
             /* 手机端登录框上下内边距收一点，配合居中更稳 */
@@ -354,7 +372,7 @@
         .stat-peak-hint { font-size:11px; color:var(--c-text-soft); margin-bottom:8px; }
         .stat-bar-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
         .stat-bar-inner { height:170px; }
-        .stat-day-empty { text-align:center; color:var(--c-text-soft); font-size:13px; padding:18px 10px; }
+        .stat-day-empty { text-align:center; color:var(--c-text-soft); font-size:13px; }
         /* 时段明细弹窗 */
         .hd-list { margin-bottom:8px; }
         .hd-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px dashed var(--c-border); }
@@ -613,7 +631,6 @@
                         <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
                     </div>
                     <div class="stat-cal" id="statCal"></div>
-                    <div class="stat-cal-tip">点有底色的日期，查看当天分析</div>
                 </div>
 
                 <!-- 当月收支 -->
@@ -647,7 +664,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="stat-day-empty" id="statDayEmpty">选择上方有记录的日期，查看当天的分类与时间分析</div>
+                <div class="stat-day-empty" id="statDayEmpty"></div>
             </div>
 
             <!-- ========== 页面3：设置 ========== -->
@@ -2050,6 +2067,14 @@
                 const pal=buildPalette(primaryHex);
                 const root=document.documentElement;
                 Object.keys(pal).forEach(k=>root.style.setProperty(k, pal[k]));
+                // 同步「键盘弹起兜底底色」：把当前主题背景钉到 html inline 背景 + theme-color，
+                // 否则换肤后键盘弹起会闪一下旧底色。
+                const bg=pal['--c-bg'];
+                if(bg){
+                    root.style.backgroundColor=bg;
+                    let tc=document.querySelector('meta[name="theme-color"]');
+                    if(tc) tc.setAttribute('content', bg);
+                }
             }
 
             // —— 读写持久化 ——
