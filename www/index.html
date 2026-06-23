@@ -234,6 +234,10 @@
         .cat-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
 
         /* 收支标签：复用 cat-chips 布局，但选中态用语义色（支出红 / 收入绿）便于一眼区分 */
+        /* 收支只有两个，平分一行各占一半、撑满，尺寸放大与分类区视觉平衡 */
+        .io-chips { display:flex; gap:10px; flex-wrap:nowrap; }
+        .io-chips .cc {
+            flex:1 1 0; text-align:center; padding:13px 0; font-size:15px; }
         .io-chips .cc.sel-out {
             background:linear-gradient(135deg,#c25a3e,#a8432b); color:#fff;
             border-color:#a8432b; box-shadow:0 0 8px rgba(181,72,46,0.35); }
@@ -497,6 +501,15 @@
             color:#b5482e; font-size:13px; cursor:pointer; border-radius:6px; transition:0.2s; }
         .edit-del-btn:hover { background:rgba(181,72,46,0.08); }
 
+        /* 键盘弹起时：弹窗改为顶部对齐并限高到可视区，内部 overflow 滚动生效，
+           这样标题/时间/金额固定可见，下面的收支、备注可以滑上来，不再被键盘顶出屏幕。
+           mask 的实际高度由 JS(syncMaskHeight) 同步成 visualViewport 高度。 */
+        body.kb-open .mask { align-items:flex-start; padding-top:8px; padding-bottom:8px; }
+        body.kb-open .edit-dialog { max-height:none; }
+        /* 限高交给 mask：弹窗最高占满 mask 可用高度，超出则内部滚动 */
+        body.kb-open .mask .edit-dialog,
+        body.kb-open .mask .dt-dialog { max-height:calc(100% - 16px); overflow-y:auto; }
+
         .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
         .cat-item { display:flex; justify-content:space-between; align-items:center;
             padding:8px 10px; border:1px solid var(--c-border); border-radius:6px; margin-bottom:6px;
@@ -582,6 +595,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0623-A</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
