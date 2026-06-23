@@ -220,6 +220,27 @@
         .cat-row { display:flex; gap:8px; }
         .cat-row select { flex:1; cursor:pointer; }
 
+        /* 分类标签：横排，常用靠前，一点即选；多了可横向滑动 */
+        .cat-chips { display:flex; gap:8px; flex-wrap:wrap; }
+        .cat-chips .cc {
+            padding:9px 16px; border:1px solid var(--c-border-mid); border-radius:20px;
+            background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer;
+            white-space:nowrap; transition:0.15s; -webkit-user-select:none; user-select:none; }
+        .cat-chips .cc:hover { border-color:var(--c-accent); }
+        .cat-chips .cc.sel {
+            background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); border-color:var(--c-primary); font-weight:600;
+            box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .cat-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
+
+        /* 收支标签：复用 cat-chips 布局，但选中态用语义色（支出红 / 收入绿）便于一眼区分 */
+        .io-chips .cc.sel-out {
+            background:linear-gradient(135deg,#c25a3e,#a8432b); color:#fff;
+            border-color:#a8432b; box-shadow:0 0 8px rgba(181,72,46,0.35); }
+        .io-chips .cc.sel-in {
+            background:linear-gradient(135deg,#4a9a3c,#357a2a); color:#fff;
+            border-color:#357a2a; box-shadow:0 0 8px rgba(58,122,46,0.35); }
+
         /* 收入/支出选择行 */
         .type-row { display:flex; gap:8px; }
         .type-row select { flex:0 0 42%; cursor:pointer;
@@ -479,11 +500,23 @@
         .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
         .cat-item { display:flex; justify-content:space-between; align-items:center;
             padding:8px 10px; border:1px solid var(--c-border); border-radius:6px; margin-bottom:6px;
-            background:var(--c-surface); color:var(--c-primary-deep); }
+            background:var(--c-surface); color:var(--c-primary-deep);
+            touch-action:pan-y; }
         .cat-item button { border:none; background:var(--c-primary); color:var(--c-on-primary); border-radius:4px;
             padding:3px 9px; cursor:pointer; font-size:12px; }
         .cat-add-row { display:flex; gap:8px; margin-top:8px; }
         .cat-add-row input { flex:1; margin:0; }
+        /* 拖动手柄与左侧名称 */
+        .cat-item .cat-left { display:flex; align-items:center; gap:8px; min-width:0; }
+        .cat-item .drag-handle { flex:0 0 auto; cursor:grab; color:var(--c-text-soft);
+            font-size:18px; line-height:1; padding:2px 4px; -webkit-user-select:none; user-select:none;
+            touch-action:none; }
+        .cat-item .cat-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        /* 长按拖起时的视觉：浮起、半透明、压暗背景占位 */
+        .cat-item.dragging { opacity:0.92; box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.4);
+            border-color:var(--c-primary); position:relative; z-index:5; }
+        .cat-item.drag-placeholder { opacity:0.35; }
+        .cat-reorder-tip { font-size:11.5px; color:var(--c-text-soft); margin:2px 2px 8px; }
 
         .empty-tip { text-align:center; padding:30px; color:var(--c-text); }
 
@@ -713,25 +746,29 @@
                     <input type="text" id="billTime" placeholder="选择记账时间" readonly class="dt-input">
                 </div>
                 <div class="field">
-                    <label class="field-label">收支与金额</label>
-                    <div class="type-row">
-                        <select id="billType">
-                            <option value="expense" selected>支出（花销）</option>
-                            <option value="income">收入（存入）</option>
-                        </select>
-                        <input type="text" inputmode="decimal" id="billMoney" class="money-input" placeholder="输入金额（正数）">
-                    </div>
+                    <label class="field-label">金额</label>
+                    <input type="text" inputmode="decimal" id="billMoney" class="money-input" placeholder="">
                 </div>
                 <div class="field">
-                    <div class="field-label-row">
-                        <label class="field-label">分类</label>
-                        <button class="link-btn" id="manageCat">管理分类</button>
-                    </div>
-                    <select id="billCat"></select>
+                    <label class="field-label">分类</label>
+                    <!-- 固定顺序的横排标签：顺序由「管理分类」页拖动决定，一点即选 -->
+                    <div class="cat-chips" id="billCatChips"></div>
+                    <!-- 分类已由上方标签(chips)驱动；此 select 仅隐藏作取值用，不再增强为可见下拉 -->
+                    <select id="billCat" style="display:none"></select>
                 </div>
                 <div class="field">
-                    <label class="field-label">备注（选填）</label>
-                    <textarea id="billRemark" class="remark-area" placeholder="可拖右下角调整大小，最多 5000 字" maxlength="5000" rows="2"></textarea>
+                    <label class="field-label">收支</label>
+                    <!-- 收支标签：与分类一致，必选、不默认选中。先选分类再选收支，从上到下一路点下来 -->
+                    <div class="cat-chips io-chips" id="billTypeChips"></div>
+                    <!-- 隐藏 select 仅作取值用，不增强为可见下拉 -->
+                    <select id="billType" style="display:none">
+                        <option value="expense">支出（花销）</option>
+                        <option value="income">收入（存入）</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field-label">备注</label>
+                    <textarea id="billRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
                 </div>
                 <button class="add-btn" id="addBill">添加记录</button>
             </div>
@@ -744,14 +781,33 @@
     <div class="mask" id="editMask">
         <div class="edit-dialog">
             <h3>修改账单</h3>
-            <input type="text" id="editTime" placeholder="选择记账时间" readonly class="dt-input">
-            <select id="editType">
-                <option value="income">收入（存入）</option>
-                <option value="expense">支出（花销）</option>
-            </select>
-            <input type="text" inputmode="decimal" id="editMoney" class="money-input" placeholder="输入金额（正数）">
-            <select id="editCat"></select>
-            <textarea id="editRemark" class="remark-area" placeholder="备注（可拖右下角调整大小，最多 5000 字）" maxlength="5000" rows="2"></textarea>
+            <div class="form-box">
+                <div class="field">
+                    <label class="field-label">记账时间</label>
+                    <input type="text" id="editTime" placeholder="选择记账时间" readonly class="dt-input">
+                </div>
+                <div class="field">
+                    <label class="field-label">金额</label>
+                    <input type="text" inputmode="decimal" id="editMoney" class="money-input" placeholder="">
+                </div>
+                <div class="field">
+                    <label class="field-label">分类</label>
+                    <div class="cat-chips" id="editCatChips"></div>
+                    <select id="editCat" style="display:none"></select>
+                </div>
+                <div class="field">
+                    <label class="field-label">收支</label>
+                    <div class="cat-chips io-chips" id="editTypeChips"></div>
+                    <select id="editType" style="display:none">
+                        <option value="expense">支出（花销）</option>
+                        <option value="income">收入（存入）</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field-label">备注</label>
+                    <textarea id="editRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
+                </div>
+            </div>
             <div class="dialog-btn">
                 <button class="save" id="saveEdit">保存</button>
                 <button class="cancel" id="cancelEdit">取消</button>
@@ -763,6 +819,7 @@
     <div class="mask" id="catMask">
         <div class="edit-dialog">
             <h3>管理分类</h3>
+            <div class="cat-reorder-tip">长按左侧 ⠿ 拖动可调整顺序，顺序会用在记账页的标签排列</div>
             <div class="cat-list" id="catList"></div>
             <div class="cat-add-row">
                 <input type="text" id="newCatName" placeholder="新分类名称（最多 8 字）" maxlength="8">
@@ -1479,7 +1536,7 @@
         }
         filterCat.addEventListener('change', ()=>{ curPage=1; renderBill(); });
 
-        $('manageCat').addEventListener('click', openCatManager);
+        // 记账弹窗内的「管理分类」入口已移除，仅保留账单页(主页)的入口
         $('manageCatMain').addEventListener('click', openCatManager);
         $('closeCat').addEventListener('click', ()=>{ $('catMask').style.display='none'; });
         function showCatErr(msg){
@@ -1496,7 +1553,7 @@
             if(a.cats.includes(name)){ showCatErr('该分类已存在'); return; }
             a.cats.push(name); saveStore(store);
             $('newCatName').value=''; showCatErr('');
-            refreshCatSelectors(); openCatManager(); refreshAllViews();
+            refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen();
         });
         function openCatManager(){
             showCatErr('');
@@ -1504,17 +1561,150 @@
             const list=$('catList'); list.innerHTML='';
             a.cats.forEach(c=>{
                 const div=document.createElement('div'); div.className='cat-item';
-                const span=document.createElement('span'); span.textContent=c;
+                div.dataset.cat=c;
+
+                const left=document.createElement('div'); left.className='cat-left';
+                const handle=document.createElement('span'); handle.className='drag-handle';
+                handle.textContent='⠿'; handle.title='长按拖动排序';
+                const span=document.createElement('span'); span.className='cat-name'; span.textContent=c;
+                left.appendChild(handle); left.appendChild(span);
+
                 const wrap=document.createElement('div');
                 const rn=document.createElement('button'); rn.textContent='改名'; rn.style.marginRight='6px';
                 rn.onclick=()=>renameCat(c);
                 const del=document.createElement('button'); del.textContent='删除';
                 del.onclick=()=>deleteCat(c);
                 wrap.appendChild(rn); wrap.appendChild(del);
-                div.appendChild(span); div.appendChild(wrap);
+
+                div.appendChild(left); div.appendChild(wrap);
+                attachCatDrag(div, handle);
                 list.appendChild(div);
             });
             $('catMask').style.display='flex';
+        }
+
+        // ===== 分类长按拖动排序（pointer/touch 手写，避免 WebView 原生 draggable 不稳）=====
+        // 在手柄上按住约 250ms 触发拖动；跟手移动，越过相邻项中线即交换位置；松手落位并存盘。
+        function attachCatDrag(item, handle){
+            let holdTimer=null, dragging=false;
+            let startY=0, curY=0, placeholder=null, listEl=null, items=[];
+            const HOLD_MS=250, MOVE_CANCEL=10;
+
+            function onDown(e){
+                const pt=e.touches?e.touches[0]:e;
+                startY=pt.clientY; curY=startY;
+                holdTimer=setTimeout(()=>startDrag(pt), HOLD_MS);
+                document.addEventListener('pointermove', onMovePre, {passive:true});
+                document.addEventListener('touchmove', onMovePre, {passive:true});
+                document.addEventListener('pointerup', cancelPre, {passive:true});
+                document.addEventListener('touchend', cancelPre, {passive:true});
+                document.addEventListener('pointercancel', cancelPre, {passive:true});
+                document.addEventListener('touchcancel', cancelPre, {passive:true});
+            }
+            // 长按未触发前若手指明显移动，判为滚动，取消长按
+            function onMovePre(e){
+                const pt=e.touches?e.touches[0]:e;
+                if(Math.abs(pt.clientY-startY)>MOVE_CANCEL){ clearHold(); }
+            }
+            function cancelPre(){ clearHold(); }
+            function clearHold(){
+                if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; }
+                if(!dragging){
+                    document.removeEventListener('pointermove', onMovePre);
+                    document.removeEventListener('touchmove', onMovePre);
+                    document.removeEventListener('pointerup', cancelPre);
+                    document.removeEventListener('touchend', cancelPre);
+                    document.removeEventListener('pointercancel', cancelPre);
+                    document.removeEventListener('touchcancel', cancelPre);
+                }
+            }
+
+            function startDrag(pt){
+                dragging=true;
+                clearHold();
+                listEl=item.parentNode;
+                items=Array.from(listEl.children);
+                const rect=item.getBoundingClientRect();
+                // 占位：保留原高度，避免后面项跳动
+                placeholder=document.createElement('div');
+                placeholder.className='cat-item drag-placeholder';
+                placeholder.style.height=rect.height+'px';
+                placeholder.style.marginBottom=getComputedStyle(item).marginBottom;
+                listEl.insertBefore(placeholder, item);
+                // 把被拖项变为绝对定位浮层，跟手
+                item.classList.add('dragging');
+                item.style.position='fixed';
+                item.style.left=rect.left+'px';
+                item.style.top=rect.top+'px';
+                item.style.width=rect.width+'px';
+                item.style.margin='0';
+                item.style.pointerEvents='none';
+                if(navigator.vibrate) try{ navigator.vibrate(15); }catch(_){}
+
+                document.addEventListener('pointermove', onMove, {passive:false});
+                document.addEventListener('touchmove', onMove, {passive:false});
+                document.addEventListener('pointerup', onUp, {passive:true});
+                document.addEventListener('touchend', onUp, {passive:true});
+                document.addEventListener('pointercancel', onUp, {passive:true});
+                document.addEventListener('touchcancel', onUp, {passive:true});
+            }
+
+            function onMove(e){
+                if(!dragging) return;
+                if(e.cancelable) e.preventDefault();      // 阻止页面滚动
+                const pt=e.touches?e.touches[0]:e;
+                curY=pt.clientY;
+                const rect=item.getBoundingClientRect();
+                item.style.top=(rect.top + (curY - (rect.top+rect.height/2)))+'px';
+                // 找占位应插入的位置：以指针 Y 与各兄弟项中线比较
+                const siblings=Array.from(listEl.children)
+                    .filter(el=>el!==item && el!==placeholder);
+                let inserted=false;
+                for(const sib of siblings){
+                    const r=sib.getBoundingClientRect();
+                    if(curY < r.top + r.height/2){
+                        listEl.insertBefore(placeholder, sib); inserted=true; break;
+                    }
+                }
+                if(!inserted) listEl.appendChild(placeholder);
+            }
+
+            function onUp(){
+                if(!dragging){ clearHold(); return; }
+                dragging=false;
+                // 落位：把拖项放回占位处
+                listEl.insertBefore(item, placeholder);
+                placeholder.remove(); placeholder=null;
+                item.classList.remove('dragging');
+                item.style.position=''; item.style.left=''; item.style.top='';
+                item.style.width=''; item.style.margin=''; item.style.pointerEvents='';
+
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('pointerup', onUp);
+                document.removeEventListener('touchend', onUp);
+                document.removeEventListener('pointercancel', onUp);
+                document.removeEventListener('touchcancel', onUp);
+
+                persistCatOrder();
+            }
+
+            handle.addEventListener('pointerdown', onDown, {passive:true});
+            handle.addEventListener('touchstart', onDown, {passive:true});
+        }
+
+        // 把当前 DOM 里 cat-item 的顺序写回存档的 cats 数组
+        function persistCatOrder(){
+            const order=Array.from($('catList').children)
+                .map(el=>el.dataset && el.dataset.cat)
+                .filter(Boolean);
+            if(!order.length) return;
+            const store=loadStore(); const a=curArchive(store);
+            // 以新顺序重排，遗漏的（理论上不会有）补在末尾
+            const set=new Set(order);
+            a.cats=order.concat(a.cats.filter(c=>!set.has(c)));
+            saveStore(store);
+            refreshCatSelectors(); refreshBillCatChipsIfOpen();
         }
         function renameCat(oldName){
             customPrompt('', oldName, (name)=>{
@@ -1524,7 +1714,7 @@
                 a.cats=a.cats.map(c=>c===oldName?name:c);
                 a.records.forEach(r=>{ if(r.cat===oldName) r.cat=name; });
                 saveStore(store);
-                refreshCatSelectors(); openCatManager(); refreshAllViews();
+                refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen();
             }, '重命名分类', (name)=>{
                 name=name.trim();
                 if(!name) return '分类名不能为空';
@@ -1546,7 +1736,7 @@
                 if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
                 ar.records.forEach(r=>{ if(r.cat===name) r.cat='未分类'; });
                 saveStore(s);
-                refreshCatSelectors(); openCatManager(); refreshAllViews();
+                refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen();
             }, '删除分类');
         }
 
@@ -1806,13 +1996,72 @@
 
         // ===== 悬浮按钮：打开/关闭记账弹窗 =====
         const addMask=$('addMask');
-        // 把记账表单恢复到「空白初始态」：空金额/空备注、支出、未分类、时间为此刻
+
+        // 渲染记账弹窗的分类标签：按存档里 cats 的固定顺序显示（顺序由「管理分类」页拖动决定）
+        // 不默认选中任何分类——分类为必选项，由用户主动点选
+        let billCatSel='';
+        function renderBillCatChips(){
+            const cats=getCats();
+            billCatSel='';               // 每次渲染都重置为「未选」
+            billCat.value='';
+            const box=$('billCatChips');
+            box.innerHTML='';
+            cats.forEach(c=>{
+                const b=document.createElement('div');
+                b.className='cc';
+                b.textContent=c;
+                b.onclick=()=>{
+                    billCatSel=c; billCat.value=c;
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                };
+                box.appendChild(b);
+            });
+        }
+
+        // 分类增删改/排序后调用：若记账弹窗正开着，重渲染标签使其立即反映最新分类。
+        // 尽量保留用户当前已选的分类（若它还存在）。
+        function refreshBillCatChipsIfOpen(){
+            if($('addMask').style.display!=='flex') return;
+            const keep=billCatSel;
+            renderBillCatChips();
+            if(keep && getCats().includes(keep)){
+                billCatSel=keep; billCat.value=keep;
+                $('billCatChips').querySelectorAll('.cc').forEach(el=>{
+                    el.classList.toggle('sel', el.textContent===keep);
+                });
+            }
+        }
+
+        // 渲染收支标签：支出/收入，必选、不默认选中。选中态用语义色（支出红/收入绿）
+        let billTypeSel='';
+        function renderBillTypeChips(){
+            billTypeSel='';
+            billType.value='';
+            const box=$('billTypeChips');
+            box.innerHTML='';
+            const opts=[ {v:'expense', t:'支出', cls:'sel-out'},
+                         {v:'income',  t:'收入', cls:'sel-in'} ];
+            opts.forEach(o=>{
+                const b=document.createElement('div');
+                b.className='cc';
+                b.textContent=o.t;
+                b.onclick=()=>{
+                    billTypeSel=o.v; billType.value=o.v;
+                    box.querySelectorAll('.cc').forEach(el=>{
+                        el.classList.remove('sel-out','sel-in');
+                    });
+                    b.classList.add(o.cls);
+                };
+                box.appendChild(b);
+            });
+        }
+
+        // 把记账表单恢复到「空白初始态」：空金额/空备注、不选收支、不选分类、时间为此刻
         function resetBillForm(){
             billMoney.value='';
             billRemark.value='';
-            billType.value='expense';
-            const cats=getCats();
-            billCat.value = cats.includes('未分类') ? '未分类' : cats[0];
+            renderBillTypeChips();
+            renderBillCatChips();
             setDtInput(billTime, nowDtValue());
         }
         function openAddModal(){
@@ -1834,6 +2083,8 @@
             const cat=billCat.value, remark=billRemark.value.trim();
             const type=billType.value;
             if(!time || money===''){ customAlert('请填写完整时间和金额！'); return; }
+            if(!cat){ customAlert('请选择一个分类～'); return; }
+            if(!type){ customAlert('请选择收支（支出或收入）～'); return; }
             const m = normMoney(money);
             if(!m.ok){ customAlert(m.why); return; }
             const data=getUserData();
@@ -1854,14 +2105,57 @@
             customAlert(item.remark || '（无备注）', '备注详情', 'left');
         };
 
+        // ===== 修改弹窗的分类/收支标签（与记账弹窗同款，但打开时预选记录原有值）=====
+        let editCatSel='', editTypeSel='';
+        // selected: 要预选中的分类；不传或不存在则不选中
+        function renderEditCatChips(selected){
+            const cats=getCats();
+            // 隐藏 select 需含每个分类的 option，否则 editCat.value=c 不生效
+            fillSelect(editCat, cats, null);
+            editCatSel = (selected && cats.includes(selected)) ? selected : '';
+            editCat.value=editCatSel;
+            const box=$('editCatChips');
+            box.innerHTML='';
+            cats.forEach(c=>{
+                const b=document.createElement('div');
+                b.className='cc'+(c===editCatSel?' sel':'');
+                b.textContent=c;
+                b.onclick=()=>{
+                    editCatSel=c; editCat.value=c;
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                };
+                box.appendChild(b);
+            });
+        }
+        function renderEditTypeChips(selected){
+            editTypeSel = (selected==='expense'||selected==='income') ? selected : '';
+            editType.value=editTypeSel;
+            const box=$('editTypeChips');
+            box.innerHTML='';
+            const opts=[ {v:'expense', t:'支出', cls:'sel-out'},
+                         {v:'income',  t:'收入', cls:'sel-in'} ];
+            opts.forEach(o=>{
+                const b=document.createElement('div');
+                b.className='cc'+(o.v===editTypeSel?' '+o.cls:'');
+                b.textContent=o.t;
+                b.onclick=()=>{
+                    editTypeSel=o.v; editType.value=o.v;
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.remove('sel-out','sel-in'));
+                    b.classList.add(o.cls);
+                };
+                box.appendChild(b);
+            });
+        }
+
         let editId=null;
         window.openEdit=function(id){
             editId=id;
             const item=getUserData().find(r=>r.id===id);
             if(!item){ customAlert('未找到该记录'); return; }
             setDtInput(editTime, item.time); editMoney.value=item.money; editRemark.value=item.remark||'';
-            editType.value=item.type||'income';
-            fillSelect(editCat, getCats(), item.cat||'未分类');
+            // 预选记录原有的分类与收支（标签式）
+            renderEditCatChips(item.cat||'未分类');
+            renderEditTypeChips(item.type||'income');
             editMask.style.display='flex';
         };
         cancelEdit.addEventListener('click', ()=>{ editMask.style.display='none'; editId=null; });
@@ -1881,6 +2175,8 @@
             const cat=editCat.value, remark=editRemark.value.trim();
             const type=editType.value;
             if(!time || money===''){ customAlert('时间和金额不能为空！'); return; }
+            if(!cat){ customAlert('请选择一个分类～'); return; }
+            if(!type){ customAlert('请选择收支（支出或收入）～'); return; }
             const m = normMoney(money);
             if(!m.ok){ customAlert(m.why); return; }
             const data=getUserData();
@@ -1972,7 +2268,9 @@
         document.addEventListener('click', ()=>{ document.querySelectorAll('.cs-wrap.open').forEach(w=>w.classList.remove('open')); });
 
         // 初始化页面里所有原生下拉
-        ['archiveSelect','filterCat','billType','billCat','editType','editCat','dtHour','dtMin']
+        // 注意：billCat 不再增强为可见下拉——它已被分类标签(chips)取代，仅作隐藏取值用
+        // 注意：billCat/billType/editCat/editType 均不增强为可见下拉——已被记账/修改弹窗的标签(chips)取代，仅作隐藏取值用
+        ['archiveSelect','filterCat','dtHour','dtMin']
             .forEach(id=>{ const el=$(id); if(el) enhanceSelect(el); });
 
         // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====
