@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#fdf8e8">
+    <meta name="theme-color" content="#f1f9f8">
     <meta name="color-scheme" content="light">
     <title>记问</title>
     <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成米黄，从源头消除白闪。
@@ -81,19 +81,6 @@
         .logout.pressed, .ask-dialog button.pressed {
             transform:scale(0.95); filter:brightness(0.95); transition:transform .04s, filter .04s;
         }
-
-        body::before {
-            content:""; position:fixed; top:0; left:0; width:100%; height:100%;
-            background-image:
-                radial-gradient(2px 2px at 20px 30px, var(--c-accent), transparent),
-                radial-gradient(2px 2px at 60px 70px, var(--c-accent-soft), transparent),
-                radial-gradient(1px 1px at 50px 50px, var(--c-chip), transparent),
-                radial-gradient(2px 2px at 130px 80px, var(--c-accent), transparent),
-                radial-gradient(1px 1px at 90px 10px, var(--c-accent-soft), transparent);
-            background-repeat:repeat; background-size:200px 200px;
-            opacity:0.4; pointer-events:none; z-index:-1; animation:shine 8s linear infinite;
-        }
-        @keyframes shine { 0%{background-position:0 0;} 100%{background-position:200px 200px;} }
 
         .container {
             max-width:760px; margin:0 auto;
@@ -801,7 +788,7 @@
             <div class="field" style="margin-top:14px;">
                 <label class="field-label">自定义主色（拾色器）</label>
                 <div class="theme-custom-row">
-                    <input type="color" id="customColor" value="#d4af37">
+                    <input type="color" id="customColor" value="#3f6f6b">
                     <button class="mini-btn gold" id="applyCustomBtn">应用此色</button>
                     <button class="mini-btn" id="resetThemeBtn">恢复默认</button>
                 </div>
@@ -2036,16 +2023,13 @@
 
         // ===== 外观：主题色（全局，所有账号共用，存 localStorage）=====
         (function(){
-            const DEFAULT_PRIMARY='#d4af37';
+            const DEFAULT_PRIMARY='#3f6f6b';
             // 预设：每套只给一个主色，其余色由算法从主色推导，保证整体协调
             const PRESETS=[
-                { name:'经典金', color:'#d4af37' },
-                { name:'薄荷绿', color:'#3aa775' },
-                { name:'天空蓝', color:'#3a86c8' },
-                { name:'樱花粉', color:'#e06fa0' },
-                { name:'珊瑚橙', color:'#e8763a' },
-                { name:'紫罗兰', color:'#8a63d2' },
-                { name:'石墨灰', color:'#5a6470' }
+                { name:'雾松青', color:'#3f6f6b' },
+                { name:'素墨米', color:'#8a7f66' },
+                { name:'黛紫烟', color:'#6b5a82' },
+                { name:'宣纸灰', color:'#5f5b54' }
             ];
 
             // —— 颜色工具：hex<->hsl，按亮度派生整套变量 ——
