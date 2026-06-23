@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#fdf8e8">
     <meta name="color-scheme" content="light">
-    <title>早日暴富记账本</title>
+    <title>记问</title>
     <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成米黄，从源头消除白闪。
          不依赖 CSS 变量，避免极早期合成时变量尚未解析。 -->
     <style>
@@ -561,7 +561,7 @@
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
-            <h2>早日暴富记账本</h2>
+            <h2>记问</h2>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1318,7 +1318,7 @@
 
         $('exportBtn').addEventListener('click', async () => {
             const store=loadStore(); const a=curArchive(store);
-            const payload={ app:'早日暴富记账本', user:currentUser, archive:currentArchive,
+            const payload={ app:'记问', user:currentUser, archive:currentArchive,
                 cats:a.cats, data:a.records, exportedAt:new Date().toLocaleString() };
             const json=JSON.stringify(payload,null,2);
             const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;

@@ -1,6 +1,6 @@
 {
   "appId": "com.baofu.ledger",
-  "appName": "早日暴富记账本",
+  "appName": "记问",
   "webDir": "www",
   "android": {
     "allowMixedContent": false,
