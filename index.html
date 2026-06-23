@@ -1,0 +1,2872 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f1f9f8">
+    <meta name="color-scheme" content="light">
+    <title>记问</title>
+    <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成米黄，从源头消除白闪。
+         不依赖 CSS 变量，避免极早期合成时变量尚未解析。 -->
+    <style>
+        html { background-color:#fdf8e8 !important; color-scheme:light; }
+        html, body { background-color:#fdf8e8; }
+    </style>
+
+    <style>
+        /* ===== 主题色变量：换肤只需改这几个，全站跟着变 =====
+           语义色（收入绿/支出红/错误红）不在此处，保持固定不随主题变化 */
+        :root {
+            --c-primary:#d4af37;      /* 主金色：按钮、强调 */
+            --c-primary-dark:#b8860b; /* 深主色：渐变深端、标题 */
+            --c-primary-deep:#8b6914; /* 更深：正文强调字 */
+            --c-accent:#ffd700;       /* 高亮：聚焦光晕 */
+            --c-accent-soft:#ffe488;  /* 柔高亮：次按钮底 */
+            --c-text:#a07500;         /* 主文字色 */
+            --c-text-soft:#a07d1a;    /* 次文字/标签 */
+            --c-border:#e6d080;       /* 浅边框 */
+            --c-border-mid:#e6c86a;   /* 中边框 */
+            --c-surface:#fffdf0;      /* 输入框/卡片底 */
+            --c-surface-2:#fffdf3;    /* 浮层底 */
+            --c-bg:#fdf8e8;           /* 页面背景 */
+            --c-card-1:#fff9e6;       /* 卡片渐变浅 */
+            --c-card-2:#fff1c1;       /* 卡片渐变深 */
+            --c-chip:#fff5cc;         /* 标签/选项悬停底 */
+            --c-on-primary:#fff;      /* 主色上的文字（白） */
+            --c-primary-mid:#e6c200;  /* 渐变起始/次要描边 */
+            --c-shadow-rgb:212,175,55;/* 阴影/光晕用的主色 RGB */
+            --c-pos:#3a7a2e;          /* 收入/正值（语义色，固定） */
+            --c-neg:#b5482e;          /* 支出/负值（语义色，固定） */
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft Yahei", sans-serif; }
+
+        /* ===== 去网页味：让它更像原生 App ===== */
+        /* 点击不再出现蓝色/灰色高亮方块 */
+        * { -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+        /* 按钮、标签、可点元素不可选中文字，避免长按选字/出现文本光标 */
+        button, .mini-btn, .link-btn, .cs-display, .cs-opt, .dt-day, .dt-nav,
+        .fab, .pager button, .user-chip, label, h3, .io-tag, .remark-view, .cat-tag {
+            -webkit-user-select:none; user-select:none;
+        }
+        /* 备注、输入框仍允许选中文字 */
+        input, textarea { -webkit-user-select:text; user-select:text; }
+        /* 去掉聚焦时的浏览器默认蓝色描边（保留我们自己的金色高亮） */
+        button:focus, button:focus-visible, select:focus-visible,
+        .cs-display:focus, .cs-display:focus-visible { outline:none; }
+        /* 输入框去除 iOS 默认圆角阴影、统一字号防止聚焦时页面缩放 */
+        input, textarea, select, button { -webkit-appearance:none; appearance:none; }
+        input, textarea { font-size:16px; }
+        /* 滚动更顺滑，去掉移动端下拉回弹露白 */
+        html {
+            background: var(--c-bg);
+            overscroll-behavior:none;
+            -webkit-text-size-adjust:100%;
+        }
+
+        body {
+            background: var(--c-bg);
+            min-height: 100dvh;
+            padding:20px;
+            position:relative;
+            overflow-x:hidden;
+        }
+
+        /* 按下时的轻微回弹，让点击有原生般的反馈（.pressed 由 JS 在 touch 时切换，WebView 里可靠） */
+        .mini-btn.pressed, .add-btn.pressed, .save.pressed, .cancel.pressed,
+        .pager button.pressed, .login-btn.pressed, .archive-bar select.pressed,
+        .cs-display.pressed, .dt-now.pressed, .link-btn.pressed, .fab.pressed,
+        .bill-actions button.pressed, .dt-day.pressed, .user-chip.pressed,
+        .io-bar .mini-btn.pressed, .cat-item button.pressed, .operate-btn.pressed,
+        .logout.pressed, .ask-dialog button.pressed {
+            transform:scale(0.95); filter:brightness(0.95); transition:transform .04s, filter .04s;
+        }
+
+        .container {
+            max-width:760px; margin:0 auto;
+            background:linear-gradient(135deg, var(--c-card-1) 0%, var(--c-card-2) 100%);
+            border:1px solid var(--c-primary-mid); border-radius:16px; padding:30px;
+            box-shadow:0 4px 18px rgba(var(--c-shadow-rgb),0.35);
+        }
+
+        @media (max-width: 600px) {
+            body { padding:10px; }
+            .container { padding:18px 14px; border-radius:14px; }
+        }
+
+        /* 登录页：让金色卡片在视口内垂直居中（仅登录态生效，不影响登录后会变长的主界面） */
+        body.login-mode { display:flex; flex-direction:column; min-height:100dvh; }
+        body.login-mode .container { margin:auto; width:100%; }
+        @media (max-width: 600px) {
+            /* 手机端登录框上下内边距收一点，配合居中更稳 */
+            body.login-mode .login-box { padding:30px 0; }
+        }
+
+        h2 { text-align:center; color:var(--c-primary-dark); margin-bottom:30px; font-weight:600;
+             letter-spacing:3px; text-shadow:0 0 6px rgba(var(--c-shadow-rgb),0.5); }
+
+        .login-box { text-align:center; padding:50px 0; }
+        .login-input { padding:12px 16px; width:240px; border:1px solid var(--c-primary);
+            border-radius:8px; font-size:16px; margin-bottom:20px; outline:none;
+            transition:0.3s; background:var(--c-surface); }
+        .login-input:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .login-btn { padding:12px 32px; border:none; border-radius:8px; font-size:16px;
+            cursor:pointer; transition:0.3s; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
+        .login-btn:hover { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.5); }
+
+        /* 登录页：从文件导入存档（次要按钮，弱于登录按钮） */
+        .login-import-row { margin-top:16px; }
+        .login-import-btn { padding:9px 20px; border:1px solid var(--c-border-mid); border-radius:8px;
+            font-size:14px; cursor:pointer; transition:0.25s; background:var(--c-surface); color:var(--c-text-soft); }
+        .login-import-btn:hover { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.35); color:var(--c-primary-deep); }
+
+        /* 最近账号 */
+        .recent-users { margin-top:28px; }
+        .recent-users .recent-title { color:var(--c-text-soft); font-size:13px; margin-bottom:12px; letter-spacing:1px; }
+        .recent-list { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+        .user-chip { display:flex; align-items:center; gap:8px; padding:8px 14px 8px 8px;
+            background:var(--c-surface); border:1px solid var(--c-border); border-radius:30px; cursor:pointer;
+            transition:0.2s; color:var(--c-primary-deep); font-size:14px; }
+        .user-chip:hover { border-color:var(--c-accent); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.4); transform:translateY(-1px); }
+        .user-chip .avatar { width:30px; height:30px; border-radius:50%; flex:0 0 30px;
+            display:flex; align-items:center; justify-content:center; color:var(--c-on-primary); font-weight:600;
+            font-size:15px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); }
+        .user-chip .u-del { border:none; background:transparent; color:var(--c-border-mid); cursor:pointer;
+            font-size:16px; line-height:1; padding:0 0 0 2px; }
+        .user-chip .u-del:hover { color:var(--c-primary-dark); }
+
+        .main-box { display:none; }
+
+        .user-info { display:flex; justify-content:space-between; align-items:center;
+            margin-bottom:25px; padding-bottom:15px; border-bottom:1px solid var(--c-border); }
+        .user-info h3 { color:var(--c-text); }
+        .logout { padding:6px 15px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); border:none; border-radius:6px; cursor:pointer; transition:0.3s; }
+        .logout:hover { box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .user-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .edit-name { background:linear-gradient(135deg,var(--c-border-mid),var(--c-primary)); }
+
+        .archive-bar, .io-bar { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+        .io-bar { margin-bottom:25px; }
+        .archive-bar select {
+            flex:1; min-width:140px; padding:12px; border:1px solid var(--c-primary);
+            border-radius:8px; font-size:14px; outline:none; background:var(--c-surface);
+            color:var(--c-primary-deep); cursor:pointer; }
+        .archive-bar select:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+
+        .mini-btn { padding:10px 14px; border:none; border-radius:8px; cursor:pointer;
+            font-size:13px; transition:0.3s; background:var(--c-accent-soft); color:#5c4500; white-space:nowrap; }
+        .mini-btn:hover { filter:brightness(1.05); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .mini-btn.gold { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
+        .io-bar .mini-btn { flex:1; text-align:center; }
+
+        .form-box { display:flex; flex-direction:column; gap:14px; margin-bottom:18px; }
+        .form-box input, .form-box select {
+            padding:12px; border:1px solid var(--c-primary); border-radius:8px; font-size:14px;
+            outline:none; transition:0.3s; background:var(--c-surface); }
+        .form-box input:focus, .form-box select:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+
+        /* 表单字段分组：标签 + 控件，让弹窗结构清晰不杂乱 */
+        .field { display:flex; flex-direction:column; gap:6px; }
+        .field-label { font-size:12.5px; color:var(--c-text-soft); font-weight:600; padding-left:2px; }
+        .field-label-row { display:flex; align-items:center; justify-content:space-between; }
+        .link-btn { background:none; border:none; color:var(--c-primary-dark); font-size:12.5px; cursor:pointer;
+            padding:2px 4px; text-decoration:underline; text-underline-offset:2px; transition:0.2s; }
+        .link-btn:hover { color:var(--c-primary-deep); }
+
+        /* 自定义金色下拉：统一手机/电脑样式，避免系统全屏面板 */
+        .cs-wrap { position:relative; display:inline-block; }
+        .cs-wrap.cs-block { display:block; width:100%; }
+        .cs-native { position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
+        .cs-display {
+            display:flex; align-items:center; justify-content:space-between; gap:8px;
+            width:100%; padding:12px; border:1px solid var(--c-primary); border-radius:8px;
+            background:var(--c-surface); color:var(--c-primary-deep); font-size:14px; cursor:pointer;
+            transition:border-color .25s, box-shadow .25s; user-select:none; }
+        .cs-display:hover { border-color:var(--c-primary-mid); }
+        .cs-wrap.open .cs-display { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .cs-display .cs-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .cs-display .cs-arrow { flex:0 0 auto; color:var(--c-primary); transition:transform .25s; font-size:12px; }
+        .cs-wrap.open .cs-display .cs-arrow { transform:rotate(180deg); }
+        .cs-panel {
+            position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:1200;
+            background:var(--c-surface-2); border:1px solid var(--c-border-mid); border-radius:10px;
+            box-shadow:0 6px 20px rgba(var(--c-shadow-rgb),0.35);
+            max-height:240px; overflow-y:auto; padding:4px; display:none; }
+        .cs-wrap.open .cs-panel { display:block; }
+        .cs-opt { padding:10px 12px; border-radius:7px; cursor:pointer; color:var(--c-primary-deep);
+            font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .cs-opt:hover { background:var(--c-chip); }
+        .cs-opt.sel { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
+        /* 让自定义下拉在各布局里占据原 select 的位置 */
+        .archive-bar .cs-wrap { flex:1; min-width:140px; }
+        .type-row .cs-wrap { flex:0 0 42%; }
+        .cat-row .cs-wrap { flex:1; }
+        .edit-dialog .cs-wrap { display:block; width:100%; margin:8px 0; }
+        .filter-bar .cs-wrap { min-width:120px; }
+        .dt-time .cs-wrap { flex:1; width:100%; }
+        .dt-time .cs-display { padding:8px 10px; }
+
+
+        /* 备注多行框：可纵向拖拽缩放，内容多时内部滚动，不撑爆弹窗 */
+        .remark-area {
+            width:100%; padding:12px; border:1px solid var(--c-primary); border-radius:8px;
+            font-size:14px; font-family:inherit; outline:none; transition:border-color .3s, box-shadow .3s;
+            background:var(--c-surface); resize:vertical; min-height:46px; max-height:220px;
+            overflow-y:auto; line-height:1.5; }
+        .remark-area:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .edit-dialog .remark-area { margin:8px 0; }
+
+        .cat-row { display:flex; gap:8px; }
+        .cat-row select { flex:1; cursor:pointer; }
+
+        /* 分类标签：横排，常用靠前，一点即选；多了可横向滑动 */
+        .cat-chips { display:flex; gap:8px; flex-wrap:wrap; }
+        .cat-chips .cc {
+            padding:9px 16px; border:1px solid var(--c-border-mid); border-radius:20px;
+            background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer;
+            white-space:nowrap; transition:0.15s; -webkit-user-select:none; user-select:none; }
+        .cat-chips .cc:hover { border-color:var(--c-accent); }
+        .cat-chips .cc.sel {
+            background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); border-color:var(--c-primary); font-weight:600;
+            box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .cat-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
+
+        /* 收支标签：复用 cat-chips 布局，但选中态用语义色（支出红 / 收入绿）便于一眼区分 */
+        /* 收支只有两个，平分一行各占一半、撑满，尺寸放大与分类区视觉平衡 */
+        .io-chips { display:flex; gap:10px; flex-wrap:nowrap; }
+        .io-chips .cc {
+            flex:1 1 0; text-align:center; padding:13px 0; font-size:15px; }
+        .io-chips .cc.sel-out {
+            background:linear-gradient(135deg,#c25a3e,#a8432b); color:#fff;
+            border-color:#a8432b; box-shadow:0 0 8px rgba(181,72,46,0.35); }
+        .io-chips .cc.sel-in {
+            background:linear-gradient(135deg,#4a9a3c,#357a2a); color:#fff;
+            border-color:#357a2a; box-shadow:0 0 8px rgba(58,122,46,0.35); }
+
+        /* 收入/支出选择行 */
+        .type-row { display:flex; gap:8px; }
+        .type-row select { flex:0 0 42%; cursor:pointer;
+            padding:12px; border:1px solid var(--c-primary); border-radius:8px; font-size:14px;
+            outline:none; background:var(--c-surface); transition:0.3s; }
+        .type-row input { flex:1; }
+        .type-row select:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+
+        /* 收支标签与正负金额颜色 */
+        .io-tag { display:inline-block; border-radius:10px; padding:2px 9px; font-size:13px; }
+        .io-in  { background:#e3f3e0; border:1px solid #b9e0b0; color:#3a7a2e; }
+        .io-out { background:#fbe6e0; border:1px solid #f0c2b4; color:#b5482e; }
+        .pos { color:#3a7a2e; }
+        .neg { color:#b5482e; }
+
+        .add-btn { padding:12px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); border:none; border-radius:8px; cursor:pointer; font-size:15px; transition:0.3s; }
+        .add-btn:hover { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.5); }
+
+        /* 右下角悬浮记账按钮 */
+        /* 固定在记账页底部、标签栏上方的「记一笔」常驻按钮 */
+        .add-bar { position:fixed; left:12px; right:12px; z-index:900;
+            bottom:calc(60px + env(safe-area-inset-bottom));
+            height:50px; border:none; border-radius:14px; cursor:pointer;
+            background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); color:var(--c-on-primary);
+            font-size:17px; font-weight:bold; display:none; align-items:center; justify-content:center; gap:6px;
+            box-shadow:0 4px 14px rgba(var(--c-shadow-rgb),0.45); transition:0.15s; }
+        .add-bar .add-bar-plus { font-size:24px; line-height:1; }
+        .add-bar:active { transform:scale(0.98); }
+        @media (min-width:761px){ .add-bar { left:50%; transform:translateX(-50%); width:480px; right:auto; } .add-bar:active{ transform:translateX(-50%) scale(0.98);} }
+
+        /* 回到顶部按钮：滚动后出现，位于「记一笔」条上方右侧 */
+        .to-top { position:fixed; right:16px; z-index:910;
+            bottom:calc(122px + env(safe-area-inset-bottom));
+            width:44px; height:44px; border-radius:50%; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-primary-dark);
+            font-size:22px; line-height:1; cursor:pointer; padding:0;
+            box-shadow:0 3px 12px rgba(var(--c-shadow-rgb),0.3);
+            opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
+        .to-top.show { opacity:1; pointer-events:auto; }
+        .to-top:active { transform:scale(0.92); }
+
+        /* ===== 底部标签栏 ===== */
+        .tab-bar { position:fixed; left:0; right:0; bottom:0; z-index:950;
+            display:flex; background:var(--c-surface-2);
+            border-top:1px solid var(--c-border);
+            padding-bottom:env(safe-area-inset-bottom);
+            box-shadow:0 -2px 12px rgba(var(--c-shadow-rgb),0.18); }
+        .tab-btn { flex:1; border:none; background:transparent; cursor:pointer;
+            padding:9px 0 8px; display:flex; flex-direction:column; align-items:center; gap:2px;
+            color:var(--c-text-soft); transition:0.15s; }
+        .tab-btn .tab-ico { font-size:21px; line-height:1; }
+        .tab-btn .tab-txt { font-size:12px; }
+        .tab-btn.active { color:var(--c-primary-dark); }
+        .tab-btn.active .tab-txt { font-weight:bold; }
+        /* 键盘弹出时，隐藏会被顶起的常驻底栏与悬浮按钮 */
+        body.kb-open .tab-bar,
+        body.kb-open .add-bar,
+        body.kb-open .to-top { display:none !important; }
+
+        /* 主界面给底栏留出空间，避免最后内容被遮住 */
+        body:not(.login-mode) .container { padding-bottom:84px; }
+        /* 记账页底部还有「记一笔」常驻条，需再多留空间（确保翻页器不被遮住） */
+        body.tab-ledger:not(.login-mode) .container { padding-bottom:165px; }
+
+        /* ===== 设置页 ===== */
+        .set-group { margin-bottom:20px; }
+        .set-group-title { color:var(--c-text-soft); font-size:13px; margin:0 4px 8px; }
+        .set-item { width:100%; display:flex; justify-content:space-between; align-items:center;
+            background:var(--c-surface); border:1px solid var(--c-border); border-radius:10px;
+            padding:14px 16px; margin-bottom:8px; cursor:pointer; font-size:15px;
+            color:var(--c-text); transition:0.15s; }
+        .set-item:hover { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.25); }
+        .set-item .set-arrow { color:var(--c-text-soft); font-size:18px; }
+        .set-item.set-danger { color:var(--c-neg, #d05a52); }
+        .set-item.set-danger .set-arrow { color:var(--c-neg, #d05a52); }
+        .set-item.set-static { cursor:default; }
+        .set-item.set-static:hover { border-color:var(--c-border); box-shadow:none; }
+        .seg { display:flex; border:1px solid var(--c-border-mid); border-radius:9px; overflow:hidden; }
+        .seg button { border:none; background:transparent; cursor:pointer; padding:6px 12px;
+            font-size:13px; color:var(--c-text-soft); transition:0.12s; }
+        .seg button.on { background:var(--c-primary); color:var(--c-on-primary); font-weight:bold; }
+
+        /* ===== 统计页 ===== */
+        .stat-card { background:var(--c-surface); border:1px solid var(--c-border);
+            border-radius:14px; padding:14px; margin-bottom:12px; }
+        .stat-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+        .stat-cal-head span { font-size:16px; font-weight:bold; color:var(--c-text); }
+        #statMonthLabel { cursor:pointer; padding:4px 12px; border-radius:9px; border:1px solid var(--c-border); }
+        #statMonthLabel:active { background:var(--c-chip); }
+        /* 年月选择器 */
+        .ym-year-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+        .ym-year-row span { font-size:18px; font-weight:bold; color:var(--c-text); }
+        .ym-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+        .ym-grid button { padding:12px 0; border:1px solid var(--c-border); border-radius:10px;
+            background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer; position:relative; transition:0.12s; }
+        .ym-grid button.cur { background:var(--c-primary); color:var(--c-on-primary); font-weight:bold; border-color:var(--c-primary); }
+        .ym-grid button.has::after { content:''; position:absolute; top:6px; right:6px;
+            width:6px; height:6px; border-radius:50%; background:var(--c-accent); }
+        .ym-grid button.cur.has::after { background:var(--c-on-primary); }
+        .stat-week { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:5px; }
+        .stat-week span { text-align:center; font-size:11px; color:var(--c-text-soft); }
+        .stat-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+        .stat-cal .day { aspect-ratio:1; border-radius:8px; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; border:1px solid transparent; }
+        .stat-cal .day .dn { font-size:12px; color:var(--c-text); }
+        .stat-cal .day .da { font-size:9px; font-weight:bold; line-height:1.1; }
+        .stat-cal .day.has { background:var(--c-chip); border-color:var(--c-border); cursor:pointer; }
+        .stat-cal .day.has:active { transform:scale(0.93); }
+        .stat-cal .day.sel { background:var(--c-primary); }
+        .stat-cal .day.sel .dn, .stat-cal .day.sel .da { color:var(--c-on-primary); }
+        .stat-cal .day.today .dn { text-decoration:underline; }
+        .stat-cal-tip { text-align:center; font-size:11px; color:var(--c-text-soft); margin-top:8px; }
+
+        .stat-month-row { display:flex; gap:10px; margin-bottom:12px; }
+        .stat-month-box { flex:1; background:var(--c-card-1); border:1px solid var(--c-border);
+            border-radius:12px; padding:12px; text-align:center; }
+        .smb-label { font-size:12px; color:var(--c-text-soft); margin-bottom:4px; }
+        .smb-val { font-size:20px; font-weight:bold; }
+
+        .stat-day-title { font-size:15px; font-weight:bold; color:var(--c-text); margin-bottom:12px; }
+        .stat-day-title .sdt-sub { display:block; font-size:13px; font-weight:normal; color:var(--c-text-soft); margin-top:4px; }
+        .stat-day-title .sdt-sub b { font-size:14px; }
+        .stat-pie-row { display:flex; gap:12px; align-items:center; }
+        .stat-pie-holder { width:140px; height:140px; flex-shrink:0; }
+        .stat-cat-list { flex:1; min-width:0; }
+        .stat-cat-list .sc-item { display:flex; align-items:center; justify-content:space-between;
+            padding:5px 0; font-size:13px; border-bottom:1px dashed var(--c-border); }
+        .stat-cat-list .sc-item:last-child { border-bottom:none; }
+        .sc-name { display:flex; align-items:center; gap:6px; min-width:0; color:var(--c-text); }
+        .sc-dot { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+        .sc-amt { font-weight:bold; white-space:nowrap; }
+
+        .stat-bar-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+        .stat-bar-title { font-size:14px; font-weight:bold; color:var(--c-text); }
+        .stat-bar-hint { font-size:11px; color:var(--c-text-soft); }
+        .stat-peak-hint { font-size:11px; color:var(--c-text-soft); margin-bottom:8px; }
+        .stat-bar-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .stat-bar-inner { height:170px; }
+        .stat-day-empty { text-align:center; color:var(--c-text-soft); font-size:13px; }
+        /* 时段明细弹窗 */
+        .hd-list { margin-bottom:8px; }
+        .hd-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px dashed var(--c-border); }
+        .hd-row:last-child { border-bottom:none; }
+        .hd-time { color:var(--c-text); font-size:14px; min-width:46px; }
+        .hd-amt { margin-left:auto; font-weight:bold; font-size:14px; }
+        .hd-sum { text-align:right; font-size:13px; color:var(--c-text-soft); padding-top:6px; border-top:1px solid var(--c-border); }
+
+        /* 分页控件 */
+        .pager { display:flex; align-items:center; justify-content:center; gap:14px;
+            margin-top:16px; flex-wrap:wrap; }
+        .pager button { padding:8px 16px; border:1px solid var(--c-primary); border-radius:8px;
+            background:var(--c-surface); color:var(--c-primary-deep); cursor:pointer; font-size:14px; transition:0.2s; }
+        .pager button:hover:not(:disabled) { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .pager button:disabled { opacity:0.4; cursor:not-allowed; }
+        .pager .page-info { color:var(--c-text); font-size:14px; }
+
+        .filter-bar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+        .filter-bar label { color:var(--c-text); font-size:14px; }
+        .filter-bar select { padding:8px 10px; border:1px solid var(--c-primary); border-radius:6px;
+            background:var(--c-surface); color:var(--c-primary-deep); outline:none; cursor:pointer; }
+
+        /* 上栏：全局总览（中性卡片底，始终显示） */
+        .summary-overall { text-align:center; color:var(--c-text); font-size:14px;
+            background:var(--c-card-1); border:1px solid var(--c-border);
+            border-radius:12px; padding:9px 12px; margin-bottom:8px; }
+        .summary-overall b { color:var(--c-primary-dark); font-size:16px; }
+        /* 下栏：当前筛选小计（主题浅色底 + 左上角分类角标，仅筛选时显示） */
+        .summary-filter { display:flex; align-items:center; gap:10px;
+            background:var(--c-chip); border:1px solid var(--c-border-mid);
+            border-radius:12px; padding:8px 12px; margin-bottom:10px;
+            color:var(--c-text); font-size:14px; }
+        .summary-filter .filter-badge { flex-shrink:0; background:var(--c-primary);
+            color:var(--c-on-primary); font-size:13px; font-weight:bold;
+            padding:3px 11px; border-radius:9px; }
+        .summary-filter .filter-nums b { color:var(--c-primary-dark); font-size:15px; }
+
+        .cat-stats { text-align:center; color:var(--c-text); font-size:13px; margin-bottom:12px; }
+        .bill-head { font-size:16px; font-weight:bold; color:var(--c-primary-dark);
+            padding:4px 2px 8px; border-bottom:2px solid var(--c-border); margin-bottom:4px;
+            scroll-margin-top:12px; }
+        .cat-stats .chip { display:inline-block; background:var(--c-chip); border:1px solid var(--c-accent-soft);
+            border-radius:12px; padding:3px 10px; margin:3px; color:var(--c-primary-deep); }
+
+        table { width:100%; border-collapse:collapse; margin-top:10px; }
+        th, td { padding:12px 8px; text-align:center; border:1px solid var(--c-border); font-size:14px; }
+        th { background:linear-gradient(135deg,var(--c-chip),var(--c-accent-soft)); color:var(--c-primary-deep); }
+
+        /* 手机端：表格变卡片 */
+        @media (max-width: 600px) {
+            table, tbody, tr, td { display:block; width:100%; }
+            thead { display:none; }                      /* 隐藏表头 */
+            table { border:none; margin-top:6px; }
+            tbody tr {
+                background:var(--c-surface-2); border:1px solid var(--c-border-mid); border-radius:12px;
+                box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),0.18);
+                margin-bottom:14px; padding:6px 4px; overflow:hidden;
+            }
+            tbody td {
+                display:flex; justify-content:space-between; align-items:center; gap:10px;
+                border:none; border-bottom:1px dashed var(--c-border);
+                padding:10px 14px; text-align:right; font-size:14px;
+            }
+            tbody td:last-child { border-bottom:none; }
+            /* 左侧标签 */
+            tbody td::before {
+                content:attr(data-label);
+                font-weight:600; color:var(--c-text); text-align:left;
+                flex:0 0 auto; white-space:nowrap;
+            }
+            /* 操作按钮一行居右 */
+            tbody td.ops-cell { justify-content:flex-end; }
+            tbody td.ops-cell .operate-btn { padding:10px 20px; font-size:15px; margin:0 4px; }
+            /* 空记录提示：去掉标签、居中 */
+            tbody td.empty-tip { display:block; text-align:center; }
+            tbody td.empty-tip::before { content:none; }
+            tbody tr:has(td.empty-tip) { box-shadow:none; border-style:dashed; }
+        }
+
+        .cat-tag { display:inline-block; background:var(--c-chip); border:1px solid var(--c-accent-soft);
+            border-radius:10px; padding:2px 9px; color:var(--c-primary-deep); font-size:13px; }
+
+        .remark-view { color:var(--c-primary-dark); cursor:pointer; border-bottom:1px dashed var(--c-primary); }
+        .remark-view:hover { color:var(--c-text); }
+        .remark-empty { color:var(--c-text-soft); }
+        .ask-msg { white-space:pre-wrap; word-break:break-word; }
+
+        .operate-btn { padding:5px 10px; margin:0 3px; border:none; border-radius:4px;
+            cursor:pointer; font-size:13px; transition:0.2s; }
+        .edit { background:var(--c-accent-soft); color:#5c4500; }
+        .del { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
+        .operate-btn:hover { filter:brightness(1.1); }
+
+        /* 弹窗在可视区内居中。height 用 dvh：键盘弹出时浏览器自动把它收缩到键盘上方，
+           居中点随之上移，因此「先弹键盘、后显示弹窗」时，弹窗一次性出现在最终居中位置，全程不动。 */
+        .mask { position:fixed; top:0; left:0; width:100%;
+            height:100vh; height:100dvh;
+            background:rgba(0,0,0,0.3); display:none;
+            align-items:center; justify-content:center; z-index:999;
+            padding:16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
+            border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
+            max-height:80vh; max-height:80dvh; overflow-y:auto;
+            box-shadow:0 4px 20px rgba(var(--c-shadow-rgb),0.4); }
+        .edit-dialog h3 { margin-bottom:15px; text-align:center; color:var(--c-primary-dark); }
+        .edit-dialog input, .edit-dialog select { width:100%; margin:8px 0; padding:10px;
+            border:1px solid var(--c-primary); border-radius:6px; outline:none; background:var(--c-surface); }
+        .dialog-btn { display:flex; gap:10px; margin-top:15px; }
+        .save { flex:1; padding:10px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); border:none; border-radius:6px; cursor:pointer; }
+        .cancel { flex:1; padding:10px; background:var(--c-border); color:#5c4500; border:none;
+            border-radius:6px; cursor:pointer; }
+        .edit-del-btn { width:100%; margin-top:10px; padding:9px; background:none; border:none;
+            color:#b5482e; font-size:13px; cursor:pointer; border-radius:6px; transition:0.2s; }
+        .edit-del-btn:hover { background:rgba(181,72,46,0.08); }
+
+        /* 键盘弹起时：弹窗改为顶部对齐并限高到可视区，内部 overflow 滚动生效，
+           这样标题/时间/金额固定可见，下面的收支、备注可以滑上来，不再被键盘顶出屏幕。
+           mask 的实际高度由 JS(syncMaskHeight) 同步成 visualViewport 高度。 */
+        body.kb-open .mask { align-items:flex-start; padding-top:8px; padding-bottom:8px; }
+        body.kb-open .edit-dialog { max-height:none; }
+        /* 限高交给 mask：弹窗最高占满 mask 可用高度，超出则内部滚动 */
+        body.kb-open .mask .edit-dialog,
+        body.kb-open .mask .dt-dialog { max-height:calc(100% - 16px); overflow-y:auto; }
+
+        .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
+        .cat-item { display:flex; justify-content:space-between; align-items:center;
+            padding:8px 10px; border:1px solid var(--c-border); border-radius:6px; margin-bottom:6px;
+            background:var(--c-surface); color:var(--c-primary-deep);
+            touch-action:pan-y; }
+        .cat-item button { border:none; background:var(--c-primary); color:var(--c-on-primary); border-radius:4px;
+            padding:3px 9px; cursor:pointer; font-size:12px; }
+        .cat-add-row { display:flex; gap:8px; margin-top:8px; }
+        .cat-add-row input { flex:1; margin:0; }
+        /* 拖动手柄与左侧名称 */
+        .cat-item .cat-left { display:flex; align-items:center; gap:8px; min-width:0; }
+        .cat-item .drag-handle { flex:0 0 auto; cursor:grab; color:var(--c-text-soft);
+            font-size:18px; line-height:1; padding:2px 4px; -webkit-user-select:none; user-select:none;
+            touch-action:none; }
+        .cat-item .cat-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        /* 长按拖起时的视觉：浮起、半透明、压暗背景占位 */
+        .cat-item.dragging { opacity:0.92; box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.4);
+            border-color:var(--c-primary); position:relative; z-index:5; }
+        .cat-item.drag-placeholder { opacity:0.35; }
+        .cat-reorder-tip { font-size:11.5px; color:var(--c-text-soft); margin:2px 2px 8px; }
+
+        .empty-tip { text-align:center; padding:30px; color:var(--c-text); }
+
+        /* 自定义时间选择器 */
+        .dt-input { cursor:pointer; }
+        .dt-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:20px;
+            border:1px solid var(--c-primary); border-radius:14px; width:92%; max-width:340px;
+            max-height:90vh; overflow-y:auto;
+            box-shadow:0 6px 24px rgba(var(--c-shadow-rgb),0.45); }
+        .dt-preview { text-align:center; font-size:18px; color:var(--c-primary-dark); font-weight:600;
+            margin-bottom:14px; letter-spacing:1px; text-shadow:0 0 6px rgba(var(--c-shadow-rgb),0.4); }
+        .dt-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+        .dt-head span { color:var(--c-primary-deep); font-weight:600; }
+        .dt-nav { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer;
+            background:var(--c-accent-soft); color:#5c4500; font-size:18px; line-height:1; transition:0.2s; }
+        .dt-nav:hover { filter:brightness(1.06); }
+        .dt-week { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px; }
+        .dt-week span { text-align:center; font-size:12px; color:var(--c-text-soft); padding:4px 0; }
+        .dt-days { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+        .dt-day { text-align:center; padding:8px 0; border-radius:8px; cursor:pointer;
+            font-size:14px; color:var(--c-primary-deep); transition:0.15s; }
+        .dt-day:hover { background:var(--c-chip); }
+        .dt-day.muted { color:var(--c-border); cursor:default; }
+        .dt-day.muted:hover { background:transparent; }
+        .dt-day.today { border:1px solid var(--c-primary); }
+        .dt-day.selected { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); font-weight:600; }
+        .dt-time { display:flex; align-items:flex-end; gap:10px; margin:14px 0 4px; }
+        .dt-time-col { display:flex; flex-direction:column; gap:4px; flex:1; }
+        .dt-time-col label { font-size:12px; color:var(--c-text-soft); }
+        .dt-time select { padding:8px; border:1px solid var(--c-primary); border-radius:8px;
+            background:var(--c-surface); color:var(--c-primary-deep); outline:none; cursor:pointer; }
+        .dt-now { padding:8px 12px; border:none; border-radius:8px; cursor:pointer;
+            background:var(--c-accent-soft); color:#5c4500; font-size:13px; white-space:nowrap; transition:0.2s; }
+        .dt-now:hover { filter:brightness(1.06); }
+
+        /* 自定义确认/输入弹窗 */
+        .ask-dialog { max-width:360px; }
+        .ask-msg { color:var(--c-primary-deep); text-align:center; margin:6px 0 4px; line-height:1.6; font-size:15px;
+            max-height:55vh; overflow-y:auto; }
+        #askInput { width:100%; margin:12px 0 4px; padding:12px; border:1px solid var(--c-primary);
+            border-radius:8px; outline:none; background:var(--c-surface); font-size:15px; font-family:inherit; }
+        #askInput:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .ask-err { color:#c0392b; font-size:13px; margin:4px 0 0; text-align:center; }
+
+        /* ===== 外观设置弹窗 ===== */
+        .theme-presets { display:flex; flex-wrap:wrap; gap:10px; }
+        .theme-swatch { width:42px; height:42px; border-radius:50%; cursor:pointer;
+            border:2px solid transparent; box-shadow:0 1px 4px rgba(0,0,0,0.15);
+            transition:transform .15s, border-color .15s; position:relative; }
+        .theme-swatch:hover { transform:scale(1.08); }
+        .theme-swatch.active { border-color:#5c4500; }
+        .theme-swatch.active::after { content:"✓"; position:absolute; inset:0;
+            display:flex; align-items:center; justify-content:center; color:var(--c-on-primary);
+            font-size:18px; text-shadow:0 1px 2px rgba(0,0,0,0.4); }
+        .theme-custom-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        .theme-custom-row input[type=color] { width:48px; height:40px; padding:0;
+            border:1px solid var(--c-border); border-radius:8px; background:var(--c-surface);
+            cursor:pointer; }
+        .theme-tip { color:var(--c-text-soft); font-size:12px; margin-top:8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-box" id="loginBox">
+            <h2>记问</h2>
+            <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
+            <br>
+            <button class="login-btn" id="loginBtn">登录</button>
+            <div class="login-import-row">
+                <button class="login-import-btn" id="loginImportBtn">从文件导入存档</button>
+                <input type="file" id="loginImportFile" accept=".json" style="display:none">
+            </div>
+            <div class="recent-users" id="recentUsers"></div>
+        </div>
+
+        <div class="main-box" id="mainBox">
+            <!-- ========== 页面1：记账（账单+记账） ========== -->
+            <div class="tab-page" id="pageLedger">
+                <div class="user-info">
+                    <h3 id="nowUser">当前用户：</h3>
+                </div>
+
+                <div class="archive-bar">
+                    <select id="archiveSelect"></select>
+                    <button class="mini-btn gold" id="newArchive">新建存档</button>
+                    <button class="mini-btn" id="renameArchive">重命名</button>
+                    <button class="mini-btn" id="delArchive">删除存档</button>
+                </div>
+
+                <div class="filter-bar">
+                    <label>按分类筛选：</label>
+                    <button class="mini-btn" id="manageCatMain" style="margin-left:auto;">管理分类</button>
+                    <select id="filterCat" style="width:100%;"><option value="__all">全部</option></select>
+                </div>
+
+                <div class="summary-overall" id="summaryOverall"></div>
+                <div class="summary-filter" id="summaryFilter" style="display:none"></div>
+                <div class="cat-stats" id="catStats"></div>
+
+                <div class="bill-head" id="billHead">账单</div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>记账时间</th>
+                            <th>收支</th>
+                            <th>金额(元)</th>
+                            <th>分类</th>
+                            <th>结余(元)</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="billList"></tbody>
+                </table>
+
+                <div class="pager" id="pager"></div>
+            </div>
+
+            <!-- ========== 页面2：统计 ========== -->
+            <div class="tab-page" id="pageStats" style="display:none">
+                <div class="user-info"><h3>统计分析</h3></div>
+
+                <!-- 日历 -->
+                <div class="stat-card">
+                    <div class="stat-cal-head">
+                        <button class="dt-nav" id="statPrevM">‹</button>
+                        <span id="statMonthLabel">2026年01月</span>
+                        <button class="dt-nav" id="statNextM">›</button>
+                    </div>
+                    <div class="stat-week">
+                        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                    </div>
+                    <div class="stat-cal" id="statCal"></div>
+                </div>
+
+                <!-- 当月收支 -->
+                <div class="stat-month-row">
+                    <div class="stat-month-box">
+                        <div class="smb-label">当月收入</div>
+                        <div class="smb-val pos" id="statMonthIn">+0.00</div>
+                    </div>
+                    <div class="stat-month-box">
+                        <div class="smb-label">当月支出</div>
+                        <div class="smb-val neg" id="statMonthOut">−0.00</div>
+                    </div>
+                </div>
+
+                <!-- 当日分析 -->
+                <div class="stat-day-wrap" id="statDayWrap" style="display:none">
+                    <div class="stat-card">
+                        <div class="stat-day-title" id="statDayTitle"></div>
+                        <div class="stat-pie-row">
+                            <div class="stat-pie-holder" id="statPie"></div>
+                            <div class="stat-cat-list" id="statCatList"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-bar-head">
+                            <span class="stat-bar-title">消费时间分布</span>
+                        </div>
+                        <div class="stat-peak-hint" id="statPeakHint"></div>
+                        <div class="stat-bar-scroll" id="statBarScroll">
+                            <div class="stat-bar-inner" id="statBarInner"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="stat-day-empty" id="statDayEmpty"></div>
+            </div>
+
+            <!-- ========== 页面3：设置 ========== -->
+            <div class="tab-page" id="pageSettings" style="display:none">
+                <div class="user-info"><h3>设置</h3></div>
+
+                <div class="set-group">
+                    <div class="set-group-title">账户</div>
+                    <button class="set-item" id="themeBtn"><span>外观主题</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="editNameBtn"><span>修改用户名</span><span class="set-arrow">›</span></button>
+                    <button class="set-item set-danger" id="logoutBtn"><span>退出登录</span><span class="set-arrow">›</span></button>
+                </div>
+
+                <div class="set-group">
+                    <div class="set-group-title">偏好</div>
+                    <div class="set-item set-static">
+                        <span>默认进入页面</span>
+                        <div class="seg" id="defaultTabSeg">
+                            <button data-v="stats">统计</button>
+                            <button data-v="ledger">记账</button>
+                            <button data-v="settings">设置</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="set-group">
+                    <div class="set-group-title">存档管理</div>
+                    <button class="set-item" id="exportBtn"><span>导出存档（备份）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="importBtn"><span>导入存档</span><span class="set-arrow">›</span></button>
+                    <input type="file" id="importFile" accept=".json" style="display:none">
+                </div>
+            </div>
+        </div>
+
+        <!-- 底部标签栏 -->
+        <nav class="tab-bar" id="tabBar" style="display:none">
+            <button class="tab-btn" data-tab="stats">
+                <span class="tab-ico">▦</span><span class="tab-txt">统计</span>
+            </button>
+            <button class="tab-btn active" data-tab="ledger">
+                <span class="tab-ico">▤</span><span class="tab-txt">记账</span>
+            </button>
+            <button class="tab-btn" data-tab="settings">
+                <span class="tab-ico">⚙</span><span class="tab-txt">设置</span>
+            </button>
+        </nav>
+
+    <!-- 右下角悬浮记账按钮 -->
+    <button class="add-bar" id="fabAdd" title="记一笔">记一笔</button>
+    <button class="to-top" id="toTopBtn" title="回到顶部" aria-label="回到顶部">↑</button>
+
+    <!-- 记账弹窗 -->
+    <div class="mask" id="addMask">
+        <div class="edit-dialog">
+            <h3>记一笔</h3>
+            <div class="form-box">
+                <div class="field">
+                    <label class="field-label">记账时间</label>
+                    <input type="text" id="billTime" placeholder="选择记账时间" readonly class="dt-input">
+                </div>
+                <div class="field">
+                    <label class="field-label">金额</label>
+                    <input type="text" inputmode="decimal" id="billMoney" class="money-input" placeholder="">
+                </div>
+                <div class="field">
+                    <label class="field-label">分类</label>
+                    <!-- 固定顺序的横排标签：顺序由「管理分类」页拖动决定，一点即选 -->
+                    <div class="cat-chips" id="billCatChips"></div>
+                    <!-- 分类已由上方标签(chips)驱动；此 select 仅隐藏作取值用，不再增强为可见下拉 -->
+                    <select id="billCat" style="display:none"></select>
+                </div>
+                <div class="field">
+                    <label class="field-label">收支</label>
+                    <!-- 收支标签：与分类一致，必选、不默认选中。先选分类再选收支，从上到下一路点下来 -->
+                    <div class="cat-chips io-chips" id="billTypeChips"></div>
+                    <!-- 隐藏 select 仅作取值用，不增强为可见下拉 -->
+                    <select id="billType" style="display:none">
+                        <option value="expense">支出（花销）</option>
+                        <option value="income">收入（存入）</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field-label">备注</label>
+                    <textarea id="billRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
+                </div>
+                <button class="add-btn" id="addBill">添加记录</button>
+            </div>
+            <div class="dialog-btn">
+                <button class="cancel" id="closeAdd">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="mask" id="editMask">
+        <div class="edit-dialog">
+            <h3>修改账单</h3>
+            <div class="form-box">
+                <div class="field">
+                    <label class="field-label">记账时间</label>
+                    <input type="text" id="editTime" placeholder="选择记账时间" readonly class="dt-input">
+                </div>
+                <div class="field">
+                    <label class="field-label">金额</label>
+                    <input type="text" inputmode="decimal" id="editMoney" class="money-input" placeholder="">
+                </div>
+                <div class="field">
+                    <label class="field-label">分类</label>
+                    <div class="cat-chips" id="editCatChips"></div>
+                    <select id="editCat" style="display:none"></select>
+                </div>
+                <div class="field">
+                    <label class="field-label">收支</label>
+                    <div class="cat-chips io-chips" id="editTypeChips"></div>
+                    <select id="editType" style="display:none">
+                        <option value="expense">支出（花销）</option>
+                        <option value="income">收入（存入）</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label class="field-label">备注</label>
+                    <textarea id="editRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="dialog-btn">
+                <button class="save" id="saveEdit">保存</button>
+                <button class="cancel" id="cancelEdit">取消</button>
+            </div>
+            <button class="edit-del-btn" id="deleteInEdit">删除这条记录</button>
+        </div>
+    </div>
+
+    <div class="mask" id="catMask">
+        <div class="edit-dialog">
+            <h3>管理分类</h3>
+            <div class="cat-reorder-tip">长按左侧 ⠿ 拖动可调整顺序，顺序会用在记账页的标签排列</div>
+            <div class="cat-list" id="catList"></div>
+            <div class="cat-add-row">
+                <input type="text" id="newCatName" placeholder="新分类名称（最多 8 字）" maxlength="8">
+                <button class="mini-btn gold" id="addCatBtn">添加</button>
+            </div>
+            <p id="catErr" class="ask-err" style="display:none"></p>
+            <div class="dialog-btn">
+                <button class="cancel" id="closeCat">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 外观主题弹窗 -->
+    <div class="mask" id="themeMask">
+        <div class="edit-dialog">
+            <h3>外观设置</h3>
+
+            <div class="field">
+                <label class="field-label">预设主题</label>
+                <div class="theme-presets" id="themePresets"></div>
+            </div>
+
+            <div class="field" style="margin-top:14px;">
+                <label class="field-label">自定义主色（拾色器）</label>
+                <div class="theme-custom-row">
+                    <input type="color" id="customColor" value="#3f6f6b">
+                    <button class="mini-btn gold" id="applyCustomBtn">应用此色</button>
+                    <button class="mini-btn" id="resetThemeBtn">恢复默认</button>
+                </div>
+                <p class="theme-tip">提示：太浅或太亮的颜色会自动加深，按钮文字也会自动配黑/白，保证清晰。</p>
+            </div>
+
+            <div class="dialog-btn">
+                <button class="cancel" id="closeTheme">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义时间选择器 -->
+    <div class="mask" id="dtMask">
+        <div class="dt-dialog">
+            <div class="dt-preview" id="dtPreview">2026-01-01 00:00</div>
+            <div class="dt-head">
+                <button class="dt-nav" id="dtPrevMonth">‹</button>
+                <span id="dtMonthLabel">2026年01月</span>
+                <button class="dt-nav" id="dtNextMonth">›</button>
+            </div>
+            <div class="dt-week">
+                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div class="dt-days" id="dtDays"></div>
+            <div class="dt-time">
+                <div class="dt-time-col">
+                    <label>时</label>
+                    <select id="dtHour"></select>
+                </div>
+                <div class="dt-time-col">
+                    <label>分</label>
+                    <select id="dtMin"></select>
+                </div>
+                <button class="dt-now" id="dtNow">此刻</button>
+            </div>
+            <div class="dialog-btn">
+                <button class="save" id="dtConfirm">确认</button>
+                <button class="cancel" id="dtCancel">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义确认 / 输入 弹窗 -->
+    <div class="mask" id="askMask">
+        <div class="edit-dialog ask-dialog">
+            <h3 id="askTitle">提示</h3>
+            <p id="askMsg" class="ask-msg"></p>
+            <input type="text" id="askInput" style="display:none">
+            <p id="askErr" class="ask-err" style="display:none"></p>
+            <div class="dialog-btn">
+                <button class="save" id="askOk">确定</button>
+                <button class="cancel" id="askCancel">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计页：年月选择器 -->
+    <div class="mask" id="ymMask">
+        <div class="edit-dialog">
+            <div class="ym-year-row">
+                <button class="dt-nav" id="ymPrevY">‹</button>
+                <span id="ymYearLabel">2026</span>
+                <button class="dt-nav" id="ymNextY">›</button>
+            </div>
+            <div class="ym-grid" id="ymGrid"></div>
+            <div class="dialog-btn">
+                <button class="save" id="ymToCurrent">回到当月</button>
+                <button class="cancel" id="ymCancel">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== 软键盘处理（极简、稳健版） =====
+        // 关键教训：之前"先把弹窗设透明、等键盘信号再淡入"的做法，会在键盘弹起、WebView 重排的
+        // 那一帧里露出透明弹窗下的底部空白 —— 这正是"先白图、后弹窗"的真正来源。
+        //
+        // 现在的策略：弹窗一律【直接、不透明】显示，绝不留透明帧。键盘让位完全交给原生层
+        // （AndroidManifest 的 adjustResize + Keyboard 插件 resize:native）：键盘弹起时 WebView
+        // 被压缩、不上推，弹窗靠 CSS 的 100dvh 自然落在键盘上方。
+        //
+        // 这里的 JS 只做一件事：用浏览器原生的 visualViewport 检测键盘开/关，借此隐藏底栏与
+        // 悬浮按钮，并给极旧 webview 兜底 mask 高度。不依赖任何 Capacitor 插件的 JS 引用
+        // （纯 HTML 项目里 window.Capacitor.Plugins.Keyboard 不一定存在，依赖它会判断失灵）。
+        (function(){
+            const vv = window.visualViewport;
+
+            // 兜底：极旧、不支持 dvh 的 webview 在键盘弹起时 100dvh 不收缩，这里同步 mask 高度。
+            // 现代 webview（含本 App 的 adjustResize）下 dvh 会自动收缩，这步是无害的双保险。
+            function syncMaskHeight(kb){
+                if(!vv) return;
+                document.querySelectorAll('.mask').forEach(m=>{
+                    if(getComputedStyle(m).display==='none'){ m.style.height=''; return; }
+                    m.style.height = kb ? vv.height+'px' : '';
+                });
+            }
+
+            if(vv){
+                let baseH = vv.height;
+                vv.addEventListener('resize', ()=>{
+                    const shrunk = (baseH - vv.height) > 120;   // 可视区明显变矮 = 键盘弹起
+                    document.body.classList.toggle('kb-open', shrunk);
+                    if(!shrunk) baseH = vv.height;               // 键盘收起后更新基准（应对横竖屏切换）
+                    syncMaskHeight(shrunk);
+                });
+                window.__relayoutMasks = ()=>syncMaskHeight((baseH - vv.height) > 120);
+            } else {
+                window.__relayoutMasks = ()=>{};
+            }
+
+            // 打开「记一笔」弹窗：直接、不透明地显示，随后聚焦输入框触发键盘。
+            // 全程没有透明帧 → 没有白图。键盘让位由原生 adjustResize 处理。
+            window.__openModalAfterKeyboard = function(mask, focusEl){
+                const dlg = mask.firstElementChild;
+                if(dlg){ dlg.style.opacity = '1'; dlg.style.transition = ''; }
+                mask.style.display = 'flex';
+                // 稍等一拍再聚焦，让弹窗先完成绘制，键盘随后弹起，不抢在绘制前造成空帧
+                setTimeout(()=>{ try{ focusEl && focusEl.focus(); }catch(e){} }, 50);
+            };
+        })();
+
+
+        let currentUser = '';
+        let currentArchive = '';
+        let currentTab = 'ledger';
+
+        const PAGE_SIZE = 15;   // 每页条数
+        let curPage = 1;
+
+        const DEFAULT_CATS = ['未分类', '餐饮', '购物', '转账', '工资', '红包', '其他'];
+
+        const $ = id => document.getElementById(id);
+        const loginBox=$('loginBox'), mainBox=$('mainBox'), nowUser=$('nowUser');
+        const logoutBtn=$('logoutBtn'), billList=$('billList');
+        const billTime=$('billTime'), billMoney=$('billMoney'), billRemark=$('billRemark'), billCat=$('billCat'), billType=$('billType');
+        const addBill=$('addBill'), editMask=$('editMask');
+        const editTime=$('editTime'), editMoney=$('editMoney'), editRemark=$('editRemark'), editCat=$('editCat'), editType=$('editType');
+
+        // ===== 金额输入过滤：只放行数字和一个小数点，小数最多两位 =====
+        function sanitizeMoney(v){
+            v = v.replace(/[^\d.]/g, '');          // 去掉数字和点以外的字符
+            const i = v.indexOf('.');
+            if(i !== -1){                           // 只保留第一个小数点
+                v = v.slice(0, i+1) + v.slice(i+1).replace(/\./g, '');
+            }
+            const p = v.split('.');
+            if(p[1] !== undefined) v = p[0] + '.' + p[1].slice(0, 2); // 小数最多两位
+            return v;
+        }
+        document.querySelectorAll('.money-input').forEach(el=>{
+            el.addEventListener('input', ()=>{
+                const start = el.selectionStart;
+                const before = el.value;
+                const after = sanitizeMoney(before);
+                if(after !== before){
+                    el.value = after;
+                    // 尽量维持光标位置（删掉了几个字符就回退几位）
+                    const delta = before.length - after.length;
+                    const pos = Math.max(0, (start||after.length) - delta);
+                    try{ el.setSelectionRange(pos, pos); }catch(e){}
+                }
+            });
+        });
+        const saveEdit=$('saveEdit'), cancelEdit=$('cancelEdit');
+        const userNameInput=$('userNameInput'), loginBtn=$('loginBtn');
+        const archiveSelect=$('archiveSelect'), filterCat=$('filterCat');
+
+        // ===== 自定义 确认 / 输入 弹窗 =====
+        const askMask=$('askMask'), askTitle=$('askTitle'), askMsg=$('askMsg'),
+              askInput=$('askInput'), askOk=$('askOk'), askCancel=$('askCancel');
+        let askResolve=null, askMode='confirm';
+
+        const askErr=$('askErr');
+        let askValidate=null;
+        function showAskErr(msg){
+            askErr.textContent=msg;
+            askErr.style.display = msg ? 'block' : 'none';
+        }
+
+        function closeAsk(result){
+            askMask.style.display='none';
+            askErr.style.display='none';
+            const r=askResolve; askResolve=null; askValidate=null;
+            if(r) r(result);
+        }
+        askOk.addEventListener('click', ()=>{
+            if(askMode==='prompt'){
+                const v=askInput.value.trim();
+                if(v===''){ showAskErr('内容不能为空'); return; }
+                if(askValidate){
+                    const err=askValidate(v);   // 返回错误文案则拦截，返回空则通过
+                    if(err){ showAskErr(err); return; }
+                }
+                closeAsk(v);
+            } else closeAsk(true);
+        });
+        askCancel.addEventListener('click', ()=>closeAsk(askMode==='prompt'?null:false));
+        // 禁止点击遮罩外部关闭，避免误触丢失输入；仅按钮可关闭
+        askInput.addEventListener('keydown', e=>{ if(e.key==='Enter') askOk.click(); });
+        askInput.addEventListener('input', ()=>{ if(askErr.style.display!=='none') showAskErr(''); });
+
+        // 确认框：回调式。opts.okText / opts.cancelText 可自定义按钮文字
+        function customConfirm(msg, onOk, title, opts){
+            opts = opts || {};
+            askMode='confirm';
+            askTitle.textContent=title||'确认操作';
+            askMsg.textContent=msg;
+            askMsg.style.display='';
+            askMsg.style.textAlign='';
+            askInput.style.display='none';
+            askCancel.style.display='';
+            askOk.textContent = opts.okText || '确定';
+            askCancel.textContent = opts.cancelText || '取消';
+            askResolve=(r)=>{
+                askOk.textContent='确定'; askCancel.textContent='取消';   // 用完恢复默认，避免影响其它弹窗
+                if(r && onOk) onOk();
+            };
+            askMask.style.display='flex';
+        }
+        // 输入框：回调式。validate(value) 返回错误文案则在弹窗内提示且不关闭，返回空则通过
+        function customPrompt(msg, defVal, onOk, title, validate, opts){
+            opts = opts || {};
+            askMode='prompt';
+            askTitle.textContent=title||'请输入';
+            // msg 为空则隐藏正文，避免与标题重复
+            if(msg){ askMsg.textContent=msg; askMsg.style.display=''; }
+            else { askMsg.textContent=''; askMsg.style.display='none'; }
+            askInput.style.display='block';
+            askInput.value=defVal||'';
+            askInput.placeholder = opts.placeholder || '';
+            if(opts.maxlen){ askInput.setAttribute('maxlength', opts.maxlen); }
+            else { askInput.removeAttribute('maxlength'); }
+            askCancel.style.display='';
+            askErr.style.display='none';
+            askValidate=validate||null;
+            askResolve=(r)=>{ if(r!==null && onOk) onOk(r); };
+            askMask.style.display='flex';
+            setTimeout(()=>{ askInput.focus(); askInput.select(); }, 50);
+        }
+        // 信息弹窗：只有“确定”，可选标题；用于替代 alert 和“查看备注”
+        function customAlert(msg, title, align, isHtml){
+            askMode='alert';
+            askTitle.textContent=title||'提示';
+            if(isHtml){ askMsg.innerHTML=msg; } else { askMsg.textContent=msg; }
+            askMsg.style.display='';
+            askMsg.style.textAlign = (align==='left') ? 'left' : '';
+            askInput.style.display='none';
+            askCancel.style.display='none';
+            askResolve=null;
+            askMask.style.display='flex';
+        }
+
+        // 金额规范化：返回 {ok:true, val} 或 {ok:false, why}，why 用于给出对症提示
+        function normMoney(raw){
+            const n = Number(raw);
+            if(!isFinite(n)) return { ok:false, why:'请输入正确的金额数字～' };  // NaN / Infinity
+            if(n > 99999999) return { ok:false, why:'金额太大啦，确认一下没多打几个 0？' };  // 上限挡手滑
+            const val = Math.round(n * 100) / 100;  // 先对齐到分
+            if(val <= 0) return { ok:false, why:'金额要大于 0 哦～' };  // 含 0、负数、以及 0.001 这类四舍五入后归零的值
+            return { ok:true, val };
+        }
+
+        // 字符数：按 Unicode 码点计（一个汉字算 1）
+        function charLen(s){ return Array.from(s).length; }
+        function charSlice(s, n){ return Array.from(s).slice(0, n).join(''); }
+        // HTML 转义，防止备注/名称里的特殊字符破坏页面
+        function escapeHtml(s){
+            return String(s).replace(/[&<>"']/g, c => ({
+                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+            }[c]));
+        }
+
+        function storeKey(){ return `store_${currentUser}`; }
+
+        let __idSeq = 0;
+        // 生成定长、可按字符串直接比较先后的 id：
+        //   r + 13位毫秒时间戳 + 6位自增序列 + 4位随机
+        // 各段都补零定长，故字符串比较结果与时间顺序一致；自增序列保证同毫秒内不重复，
+        // 末尾随机进一步降低多端/导入时的碰撞概率。
+        function genId(){
+            const ts=String(Date.now()).padStart(13,'0');
+            const seq=String((__idSeq++) % 1000000).padStart(6,'0');
+            const rnd=String(Math.floor(Math.random()*10000)).padStart(4,'0');
+            return 'r'+ts+seq+rnd;
+        }
+
+        function normArchive(a){
+            if (Array.isArray(a)) a = { records:a, cats:DEFAULT_CATS.slice() };
+            if (!a.records) a.records = [];
+            if (!a.cats || !a.cats.length) a.cats = DEFAULT_CATS.slice();
+            a.records.forEach(r => {
+                if (!r.cat) r.cat = '未分类';
+                if (!r.id) r.id = genId();
+                if (!r.type) r.type = 'income';   // 旧记录无收支类型，默认按收入
+            });
+            return a;
+        }
+
+        function loadStore(){
+            const raw = localStorage.getItem(storeKey());
+            let store;
+            if (raw) { try { store = JSON.parse(raw); } catch(e) { store = null; } }
+            if (!store) {
+                const old = localStorage.getItem(`billData_${currentUser}`);
+                const arr = old ? JSON.parse(old) : [];
+                store = { archives:{ '默认存档':{ records:arr, cats:DEFAULT_CATS.slice() } }, last:'默认存档' };
+            }
+            Object.keys(store.archives).forEach(k => { store.archives[k] = normArchive(store.archives[k]); });
+            return store;
+        }
+        function saveStore(store){ localStorage.setItem(storeKey(), JSON.stringify(store)); }
+        function curArchive(store){ return store.archives[currentArchive]; }
+
+        loginBtn.addEventListener('click', ()=>login());
+        userNameInput.addEventListener('keydown', e => { if(e.key==='Enter') login(); });
+
+        // ===== 登录页：从文件导入存档（先选文件，再指定要导入到哪个账号）=====
+        $('loginImportBtn').addEventListener('click', ()=> $('loginImportFile').click());
+        $('loginImportFile').addEventListener('change', e => {
+            const file=e.target.files[0]; if(!file) return;
+            const reader=new FileReader();
+            reader.onload=ev=>{
+                const text=ev.target.result;
+                // 先校验文件本身能不能解析，避免输完名字才报错
+                try{ const t=JSON.parse(text); const arr=Array.isArray(t)?t:t.data; if(!Array.isArray(arr)) throw 0; }
+                catch(_){ customAlert('导入失败：文件格式不正确'); $('loginImportFile').value=''; return; }
+
+                const preset=userNameInput.value.trim();
+                customPrompt('把这份存档导入到哪个账号？（不存在会自动创建）', preset, (acct)=>{
+                    acct=acct.trim();
+                    try{
+                        const { finalName, stats }=importArchiveFromText(text, acct);
+                        recordUser(acct);            // 让该账号出现在最近账号里
+                        renderRecentUsers();
+                        customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。${importFixSuffix(stats)}\n\n现在进入该账号吗？`, ()=>{
+                            login(acct);             // 进入后会自动定位到 last（即刚导入的存档）
+                        }, '导入成功', { okText:'立即进入', cancelText:'稍后' });
+                    }catch(err){
+                        customAlert(err && err.message==='empty'
+                            ? '导入失败：文件里没有有效记录'
+                            : '导入失败：文件格式不正确');
+                    }
+                }, '导入到账号', (acct)=>{
+                    acct=acct.trim();
+                    if(!acct) return '请输入账号名';
+                    if(charLen(acct) > 8) return '账号名最多 8 个字～';
+                    return '';
+                }, { placeholder:'输入账号名（最多 8 字）', maxlen:8 });
+
+                $('loginImportFile').value='';
+            };
+            reader.readAsText(file);
+        });
+
+        // ===== 账号索引（用于登录页最近账号）=====
+        function getUsers(){
+            try { return JSON.parse(localStorage.getItem('users_index')||'[]'); }
+            catch(e){ return []; }
+        }
+        function recordUser(name){
+            let list=getUsers().filter(u=>u!==name);
+            list.unshift(name);              // 最近用的排最前
+            localStorage.setItem('users_index', JSON.stringify(list));
+        }
+        function removeUser(name){
+            const list=getUsers().filter(u=>u!==name);
+            localStorage.setItem('users_index', JSON.stringify(list));
+        }
+        function renderRecentUsers(){
+            const box=$('recentUsers');
+            const list=getUsers();
+            if(!list.length){ box.innerHTML=''; return; }
+            box.innerHTML='<div class="recent-title">最近账号（点击直接进入）</div>';
+            const wrap=document.createElement('div'); wrap.className='recent-list';
+            list.forEach(name=>{
+                const chip=document.createElement('div'); chip.className='user-chip';
+                chip.title='点击进入';
+                const av=document.createElement('div'); av.className='avatar';
+                av.textContent=name.slice(0,1).toUpperCase();
+                const label=document.createElement('span'); label.textContent=name;
+                const del=document.createElement('button'); del.className='u-del'; del.textContent='×';
+                del.title='从列表移除（不会删除账本数据）';
+                del.onclick=(e)=>{
+                    e.stopPropagation();
+                    customConfirm(`将「${name}」从最近账号列表移除？（账本数据不会删除，重新输入名字仍可进入）`, ()=>{
+                        removeUser(name); renderRecentUsers();
+                    }, '移除账号');
+                };
+                chip.appendChild(av); chip.appendChild(label); chip.appendChild(del);
+                chip.onclick=()=>login(name);
+                wrap.appendChild(chip);
+            });
+            box.appendChild(wrap);
+        }
+
+        function login(presetName){
+            const name = (presetName!==undefined ? presetName : userNameInput.value).trim();
+            if(!name){ customAlert('请输入姓名！'); return; }
+            if(charLen(name) > 8){ customAlert('姓名最多 8 个字～'); return; }
+            currentUser = name;
+            recordUser(name);
+            localStorage.setItem('app_logged_in_user', name);   // 记住当前登录用户，下次自动进入
+            const store = loadStore();
+            saveStore(store);
+            currentArchive = store.last || Object.keys(store.archives)[0];
+            loginBox.style.display='none';
+            mainBox.style.display='block';
+            $('tabBar').style.display='flex';
+            document.body.classList.remove('login-mode');
+            nowUser.innerText = `当前用户：${name}`;
+            refreshArchiveSelect();
+            refreshCatSelectors();
+            setDtInput(billTime, nowDtValue());   // 进入主界面即默认当前时间
+            renderBill();
+            switchTab(getDefaultTab());   // 按用户设置进入默认页（默认记账）
+        }
+
+        logoutBtn.addEventListener('click', () => {
+            currentUser=''; currentArchive='';
+            localStorage.removeItem('app_logged_in_user');   // 退出后不再自动登录
+            userNameInput.value='';
+            mainBox.style.display='none';
+            $('tabBar').style.display='none';
+            loginBox.style.display='block';
+            document.body.classList.add('login-mode');
+            $('fabAdd').style.display='none';
+            renderRecentUsers();
+        });
+
+        // 修改用户名：把当前账号连同其全部存档数据迁移到新名字下
+        $('editNameBtn').addEventListener('click', () => {
+            const oldName=currentUser;
+            customPrompt('', oldName, (newName)=>{
+                if(newName===oldName) return;
+                // 迁移数据：store_old -> store_new
+                const data=localStorage.getItem(`store_${oldName}`);
+                if(data!==null){ localStorage.setItem(`store_${newName}`, data); }
+                localStorage.removeItem(`store_${oldName}`);
+                // 更新账号索引：移除旧名、加入新名（保持在最前）
+                let list=getUsers().filter(u=>u!==oldName && u!==newName);
+                list.unshift(newName);
+                localStorage.setItem('users_index', JSON.stringify(list));
+                // 更新当前状态与界面
+                currentUser=newName;
+                nowUser.innerText=`当前用户：${newName}`;
+                // 数据迁移后必须重新加载界面，否则仍显示旧视图直到刷新
+                const store=loadStore();
+                currentArchive = store.last || Object.keys(store.archives)[0];
+                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
+                customAlert(`用户名已改为「${newName}」`);
+            }, '修改用户名', (newName)=>{
+                if(newName===oldName) return '';
+                if(charLen(newName) > 8) return '用户名最多 8 个字～';
+                // 已存在同名且有数据的账号，不允许覆盖
+                if(localStorage.getItem(`store_${newName}`)!==null) return '该用户名已存在，换一个吧';
+                return '';
+            }, { placeholder:'输入新用户名（最多 8 字，数据会一并迁移）', maxlen:8 });
+        });
+
+        function refreshArchiveSelect(){
+            const store = loadStore();
+            archiveSelect.innerHTML='';
+            Object.keys(store.archives).forEach(name => {
+                const opt=document.createElement('option');
+                opt.value=name; opt.textContent=name;
+                if(name===currentArchive) opt.selected=true;
+                archiveSelect.appendChild(opt);
+            });
+        }
+        archiveSelect.addEventListener('change', () => {
+            currentArchive = archiveSelect.value;
+            const store=loadStore(); store.last=currentArchive; saveStore(store);
+            curPage=1; statSelDay=null; refreshCatSelectors(); refreshAllViews();
+        });
+        $('newArchive').addEventListener('click', () => {
+            customPrompt('', '', (name)=>{
+                const store=loadStore();
+                store.archives[name]={ records:[], cats:DEFAULT_CATS.slice() };
+                store.last=name; saveStore(store); currentArchive=name;
+                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
+            }, '新建存档', (name)=>{
+                if(charLen(name) > 16) return '存档名最多 16 个字～';
+                if(loadStore().archives[name]) return '该存档名已存在';
+                return '';
+            }, { placeholder:'输入存档名称（最多 16 字）', maxlen:16 });
+        });
+        $('renameArchive').addEventListener('click', () => {
+            customPrompt('', currentArchive, (name)=>{
+                if(name===currentArchive) return;
+                const store=loadStore();
+                store.archives[name]=store.archives[currentArchive];
+                delete store.archives[currentArchive];
+                currentArchive=name; store.last=name; saveStore(store);
+                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
+            }, '重命名存档', (name)=>{
+                if(name===currentArchive) return '';
+                if(charLen(name) > 16) return '存档名最多 16 个字～';
+                if(loadStore().archives[name]) return '该存档名已存在';
+                return '';
+            }, { placeholder:'输入新存档名（最多 16 字）', maxlen:16 });
+        });
+        $('delArchive').addEventListener('click', () => {
+            const store=loadStore();
+            if(Object.keys(store.archives).length<=1){ customAlert('至少保留一个存档！'); return; }
+            customConfirm(`确定删除存档「${currentArchive}」吗？此操作不可恢复。`, ()=>{
+                const s=loadStore();
+                delete s.archives[currentArchive];
+                currentArchive=Object.keys(s.archives)[0];
+                s.last=currentArchive; saveStore(s);
+                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
+            }, '删除存档');
+        });
+
+        $('exportBtn').addEventListener('click', async () => {
+            const store=loadStore(); const a=curArchive(store);
+            const payload={ app:'记问', user:currentUser, archive:currentArchive,
+                cats:a.cats, data:a.records, exportedAt:new Date().toLocaleString() };
+            const json=JSON.stringify(payload,null,2);
+            const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;
+
+            // 在 App（安卓 WebView）里，<a download> 无效，改用 Capacitor 文件插件直接存到手机
+            const cap = window.Capacitor;
+            if(cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.Filesystem){
+                const { Filesystem } = cap.Plugins;
+                // 依次尝试真实存在的目录枚举（Capacitor v6）：文档→外部→数据，哪个成功用哪个
+                const targets = [
+                    { directory:'DOCUMENTS', label:'手机「文档 / Documents」文件夹' },
+                    { directory:'EXTERNAL',  label:'应用外部存储目录' },
+                    { directory:'DATA',      label:'应用内部存储目录' }
+                ];
+                for(const t of targets){
+                    try{
+                        await Filesystem.writeFile({
+                            path: fileName,
+                            data: json,
+                            directory: t.directory,
+                            encoding: 'utf8',
+                            recursive: true
+                        });
+                        customAlert(`已保存到${t.label}：\n${fileName}\n\n可用手机自带「文件管理」找到它。`, '导出成功', 'left');
+                        return;
+                    }catch(err){ /* 换下一个目录再试 */ }
+                }
+                // 全部失败：复制兜底
+                showExportCopy(json);
+                return;
+            }
+
+            // 浏览器：正常下载
+            try{
+                const blob=new Blob([json],{type:'application/json'});
+                const url=URL.createObjectURL(blob);
+                const el=document.createElement('a');
+                el.href=url; el.download=fileName; el.click();
+                URL.revokeObjectURL(url);
+            }catch(err){
+                showExportCopy(json);
+            }
+        });
+        // 兜底：弹出存档内容供手动复制
+        function showExportCopy(json){
+            customPrompt('下载不可用，已为你准备好存档内容，请全选复制保存到记事本/文件：', json, ()=>{}, '导出存档（复制）', null, { placeholder:'' });
+            // 把输入框换成多行更好读
+            setTimeout(()=>{ const i=$('askInput'); if(i){ i.select(); } }, 80);
+        }
+        // 校验并清洗导入的单条记录：金额非正数/非法、类型非法都会被拒，避免脏数据污染结余。
+        // 返回 { records, stats }，stats 记录做了哪些「静默修正」，供导入后如实提示用户。
+        function sanitizeImportedRecords(records){
+            const out=[];
+            const stats={ dropped:0, timeFixed:0, typeFilled:0 };
+            const reFull=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;          // 恰好到分钟
+            const reWithSec=/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):\d{2}/; // 带秒/毫秒，可安全截断
+            for(const r of records){
+                if(!r || typeof r!=='object'){ stats.dropped++; continue; }
+                const m=normMoney(r.money);
+                if(!m.ok){ stats.dropped++; continue; }              // 金额非法直接丢弃这条
+
+                // 类型：仅接受 expense/income，缺失或非法补为 income 并计数
+                let type, mSec;
+                if(r.type==='expense'||r.type==='income'){ type=r.type; }
+                else { type='income'; stats.typeFilled++; }
+
+                // 时间：完整分钟格式直接用；带秒/毫秒则截断到分钟（不算改写）；
+                //       其余一律补为当前时刻并计数（这才是真正改变了数据语义的情况）
+                let time;
+                if(typeof r.time==='string' && reFull.test(r.time)){
+                    time=r.time;
+                } else if(typeof r.time==='string' && (mSec=r.time.match(reWithSec))){
+                    time=mSec[1];
+                } else {
+                    time=nowDtValue(); stats.timeFixed++;
+                }
+
+                let cat = (typeof r.cat==='string' && r.cat.trim()) ? r.cat.trim() : '未分类';
+                let remark = (typeof r.remark==='string') ? r.remark.slice(0,5000) : '';
+                out.push({ id:genId(), time, money:m.val, cat, remark, type });
+            }
+            return { records:out, stats };
+        }
+
+        // 核心导入逻辑：解析文本 → 清洗 → 存为目标用户名下的新存档。
+        // 返回 { finalName, stats } 或抛错；stats 用于导入后提示静默修正情况。
+        function importArchiveFromText(text, targetUser){
+            const parsed=JSON.parse(text);   // 解析失败由调用方 catch
+            const rawRecords=Array.isArray(parsed)?parsed:parsed.data;
+            if(!Array.isArray(rawRecords)) throw new Error('bad');
+            const { records, stats }=sanitizeImportedRecords(rawRecords);
+            // 一条有效记录都没有：视为无效文件，避免悄悄建一个空存档
+            if(records.length===0) throw new Error('empty');
+
+            // 分类：清洗去空、去重，确保含「未分类」
+            let cats=(parsed && Array.isArray(parsed.cats) && parsed.cats.length)
+                ? parsed.cats.map(c=>String(c).trim()).filter(Boolean)
+                : DEFAULT_CATS.slice();
+            cats=[...new Set(cats)];
+            if(!cats.includes('未分类')) cats.unshift('未分类');
+            // 把记录里用到、但分类表没有的分类补进去
+            records.forEach(r=>{ if(!cats.includes(r.cat)) cats.push(r.cat); });
+
+            // 存档名清洗：去空、限长，重名自动加序号
+            let name=(parsed && typeof parsed.archive==='string' && parsed.archive.trim())
+                ? parsed.archive.trim().slice(0,16) : '导入存档';
+
+            // 切到目标用户后再读写其 store
+            const prevUser=currentUser;
+            currentUser=targetUser;
+            const store=loadStore();
+            let finalName=name, n=1;
+            while(store.archives[finalName]) finalName=`${name}(${n++})`;
+            store.archives[finalName]={ records, cats };
+            store.last=finalName; saveStore(store);
+            currentUser=prevUser;   // 还原，由调用方决定是否真正登录
+            return { finalName, stats };
+        }
+
+        // 把清洗统计拼成一句人类可读的提示尾巴（没有任何修正则返回空串）
+        function importFixSuffix(stats){
+            if(!stats) return '';
+            const parts=[];
+            if(stats.timeFixed>0)  parts.push(`${stats.timeFixed} 条时间格式异常，已改为导入时刻`);
+            if(stats.typeFilled>0) parts.push(`${stats.typeFilled} 条缺收支类型，已默认按收入`);
+            if(stats.dropped>0)    parts.push(`${stats.dropped} 条金额无效，已跳过`);
+            return parts.length ? `\n\n注意：其中 ${parts.join('；')}。` : '';
+        }
+
+        $('importBtn').addEventListener('click', () => $('importFile').click());
+        $('importFile').addEventListener('change', e => {
+            const file=e.target.files[0]; if(!file) return;
+            const reader=new FileReader();
+            reader.onload=ev=>{
+                try{
+                    const { finalName, stats }=importArchiveFromText(ev.target.result, currentUser);
+                    const store=loadStore();
+                    store.last=finalName; saveStore(store); currentArchive=finalName;
+                    refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
+                    customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}`, '导入成功', 'left');
+                }catch(err){
+                    customAlert(err && err.message==='empty'
+                        ? '导入失败：文件里没有有效记录'
+                        : '导入失败：文件格式不正确');
+                }
+                $('importFile').value='';
+            };
+            reader.readAsText(file);
+        });
+
+        function getCats(){ return curArchive(loadStore()).cats; }
+        function fillSelect(sel, cats, selected){
+            sel.innerHTML='';
+            cats.forEach(c=>{
+                const o=document.createElement('option');
+                o.value=c; o.textContent=c;
+                if(c===selected) o.selected=true;
+                sel.appendChild(o);
+            });
+        }
+        function refreshCatSelectors(){
+            const cats=getCats();
+            fillSelect(billCat, cats, cats[0]);
+            const cur=filterCat.value;
+            filterCat.innerHTML='<option value="__all">全部</option>';
+            cats.forEach(c=>{
+                const o=document.createElement('option'); o.value=c; o.textContent=c;
+                filterCat.appendChild(o);
+            });
+            if([...filterCat.options].some(o=>o.value===cur)) filterCat.value=cur;
+        }
+        filterCat.addEventListener('change', ()=>{ curPage=1; renderBill(); });
+
+        // 记账弹窗内的「管理分类」入口已移除，仅保留账单页(主页)的入口
+        $('manageCatMain').addEventListener('click', openCatManager);
+        $('closeCat').addEventListener('click', ()=>{ $('catMask').style.display='none'; });
+        function showCatErr(msg){
+            const el=$('catErr');
+            el.textContent=msg||'';
+            el.style.display = msg ? 'block' : 'none';
+        }
+        $('newCatName').addEventListener('input', ()=>showCatErr(''));
+        $('addCatBtn').addEventListener('click', () => {
+            const name=$('newCatName').value.trim();
+            if(!name){ showCatErr('请输入分类名'); return; }
+            if(charLen(name) > 8){ showCatErr('分类名最多 8 个字～'); return; }
+            const store=loadStore(); const a=curArchive(store);
+            if(a.cats.includes(name)){ showCatErr('该分类已存在'); return; }
+            a.cats.push(name); saveStore(store);
+            $('newCatName').value=''; showCatErr('');
+            refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen();
+        });
+        function openCatManager(){
+            showCatErr('');
+            const store=loadStore(); const a=curArchive(store);
+            const list=$('catList'); list.innerHTML='';
+            a.cats.forEach(c=>{
+                const div=document.createElement('div'); div.className='cat-item';
+                div.dataset.cat=c;
+
+                const left=document.createElement('div'); left.className='cat-left';
+                const handle=document.createElement('span'); handle.className='drag-handle';
+                handle.textContent='⠿'; handle.title='长按拖动排序';
+                const span=document.createElement('span'); span.className='cat-name'; span.textContent=c;
+                left.appendChild(handle); left.appendChild(span);
+
+                const wrap=document.createElement('div');
+                const rn=document.createElement('button'); rn.textContent='改名'; rn.style.marginRight='6px';
+                rn.onclick=()=>renameCat(c);
+                const del=document.createElement('button'); del.textContent='删除';
+                del.onclick=()=>deleteCat(c);
+                wrap.appendChild(rn); wrap.appendChild(del);
+
+                div.appendChild(left); div.appendChild(wrap);
+                attachCatDrag(div, handle);
+                list.appendChild(div);
+            });
+            $('catMask').style.display='flex';
+        }
+
+        // ===== 分类长按拖动排序（pointer/touch 手写，避免 WebView 原生 draggable 不稳）=====
+        // 在手柄上按住约 250ms 触发拖动；跟手移动，越过相邻项中线即交换位置；松手落位并存盘。
+        function attachCatDrag(item, handle){
+            let holdTimer=null, dragging=false;
+            let startY=0, curY=0, placeholder=null, listEl=null, items=[];
+            const HOLD_MS=250, MOVE_CANCEL=10;
+
+            function onDown(e){
+                const pt=e.touches?e.touches[0]:e;
+                startY=pt.clientY; curY=startY;
+                holdTimer=setTimeout(()=>startDrag(pt), HOLD_MS);
+                document.addEventListener('pointermove', onMovePre, {passive:true});
+                document.addEventListener('touchmove', onMovePre, {passive:true});
+                document.addEventListener('pointerup', cancelPre, {passive:true});
+                document.addEventListener('touchend', cancelPre, {passive:true});
+                document.addEventListener('pointercancel', cancelPre, {passive:true});
+                document.addEventListener('touchcancel', cancelPre, {passive:true});
+            }
+            // 长按未触发前若手指明显移动，判为滚动，取消长按
+            function onMovePre(e){
+                const pt=e.touches?e.touches[0]:e;
+                if(Math.abs(pt.clientY-startY)>MOVE_CANCEL){ clearHold(); }
+            }
+            function cancelPre(){ clearHold(); }
+            function clearHold(){
+                if(holdTimer){ clearTimeout(holdTimer); holdTimer=null; }
+                if(!dragging){
+                    document.removeEventListener('pointermove', onMovePre);
+                    document.removeEventListener('touchmove', onMovePre);
+                    document.removeEventListener('pointerup', cancelPre);
+                    document.removeEventListener('touchend', cancelPre);
+                    document.removeEventListener('pointercancel', cancelPre);
+                    document.removeEventListener('touchcancel', cancelPre);
+                }
+            }
+
+            function startDrag(pt){
+                dragging=true;
+                clearHold();
+                listEl=item.parentNode;
+                items=Array.from(listEl.children);
+                const rect=item.getBoundingClientRect();
+                // 占位：保留原高度，避免后面项跳动
+                placeholder=document.createElement('div');
+                placeholder.className='cat-item drag-placeholder';
+                placeholder.style.height=rect.height+'px';
+                placeholder.style.marginBottom=getComputedStyle(item).marginBottom;
+                listEl.insertBefore(placeholder, item);
+                // 把被拖项变为绝对定位浮层，跟手
+                item.classList.add('dragging');
+                item.style.position='fixed';
+                item.style.left=rect.left+'px';
+                item.style.top=rect.top+'px';
+                item.style.width=rect.width+'px';
+                item.style.margin='0';
+                item.style.pointerEvents='none';
+                if(navigator.vibrate) try{ navigator.vibrate(15); }catch(_){}
+
+                document.addEventListener('pointermove', onMove, {passive:false});
+                document.addEventListener('touchmove', onMove, {passive:false});
+                document.addEventListener('pointerup', onUp, {passive:true});
+                document.addEventListener('touchend', onUp, {passive:true});
+                document.addEventListener('pointercancel', onUp, {passive:true});
+                document.addEventListener('touchcancel', onUp, {passive:true});
+            }
+
+            function onMove(e){
+                if(!dragging) return;
+                if(e.cancelable) e.preventDefault();      // 阻止页面滚动
+                const pt=e.touches?e.touches[0]:e;
+                curY=pt.clientY;
+                const rect=item.getBoundingClientRect();
+                item.style.top=(rect.top + (curY - (rect.top+rect.height/2)))+'px';
+                // 找占位应插入的位置：以指针 Y 与各兄弟项中线比较
+                const siblings=Array.from(listEl.children)
+                    .filter(el=>el!==item && el!==placeholder);
+                let inserted=false;
+                for(const sib of siblings){
+                    const r=sib.getBoundingClientRect();
+                    if(curY < r.top + r.height/2){
+                        listEl.insertBefore(placeholder, sib); inserted=true; break;
+                    }
+                }
+                if(!inserted) listEl.appendChild(placeholder);
+            }
+
+            function onUp(){
+                if(!dragging){ clearHold(); return; }
+                dragging=false;
+                // 落位：把拖项放回占位处
+                listEl.insertBefore(item, placeholder);
+                placeholder.remove(); placeholder=null;
+                item.classList.remove('dragging');
+                item.style.position=''; item.style.left=''; item.style.top='';
+                item.style.width=''; item.style.margin=''; item.style.pointerEvents='';
+
+                document.removeEventListener('pointermove', onMove);
+                document.removeEventListener('touchmove', onMove);
+                document.removeEventListener('pointerup', onUp);
+                document.removeEventListener('touchend', onUp);
+                document.removeEventListener('pointercancel', onUp);
+                document.removeEventListener('touchcancel', onUp);
+
+                persistCatOrder();
+            }
+
+            handle.addEventListener('pointerdown', onDown, {passive:true});
+            handle.addEventListener('touchstart', onDown, {passive:true});
+        }
+
+        // 把当前 DOM 里 cat-item 的顺序写回存档的 cats 数组
+        function persistCatOrder(){
+            const order=Array.from($('catList').children)
+                .map(el=>el.dataset && el.dataset.cat)
+                .filter(Boolean);
+            if(!order.length) return;
+            const store=loadStore(); const a=curArchive(store);
+            // 以新顺序重排，遗漏的（理论上不会有）补在末尾
+            const set=new Set(order);
+            a.cats=order.concat(a.cats.filter(c=>!set.has(c)));
+            saveStore(store);
+            refreshCatSelectors(); refreshBillCatChipsIfOpen();
+        }
+        function renameCat(oldName){
+            customPrompt('', oldName, (name)=>{
+                name=name.trim();
+                if(!name || name===oldName) return;
+                const store=loadStore(); const a=curArchive(store);
+                a.cats=a.cats.map(c=>c===oldName?name:c);
+                a.records.forEach(r=>{ if(r.cat===oldName) r.cat=name; });
+                saveStore(store);
+                refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen();
+            }, '重命名分类', (name)=>{
+                name=name.trim();
+                if(!name) return '分类名不能为空';
+                if(name===oldName) return '';
+                if(charLen(name) > 8) return '分类名最多 8 个字～';
+                if(curArchive(loadStore()).cats.includes(name)) return '该分类已存在';
+                return '';
+            }, { placeholder:'输入新分类名（最多 8 字）', maxlen:8 });
+        }
+        function deleteCat(name){
+            if(name==='未分类'){ customAlert('「未分类」是保留分类，不能删除哦～'); return; }
+            const store=loadStore(); const a=curArchive(store);
+            if(a.cats.length<=1){ customAlert('至少保留一个分类！'); return; }
+            const used=a.records.filter(r=>r.cat===name).length;
+            const tip=used>0?`有 ${used} 条记录使用该分类，删除后将归为「未分类」。`:'';
+            customConfirm(`确定删除分类「${name}」吗？${tip}`, ()=>{
+                const s=loadStore(); const ar=curArchive(s);
+                ar.cats=ar.cats.filter(c=>c!==name);
+                if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
+                ar.records.forEach(r=>{ if(r.cat===name) r.cat='未分类'; });
+                saveStore(s);
+                refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen();
+            }, '删除分类');
+        }
+
+        function getUserData(){ return curArchive(loadStore()).records; }
+        function saveUserData(data){
+            const store=loadStore(); curArchive(store).records=data;
+            store.last=currentArchive; saveStore(store);
+        }
+        // 数据变更后统一刷新：账单页总是刷新；统计页若正在显示也立即重算，
+        // 避免「新增/删除记录后切到统计页数字没更新」的问题
+        function refreshAllViews(){
+            renderBill();
+            if(currentTab==='stats') renderStats();
+        }
+
+        // ===== 自定义时间选择器 =====
+        const dtMask=$('dtMask'), dtDays=$('dtDays'), dtMonthLabel=$('dtMonthLabel');
+        const dtHour=$('dtHour'), dtMin=$('dtMin'), dtPreview=$('dtPreview');
+        let dtTargetInput=null;   // 当前正在编辑哪个输入框
+        let dtView={ year:new Date().getFullYear(), month:new Date().getMonth() };  // month 0-11，当前显示的月份
+        let dtSel={ y:null, m:null, d:null }; // 选中的日期
+
+        // 填充时分下拉
+        for(let h=0; h<24; h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0'); dtHour.appendChild(o); }
+        for(let m=0; m<60; m++){ const o=document.createElement('option'); o.value=m; o.textContent=String(m).padStart(2,'0'); dtMin.appendChild(o); }
+
+        function pad(n){ return String(n).padStart(2,'0'); }
+
+        // 解析 input 现有值 "YYYY-MM-DDTHH:mm" -> Date 部件；无值则用当前时间
+        function parseInputDt(val){
+            const m = val && val.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+            if(m) return { y:+m[1], mo:+m[2]-1, d:+m[3], h:+m[4], mi:+m[5] };
+            const now=new Date();
+            return { y:now.getFullYear(), mo:now.getMonth(), d:now.getDate(), h:now.getHours(), mi:now.getMinutes() };
+        }
+
+        function openDtPicker(input){
+            dtTargetInput=input;
+            const p=parseInputDt(getDtInput(input));
+            dtView={ year:p.y, month:p.mo };
+            dtSel={ y:p.y, m:p.mo, d:p.d };
+            dtHour.value=p.h; dtMin.value=p.mi;
+            renderDtDays();
+            updateDtPreview();
+            dtMask.style.display='flex';
+        }
+
+        function renderDtDays(){
+            dtMonthLabel.textContent=`${dtView.year}年${pad(dtView.month+1)}月`;
+            dtDays.innerHTML='';
+            const first=new Date(dtView.year, dtView.month, 1);
+            // 周一为起始：getDay() 0=周日
+            let lead=(first.getDay()+6)%7;
+            const daysInMonth=new Date(dtView.year, dtView.month+1, 0).getDate();
+            const today=new Date();
+            for(let i=0;i<lead;i++){ const e=document.createElement('div'); e.className='dt-day muted'; dtDays.appendChild(e); }
+            for(let d=1; d<=daysInMonth; d++){
+                const el=document.createElement('div'); el.className='dt-day'; el.textContent=d;
+                if(today.getFullYear()===dtView.year && today.getMonth()===dtView.month && today.getDate()===d) el.classList.add('today');
+                if(dtSel.y===dtView.year && dtSel.m===dtView.month && dtSel.d===d) el.classList.add('selected');
+                el.onclick=()=>{
+                    dtSel={ y:dtView.year, m:dtView.month, d:d };
+                    renderDtDays(); updateDtPreview();
+                };
+                dtDays.appendChild(el);
+            }
+        }
+
+        function updateDtPreview(){
+            if(dtSel.d==null){ dtPreview.textContent='请选择日期'; return; }
+            dtPreview.textContent=`${dtSel.y}-${pad(dtSel.m+1)}-${pad(dtSel.d)} ${pad(dtHour.value)}:${pad(dtMin.value)}`;
+        }
+
+        $('dtPrevMonth').onclick=()=>{
+            dtView.month--; if(dtView.month<0){ dtView.month=11; dtView.year--; } renderDtDays();
+        };
+        $('dtNextMonth').onclick=()=>{
+            dtView.month++; if(dtView.month>11){ dtView.month=0; dtView.year++; } renderDtDays();
+        };
+        dtHour.onchange=updateDtPreview;
+        dtMin.onchange=updateDtPreview;
+        $('dtNow').onclick=()=>{
+            const now=new Date();
+            dtView={ year:now.getFullYear(), month:now.getMonth() };
+            dtSel={ y:now.getFullYear(), m:now.getMonth(), d:now.getDate() };
+            dtHour.value=now.getHours(); dtMin.value=now.getMinutes();
+            renderDtDays(); updateDtPreview();
+        };
+        function closeDtPicker(){ dtMask.style.display='none'; dtTargetInput=null; }
+        $('dtCancel').onclick=closeDtPicker;
+        // 禁止点击遮罩外部关闭，仅按钮可关闭
+        $('dtConfirm').onclick=()=>{
+            if(dtSel.d==null){ customAlert('请先选择日期！'); return; }
+            const val=`${dtSel.y}-${pad(dtSel.m+1)}-${pad(dtSel.d)}T${pad(dtHour.value)}:${pad(dtMin.value)}`;
+            if(dtTargetInput){
+                setDtInput(dtTargetInput, val);
+            }
+            closeDtPicker();
+        };
+
+        // 给时间输入框赋值：dataset.value 存规范格式(带T，逻辑用)，显示框去掉T更美观
+        // 传空则同时清空
+        function setDtInput(input, val){
+            if(!val){ input.value=''; input.dataset.value=''; return; }
+            input.dataset.value=val;
+            input.value=val.replace('T',' ');
+        }
+        // 读取时间输入框的规范值（带T），供保存逻辑使用
+        function getDtInput(input){ return input.dataset.value || input.value.replace(' ','T'); }
+        // 当前时刻的规范格式 YYYY-MM-DDTHH:mm
+        function nowDtValue(){
+            const n=new Date();
+            return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}T${pad(n.getHours())}:${pad(n.getMinutes())}`;
+        }
+
+        // 绑定两个时间输入框
+        billTime.addEventListener('click', ()=>openDtPicker(billTime));
+        editTime.addEventListener('click', ()=>openDtPicker(editTime));
+
+        function renderBill(){
+            const filterVal=filterCat.value;
+            // 结余必须基于「全部记录」累计，否则筛选时结余列会误导（这正是账对不上的根源）
+            // 先对全部记录按时间正序，算出每笔的真实账户累计结余。
+            // 时间精度仅到分钟，同分钟多笔用「记录在存储数组里的原始顺序」作次级键——
+            // 它天然稳定且唯一，不依赖 id 的字符串大小（旧 id 不定长，字符串比较会乱序）。
+            const raw=getUserData();
+            const allAsc=raw
+                .map((r,origIdx)=>({ r, origIdx }))
+                .sort((a,b)=>{
+                    const t=new Date(a.r.time)-new Date(b.r.time);
+                    if(t!==0) return t;
+                    return a.origIdx-b.origIdx;
+                })
+                .map(x=>x.r);
+
+            let running=0;
+            // 把每笔的累计结余直接挂在「排序后的记录对象」上（__bal）。
+            // 后续筛选/反转/分页都带着同一对象走，渲染时按对象取值，不经过 id 查表，
+            // 因此旧数据里即便存在偶发重复 id 也绝不会互相覆盖、算错结余。
+            allAsc.forEach(item=>{
+                const amt=Number(item.money||0);
+                running += (item.type==='expense' ? -amt : amt);
+                item.__bal=running;
+            });
+
+            // 再按筛选条件取出要显示的子集（仍保持时间正序）
+            const asc=allAsc.filter(r=> filterVal==='__all' ? true : r.cat===filterVal);
+
+            billList.innerHTML='';
+            if(asc.length===0){
+                billList.innerHTML='<tr><td colspan="7" class="empty-tip">暂无记账记录</td></tr>';
+                $('summaryOverall').innerHTML=''; $('summaryFilter').style.display='none'; $('catStats').innerHTML=''; $('pager').innerHTML='';
+                return;
+            }
+
+            // 汇总：收入/支出/结余。结余始终为全账户净额，不随筛选变化
+            let totalIn=0, totalOut=0;
+            allAsc.forEach(item=>{
+                const amt=Number(item.money||0);
+                if(item.type==='expense') totalOut+=amt; else totalIn+=amt;
+            });
+            const net=totalIn-totalOut;
+
+            // 筛选状态下额外提示当前筛选子集的收支，避免「为什么数字对不上」的疑惑
+            const filtering = filterVal!=='__all';
+            $('summaryOverall').innerHTML=
+                `共 <b>${allAsc.length}</b> 条　`+
+                `收入 <b class="pos">${totalIn.toFixed(2)}</b>　`+
+                `支出 <b class="neg">${totalOut.toFixed(2)}</b>　`+
+                `结余 <b>${net.toFixed(2)}</b> 元`;
+
+            const fBar=$('summaryFilter');
+            if(filtering){
+                let fIn=0, fOut=0;
+                asc.forEach(item=>{ const amt=Number(item.money||0); if(item.type==='expense') fOut+=amt; else fIn+=amt; });
+                fBar.innerHTML=
+                    `<span class="filter-badge">${escapeHtml(filterVal)}</span>`+
+                    `<span class="filter-nums">收入 <b class="pos">${fIn.toFixed(2)}</b>　支出 <b class="neg">${fOut.toFixed(2)}</b></span>`;
+                fBar.style.display='flex';
+            } else {
+                fBar.style.display='none';
+            }
+
+            // 分类统计：始终基于全部记录，按收支净额（收入加、支出减）
+            const byCat={};
+            allAsc.forEach(r=>{
+                const amt=Number(r.money||0)*(r.type==='expense'?-1:1);
+                byCat[r.cat]=(byCat[r.cat]||0)+amt;
+            });
+            $('catStats').innerHTML = Object.keys(byCat)
+                .map(c=>`<span class="chip">${escapeHtml(c)}：${byCat[c].toFixed(2)} 元</span>`).join('');
+
+            // 显示按时间倒序（最新在上）；结余取自全账户累计
+            const desc = asc.slice().reverse();
+
+            // 分页：只渲染当前页，结余/汇总仍按全部记录计算
+            const totalPages = Math.max(1, Math.ceil(desc.length / PAGE_SIZE));
+            if(curPage > totalPages) curPage = totalPages;
+            if(curPage < 1) curPage = 1;
+            const start = (curPage - 1) * PAGE_SIZE;
+            const pageItems = desc.slice(start, start + PAGE_SIZE);
+
+            pageItems.forEach(item=>{
+                const balance=item.__bal;
+                const isExp = item.type==='expense';
+                const amt=Number(item.money||0);
+                const typeTag = isExp
+                    ? '<span class="io-tag io-out">支出</span>'
+                    : '<span class="io-tag io-in">收入</span>';
+                const amtCell = `<span class="${isExp?'neg':'pos'}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
+
+                const remarkFull = item.remark || '';
+                let remarkCell;
+                if(!remarkFull){
+                    remarkCell = '<span class="remark-empty">无</span>';
+                } else {
+                    const shown = escapeHtml(charSlice(remarkFull, 10)) + (charLen(remarkFull) > 10 ? '…' : '');
+                    remarkCell = `<span class="remark-view" onclick="viewRemark('${item.id}')" title="点击查看完整备注">${shown}</span>`;
+                }
+                const tr=document.createElement('tr');
+                tr.innerHTML=`
+                    <td data-label="记账时间">${item.time.replace('T',' ')}</td>
+                    <td data-label="收支">${typeTag}</td>
+                    <td data-label="金额">${amtCell}</td>
+                    <td data-label="分类"><span class="cat-tag">${escapeHtml(item.cat||'未分类')}</span></td>
+                    <td data-label="结余">${balance.toFixed(2)}</td>
+                    <td data-label="备注">${remarkCell}</td>
+                    <td data-label="" class="ops-cell">
+                        <button class="operate-btn edit" onclick="openEdit('${item.id}')">修改</button>
+                    </td>`;
+                billList.appendChild(tr);
+            });
+
+            renderPager(totalPages);
+        }
+
+        // 渲染分页控件（≤1 页时不显示）
+        function renderPager(totalPages){
+            const box=$('pager');
+            if(totalPages<=1){ box.innerHTML=''; return; }
+            box.innerHTML='';
+            const prev=document.createElement('button');
+            prev.textContent='‹ 上一页'; prev.disabled = curPage<=1;
+            prev.onclick=()=>{ curPage--; renderBill(); scrollListTop(); };
+            const info=document.createElement('span');
+            info.className='page-info'; info.textContent=`第 ${curPage} / ${totalPages} 页`;
+            const next=document.createElement('button');
+            next.textContent='下一页 ›'; next.disabled = curPage>=totalPages;
+            next.onclick=()=>{ curPage++; renderBill(); scrollListTop(); };
+            box.appendChild(prev); box.appendChild(info); box.appendChild(next);
+        }
+        // 翻页后让列表顶部对齐，避免停在半截
+        function scrollListTop(){
+            const t=$('billHead') || document.querySelector('table');
+            if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
+        }
+
+        // ===== 悬浮按钮：打开/关闭记账弹窗 =====
+        const addMask=$('addMask');
+
+        // 渲染记账弹窗的分类标签：按存档里 cats 的固定顺序显示（顺序由「管理分类」页拖动决定）
+        // 不默认选中任何分类——分类为必选项，由用户主动点选
+        let billCatSel='';
+        function renderBillCatChips(){
+            const cats=getCats();
+            billCatSel='';               // 每次渲染都重置为「未选」
+            billCat.value='';
+            const box=$('billCatChips');
+            box.innerHTML='';
+            cats.forEach(c=>{
+                const b=document.createElement('div');
+                b.className='cc';
+                b.textContent=c;
+                b.onclick=()=>{
+                    billCatSel=c; billCat.value=c;
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                };
+                box.appendChild(b);
+            });
+        }
+
+        // 分类增删改/排序后调用：若记账弹窗正开着，重渲染标签使其立即反映最新分类。
+        // 尽量保留用户当前已选的分类（若它还存在）。
+        function refreshBillCatChipsIfOpen(){
+            if($('addMask').style.display!=='flex') return;
+            const keep=billCatSel;
+            renderBillCatChips();
+            if(keep && getCats().includes(keep)){
+                billCatSel=keep; billCat.value=keep;
+                $('billCatChips').querySelectorAll('.cc').forEach(el=>{
+                    el.classList.toggle('sel', el.textContent===keep);
+                });
+            }
+        }
+
+        // 渲染收支标签：支出/收入，必选、不默认选中。选中态用语义色（支出红/收入绿）
+        let billTypeSel='';
+        function renderBillTypeChips(){
+            billTypeSel='';
+            billType.value='';
+            const box=$('billTypeChips');
+            box.innerHTML='';
+            const opts=[ {v:'expense', t:'支出', cls:'sel-out'},
+                         {v:'income',  t:'收入', cls:'sel-in'} ];
+            opts.forEach(o=>{
+                const b=document.createElement('div');
+                b.className='cc';
+                b.textContent=o.t;
+                b.onclick=()=>{
+                    billTypeSel=o.v; billType.value=o.v;
+                    box.querySelectorAll('.cc').forEach(el=>{
+                        el.classList.remove('sel-out','sel-in');
+                    });
+                    b.classList.add(o.cls);
+                };
+                box.appendChild(b);
+            });
+        }
+
+        // 把记账表单恢复到「空白初始态」：空金额/空备注、不选收支、不选分类、时间为此刻
+        function resetBillForm(){
+            billMoney.value='';
+            billRemark.value='';
+            renderBillTypeChips();
+            renderBillCatChips();
+            setDtInput(billTime, nowDtValue());
+        }
+        function openAddModal(){
+            resetBillForm();
+            if(window.__openModalAfterKeyboard){
+                // 键盘先出来，弹窗再淡入（消除被键盘顶起的闪动）
+                window.__openModalAfterKeyboard(addMask, billMoney);
+            } else {
+                // 不支持 visualViewport 的环境：保持原行为
+                addMask.style.display='flex';
+                setTimeout(()=>billMoney.focus(), 60);
+            }
+        }
+        $('fabAdd').addEventListener('click', openAddModal);
+        $('closeAdd').addEventListener('click', ()=>{ addMask.style.display='none'; });
+
+        addBill.addEventListener('click', () => {
+            const time=getDtInput(billTime), money=billMoney.value;
+            const cat=billCat.value, remark=billRemark.value.trim();
+            const type=billType.value;
+            if(!time || money===''){ customAlert('请填写完整时间和金额！'); return; }
+            if(!cat){ customAlert('请选择一个分类～'); return; }
+            if(!type){ customAlert('请选择收支（支出或收入）～'); return; }
+            const m = normMoney(money);
+            if(!m.ok){ customAlert(m.why); return; }
+            const data=getUserData();
+            data.push({ id:genId(), time, money:m.val, cat, remark, type });
+            saveUserData(data);
+            curPage = 1;            // 新记录在最前，回到第 1 页才看得到
+            refreshAllViews();
+            // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
+            addMask.style.display='none';
+            customConfirm('已记下这一笔，要再记一笔吗？', ()=>{
+                openAddModal();     // 重新打开，且为全新空白表单（不带上次数据）
+            }, '记账成功', { okText:'再记一笔', cancelText:'关闭' });
+        });
+
+        window.viewRemark=function(id){
+            const item=getUserData().find(r=>r.id===id);
+            if(!item) return;
+            customAlert(item.remark || '（无备注）', '备注详情', 'left');
+        };
+
+        // ===== 修改弹窗的分类/收支标签（与记账弹窗同款，但打开时预选记录原有值）=====
+        let editCatSel='', editTypeSel='';
+        // selected: 要预选中的分类；不传或不存在则不选中
+        function renderEditCatChips(selected){
+            const cats=getCats();
+            // 隐藏 select 需含每个分类的 option，否则 editCat.value=c 不生效
+            fillSelect(editCat, cats, null);
+            editCatSel = (selected && cats.includes(selected)) ? selected : '';
+            editCat.value=editCatSel;
+            const box=$('editCatChips');
+            box.innerHTML='';
+            cats.forEach(c=>{
+                const b=document.createElement('div');
+                b.className='cc'+(c===editCatSel?' sel':'');
+                b.textContent=c;
+                b.onclick=()=>{
+                    editCatSel=c; editCat.value=c;
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                };
+                box.appendChild(b);
+            });
+        }
+        function renderEditTypeChips(selected){
+            editTypeSel = (selected==='expense'||selected==='income') ? selected : '';
+            editType.value=editTypeSel;
+            const box=$('editTypeChips');
+            box.innerHTML='';
+            const opts=[ {v:'expense', t:'支出', cls:'sel-out'},
+                         {v:'income',  t:'收入', cls:'sel-in'} ];
+            opts.forEach(o=>{
+                const b=document.createElement('div');
+                b.className='cc'+(o.v===editTypeSel?' '+o.cls:'');
+                b.textContent=o.t;
+                b.onclick=()=>{
+                    editTypeSel=o.v; editType.value=o.v;
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.remove('sel-out','sel-in'));
+                    b.classList.add(o.cls);
+                };
+                box.appendChild(b);
+            });
+        }
+
+        let editId=null;
+        window.openEdit=function(id){
+            editId=id;
+            const item=getUserData().find(r=>r.id===id);
+            if(!item){ customAlert('未找到该记录'); return; }
+            setDtInput(editTime, item.time); editMoney.value=item.money; editRemark.value=item.remark||'';
+            // 预选记录原有的分类与收支（标签式）
+            renderEditCatChips(item.cat||'未分类');
+            renderEditTypeChips(item.type||'income');
+            editMask.style.display='flex';
+        };
+        cancelEdit.addEventListener('click', ()=>{ editMask.style.display='none'; editId=null; });
+        $('deleteInEdit').addEventListener('click', ()=>{
+            const id=editId;
+            if(id==null) return;
+            customConfirm('确定要删除这条记录吗？', ()=>{
+                const data=getUserData().filter(r=>r.id!==id);
+                saveUserData(data);
+                editMask.style.display='none'; editId=null;
+                refreshAllViews();
+            }, '删除记录');
+        });
+        // 禁止点击遮罩外部关闭，仅按钮可关闭
+        saveEdit.addEventListener('click', () => {
+            const time=getDtInput(editTime), money=editMoney.value;
+            const cat=editCat.value, remark=editRemark.value.trim();
+            const type=editType.value;
+            if(!time || money===''){ customAlert('时间和金额不能为空！'); return; }
+            if(!cat){ customAlert('请选择一个分类～'); return; }
+            if(!type){ customAlert('请选择收支（支出或收入）～'); return; }
+            const m = normMoney(money);
+            if(!m.ok){ customAlert(m.why); return; }
+            const data=getUserData();
+            const idx=data.findIndex(r=>r.id===editId);
+            if(idx>=0){ data[idx]={ id:editId, time, money:m.val, cat, remark, type }; saveUserData(data); }
+            editMask.style.display='none';
+            refreshAllViews();
+        });
+
+        // ===== 自定义金色下拉：包裹原生 select，保留全部 value/事件逻辑 =====
+        function enhanceSelect(sel){
+            if(!sel || sel.dataset.csReady) return;
+            sel.dataset.csReady='1';
+
+            const wrap=document.createElement('div');
+            wrap.className='cs-wrap';
+            if(getComputedStyle(sel).display==='block' || sel.style.width==='100%') wrap.classList.add('cs-block');
+            sel.parentNode.insertBefore(wrap, sel);
+            wrap.appendChild(sel);
+            sel.classList.add('cs-native');
+
+            const display=document.createElement('div');
+            display.className='cs-display';
+            display.innerHTML='<span class="cs-text"></span><span class="cs-arrow">▼</span>';
+            const panel=document.createElement('div');
+            panel.className='cs-panel';
+            wrap.appendChild(display);
+            wrap.appendChild(panel);
+
+            const textEl=display.querySelector('.cs-text');
+
+            function buildPanel(){
+                panel.innerHTML='';
+                Array.from(sel.options).forEach(opt=>{
+                    const o=document.createElement('div');
+                    o.className='cs-opt'+(opt.value===sel.value?' sel':'');
+                    o.textContent=opt.textContent;
+                    o.onclick=(e)=>{
+                        e.stopPropagation();
+                        const changed = sel.value!==opt.value;
+                        if(changed) sel.value=opt.value;
+                        syncDisplay();
+                        close();
+                        if(changed){
+                            // 先收起面板，再派发 change，避免 change 触发的重建把面板卡在展开态
+                            setTimeout(()=>{ sel.dispatchEvent(new Event('change', {bubbles:true})); }, 0);
+                        }
+                    };
+                    panel.appendChild(o);
+                });
+            }
+            function syncDisplay(){
+                const cur=sel.options[sel.selectedIndex];
+                textEl.textContent=cur?cur.textContent:'';
+                panel.querySelectorAll('.cs-opt').forEach((el,i)=>{
+                    el.classList.toggle('sel', sel.options[i] && sel.options[i].value===sel.value);
+                });
+            }
+            function open(){
+                // 关闭其它打开的下拉
+                document.querySelectorAll('.cs-wrap.open').forEach(w=>{ if(w!==wrap) w.classList.remove('open'); });
+                buildPanel(); wrap.classList.add('open');
+                const selEl=panel.querySelector('.cs-opt.sel');
+                if(selEl) selEl.scrollIntoView({block:'nearest'});
+            }
+            function close(){ wrap.classList.remove('open'); }
+            display.onclick=(e)=>{ e.stopPropagation(); wrap.classList.contains('open')?close():open(); };
+
+            // 选项变化（如分类/存档动态重建）时重建并同步
+            const mo=new MutationObserver(()=>{ buildPanel(); syncDisplay(); });
+            mo.observe(sel, {childList:true});
+
+            // 当代码用 sel.value=... 赋值时，同步显示
+            const proto=Object.getPrototypeOf(sel);
+            const desc=Object.getOwnPropertyDescriptor(proto,'value');
+            if(desc && desc.set){
+                Object.defineProperty(sel,'value',{
+                    get(){ return desc.get.call(this); },
+                    set(v){ desc.set.call(this, v); syncDisplay(); },
+                    configurable:true
+                });
+            }
+            sel.addEventListener('change', syncDisplay);
+
+            buildPanel(); syncDisplay();
+        }
+
+        // 点击空白处关闭所有自定义下拉
+        document.addEventListener('click', ()=>{ document.querySelectorAll('.cs-wrap.open').forEach(w=>w.classList.remove('open')); });
+
+        // 初始化页面里所有原生下拉
+        // 注意：billCat 不再增强为可见下拉——它已被分类标签(chips)取代，仅作隐藏取值用
+        // 注意：billCat/billType/editCat/editType 均不增强为可见下拉——已被记账/修改弹窗的标签(chips)取代，仅作隐藏取值用
+        ['archiveSelect','filterCat','dtHour','dtMin']
+            .forEach(id=>{ const el=$(id); if(el) enhanceSelect(el); });
+
+        // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====
+        (function(){
+            const masks=Array.from(document.querySelectorAll('.mask'));
+            let savedScrollY=0, locked=false;
+
+            function anyMaskOpen(){
+                return masks.some(m=>{
+                    const d=getComputedStyle(m).display;
+                    return d && d!=='none';
+                });
+            }
+            function lock(){
+                if(locked) return;
+                savedScrollY=window.scrollY || window.pageYOffset || 0;
+                document.body.style.position='fixed';
+                document.body.style.top=`-${savedScrollY}px`;
+                document.body.style.left='0';
+                document.body.style.right='0';
+                document.body.style.width='100%';
+                locked=true;
+            }
+            function unlock(){
+                if(!locked) return;
+                document.body.style.position='';
+                document.body.style.top='';
+                document.body.style.left='';
+                document.body.style.right='';
+                document.body.style.width='';
+                window.scrollTo(0, savedScrollY);
+                locked=false;
+            }
+            function update(){ anyMaskOpen()?lock():unlock(); }
+
+            // 监听每个弹窗的显示状态变化
+            masks.forEach(m=>{
+                new MutationObserver(update).observe(m, {attributes:true, attributeFilter:['style']});
+            });
+
+            // 弹窗内列表（可滚动区域）到顶/到底时，阻止滚动冒泡到背景，进一步防穿透
+            document.querySelectorAll('.cat-list, .ask-msg, .edit-dialog, .dt-dialog').forEach(el=>{
+                el.addEventListener('touchmove', e=>{ e.stopPropagation(); }, {passive:true});
+            });
+        })();
+
+        // 页面初始化逻辑见脚本末尾 initApp()（在所有函数与外观主题就绪后执行）
+
+        // ===== 外观：主题色（全局，所有账号共用，存 localStorage）=====
+        (function(){
+            const DEFAULT_PRIMARY='#3f6f6b';
+            // 预设：每套只给一个主色，其余色由算法从主色推导，保证整体协调
+            const PRESETS=[
+                { name:'雾松青', color:'#3f6f6b' },
+                { name:'素墨米', color:'#8a7f66' },
+                { name:'黛紫烟', color:'#6b5a82' },
+                { name:'宣纸灰', color:'#5f5b54' }
+            ];
+
+            // —— 颜色工具：hex<->hsl，按亮度派生整套变量 ——
+            function hexToRgb(h){ h=h.replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join('');
+                return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) }; }
+            function rgbToHex(r,g,b){ const f=v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0'); return '#'+f(r)+f(g)+f(b); }
+            function rgbToHsl({r,g,b}){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h,s,l=(mx+mn)/2;
+                if(mx===mn){h=s=0;}else{const d=mx-mn; s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+                    switch(mx){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4;}h/=6;}
+                return { h:h*360, s:s*100, l:l*100 }; }
+            function hslToHex(h,s,l){ h=(h%360+360)%360; s=Math.max(0,Math.min(100,s))/100; l=Math.max(0,Math.min(100,l))/100;
+                const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2; let r,g,b;
+                if(h<60)[r,g,b]=[c,x,0];else if(h<120)[r,g,b]=[x,c,0];else if(h<180)[r,g,b]=[0,c,x];
+                else if(h<240)[r,g,b]=[0,x,c];else if(h<300)[r,g,b]=[x,0,c];else[r,g,b]=[c,0,x];
+                return rgbToHex((r+m)*255,(g+m)*255,(b+m)*255); }
+            // 相对亮度 & 与白色的对比度（用于兜底压暗）
+            function _lum(hex){ const {r,g,b}=hexToRgb(hex); const a=[r,g,b].map(v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);}); return 0.2126*a[0]+0.7152*a[1]+0.0722*a[2]; }
+            function _whiteContrast(hex){ const l=_lum(hex); return (1.0+0.05)/(l+0.05); }
+            function _contrast(a,b){ const l1=_lum(a),l2=_lum(b); return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05); }
+
+            // 从一个主色推导整套主题变量（保证浅底深字、对比足够）
+            function buildPalette(primaryHex){
+                let { h,s,l } = rgbToHsl(hexToRgb(primaryHex));
+                if(s<12) s=12;                       // 太灰会显脏，给个下限
+                // 主色亮度收进可读区间：上限 56
+                let pL=Math.min(l,56);
+                // 关键兜底：黄/青等高亮色相即使压到 56 白字仍可能发虚，
+                // 逐步压暗直到「白字 / 主色」对比≥2.4，保证按钮文字任何选色下都看得清
+                let primary=hslToHex(h,s,pL);
+                let guard=0;
+                while(_whiteContrast(primary) < 2.4 && pL > 20 && guard++ < 40){
+                    pL -= 2; primary=hslToHex(h,s,pL);
+                }
+                const primaryMid=hslToHex(h,Math.min(s+4,90),Math.min(pL+6,60));
+                // 主色按钮上的文字：黑/白哪个对主色对比更高就用哪个（比单纯按亮度判断更稳）
+                const {r,g,b}=hexToRgb(primary);
+                const onPrimary = _contrast(primary,'#ffffff') >= _contrast(primary,'#2a2200')
+                    ? '#ffffff' : '#2a2200';
+                return {
+                    '--c-primary':       primary,
+                    '--c-primary-mid':   primaryMid,
+                    '--c-primary-dark':  hslToHex(h,Math.min(s+6,90),Math.max(pL-14,26)),
+                    '--c-primary-deep':  hslToHex(h,Math.min(s+10,92),Math.max(pL-26,20)),
+                    '--c-accent':        hslToHex(h,Math.min(s+20,100),Math.min(pL+10,68)),
+                    '--c-accent-soft':   hslToHex(h,Math.min(s+8,80),88),
+                    '--c-text':          hslToHex(h,Math.min(s+8,85),28),
+                    '--c-text-soft':     hslToHex(h,Math.min(s+4,70),38),
+                    '--c-border':        hslToHex(h,Math.min(s,55),78),
+                    '--c-border-mid':    hslToHex(h,Math.min(s+4,60),68),
+                    '--c-surface':       hslToHex(h,40,98),
+                    '--c-surface-2':     hslToHex(h,45,98.5),
+                    '--c-bg':            hslToHex(h,42,96),
+                    '--c-card-1':        hslToHex(h,55,95),
+                    '--c-card-2':        hslToHex(h,62,88),
+                    '--c-chip':          hslToHex(h,70,92),
+                    '--c-on-primary':    onPrimary,
+                    '--c-shadow-rgb':    `${r},${g},${b}`
+                };
+            }
+            function applyPrimary(primaryHex){
+                const pal=buildPalette(primaryHex);
+                const root=document.documentElement;
+                Object.keys(pal).forEach(k=>root.style.setProperty(k, pal[k]));
+                // 同步「键盘弹起兜底底色」：把当前主题背景钉到 html inline 背景 + theme-color，
+                // 否则换肤后键盘弹起会闪一下旧底色。
+                const bg=pal['--c-bg'];
+                if(bg){
+                    root.style.backgroundColor=bg;
+                    let tc=document.querySelector('meta[name="theme-color"]');
+                    if(tc) tc.setAttribute('content', bg);
+                }
+            }
+
+            // —— 读写持久化 ——
+            function loadPrefs(){
+                try{ return JSON.parse(localStorage.getItem('app_appearance')||'{}'); }catch(_){ return {}; }
+            }
+            function savePrefs(p){ localStorage.setItem('app_appearance', JSON.stringify(p)); }
+
+            // —— 弹窗交互 ——
+            const themeMask=$('themeMask');
+            function renderPresets(activeColor){
+                const box=$('themePresets'); box.innerHTML='';
+                PRESETS.forEach(p=>{
+                    const sw=document.createElement('div');
+                    sw.className='theme-swatch';
+                    sw.style.background=`linear-gradient(135deg, ${p.color}, ${hslToHex(rgbToHsl(hexToRgb(p.color)).h, rgbToHsl(hexToRgb(p.color)).s, Math.max(rgbToHsl(hexToRgb(p.color)).l-16,22))})`;
+                    sw.title=p.name;
+                    if(activeColor && p.color.toLowerCase()===activeColor.toLowerCase()) sw.classList.add('active');
+                    sw.onclick=()=>{
+                        applyPrimary(p.color);
+                        const pf=loadPrefs(); pf.primary=p.color; savePrefs(pf);
+                        renderPresets(p.color);
+                        $('customColor').value=p.color;
+                    };
+                    box.appendChild(sw);
+                });
+            }
+            function openTheme(){
+                const pf=loadPrefs();
+                const cur=pf.primary||DEFAULT_PRIMARY;
+                $('customColor').value = /^#[0-9a-fA-F]{6}$/.test(cur)?cur:DEFAULT_PRIMARY;
+                renderPresets(cur);
+                themeMask.style.display='flex';
+            }
+            $('themeBtn').addEventListener('click', openTheme);
+            $('closeTheme').addEventListener('click', ()=>{ themeMask.style.display='none'; });
+
+            $('applyCustomBtn').addEventListener('click', ()=>{
+                const c=$('customColor').value;
+                applyPrimary(c);
+                const pf=loadPrefs(); pf.primary=c; savePrefs(pf);
+                renderPresets(c);
+            });
+            $('resetThemeBtn').addEventListener('click', ()=>{
+                applyPrimary(DEFAULT_PRIMARY);
+                const pf=loadPrefs(); pf.primary=DEFAULT_PRIMARY; savePrefs(pf);
+                $('customColor').value=DEFAULT_PRIMARY;
+                renderPresets(DEFAULT_PRIMARY);
+            });
+
+            // —— 启动时应用已保存的外观 ——
+            const pf=loadPrefs();
+            if(pf.primary) applyPrimary(pf.primary);
+        })();
+
+        // ===== 点击按下反馈：用事件委托给可点元素加 .pressed（WebView 里 :active 不稳，故用 JS）=====
+        (function(){
+            const SEL = 'button, .mini-btn, .link-btn, .cs-display, .dt-day, .dt-now, '
+                      + '.pager button, .user-chip, .login-btn, .add-btn, .save, .cancel, '
+                      + '.operate-btn, .logout, .cat-item button, .archive-bar select';
+            let cur=null;
+            function press(e){
+                const t=e.target.closest(SEL);
+                if(!t || t.disabled) return;
+                cur=t; t.classList.add('pressed');
+            }
+            function release(){
+                if(cur){ cur.classList.remove('pressed'); cur=null; }
+            }
+            // 触摸优先；同时挂 pointer/mouse 兼容电脑与混合设备
+            document.addEventListener('touchstart', press, {passive:true});
+            document.addEventListener('touchend', release, {passive:true});
+            document.addEventListener('touchcancel', release, {passive:true});
+            document.addEventListener('pointerdown', press, {passive:true});
+            document.addEventListener('pointerup', release, {passive:true});
+            document.addEventListener('pointercancel', release, {passive:true});
+            // 滚动时若手指离开按钮，确保还原
+            document.addEventListener('scroll', release, {passive:true, capture:true});
+        })();
+        // ============================================================
+        // ===== 底部标签切换 =====
+        // ============================================================
+        // 默认进入页面（存全局偏好，所有用户共用此设置）
+        function getDefaultTab(){
+            const v=localStorage.getItem('app_default_tab');
+            return (v==='stats'||v==='ledger'||v==='settings') ? v : 'ledger';
+        }
+        function setDefaultTab(v){ localStorage.setItem('app_default_tab', v); }
+
+        function switchTab(tab){
+            currentTab=tab;
+            $('pageLedger').style.display   = tab==='ledger'   ? 'block':'none';
+            $('pageStats').style.display    = tab==='stats'    ? 'block':'none';
+            $('pageSettings').style.display = tab==='settings' ? 'block':'none';
+            // 记账按钮只在记账页显示
+            $('fabAdd').style.display = tab==='ledger' ? 'flex':'none';
+            if(tab!=='ledger'){ const tt=$('toTopBtn'); if(tt) tt.classList.remove('show'); }
+            document.body.classList.toggle('tab-ledger', tab==='ledger');
+            document.querySelectorAll('.tab-btn').forEach(b=>{
+                b.classList.toggle('active', b.dataset.tab===tab);
+            });
+            if(tab==='stats') renderStats();
+            // 切换标签后回到顶部：延到布局完成后执行，避免在 display 切换同帧里失效
+            window.scrollTo(0,0);
+            requestAnimationFrame(()=>{ window.scrollTo(0,0); document.documentElement.scrollTop=0; document.body.scrollTop=0; });
+        }
+        document.querySelectorAll('.tab-btn').forEach(b=>{
+            b.addEventListener('click', ()=>switchTab(b.dataset.tab));
+        });
+
+        // 回到顶部：滚动超过一屏且在记账页时显示
+        (function(){
+            const btn=$('toTopBtn');
+            function onScroll(){
+                const show = currentTab==='ledger' && (window.scrollY||document.documentElement.scrollTop) > 400;
+                btn.classList.toggle('show', show);
+            }
+            window.addEventListener('scroll', onScroll, {passive:true});
+            btn.addEventListener('click', ()=>{ window.scrollTo({top:0, behavior:'smooth'}); });
+            onScroll();
+        })();
+
+        // 默认进入页面：分段选择器
+        (function(){
+            const seg=$('defaultTabSeg');
+            function paint(){
+                const cur=getDefaultTab();
+                seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===cur));
+            }
+            seg.querySelectorAll('button').forEach(b=>{
+                b.addEventListener('click', ()=>{ setDefaultTab(b.dataset.v); paint(); });
+            });
+            paint();
+        })();
+
+        // ============================================================
+        // ===== 统计模块（纯手写 SVG，跟随外观主题变量） =====
+        // ============================================================
+        let statYear, statMonth;     // 当前查看的年/月（month: 0-11）
+        let statSelDay=null;         // 当前选中的日（1-31）
+
+        // 读取 CSS 变量当前值，让 SVG 颜色跟着外观走
+        function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+        // —— 统计页自带的颜色工具（独立于外观系统的私有函数，避免作用域报错） ——
+        function statHexToRgb(h){ h=(h||'').replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join('');
+            if(h.length<6) h='d4af37';
+            return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) }; }
+        function statRgbToHsl(r,g,b){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h,s,l=(mx+mn)/2;
+            if(mx===mn){h=s=0;}else{const d=mx-mn; s=l>0.5?d/(2-mx-mn):d/(mx+mn);
+                switch(mx){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4;}h/=6;}
+            return { h:h*360, s:s*100, l:l*100 }; }
+        function statHslToHex(h,s,l){ h=(h%360+360)%360; s=Math.max(0,Math.min(100,s))/100; l=Math.max(0,Math.min(100,l))/100;
+            const c=(1-Math.abs(2*l-1))*s, x=c*(1-Math.abs((h/60)%2-1)), m=l-c/2; let r,g,b;
+            if(h<60)[r,g,b]=[c,x,0];else if(h<120)[r,g,b]=[x,c,0];else if(h<180)[r,g,b]=[0,c,x];
+            else if(h<240)[r,g,b]=[0,x,c];else if(h<300)[r,g,b]=[x,0,c];else[r,g,b]=[c,0,x];
+            const f=v=>Math.round(Math.max(0,Math.min(255,(v+m)*255))).toString(16).padStart(2,'0');
+            return '#'+f(r)+f(g)+f(b); }
+
+        // 为当月每个分类分配稳定颜色：基于主题色在色相环上均匀散开，保证跟随主题
+        function catColor(idx, total){
+            const base=cssVar('--c-primary')||'#d4af37';
+            const {r,g,b}=statHexToRgb(base);
+            const {h,s}=statRgbToHsl(r,g,b);
+            const hue=(h + idx*(360/Math.max(total,1))) % 360;
+            return statHslToHex(hue, Math.max(s,45), 50);
+        }
+
+        function statRecords(){
+            // 统计基于当前存档的全部记录
+            return getUserData().slice();
+        }
+
+        function renderStats(){
+            if(statYear===undefined){
+                const now=new Date();
+                statYear=now.getFullYear(); statMonth=now.getMonth();
+            }
+            renderStatCalendar();
+        }
+
+        function renderStatCalendar(){
+            $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
+            const recs=statRecords();
+
+            // 按「日」聚合当月净额，并记录哪天有数据
+            const dayNet={}, dayHas={};
+            recs.forEach(r=>{
+                const d=new Date(r.time);
+                if(d.getFullYear()===statYear && d.getMonth()===statMonth){
+                    const day=d.getDate();
+                    const amt=Number(r.money||0)*(r.type==='expense'?-1:1);
+                    dayNet[day]=(dayNet[day]||0)+amt;
+                    dayHas[day]=true;
+                }
+            });
+
+            // 当月收入/支出汇总
+            let mIn=0, mOut=0;
+            recs.forEach(r=>{
+                const d=new Date(r.time);
+                if(d.getFullYear()===statYear && d.getMonth()===statMonth){
+                    const amt=Number(r.money||0);
+                    if(r.type==='expense') mOut+=amt; else mIn+=amt;
+                }
+            });
+            $('statMonthIn').textContent='+'+mIn.toFixed(2);
+            $('statMonthOut').textContent='−'+mOut.toFixed(2);
+
+            // 画日历格子
+            const firstDow=new Date(statYear, statMonth, 1).getDay();   // 0=周日
+            const daysInMonth=new Date(statYear, statMonth+1, 0).getDate();
+            const today=new Date();
+            const isThisMonth = today.getFullYear()===statYear && today.getMonth()===statMonth;
+
+            const grid=$('statCal'); grid.innerHTML='';
+            for(let i=0;i<firstDow;i++){ grid.appendChild(document.createElement('div')); }
+            for(let day=1; day<=daysInMonth; day++){
+                const cell=document.createElement('div');
+                cell.className='day';
+                const has=!!dayHas[day];
+                if(has) cell.classList.add('has');
+                if(isThisMonth && today.getDate()===day) cell.classList.add('today');
+                if(statSelDay===day && has) cell.classList.add('sel');
+
+                let inner=`<div class="dn">${day}</div>`;
+                if(has){
+                    const n=dayNet[day];
+                    const col = n>=0 ? 'var(--c-pos,#2f7d57)' : 'var(--c-neg,#d05a52)';
+                    inner+=`<div class="da" style="color:${col}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
+                }
+                cell.innerHTML=inner;
+                if(has){
+                    cell.addEventListener('click', ()=>{ statSelDay=day; renderStatCalendar(); renderStatDay(day); });
+                }
+                grid.appendChild(cell);
+            }
+
+            // 若已选中某天且该天仍在本月有数据，刷新当日分析；否则隐藏
+            if(statSelDay && dayHas[statSelDay]){
+                renderStatDay(statSelDay);
+            } else {
+                statSelDay=null;
+                $('statDayWrap').style.display='none';
+                $('statDayEmpty').style.display='block';
+            }
+        }
+
+        function renderStatDay(day){
+            const recs=statRecords().filter(r=>{
+                const d=new Date(r.time);
+                return d.getFullYear()===statYear && d.getMonth()===statMonth && d.getDate()===day;
+            });
+            $('statDayEmpty').style.display='none';
+            $('statDayWrap').style.display='block';
+            $('statDayTitle').textContent=`${statYear}-${pad(statMonth+1)}-${pad(day)} · 当日支出分析`;
+
+            // —— 当日支出按分类聚合 ——
+            const byCat={};
+            recs.forEach(r=>{ if(r.type==='expense'){ const amt=Number(r.money||0); byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt; } });
+            const cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
+            const vals=cats.map(c=>byCat[c]);
+            const colors=cats.map((_,i)=>catColor(i, cats.length));
+
+            // 饼图：有支出就画占比；当天无支出则提示
+            if(cats.length){
+                $('statPie').innerHTML = buildDonutSVG(vals, colors);
+                $('statCatList').innerHTML = cats.map((c,i)=>
+                    `<div class="sc-item">
+                        <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span>${escapeHtml(c)}</span>
+                        <span class="sc-amt neg">−${byCat[c].toFixed(2)}</span>
+                    </div>`).join('');
+            } else {
+                $('statPie').innerHTML = '<div style="font-size:12px;color:var(--c-text-soft);text-align:center;padding-top:54px;">当日无支出</div>';
+                $('statCatList').innerHTML = '<div style="font-size:13px;color:var(--c-text-soft);">这天没有支出记录</div>';
+            }
+
+            // —— 当日按小时支出 ——
+            const hours=new Array(24).fill(0);
+            const hourRecs={};   // 小时 -> 该小时的支出记录数组
+            recs.forEach(r=>{ if(r.type==='expense'){ const h=new Date(r.time).getHours(); hours[h]+=Number(r.money||0); (hourRecs[h]=hourRecs[h]||[]).push(r); } });
+            renderHourBars(hours, hourRecs);
+        }
+
+        // 手写甜甜圈饼图
+        function buildDonutSVG(vals, colors){
+            const total=vals.reduce((a,b)=>a+b,0);
+            if(total<=0) return '';
+            const cx=70, cy=70, r=58, rin=33;
+            let ang=-Math.PI/2;   // 从顶端开始
+            let paths='';
+            vals.forEach((v,i)=>{
+                const frac=v/total;
+                const a2=ang + frac*Math.PI*2;
+                // 单一扇形若占满整圈，用两段避免 arc 退化
+                if(frac>=0.9999){
+                    paths+=`<circle cx="${cx}" cy="${cy}" r="${(r+rin)/2}" fill="none" stroke="${colors[i]}" stroke-width="${r-rin}"/>`;
+                } else {
+                    const x1=cx+r*Math.cos(ang),   y1=cy+r*Math.sin(ang);
+                    const x2=cx+r*Math.cos(a2),    y2=cy+r*Math.sin(a2);
+                    const xi2=cx+rin*Math.cos(a2), yi2=cy+rin*Math.sin(a2);
+                    const xi1=cx+rin*Math.cos(ang),yi1=cy+rin*Math.sin(ang);
+                    const large=frac>0.5?1:0;
+                    paths+=`<path d="M${x1.toFixed(2)},${y1.toFixed(2)} A${r},${r} 0 ${large} 1 ${x2.toFixed(2)},${y2.toFixed(2)} L${xi2.toFixed(2)},${yi2.toFixed(2)} A${rin},${rin} 0 ${large} 0 ${xi1.toFixed(2)},${yi1.toFixed(2)} Z" fill="${colors[i]}"/>`;
+                }
+                ang=a2;
+            });
+            return `<svg viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="当日支出分类占比">${paths}</svg>`;
+        }
+
+        // 手写柱状图（24 小时，可横向滚动，自动定位高峰，点击看该时段明细）
+        let statHourRecs={};   // 供点击明细使用：小时 -> 记录数组
+        function renderHourBars(hours, hourRecs){
+            statHourRecs = hourRecs || {};
+            const max=Math.max(...hours, 1);
+            const colW=30, gap=6, padL=4, padBottom=22, padTop=8;
+            const innerW=padL*2 + hours.length*colW + (hours.length-1)*gap;
+            const H=170, plotH=H-padBottom-padTop;
+            const barCol=cssVar('--c-primary')||'#d4af37';
+            const emptyCol=cssVar('--c-chip')||'#fff5cc';
+            const txtCol=cssVar('--c-text-soft')||'#888';
+            const onBar=cssVar('--c-on-primary')||'#fff';
+
+            let bars='';
+            let peak=0, peakV=-1;
+            hours.forEach((v,h)=>{ if(v>peakV){ peakV=v; peak=h; } });
+
+            hours.forEach((v,h)=>{
+                const x=padL + h*(colW+gap);
+                const bh=v>0 ? Math.max(3, (v/max)*plotH) : 0;
+                const y=padTop+plotH-bh;
+                if(v>0){
+                    // 整根柱子包一个可点击的 group
+                    let cell=`<rect x="${x}" y="${y}" width="${colW}" height="${bh}" rx="4" fill="${barCol}"/>`;
+                    const label=v.toFixed(0);
+                    // 金额放进柱子内部（柱子够高时），否则放柱子上方
+                    if(bh>=18){
+                        cell+=`<text x="${x+colW/2}" y="${y+13}" text-anchor="middle" font-size="9" fill="${onBar}">${label}</text>`;
+                    } else {
+                        cell+=`<text x="${x+colW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${txtCol}">${label}</text>`;
+                    }
+                    // 透明热区，扩大点击范围（含柱子上方空白），方便手指点
+                    bars+=`<g style="cursor:pointer" onclick="showHourDetail(${h})">`
+                        + `<rect x="${x}" y="${padTop}" width="${colW}" height="${plotH}" fill="transparent"/>`
+                        + cell + `</g>`;
+                } else {
+                    bars+=`<rect x="${x}" y="${padTop+plotH-3}" width="${colW}" height="3" rx="1.5" fill="${emptyCol}"/>`;
+                }
+                bars+=`<text x="${x+colW/2}" y="${H-7}" text-anchor="middle" font-size="9" fill="${txtCol}">${h}</text>`;
+            });
+
+            $('statBarInner').innerHTML=
+                `<svg viewBox="0 0 ${innerW} ${H}" width="${innerW}" height="${H}" role="img" aria-label="当日按小时支出，可横向滑动，点柱子看该时段明细">${bars}</svg>`;
+
+            const peakHour = peakV>0 ? peak : null;
+            $('statPeakHint').textContent = peakHour!==null
+                ? `消费高峰在 ${peakHour}:00 前后`
+                : '这天没有支出，无时间分布';
+
+            // 自动滚动定位到高峰
+            const scroll=$('statBarScroll');
+            setTimeout(()=>{
+                if(peakHour===null){ scroll.scrollLeft=0; return; }
+                const center=padL + peakHour*(colW+gap) + colW/2;
+                scroll.scrollLeft=Math.max(0, center - scroll.clientWidth/2);
+            }, 30);
+        }
+
+        // 点击某个时段的柱子，弹出该小时的消费明细（时间 / 分类 / 金额）
+        window.showHourDetail=function(h){
+            const list=(statHourRecs[h]||[]).slice()
+                .sort((a,b)=>new Date(a.time)-new Date(b.time));
+            if(!list.length) return;
+            const rows=list.map(r=>{
+                const t=r.time.replace('T',' ').slice(11,16);
+                const amt=Number(r.money||0);
+                return `<div class="hd-row">`
+                    + `<span class="hd-time">${t}</span>`
+                    + `<span class="cat-tag">${escapeHtml(r.cat||'未分类')}</span>`
+                    + `<span class="hd-amt neg">−${amt.toFixed(2)}</span>`
+                    + `</div>`;
+            }).join('');
+            const sum=list.reduce((s,r)=> s + (r.type==='expense' ? Number(r.money||0) : 0), 0);
+            const html=`<div class="hd-list">${rows}</div>`
+                + `<div class="hd-sum">该时段合计支出 <b class="neg">−${sum.toFixed(2)}</b> 元</div>`;
+            customAlert(html, `${pad(h)}:00 – ${pad(h)}:59 消费明细`, 'left', true);
+        };
+
+        // 统计页月份切换
+        $('statPrevM').addEventListener('click', ()=>{
+            statMonth--; if(statMonth<0){ statMonth=11; statYear--; }
+            statSelDay=null; renderStatCalendar();
+        });
+        $('statNextM').addEventListener('click', ()=>{
+            statMonth++; if(statMonth>11){ statMonth=0; statYear++; }
+            statSelDay=null; renderStatCalendar();
+        });
+
+        // ===== 年月选择器 =====
+        (function(){
+            const mask=$('ymMask'), grid=$('ymGrid'), yearLabel=$('ymYearLabel');
+            let pickYear;   // 选择器里临时浏览的年份
+
+            // 找出某年里有记账记录的月份集合（用于打点标记）
+            function monthsWithData(year){
+                const set=new Set();
+                statRecords().forEach(r=>{
+                    const d=new Date(r.time);
+                    if(d.getFullYear()===year) set.add(d.getMonth());
+                });
+                return set;
+            }
+            function paint(){
+                yearLabel.textContent=pickYear;
+                const has=monthsWithData(pickYear);
+                const now=new Date();
+                grid.innerHTML='';
+                for(let m=0;m<12;m++){
+                    const b=document.createElement('button');
+                    b.textContent=(m+1)+'月';
+                    if(pickYear===statYear && m===statMonth) b.classList.add('cur');
+                    if(has.has(m)) b.classList.add('has');
+                    b.onclick=()=>{
+                        statYear=pickYear; statMonth=m; statSelDay=null;
+                        mask.style.display='none'; renderStatCalendar();
+                    };
+                    grid.appendChild(b);
+                }
+            }
+            function open(){ pickYear=statYear; paint(); mask.style.display='flex'; }
+
+            $('statMonthLabel').addEventListener('click', open);
+            $('ymPrevY').addEventListener('click', ()=>{ pickYear--; paint(); });
+            $('ymNextY').addEventListener('click', ()=>{ pickYear++; paint(); });
+            $('ymCancel').addEventListener('click', ()=>{ mask.style.display='none'; });
+            $('ymToCurrent').addEventListener('click', ()=>{
+                const now=new Date();
+                statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null;
+                mask.style.display='none'; renderStatCalendar();
+            });
+        })();
+
+        // ===== 页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页 =====
+        (function initApp(){
+            const remembered=localStorage.getItem('app_logged_in_user');
+            if(remembered && localStorage.getItem(`store_${remembered}`)!==null){
+                login(remembered);   // 自动登录，按设置进入默认页
+            } else {
+                if(remembered) localStorage.removeItem('app_logged_in_user');
+                document.body.classList.add('login-mode');
+                renderRecentUsers();
+            }
+        })();
+
+    </script>
+
+</body>
+</html>
