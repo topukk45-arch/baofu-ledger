@@ -1330,16 +1330,34 @@
             }[c]));
         }
 
-        function storeKey(){ return `store_${currentUser}`; }
+        // 导入相关的共用上限常量（预校验与清洗逻辑共用同一个值，避免两处魔数不一致）：
+        //   MAX_IMPORT_RECORDS —— 单次导入记录条数上限
+        //   IMPORT_MAX_BYTES   —— 导入文件体积上限（约 8MB 文本，避免超大文件 JSON.parse 卡死 UI）
+        const MAX_IMPORT_RECORDS = 50000;
+        const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
 
-        let __idSeq = 0;
+        // 数据层统一支持「显式指定用户」：传入 user 则操作该用户的数据，省略则默认当前登录用户。
+        // 这样导入到其它账号时无需临时改写全局 currentUser（旧做法在异步/重入下会写错账号）。
+        function storeKey(user){ return `store_${user!==undefined ? user : currentUser}`; }
+
+        // 自增序列持久化：旧实现每次刷新归零，刷新前后同一毫秒生成 id 时，
+        // 时间戳与 seq 都可能相同，仅靠 4 位随机区分（万分之一碰撞），
+        // 而 editId/删除按 id 精确匹配，碰撞会误改/误删另一条。
+        // 改为从 localStorage 续读，跨刷新单调递增（mod 100万循环），彻底规避同毫秒同序列。
+        let __idSeq = (function(){
+            const n = parseInt(localStorage.getItem('app_id_seq'), 10);
+            return (isFinite(n) && n >= 0) ? (n % 1000000) : 0;
+        })();
         // 生成定长、可按字符串直接比较先后的 id：
         //   r + 13位毫秒时间戳 + 6位自增序列 + 4位随机
         // 各段都补零定长，故字符串比较结果与时间顺序一致；自增序列保证同毫秒内不重复，
         // 末尾随机进一步降低多端/导入时的碰撞概率。
         function genId(){
             const ts=String(Date.now()).padStart(13,'0');
-            const seq=String((__idSeq++) % 1000000).padStart(6,'0');
+            const cur=__idSeq++ % 1000000;
+            // 持久化下一个序列值；写失败（如隐私模式）不影响本次 id 生成
+            try{ localStorage.setItem('app_id_seq', String(__idSeq % 1000000)); }catch(_){}
+            const seq=String(cur).padStart(6,'0');
             const rnd=String(Math.floor(Math.random()*10000)).padStart(4,'0');
             return 'r'+ts+seq+rnd;
         }
@@ -1356,8 +1374,9 @@
             return a;
         }
 
-        function loadStore(){
-            const raw = localStorage.getItem(storeKey());
+        function loadStore(user){
+            const u = (user!==undefined) ? user : currentUser;
+            const raw = localStorage.getItem(storeKey(u));
             let store, corrupted=false;
             if (raw) {
                 try { store = JSON.parse(raw); } catch(e) { store = null; corrupted = true; }
@@ -1369,10 +1388,10 @@
             if (corrupted) {
                 // 数据存在但损坏：备份原始串到独立 key，避免被随后的 saveStore 覆盖而永久丢失。
                 // 仍回退到可用结构以保证界面不白屏，但不主动写回，给用户/后续逻辑留出恢复余地。
-                try { localStorage.setItem(`${storeKey()}__corrupted_${Date.now()}`, raw); } catch(_){}
+                try { localStorage.setItem(`${storeKey(u)}__corrupted_${Date.now()}`, raw); } catch(_){}
             }
             if (!store) {
-                const old = localStorage.getItem(`billData_${currentUser}`);
+                const old = localStorage.getItem(`billData_${u}`);
                 let arr = [];
                 try { arr = old ? JSON.parse(old) : []; } catch(_){ arr = []; }
                 if (!Array.isArray(arr)) arr = [];
@@ -1383,9 +1402,9 @@
         }
         // 写存档：捕获配额溢出（QuotaExceededError）等写入失败，避免静默丢数据。
         // 失败时抛出带标记的错误，由调用方决定如何提示；返回 true/false 供需要的地方判断。
-        function saveStore(store){
+        function saveStore(store, user){
             try{
-                localStorage.setItem(storeKey(), JSON.stringify(store));
+                localStorage.setItem(storeKey(user), JSON.stringify(store));
                 return true;
             }catch(err){
                 const quota = err && (err.name==='QuotaExceededError'
@@ -1397,8 +1416,8 @@
             }
         }
         // 安全写：吞掉异常并弹窗提示，用于「写失败也不该中断流程」的高频场景
-        function saveStoreSafe(store){
-            try{ return saveStore(store); }
+        function saveStoreSafe(store, user){
+            try{ return saveStore(store, user); }
             catch(err){
                 customAlert(err && err.message==='quota'
                     ? '存储空间已满，本次修改未能保存。请删除部分存档或记录后重试。'
@@ -1415,12 +1434,23 @@
         $('loginImportBtn').addEventListener('click', ()=> $('loginImportFile').click());
         $('loginImportFile').addEventListener('change', e => {
             const file=e.target.files[0]; if(!file) return;
+            // 文件体积预校验：与主界面导入一致，避免超大文件读入后 JSON.parse 卡死 UI
+            if(file.size > IMPORT_MAX_BYTES){
+                customAlert('文件太大啦（超过 8MB），请确认是否为正确的备份文件。');
+                $('loginImportFile').value=''; return;
+            }
             const reader=new FileReader();
             reader.onload=ev=>{
                 const text=ev.target.result;
-                // 先校验文件本身能不能解析，避免输完名字才报错
-                try{ const t=JSON.parse(text); const arr=Array.isArray(t)?t:t.data; if(!Array.isArray(arr)) throw 0; }
+                // 先校验文件本身能不能解析，避免输完名字才报错。
+                // 同时把「条数过多」单独识别出来，给出对症提示（与主界面导入区分 toomany 保持一致）。
+                let arr;
+                try{ const t=JSON.parse(text); arr=Array.isArray(t)?t:t.data; if(!Array.isArray(arr)) throw 0; }
                 catch(_){ customAlert('导入失败：文件格式不正确'); $('loginImportFile').value=''; return; }
+                if(arr.length > MAX_IMPORT_RECORDS){
+                    customAlert('导入失败：记录条数过多（上限 5 万条），请拆分后再导入');
+                    $('loginImportFile').value=''; return;
+                }
 
                 const preset=userNameInput.value.trim();
                 customPrompt('把这份存档导入到哪个账号？（不存在会自动创建）', preset, (acct)=>{
@@ -1433,9 +1463,13 @@
                             login(acct);             // 进入后会自动定位到 last（即刚导入的存档）
                         }, '导入成功', { okText:'立即进入', cancelText:'稍后' });
                     }catch(err){
-                        customAlert(err && err.message==='empty'
-                            ? '导入失败：文件里没有有效记录'
-                            : '导入失败：文件格式不正确');
+                        const msg = err && err.message;
+                        let tip;
+                        if(msg==='empty')        tip='导入失败：文件里没有有效记录';
+                        else if(msg==='toomany') tip='导入失败：记录条数过多（上限 5 万条），请拆分后再导入';
+                        else if(msg==='quota')   tip='导入失败：存储空间不足，已放弃本次导入。请删除部分存档或记录后重试。';
+                        else                     tip='导入失败：文件格式不正确';
+                        customAlert(tip);
                     }
                 }, '导入到账号', (acct)=>{
                     acct=acct.trim();
@@ -1682,8 +1716,7 @@
         // 返回 { records, stats }，stats 记录做了哪些「静默修正」，供导入后如实提示用户。
         function sanitizeImportedRecords(records){
             // 条数上限：超大数组会让 localStorage 写入与后续渲染卡死，直接拒绝
-            const MAX_RECORDS = 50000;
-            if(records.length > MAX_RECORDS){ throw new Error('toomany'); }
+            if(records.length > MAX_IMPORT_RECORDS){ throw new Error('toomany'); }
             const out=[];
             const stats={ dropped:0, timeFixed:0, typeFilled:0 };
             const reFull=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;          // 恰好到分钟
@@ -1741,21 +1774,15 @@
             let name=(parsed && typeof parsed.archive==='string' && parsed.archive.trim())
                 ? parsed.archive.trim().slice(0,16) : '导入存档';
 
-            // 切到目标用户后再读写其 store
-            // 用 try/finally 保证：即便 loadStore/saveStore 抛错（如 localStorage 配额满），
-            // currentUser 也一定被还原，绝不会卡在 targetUser 上导致后续操作写错账号
-            const prevUser=currentUser;
+            // 直接对目标用户的 store 读写，全程不触碰全局 currentUser。
+            // 这样即便中途有异步回调/重入读到 currentUser，也始终是当前登录用户，不会写错账号。
             let finalName=name;
-            try{
-                currentUser=targetUser;
-                const store=loadStore();
-                let n=1;
-                while(store.archives[finalName]) finalName=`${name}(${n++})`;
-                store.archives[finalName]={ records, cats };
-                store.last=finalName; saveStore(store);
-            } finally {
-                currentUser=prevUser;   // 还原，由调用方决定是否真正登录
-            }
+            const store=loadStore(targetUser);
+            let n=1;
+            while(store.archives[finalName]) finalName=`${name}(${n++})`;
+            store.archives[finalName]={ records, cats };
+            store.last=finalName;
+            saveStore(store, targetUser);   // 抛错（配额满等）由调用方 catch 处理
             return { finalName, stats };
         }
 
@@ -1770,8 +1797,6 @@
         }
 
         $('importBtn').addEventListener('click', () => $('importFile').click());
-        // 导入文件大小上限：避免超大文件读入后 JSON.parse 卡死 UI（约 8MB 文本）
-        const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
         $('importFile').addEventListener('change', e => {
             const file=e.target.files[0]; if(!file) return;
             if(file.size > IMPORT_MAX_BYTES){
@@ -1782,8 +1807,8 @@
             reader.onload=ev=>{
                 try{
                     const { finalName, stats }=importArchiveFromText(ev.target.result, currentUser);
-                    const store=loadStore();
-                    store.last=finalName; saveStore(store); currentArchive=finalName;
+                    // importArchiveFromText 内部已把新存档写盘并设好 store.last，无需再重读重写一遍
+                    currentArchive=finalName;
                     refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
                     customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}`, '导入成功', 'left');
                 }catch(err){
@@ -2088,9 +2113,15 @@
         }
 
         function getUserData(){ return curArchive(loadStore()).records; }
-        function saveUserData(data){
+        // silent=true 时不弹通用失败提示，由调用方自行给出对症提示（避免同一次失败连弹两个弹窗）
+        function saveUserData(data, silent){
             const store=loadStore(); curArchive(store).records=data;
-            store.last=currentArchive; return saveStoreSafe(store);
+            store.last=currentArchive;
+            if(silent){
+                try{ return saveStore(store); }
+                catch(_){ return false; }
+            }
+            return saveStoreSafe(store);
         }
         // 数据变更后统一刷新：账单页总是刷新；统计页若正在显示也立即重算，
         // 避免「新增/删除记录后切到统计页数字没更新」的问题
@@ -2708,7 +2739,9 @@
             if(!m.ok){ customAlert(m.why); return; }
             const data=getUserData();
             data.push({ id:genId(), time, money:m.val, cat, remark, type });
-            saveUserData(data);
+            // 保存失败（如存储配额满）时 saveUserData 已弹出失败提示，这里必须提前返回：
+            // 否则会继续弹「记账成功」，造成「提示成功但实际没存上」的丢账假象。
+            if(!saveUserData(data)) return;
             curPage = 1;            // 新记录在最前，回到第 1 页才看得到
             refreshAllViews();
             // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
@@ -2783,7 +2816,12 @@
             if(id==null) return;
             customConfirm('确定要删除这条记录吗？', ()=>{
                 const data=getUserData().filter(r=>r.id!==id);
-                saveUserData(data);
+                // 删除写盘失败时记录其实仍在。这里用 silent 保存：抑制通用提示，只弹一条
+                // 对症的、保持弹窗打开不刷新，避免同一次失败连弹两个弹窗、也避免用户误以为已删除。
+                if(!saveUserData(data, true)){
+                    customAlert('删除未能保存，这条记录仍然存在，请稍后重试。', '删除失败');
+                    return;
+                }
                 editMask.style.display='none'; editId=null;
                 refreshAllViews();
             }, '删除记录');
@@ -2801,7 +2839,10 @@
             const data=getUserData();
             const idx=data.findIndex(r=>r.id===editId);
             if(idx>=0){
-                data[idx]={ id:editId, time, money:m.val, cat, remark, type }; saveUserData(data);
+                data[idx]={ id:editId, time, money:m.val, cat, remark, type };
+                // 保存失败时 saveUserData 已弹失败提示；提前返回，保持弹窗打开、不刷新，
+                // 避免「提示失败但弹窗已关、看似已保存」的不一致。
+                if(!saveUserData(data)) return;
                 editMask.style.display='none';
                 refreshAllViews();
             } else {
@@ -3400,7 +3441,10 @@
 
             const byCat={};
             recs.forEach(r=>{
-                if(r.type==='expense'){
+                const d=new Date(r.time);
+                // 关键：只统计当前查看月份的支出（recs 是整档全量，需按 statYear/statMonth 过滤，
+                // 与日历格子、当月收支汇总的判定保持一致）
+                if(d.getFullYear()===statYear && d.getMonth()===statMonth && r.type==='expense'){
                     const amt=Number(r.money||0);
                     byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt;
                 }
