@@ -97,8 +97,8 @@
         .mini-btn.pressed, .add-btn.pressed, .save.pressed, .cancel.pressed,
         .pager button.pressed, .login-btn.pressed, .archive-bar select.pressed,
         .cs-display.pressed, .dt-now.pressed, .link-btn.pressed, .fab.pressed,
-        .bill-actions button.pressed, .dt-day.pressed, .user-chip.pressed,
-        .io-bar .mini-btn.pressed, .cat-item button.pressed, .operate-btn.pressed,
+        .dt-day.pressed, .user-chip.pressed,
+        .cat-item button.pressed, .operate-btn.pressed,
         .logout.pressed, .ask-dialog button.pressed {
             transform:scale(0.95); filter:brightness(0.95); transition:transform .04s, filter .04s;
         }
@@ -164,11 +164,8 @@
         .logout { padding:6px 15px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
             color:var(--c-on-primary); border:none; border-radius:6px; cursor:pointer; transition:0.3s; }
         .logout:hover { box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
-        .user-actions { display:flex; gap:8px; flex-wrap:wrap; }
-        .edit-name { background:linear-gradient(135deg,var(--c-border-mid),var(--c-primary)); }
 
-        .archive-bar, .io-bar { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
-        .io-bar { margin-bottom:25px; }
+        .archive-bar { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
         .archive-bar select {
             flex:1; min-width:140px; padding:12px; border:1px solid var(--c-primary);
             border-radius:8px; font-size:14px; outline:none; background:var(--c-surface);
@@ -179,7 +176,6 @@
             font-size:13px; transition:0.3s; background:var(--c-accent-soft); color:#5c4500; white-space:nowrap; }
         .mini-btn:hover { filter:brightness(1.05); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
         .mini-btn.gold { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
-        .io-bar .mini-btn { flex:1; text-align:center; }
 
         .form-box { display:flex; flex-direction:column; gap:14px; margin-bottom:18px; }
         .form-box input, .form-box select {
@@ -221,10 +217,7 @@
         .cs-opt.sel { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; }
         /* 让自定义下拉在各布局里占据原 select 的位置 */
         .archive-bar .cs-wrap { flex:1; min-width:140px; }
-        .type-row .cs-wrap { flex:0 0 42%; }
-        .cat-row .cs-wrap { flex:1; }
         .edit-dialog .cs-wrap { display:block; width:100%; margin:8px 0; }
-        .filter-bar .cs-wrap { min-width:120px; }
         .dt-time .cs-wrap { flex:1; width:100%; }
         .dt-time .cs-display { padding:8px 10px; }
 
@@ -238,8 +231,6 @@
         .remark-area:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
         .edit-dialog .remark-area { margin:8px 0; }
 
-        .cat-row { display:flex; gap:8px; }
-        .cat-row select { flex:1; cursor:pointer; }
 
         /* 分类标签：横排，常用靠前，一点即选；多了可横向滑动 */
         .cat-chips { display:flex; gap:8px; flex-wrap:wrap; }
@@ -268,12 +259,6 @@
             border-color:#357a2a; box-shadow:0 0 8px rgba(58,122,46,0.35); }
 
         /* 收入/支出选择行 */
-        .type-row { display:flex; gap:8px; }
-        .type-row select { flex:0 0 42%; cursor:pointer;
-            padding:12px; border:1px solid var(--c-primary); border-radius:8px; font-size:14px;
-            outline:none; background:var(--c-surface); transition:0.3s; }
-        .type-row input { flex:1; }
-        .type-row select:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
 
         /* 收支标签与正负金额颜色 */
         .io-tag { display:inline-block; border-radius:10px; padding:2px 9px; font-size:13px; }
@@ -298,7 +283,6 @@
             display:flex; align-items:center; justify-content:center; gap:7px;
             font-size:16px; font-weight:bold; transition:0.15s; position:relative;
             box-shadow:0 4px 14px rgba(var(--c-shadow-rgb),0.3); }
-        .act-btn .act-ico { font-size:19px; line-height:1; }
         .act-btn:active { transform:scale(0.97); }
         /* 左：筛选（次操作，浅底描边） */
         .act-filter { background:var(--c-surface); color:var(--c-primary-dark);
@@ -411,7 +395,6 @@
         }
         .stat-cal .day.sel .dn { color:var(--c-sel-text); font-weight:700; }
         .stat-cal .day.today .dn { text-decoration:underline; }
-        .stat-cal-tip { text-align:center; font-size:11px; color:var(--c-text-soft); margin-top:8px; }
 
         .stat-month-row { display:flex; gap:10px; margin-bottom:12px; }
         .stat-month-box { flex:1; background:var(--c-card-1); border:1px solid var(--c-border);
@@ -420,8 +403,6 @@
         .smb-val { font-size:20px; font-weight:bold; }
 
         .stat-day-title { font-size:15px; font-weight:bold; color:var(--c-text); margin-bottom:12px; }
-        .stat-day-title .sdt-sub { display:block; font-size:13px; font-weight:normal; color:var(--c-text-soft); margin-top:4px; }
-        .stat-day-title .sdt-sub b { font-size:14px; }
         .stat-pie-row { display:flex; gap:12px; align-items:center; }
         .stat-pie-holder { width:140px; height:140px; flex-shrink:0; }
         .stat-cat-list { flex:1; min-width:0; }
@@ -434,7 +415,6 @@
 
         .stat-bar-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
         .stat-bar-title { font-size:14px; font-weight:bold; color:var(--c-text); }
-        .stat-bar-hint { font-size:11px; color:var(--c-text-soft); }
         .stat-peak-hint { font-size:11px; color:var(--c-text-soft); margin-bottom:8px; }
         .stat-bar-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
         .stat-bar-inner { height:170px; }
@@ -468,10 +448,6 @@
         .search-range { display:flex; align-items:center; gap:8px; }
         .search-sep { color:var(--c-text-soft); flex:0 0 auto; }
 
-        .filter-bar { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
-        .filter-bar label { color:var(--c-text); font-size:14px; }
-        .filter-bar select { padding:8px 10px; border:1px solid var(--c-primary); border-radius:6px;
-            background:var(--c-surface); color:var(--c-primary-deep); outline:none; cursor:pointer; }
 
         /* 筛选分类标签：横排、不换行、可横向滑动；复用 cat-chips 的标签外观 */
         .filter-chips {
@@ -1122,6 +1098,7 @@
                 <button class="cancel" id="ymCancel">取消</button>
             </div>
         </div>
+    </div>
     </div>
 
     <script>
