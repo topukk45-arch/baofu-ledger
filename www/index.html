@@ -2,7 +2,12 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <!-- maximum-scale=1.0 + user-scalable=no：禁止捏合/双击缩放。本应用为固定布局，
+         不需要用户放大；这样在 WebView 套壳、PWA、各端浏览器下行为一致，避免误触双击放大。 -->
+    <meta name="format-detection" content="telephone=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#f1f9f8">
     <meta name="color-scheme" content="light">
     <title>记问</title>
@@ -37,6 +42,12 @@
             --c-shadow-rgb:212,175,55;/* 阴影/光晕用的主色 RGB */
             --c-pos:#3a7a2e;          /* 收入/正值（语义色，固定） */
             --c-neg:#b5482e;          /* 支出/负值（语义色，固定） */
+            /* ===== 选中态专属语义色：日历选中、以及后续任何「当前选中」处统一复用 =====
+               跟主色同色系但固定为明快的一档（不随主色深浅漂移），保证选中格清爽好看、
+               红/绿盈亏字在其上始终清晰。由 buildPalette 按主题自动派生。 */
+            --c-sel-bg:#f5dd8f;       /* 选中底：中浅染，明显深于未选中 */
+            --c-sel-border:#d4af37;   /* 选中描边：主色（备用，日历当前不描边） */
+            --c-sel-text:#6e5200;     /* 选中格内日期数字色 */
         }
 
         * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft Yahei", sans-serif; }
@@ -62,6 +73,10 @@
             background: var(--c-bg);
             overscroll-behavior:none;
             -webkit-text-size-adjust:100%;
+            /* 禁双击缩放兜底：iOS Safari 会忽略 viewport 的 user-scalable=no，
+               touch-action:manipulation 保留单击与滚动，仅去掉双击/长按缩放，是可靠手段。
+               局部需要更细手势的区域（如拖拽排序）已各自设置 touch-action，优先级更高不受影响。 */
+            touch-action:manipulation;
         }
 
         body {
@@ -197,7 +212,7 @@
         .cs-opt { padding:10px 12px; border-radius:7px; cursor:pointer; color:var(--c-primary-deep);
             font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .cs-opt:hover { background:var(--c-chip); }
-        .cs-opt.sel { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
+        .cs-opt.sel { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; }
         /* 让自定义下拉在各布局里占据原 select 的位置 */
         .archive-bar .cs-wrap { flex:1; min-width:140px; }
         .type-row .cs-wrap { flex:0 0 42%; }
@@ -228,14 +243,15 @@
             white-space:nowrap; transition:0.15s; -webkit-user-select:none; user-select:none; }
         .cat-chips .cc:hover { border-color:var(--c-accent); }
         .cat-chips .cc.sel {
-            background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
-            color:var(--c-on-primary); border-color:var(--c-primary); font-weight:600;
-            box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+            background:var(--c-sel-bg);
+            border-color:var(--c-sel-border); font-weight:600; }
         .cat-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
 
         /* 收支标签：复用 cat-chips 布局，但选中态用语义色（支出红 / 收入绿）便于一眼区分 */
         /* 收支只有两个，平分一行各占一半、撑满，尺寸放大与分类区视觉平衡 */
         .io-chips { display:flex; gap:10px; flex-wrap:nowrap; }
+        /* 收支按钮左右对调（左撇子偏好）：选「收入在左」时整行 row-reverse */
+        .io-chips.io-rev { flex-direction:row-reverse; }
         .io-chips .cc {
             flex:1 1 0; text-align:center; padding:13px 0; font-size:15px; }
         .io-chips .cc.sel-out {
@@ -300,6 +316,19 @@
         .to-top.show { opacity:1; pointer-events:auto; }
         .to-top:active { transform:scale(0.92); }
 
+        /* 清除筛选浮钮：与回到顶部同款圆钮，位于其正上方；仅在筛选生效时浮现。
+           与滚动位置无关——只要当前在记账页且有筛选条件就显示。 */
+        .clear-filter-fab { position:fixed; right:16px; z-index:910;
+            bottom:calc(176px + env(safe-area-inset-bottom));
+            width:44px; height:44px; border-radius:50%; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-neg);
+            font-size:20px; line-height:1; cursor:pointer; padding:0;
+            display:flex; align-items:center; justify-content:center;
+            box-shadow:0 3px 12px rgba(var(--c-shadow-rgb),0.3);
+            opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
+        .clear-filter-fab.show { opacity:1; pointer-events:auto; }
+        .clear-filter-fab:active { transform:scale(0.92); }
+
         /* ===== 底部标签栏 ===== */
         .tab-bar { position:fixed; left:0; right:0; bottom:0; z-index:950;
             display:flex; background:var(--c-surface-2);
@@ -316,7 +345,8 @@
         /* 键盘弹出时，隐藏会被顶起的常驻底栏与悬浮按钮 */
         body.kb-open .tab-bar,
         body.kb-open .action-bar,
-        body.kb-open .to-top { display:none !important; }
+        body.kb-open .to-top,
+        body.kb-open .clear-filter-fab { display:none !important; }
 
         /* 主界面给底栏留出空间，避免最后内容被遮住 */
         body:not(.login-mode) .container { padding-bottom:84px; }
@@ -339,7 +369,7 @@
         .seg { display:flex; border:1px solid var(--c-border-mid); border-radius:9px; overflow:hidden; }
         .seg button { border:none; background:transparent; cursor:pointer; padding:6px 12px;
             font-size:13px; color:var(--c-text-soft); transition:0.12s; }
-        .seg button.on { background:var(--c-primary); color:var(--c-on-primary); font-weight:bold; }
+        .seg button.on { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:bold; }
 
         /* ===== 统计页 ===== */
         .stat-card { background:var(--c-surface); border:1px solid var(--c-border);
@@ -354,10 +384,10 @@
         .ym-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
         .ym-grid button { padding:12px 0; border:1px solid var(--c-border); border-radius:10px;
             background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer; position:relative; transition:0.12s; }
-        .ym-grid button.cur { background:var(--c-primary); color:var(--c-on-primary); font-weight:bold; border-color:var(--c-primary); }
+        .ym-grid button.cur { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:bold; border-color:var(--c-sel-border); }
         .ym-grid button.has::after { content:''; position:absolute; top:6px; right:6px;
             width:6px; height:6px; border-radius:50%; background:var(--c-accent); }
-        .ym-grid button.cur.has::after { background:var(--c-on-primary); }
+        .ym-grid button.cur.has::after { background:var(--c-sel-border); }
         .stat-week { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:5px; }
         .stat-week span { text-align:center; font-size:11px; color:var(--c-text-soft); }
         .stat-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
@@ -367,8 +397,13 @@
         .stat-cal .day .da { font-size:9px; font-weight:bold; line-height:1.1; }
         .stat-cal .day.has { background:var(--c-chip); border-color:var(--c-border); cursor:pointer; }
         .stat-cal .day.has:active { transform:scale(0.93); }
-        .stat-cal .day.sel { background:var(--c-primary); }
-        .stat-cal .day.sel .dn, .stat-cal .day.sel .da { color:var(--c-on-primary); }
+        /* 选中态：使用专属语义色变量（--c-sel-*），全站「当前选中」统一复用。
+           只换一个柔和底色来区分，不加边框/描边/阴影，最干净。 */
+        .stat-cal .day.sel {
+            background:var(--c-sel-bg);
+            border-color:transparent;   /* 覆盖 .has 的可见边框，确保选中态真正无描边 */
+        }
+        .stat-cal .day.sel .dn { color:var(--c-sel-text); font-weight:700; }
         .stat-cal .day.today .dn { text-decoration:underline; }
         .stat-cal-tip { text-align:center; font-size:11px; color:var(--c-text-soft); margin-top:8px; }
 
@@ -446,9 +481,8 @@
             white-space:nowrap; transition:0.15s; -webkit-user-select:none; user-select:none; }
         .filter-chips .cc:hover { border-color:var(--c-accent); }
         .filter-chips .cc.sel {
-            background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
-            color:var(--c-on-primary); border-color:var(--c-primary); font-weight:600;
-            box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+            background:var(--c-sel-bg);
+            border-color:var(--c-sel-border); font-weight:600; }
         .filter-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
 
         /* 上栏：全局总览（中性卡片底，始终显示） */
@@ -461,8 +495,8 @@
             background:var(--c-chip); border:1px solid var(--c-border-mid);
             border-radius:12px; padding:8px 12px; margin-bottom:10px;
             color:var(--c-text); font-size:14px; }
-        .summary-filter .filter-badge { flex-shrink:0; background:var(--c-primary);
-            color:var(--c-on-primary); font-size:13px; font-weight:bold;
+        .summary-filter .filter-badge { flex-shrink:0; background:var(--c-sel-bg);
+            color:var(--c-sel-text); font-size:13px; font-weight:bold;
             padding:3px 11px; border-radius:9px; }
         .summary-filter .filter-nums b { color:var(--c-primary-dark); font-size:15px; }
 
@@ -562,9 +596,7 @@
         .sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
         .sheet-head h3 { color:var(--c-primary-dark); }
         .sheet-body { display:flex; flex-direction:column; gap:16px; }
-        .sheet .field-label-row { display:flex; align-items:center; justify-content:space-between; }
-        /* 标签行里的「管理分类」紧凑小胶囊，别比旁边的小标签高太多 */
-        .sheet .field-label-row .mini-btn { padding:5px 12px; font-size:12px; border-radius:14px; }
+        .sheet .field-label-row { display:flex; align-items:center; }
         /* 浮层里分类标签允许换行铺开（不像顶部那样强制单行），一眼看全 */
         .sheet .filter-chips { flex-wrap:wrap; overflow-x:visible; }
         .sheet .dialog-btn { margin-top:18px; }
@@ -623,7 +655,7 @@
         .dt-day.muted { color:var(--c-border); cursor:default; }
         .dt-day.muted:hover { background:transparent; }
         .dt-day.today { border:1px solid var(--c-primary); }
-        .dt-day.selected { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); font-weight:600; }
+        .dt-day.selected { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; }
         .dt-time { display:flex; align-items:flex-end; gap:10px; margin:14px 0 4px; }
         .dt-time-col { display:flex; flex-direction:column; gap:4px; flex:1; }
         .dt-time-col label { font-size:12px; color:var(--c-text-soft); }
@@ -778,6 +810,7 @@
                     <button class="set-item" id="exportBtn"><span>导出存档（备份）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="importBtn"><span>导入存档</span><span class="set-arrow">›</span></button>
                     <input type="file" id="importFile" accept=".json" style="display:none">
+                    <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                 </div>
 
                 <div class="set-group">
@@ -795,6 +828,13 @@
                         <div class="seg" id="addSideSeg">
                             <button data-v="left">左</button>
                             <button data-v="right">右</button>
+                        </div>
+                    </div>
+                    <div class="set-item set-static">
+                        <span>收支按钮顺序</span>
+                        <div class="seg" id="ioSideSeg">
+                            <button data-v="out">支出在左</button>
+                            <button data-v="in">收入在左</button>
                         </div>
                     </div>
                 </div>
@@ -831,6 +871,7 @@
         </button>
     </div>
     <button class="to-top" id="toTopBtn" title="回到顶部" aria-label="回到顶部">↑</button>
+    <button class="clear-filter-fab" id="clearFilterFab" title="清除筛选" aria-label="清除筛选">✕</button>
 
     <!-- 筛选浮层（bottom sheet）：关键词 / 金额区间 / 日期范围 / 分类，全部筛选条件集中于此 -->
     <div class="mask sheet-mask" id="filterSheetMask">
@@ -863,7 +904,6 @@
                 <div class="search-field">
                     <div class="field-label-row">
                         <span class="search-label">分类</span>
-                        <button class="mini-btn" id="manageCatMain">管理分类</button>
                     </div>
                     <div class="filter-chips" id="filterChips"></div>
                 </div>
@@ -957,7 +997,7 @@
 
     <div class="mask" id="catMask">
         <div class="edit-dialog">
-            <h3>管理分类</h3>
+            <h3>管理账单分类</h3>
             <div class="cat-reorder-tip">长按左侧 ⠿ 拖动可调整顺序，顺序会用在记账页的标签排列</div>
             <div class="cat-list" id="catList"></div>
             <div class="cat-add-row">
@@ -1120,6 +1160,15 @@
         const $ = id => document.getElementById(id);
         const loginBox=$('loginBox'), mainBox=$('mainBox'), nowUser=$('nowUser');
         const logoutBtn=$('logoutBtn'), billList=$('billList');
+        // 账单表事件委托：备注查看 / 修改。用 data-act + data-id 取代内联 onclick，
+        // 既杜绝把记录 id 拼进 HTML 属性的注入隐患，也避免每行绑定监听。
+        billList.addEventListener('click', e => {
+            const el = e.target.closest('[data-act]');
+            if(!el || !billList.contains(el)) return;
+            const id = el.dataset.id;
+            if(el.dataset.act==='remark'){ window.viewRemark && window.viewRemark(id); }
+            else if(el.dataset.act==='edit'){ window.openEdit && window.openEdit(id); }
+        });
         const billTime=$('billTime'), billMoney=$('billMoney'), billRemark=$('billRemark'), billCat=$('billCat'), billType=$('billType');
         const addBill=$('addBill'), editMask=$('editMask');
         const editTime=$('editTime'), editMoney=$('editMoney'), editRemark=$('editRemark'), editCat=$('editCat'), editType=$('editType');
@@ -1225,11 +1274,14 @@
             askMask.style.display='flex';
             setTimeout(()=>{ askInput.focus(); askInput.select(); }, 50);
         }
-        // 信息弹窗：只有“确定”，可选标题；用于替代 alert 和“查看备注”
+        // 信息弹窗：只有“确定”，可选标题；用于替代 alert 和“查看备注”。
+        // 安全约定：默认走 textContent，绝不解析 HTML。仅当调用方显式传 isHtml=true
+        //   且已对所有插值的用户数据做过 escapeHtml 时，才用 innerHTML 渲染富文本。
+        //   普通文本提示永远不要传 isHtml。
         function customAlert(msg, title, align, isHtml){
             askMode='alert';
             askTitle.textContent=title||'提示';
-            if(isHtml){ askMsg.innerHTML=msg; } else { askMsg.textContent=msg; }
+            if(isHtml===true){ askMsg.innerHTML=msg; } else { askMsg.textContent=String(msg); }
             askMsg.style.display='';
             askMsg.style.textAlign = (align==='left') ? 'left' : '';
             askInput.style.display='none';
@@ -1309,7 +1361,31 @@
             Object.keys(store.archives).forEach(k => { store.archives[k] = normArchive(store.archives[k]); });
             return store;
         }
-        function saveStore(store){ localStorage.setItem(storeKey(), JSON.stringify(store)); }
+        // 写存档：捕获配额溢出（QuotaExceededError）等写入失败，避免静默丢数据。
+        // 失败时抛出带标记的错误，由调用方决定如何提示；返回 true/false 供需要的地方判断。
+        function saveStore(store){
+            try{
+                localStorage.setItem(storeKey(), JSON.stringify(store));
+                return true;
+            }catch(err){
+                const quota = err && (err.name==='QuotaExceededError'
+                    || err.name==='NS_ERROR_DOM_QUOTA_REACHED'
+                    || err.code===22 || err.code===1014);
+                const e = new Error(quota ? 'quota' : 'savefail');
+                e.cause = err;
+                throw e;
+            }
+        }
+        // 安全写：吞掉异常并弹窗提示，用于「写失败也不该中断流程」的高频场景
+        function saveStoreSafe(store){
+            try{ return saveStore(store); }
+            catch(err){
+                customAlert(err && err.message==='quota'
+                    ? '存储空间已满，本次修改未能保存。请删除部分存档或记录后重试。'
+                    : '保存失败，请重试。', '保存失败');
+                return false;
+            }
+        }
         function curArchive(store){ return store.archives[currentArchive]; }
 
         loginBtn.addEventListener('click', ()=>login());
@@ -1402,13 +1478,13 @@
             recordUser(name);
             localStorage.setItem('app_logged_in_user', name);   // 记住当前登录用户，下次自动进入
             const store = loadStore();
-            saveStore(store);
+            saveStoreSafe(store);
             currentArchive = store.last || Object.keys(store.archives)[0];
             // 兜底：若 last 指向一个已不存在的存档（导入/迁移等异常路径下可能发生），
             // 回退到第一个存档，避免 curArchive() 返回 undefined 导致主界面白屏
             if(!store.archives[currentArchive]){
                 currentArchive = Object.keys(store.archives)[0];
-                store.last = currentArchive; saveStore(store);
+                store.last = currentArchive; saveStoreSafe(store);
             }
             loginBox.style.display='none';
             mainBox.style.display='block';
@@ -1482,7 +1558,7 @@
         }
         archiveSelect.addEventListener('change', () => {
             currentArchive = archiveSelect.value;
-            const store=loadStore(); store.last=currentArchive; saveStore(store);
+            const store=loadStore(); store.last=currentArchive; saveStoreSafe(store);
             curPage=1; statSelDay=null; resetSearch(); refreshCatSelectors(); refreshAllViews();
         });
         $('newArchive').addEventListener('click', () => {
@@ -1490,7 +1566,7 @@
                 name=name.trim();
                 const store=loadStore();
                 store.archives[name]={ records:[], cats:DEFAULT_CATS.slice() };
-                store.last=name; saveStore(store); currentArchive=name;
+                store.last=name; saveStoreSafe(store); currentArchive=name;
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '新建存档', (name)=>{
                 name=name.trim();
@@ -1507,7 +1583,7 @@
                 const store=loadStore();
                 store.archives[name]=store.archives[currentArchive];
                 delete store.archives[currentArchive];
-                currentArchive=name; store.last=name; saveStore(store);
+                currentArchive=name; store.last=name; saveStoreSafe(store);
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '重命名存档', (name)=>{
                 name=name.trim();
@@ -1525,7 +1601,7 @@
                 const s=loadStore();
                 delete s.archives[currentArchive];
                 currentArchive=Object.keys(s.archives)[0];
-                s.last=currentArchive; saveStore(s);
+                s.last=currentArchive; saveStoreSafe(s);
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '删除存档');
         });
@@ -1585,10 +1661,14 @@
         // 校验并清洗导入的单条记录：金额非正数/非法、类型非法都会被拒，避免脏数据污染结余。
         // 返回 { records, stats }，stats 记录做了哪些「静默修正」，供导入后如实提示用户。
         function sanitizeImportedRecords(records){
+            // 条数上限：超大数组会让 localStorage 写入与后续渲染卡死，直接拒绝
+            const MAX_RECORDS = 50000;
+            if(records.length > MAX_RECORDS){ throw new Error('toomany'); }
             const out=[];
             const stats={ dropped:0, timeFixed:0, typeFilled:0 };
             const reFull=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;          // 恰好到分钟
             const reWithSec=/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):\d{2}/; // 带秒/毫秒，可安全截断
+            const validDt = s => isFinite(new Date(s).getTime());   // 截断后再确认是真实存在的时刻
             for(const r of records){
                 if(!r || typeof r!=='object'){ stats.dropped++; continue; }
                 const m=normMoney(r.money);
@@ -1599,18 +1679,19 @@
                 if(r.type==='expense'||r.type==='income'){ type=r.type; }
                 else { type='income'; stats.typeFilled++; }
 
-                // 时间：完整分钟格式直接用；带秒/毫秒则截断到分钟（不算改写）；
-                //       其余一律补为当前时刻并计数（这才是真正改变了数据语义的情况）
+                // 时间：完整分钟格式且为真实时刻直接用；带秒/毫秒则截断到分钟后再校验；
+                //       格式对但日期非法（如 9999-99-99）或其余情况一律补为当前时刻并计数
                 let time;
-                if(typeof r.time==='string' && reFull.test(r.time)){
+                if(typeof r.time==='string' && reFull.test(r.time) && validDt(r.time)){
                     time=r.time;
-                } else if(typeof r.time==='string' && (mSec=r.time.match(reWithSec))){
+                } else if(typeof r.time==='string' && (mSec=r.time.match(reWithSec)) && validDt(mSec[1])){
                     time=mSec[1];
                 } else {
                     time=nowDtValue(); stats.timeFixed++;
                 }
 
-                let cat = (typeof r.cat==='string' && r.cat.trim()) ? r.cat.trim() : '未分类';
+                // 分类名限长，与手动输入的 8 字校验对齐，防止超长名污染分类表/下拉
+                let cat = (typeof r.cat==='string' && r.cat.trim()) ? charSlice(r.cat.trim(), 8) : '未分类';
                 let remark = (typeof r.remark==='string') ? r.remark.slice(0,5000) : '';
                 out.push({ id:genId(), time, money:m.val, cat, remark, type });
             }
@@ -1627,13 +1708,13 @@
             // 一条有效记录都没有：视为无效文件，避免悄悄建一个空存档
             if(records.length===0) throw new Error('empty');
 
-            // 分类：清洗去空、去重，确保含「未分类」
+            // 分类：清洗去空、限长（与记录侧/手动输入的 8 字一致）、去重，确保含「未分类」
             let cats=(parsed && Array.isArray(parsed.cats) && parsed.cats.length)
-                ? parsed.cats.map(c=>String(c).trim()).filter(Boolean)
+                ? parsed.cats.map(c=>charSlice(String(c).trim(), 8)).filter(Boolean)
                 : DEFAULT_CATS.slice();
             cats=[...new Set(cats)];
             if(!cats.includes('未分类')) cats.unshift('未分类');
-            // 把记录里用到、但分类表没有的分类补进去
+            // 把记录里用到、但分类表没有的分类补进去（记录侧分类名已在清洗时限长）
             records.forEach(r=>{ if(!cats.includes(r.cat)) cats.push(r.cat); });
 
             // 存档名清洗：去空、限长，重名自动加序号
@@ -1669,8 +1750,14 @@
         }
 
         $('importBtn').addEventListener('click', () => $('importFile').click());
+        // 导入文件大小上限：避免超大文件读入后 JSON.parse 卡死 UI（约 8MB 文本）
+        const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
         $('importFile').addEventListener('change', e => {
             const file=e.target.files[0]; if(!file) return;
+            if(file.size > IMPORT_MAX_BYTES){
+                customAlert('文件太大啦（超过 8MB），请确认是否为正确的备份文件。');
+                $('importFile').value=''; return;
+            }
             const reader=new FileReader();
             reader.onload=ev=>{
                 try{
@@ -1680,9 +1767,13 @@
                     refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
                     customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}`, '导入成功', 'left');
                 }catch(err){
-                    customAlert(err && err.message==='empty'
-                        ? '导入失败：文件里没有有效记录'
-                        : '导入失败：文件格式不正确');
+                    const msg = err && err.message;
+                    let tip;
+                    if(msg==='empty')      tip='导入失败：文件里没有有效记录';
+                    else if(msg==='toomany') tip='导入失败：记录条数过多（上限 5 万条），请拆分后再导入';
+                    else if(msg==='quota')   tip='导入失败：存储空间不足，已放弃本次导入。请删除部分存档或记录后重试。';
+                    else                     tip='导入失败：文件格式不正确';
+                    customAlert(tip);
                 }
                 $('importFile').value='';
             };
@@ -1714,13 +1805,22 @@
             if(window.syncFilterFab) window.syncFilterFab();
         }
 
-        // 渲染筛选分类标签：「全部」固定第一个，其后按存档 cats 顺序；点击即筛选。
-        // 隐藏的 filterCat <select> 仍是取值来源（renderBill 读它的 value），这里只负责把
-        // 当前选中态同步成高亮，并在点击时改写 select 值后触发 change，复用原有筛选逻辑。
+        // 渲染筛选分类标签：「全部」固定第一个，其后按存档 cats 顺序。
+        // 草稿模式：点击只更新草稿分类 draftCat + 切换高亮，不提交、不刷新列表；
+        //   要点 sheet 的「完成」才会把 draftCat 提交进 filterCat 并筛选。
         function renderFilterChips(){
             const box=$('filterChips'); if(!box) return;
-            const cur=filterCat.value || '__all';
-            const prevScroll=box.scrollLeft;   // 记下当前横向滚动位置，重建后还原，避免标签条跳回最左
+            // 草稿当前值：sheet 打开时用 draftCat；若 sheet 未开（如分类管理触发的重渲染），
+            // 以已提交的 filterCat 为准并同步给 draftCat，避免下次打开时草稿是旧值
+            const sheetOpen = $('filterSheetMask') && $('filterSheetMask').classList.contains('open');
+            let cur;
+            if(sheetOpen && window.getDraftCat){
+                cur = window.getDraftCat();
+            } else {
+                cur = filterCat.value || '__all';
+                if(window.setDraftCat) window.setDraftCat(cur);
+            }
+            const prevScroll=box.scrollLeft;
             box.innerHTML='';
             const items=[{v:'__all', t:'全部'}].concat(getCats().map(c=>({v:c, t:c})));
             items.forEach(it=>{
@@ -1728,20 +1828,13 @@
                 b.className='cc'+(it.v===cur?' sel':'');
                 b.textContent=it.t;
                 b.onclick=()=>{
-                    if(filterCat.value!==it.v){
-                        filterCat.value=it.v;
-                        curPage=1; renderBill();
-                    }
-                    // 无论是否变化都刷新高亮（确保视觉与取值一致）
+                    if(window.setDraftCat) window.setDraftCat(it.v);   // 只改草稿
                     box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
-                    // 浮层里标签换行铺开，无需横向滚动；仍调用以兼容（容器不可横滚时无副作用）
                     scrollChipIntoView(box, b);
-                    // 分类也是筛选条件，选完同步底部筛选图标的高亮点
-                    if(window.syncFilterFab) window.syncFilterFab();
                 };
                 box.appendChild(b);
             });
-            box.scrollLeft=prevScroll;   // 还原滚动位置（内容变短时浏览器会自动夹到合法范围）
+            box.scrollLeft=prevScroll;
         }
 
         // 仅在横向标签条容器内部滚动，使目标标签完整可见。
@@ -1759,8 +1852,8 @@
                 container.scrollLeft = bRight - container.clientWidth + pad;
             }
         }
-        // 记账弹窗内的「管理分类」入口已移除，仅保留账单页(主页)的入口
-        $('manageCatMain').addEventListener('click', openCatManager);
+        // 「管理分类」入口已从筛选浮层移到设置页（分类属于存档配置，与筛选语义分离）
+        $('manageCatSetting').addEventListener('click', openCatManager);
         $('closeCat').addEventListener('click', ()=>{ $('catMask').style.display='none'; });
         function showCatErr(msg){
             const el=$('catErr');
@@ -1774,7 +1867,7 @@
             if(charLen(name) > 8){ showCatErr('分类名最多 8 个字～'); return; }
             const store=loadStore(); const a=curArchive(store);
             if(a.cats.includes(name)){ showCatErr('该分类已存在'); return; }
-            a.cats.push(name); saveStore(store);
+            a.cats.push(name); saveStoreSafe(store);
             $('newCatName').value=''; showCatErr('');
             refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             // 新分类排在末尾，若标签条已需横滑则它在最右看不到——主动滚到可见，给用户「确实加上了」的反馈
@@ -1918,8 +2011,13 @@
                 persistCatOrder();
             }
 
-            handle.addEventListener('pointerdown', onDown, {passive:true});
-            handle.addEventListener('touchstart', onDown, {passive:true});
+            // 支持 PointerEvent 的设备只绑 pointerdown，避免触屏上 pointer+touch 双触发
+            // 导致重复计时器/重复挂监听；老设备回退 touchstart。
+            if(window.PointerEvent){
+                handle.addEventListener('pointerdown', onDown, {passive:true});
+            } else {
+                handle.addEventListener('touchstart', onDown, {passive:true});
+            }
         }
 
         // 把当前 DOM 里 cat-item 的顺序写回存档的 cats 数组
@@ -1932,7 +2030,7 @@
             // 以新顺序重排，遗漏的（理论上不会有）补在末尾
             const set=new Set(order);
             a.cats=order.concat(a.cats.filter(c=>!set.has(c)));
-            saveStore(store);
+            saveStoreSafe(store);
             refreshCatSelectors(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
         }
         function renameCat(oldName){
@@ -1942,7 +2040,7 @@
                 const store=loadStore(); const a=curArchive(store);
                 a.cats=a.cats.map(c=>c===oldName?name:c);
                 a.records.forEach(r=>{ if(r.cat===oldName) r.cat=name; });
-                saveStore(store);
+                saveStoreSafe(store);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '重命名分类', (name)=>{
                 name=name.trim();
@@ -1964,7 +2062,7 @@
                 ar.cats=ar.cats.filter(c=>c!==name);
                 if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
                 ar.records.forEach(r=>{ if(r.cat===name) r.cat='未分类'; });
-                saveStore(s);
+                saveStoreSafe(s);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '删除分类');
         }
@@ -1972,7 +2070,7 @@
         function getUserData(){ return curArchive(loadStore()).records; }
         function saveUserData(data){
             const store=loadStore(); curArchive(store).records=data;
-            store.last=currentArchive; saveStore(store);
+            store.last=currentArchive; return saveStoreSafe(store);
         }
         // 数据变更后统一刷新：账单页总是刷新；统计页若正在显示也立即重算，
         // 避免「新增/删除记录后切到统计页数字没更新」的问题
@@ -2117,76 +2215,153 @@
         editTime.addEventListener('click', ()=>openDtPicker(editTime));
 
         // ===== 筛选浮层（bottom sheet）控件绑定 =====
+        // 草稿模式：sheet 内所有改动只写进控件（草稿），不动列表。
+        //   完成 → 提交草稿到 searchState/filterCat 并刷新列表；
+        //   下滑 / 点遮罩 → 丢弃草稿，列表不变；
+        //   清除全部 → 只清草稿，要点完成才生效。
+        // draftCat 暂存分类选择，避免直接改 filterCat（filterCat 是已提交状态，renderBill 读它）。
+        let draftCat='__all';
         (function(){
             const kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax'),
                   from=$('searchFrom'), to=$('searchTo'),
                   fab=$('filterFab'), sheetMask=$('filterSheetMask'),
+                  sheet=$('filterSheet'),
                   clearBtn=$('sheetClear'), applyBtn=$('sheetApply');
 
-            // 防抖：关键词/金额边打边筛，避免每个字符都重排
-            let timer=null;
-            function applySoon(){
-                clearTimeout(timer);
-                timer=setTimeout(applyNow, 200);
+            // 把当前「已提交」状态回填到控件（打开时初始化草稿，或丢弃时还原）
+            function loadCommittedIntoControls(){
+                kw.value = searchState.keyword || '';
+                min.value = (searchState.min!=null) ? String(searchState.min) : '';
+                max.value = (searchState.max!=null) ? String(searchState.max) : '';
+                from.value = searchState.from || ''; from.dataset.day = searchState.from || '';
+                to.value   = searchState.to   || ''; to.dataset.day   = searchState.to   || '';
+                draftCat = filterCat.value || '__all';
             }
-            // 把控件当前值读进 searchState，再刷新列表 + 同步筛选图标高亮
-            function applyNow(){
+            // 完成：把控件草稿提交为正式筛选条件，刷新列表
+            function commitDraft(){
                 searchState.keyword=(kw.value||'').trim().toLowerCase();
                 const mn=Number(min.value), mx=Number(max.value);
                 searchState.min = (min.value!=='' && isFinite(mn)) ? mn : null;
                 searchState.max = (max.value!=='' && isFinite(mx)) ? mx : null;
                 searchState.from = from.dataset.day || null;
                 searchState.to   = to.dataset.day || null;
+                filterCat.value = draftCat;
                 curPage=1;
                 renderBill();
                 syncFilterFab();
             }
-            // 筛选图标高亮：搜索条件或分类筛选任一生效都算「正在筛选」
+            // 暴露给分类标签点击用：只更新草稿分类，不提交
+            window.setDraftCat = function(v){ draftCat = v; };
+            window.getDraftCat = function(){ return draftCat; };
+
+            // 筛选图标高亮 + 清除浮钮显隐：搜索条件或分类筛选任一生效都算「正在筛选」（基于已提交状态）
             window.syncFilterFab = function(){
                 const active = hasActiveSearch() || (filterCat.value && filterCat.value!=='__all');
                 fab.classList.toggle('active-filter', active);
+                // 主页面「清除筛选」浮钮：仅在记账页且有筛选生效时浮现（与滚动位置无关）
+                const cf=$('clearFilterFab');
+                if(cf) cf.classList.toggle('show', active && currentTab==='ledger');
             };
 
-            kw.addEventListener('input', applySoon);
-            min.addEventListener('input', applySoon);
-            max.addEventListener('input', applySoon);
-
-            // 打开/关闭浮层（用 .open 触发滑入动画；关闭后延一拍再 display:none，让滑出动画播完）
+            // 打开：先把已提交状态灌进控件作为草稿起点，再渲染分类标签（高亮草稿分类），滑入
             function openSheet(){
-                renderFilterChips();                 // 每次打开按最新分类重建标签，并高亮当前选中
+                loadCommittedIntoControls();
+                renderFilterChips();
                 sheetMask.style.display='flex';
+                resetSheetDrag();
                 requestAnimationFrame(()=>sheetMask.classList.add('open'));
             }
-            function closeSheet(){
+            // 关闭（不提交）：丢弃草稿——把控件还原回已提交状态，列表保持不变
+            function closeSheetDiscard(){
                 sheetMask.classList.remove('open');
+                resetSheetDrag();
+                setTimeout(()=>{ sheetMask.style.display='none'; loadCommittedIntoControls(); }, 260);
+            }
+            // 完成：提交后关闭
+            function closeSheetApply(){
+                commitDraft();
+                sheetMask.classList.remove('open');
+                resetSheetDrag();
                 setTimeout(()=>{ sheetMask.style.display='none'; }, 260);
             }
             fab.addEventListener('click', openSheet);
-            applyBtn.addEventListener('click', closeSheet);
-            // 点浮层外的遮罩区域也可关闭（符合 bottom sheet 直觉）
-            sheetMask.addEventListener('click', (e)=>{ if(e.target===sheetMask) closeSheet(); });
+            applyBtn.addEventListener('click', closeSheetApply);
+            // 点浮层外的遮罩区域 = 丢弃关闭
+            sheetMask.addEventListener('click', (e)=>{ if(e.target===sheetMask) closeSheetDiscard(); });
 
-            // 日期：用仅日期选择器，选定后写显示值 + dataset.day，再触发筛选
+            // 日期：选定后只写控件草稿（显示值 + dataset.day），不提交、不刷新列表
             from.addEventListener('click', ()=>{
                 openDtPickerDate(from.dataset.day || '', (day)=>{
-                    from.value=day; from.dataset.day=day; applyNow();
+                    from.value=day; from.dataset.day=day;
                 });
             });
             to.addEventListener('click', ()=>{
                 openDtPickerDate(to.dataset.day || '', (day)=>{
-                    to.value=day; to.dataset.day=day; applyNow();
+                    to.value=day; to.dataset.day=day;
                 });
             });
 
-            // 清除全部：搜索条件 + 分类筛选一并归零（分类回到「全部」）
+            // 清除全部：只清草稿（控件 + 草稿分类），不动已提交状态、不刷新列表
             clearBtn.addEventListener('click', ()=>{
                 kw.value=''; min.value=''; max.value='';
                 from.value=''; from.dataset.day=''; to.value=''; to.dataset.day='';
-                searchState.keyword=''; searchState.min=null; searchState.max=null;
-                searchState.from=null; searchState.to=null;
-                filterCat.value='__all';
-                curPage=1; renderBill(); renderFilterChips(); syncFilterFab();
+                draftCat='__all';
+                renderFilterChips();   // 重渲染让分类高亮回到「全部」
             });
+
+            // ===== 下滑手势关闭（按住 sheet 顶部往下拖，超过阈值丢弃关闭，否则回弹）=====
+            const DRAG_DISMISS_PX = 90;     // 位移阈值
+            const DRAG_FLING_PX   = 40;     // 快速下滑的最小位移
+            let dragStartY=0, dragDY=0, dragging=false, dragStartT=0;
+
+            function resetSheetDrag(){
+                dragging=false; dragDY=0;
+                sheet.style.transition='';
+                sheet.style.transform='';
+            }
+            // 仅当触点起始于 sheet 上半部（避免和内部输入/滚动冲突）才接管拖拽
+            function onDragStart(e){
+                if(!sheetMask.classList.contains('open')) return;
+                // sheet 内部已向下滚动时，优先让它滚动，不拦截
+                if(sheet.scrollTop>0) return;
+                const pt=e.touches?e.touches[0]:e;
+                const rect=sheet.getBoundingClientRect();
+                if(pt.clientY - rect.top > 120) return;   // 只在顶部约 120px 区域起拖
+                dragging=true; dragStartY=pt.clientY; dragDY=0; dragStartT=Date.now();
+                sheet.style.transition='none';
+            }
+            function onDragMove(e){
+                if(!dragging) return;
+                const pt=e.touches?e.touches[0]:e;
+                dragDY=pt.clientY-dragStartY;
+                if(dragDY<0) dragDY=0;             // 只允许下拉
+                sheet.style.transform=`translateY(${dragDY}px)`;
+            }
+            function onDragEnd(){
+                if(!dragging) return;
+                const dt=Date.now()-dragStartT;
+                const fling = dragDY>DRAG_FLING_PX && dt<250;   // 快速下滑也算关闭
+                sheet.style.transition='';
+                if(dragDY>DRAG_DISMISS_PX || fling){
+                    sheet.style.transform='';
+                    closeSheetDiscard();
+                } else {
+                    sheet.style.transform='';      // 回弹
+                }
+                dragging=false; dragDY=0;
+            }
+            // 有 PointerEvent 用 pointer 一套，否则回退 touch，避免双触发
+            if(window.PointerEvent){
+                sheet.addEventListener('pointerdown', onDragStart, {passive:true});
+                sheet.addEventListener('pointermove', onDragMove, {passive:true});
+                sheet.addEventListener('pointerup', onDragEnd, {passive:true});
+                sheet.addEventListener('pointercancel', onDragEnd, {passive:true});
+            } else {
+                sheet.addEventListener('touchstart', onDragStart, {passive:true});
+                sheet.addEventListener('touchmove', onDragMove, {passive:true});
+                sheet.addEventListener('touchend', onDragEnd, {passive:true});
+                sheet.addEventListener('touchcancel', onDragEnd, {passive:true});
+            }
         })();
 
         // ===== 搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加 =====
@@ -2210,7 +2385,19 @@
             if(max) max.value='';
             if(from){ from.value=''; from.dataset.day=''; }
             if(to){ to.value=''; to.dataset.day=''; }
+            if(window.setDraftCat) window.setDraftCat('__all');   // 草稿分类也归零，避免跨存档残留
             if(window.syncFilterFab) window.syncFilterFab();
+        }
+
+        // 一键清除全部筛选（主页面浮钮用）：搜索条件 + 分类一并归零，立即刷新列表。
+        // 与 sheet 内「清除全部」不同——那个只清草稿、要点完成才生效；这个在浮层外，直接生效。
+        function clearAllFilters(){
+            resetSearch();                 // 清搜索条件 + 控件 + 草稿分类
+            filterCat.value='__all';       // 分类筛选也归零（resetSearch 不动分类，这里补上）
+            curPage=1;
+            if(window.syncFilterFab) window.syncFilterFab();            // 先同步浮钮/图标状态
+            if($('filterChips')) renderFilterChips();                  // sheet 若开着，分类高亮回「全部」
+            renderBill();                                              // 再刷新列表
         }
 
         // 单条记录是否命中当前搜索条件（分类筛选不在这里，单独处理）
@@ -2350,7 +2537,8 @@
                     remarkCell = '<span class="remark-empty">无</span>';
                 } else {
                     const shown = escapeHtml(charSlice(remarkFull, 10)) + (charLen(remarkFull) > 10 ? '…' : '');
-                    remarkCell = `<span class="remark-view" onclick="viewRemark('${item.id}')" title="点击查看完整备注">${shown}</span>`;
+                    // 用 data-act/data-id + 事件委托，避免把 id 拼进内联 onclick（杜绝属性注入隐患）
+                    remarkCell = `<span class="remark-view" data-act="remark" data-id="${escapeHtml(item.id)}" title="点击查看完整备注">${shown}</span>`;
                 }
                 const tr=document.createElement('tr');
                 tr.innerHTML=`
@@ -2361,7 +2549,7 @@
                     <td data-label="结余">${balance.toFixed(2)}</td>
                     <td data-label="备注">${remarkCell}</td>
                     <td data-label="" class="ops-cell">
-                        <button class="operate-btn edit" onclick="openEdit('${item.id}')">修改</button>
+                        <button class="operate-btn edit" data-act="edit" data-id="${escapeHtml(item.id)}">修改</button>
                     </td>`;
                 billList.appendChild(tr);
             });
@@ -2798,7 +2986,12 @@
                     '--c-card-2':        hslToHex(h,62,88),
                     '--c-chip':          hslToHex(h,70,92),
                     '--c-on-primary':    onPrimary,
-                    '--c-shadow-rgb':    `${r},${g},${b}`
+                    '--c-shadow-rgb':    `${r},${g},${b}`,
+                    // 选中态：底色取中浅染（亮度 82，明显深于未选中的 --c-chip≈92），
+                    // 纯色块即可清晰区分，无需边框；文字用深主色保证可读。
+                    '--c-sel-bg':        hslToHex(h,Math.min(s+14,74),82),
+                    '--c-sel-border':    primary,
+                    '--c-sel-text':      hslToHex(h,Math.min(s+10,92),Math.max(pL-22,22))
                 };
             }
             function applyPrimary(primaryHex){
@@ -2882,13 +3075,17 @@
             function release(){
                 if(cur){ cur.classList.remove('pressed'); cur=null; }
             }
-            // 触摸优先；同时挂 pointer/mouse 兼容电脑与混合设备
-            document.addEventListener('touchstart', press, {passive:true});
-            document.addEventListener('touchend', release, {passive:true});
-            document.addEventListener('touchcancel', release, {passive:true});
-            document.addEventListener('pointerdown', press, {passive:true});
-            document.addEventListener('pointerup', release, {passive:true});
-            document.addEventListener('pointercancel', release, {passive:true});
+            // 有 PointerEvent 就只用 pointer 一套（覆盖鼠标/触摸/触控笔），
+            // 否则回退 touch；避免同一次按压在触屏上被 pointer+touch 触发两次。
+            if(window.PointerEvent){
+                document.addEventListener('pointerdown', press, {passive:true});
+                document.addEventListener('pointerup', release, {passive:true});
+                document.addEventListener('pointercancel', release, {passive:true});
+            } else {
+                document.addEventListener('touchstart', press, {passive:true});
+                document.addEventListener('touchend', release, {passive:true});
+                document.addEventListener('touchcancel', release, {passive:true});
+            }
             // 滚动时若手指离开按钮，确保还原
             document.addEventListener('scroll', release, {passive:true, capture:true});
         })();
@@ -2914,6 +3111,20 @@
             if(bar) bar.style.flexDirection = (getAddSide()==='left') ? 'row-reverse' : 'row';
         }
 
+        // 收支按钮顺序偏好（左撇子可设为「收入在左」）。默认 out=支出在左、收入在右。
+        function getIoSide(){
+            const v=localStorage.getItem('app_io_side');
+            return (v==='out'||v==='in') ? v : 'out';
+        }
+        function setIoSide(v){ localStorage.setItem('app_io_side', v); }
+        // 应用到记一笔/修改账单弹窗的收支标签：选「收入在左」时 row-reverse 对调左右
+        function applyIoSide(){
+            const rev = getIoSide()==='in';
+            ['billTypeChips','editTypeChips'].forEach(id=>{
+                const box=$(id); if(box) box.classList.toggle('io-rev', rev);
+            });
+        }
+
         function switchTab(tab){
             currentTab=tab;
             $('pageLedger').style.display   = tab==='ledger'   ? 'block':'none';
@@ -2921,11 +3132,16 @@
             $('pageSettings').style.display = tab==='settings' ? 'block':'none';
             // 底部操作栏（筛选 + 记一笔）只在记账页显示
             $('actionBar').style.display = tab==='ledger' ? 'flex':'none';
-            if(tab!=='ledger'){ const tt=$('toTopBtn'); if(tt) tt.classList.remove('show'); }
+            if(tab!=='ledger'){
+                const tt=$('toTopBtn'); if(tt) tt.classList.remove('show');
+                const cf=$('clearFilterFab'); if(cf) cf.classList.remove('show');
+            }
             document.body.classList.toggle('tab-ledger', tab==='ledger');
             document.querySelectorAll('.tab-btn').forEach(b=>{
                 b.classList.toggle('active', b.dataset.tab===tab);
             });
+            // 进入记账页时按当前筛选状态决定清除浮钮显隐
+            if(tab==='ledger' && window.syncFilterFab) window.syncFilterFab();
             if(tab==='stats') renderStats();
             // 切换标签后回到顶部：延到布局完成后执行，避免在 display 切换同帧里失效
             window.scrollTo(0,0);
@@ -2945,6 +3161,10 @@
             window.addEventListener('scroll', onScroll, {passive:true});
             btn.addEventListener('click', ()=>{ window.scrollTo({top:0, behavior:'smooth'}); });
             onScroll();
+
+            // 清除筛选浮钮：一键清空全部筛选并刷新列表
+            const clearFab=$('clearFilterFab');
+            if(clearFab) clearFab.addEventListener('click', ()=>{ clearAllFilters(); });
         })();
 
         // 默认进入页面：分段选择器
@@ -2972,6 +3192,20 @@
             });
             paint();
             applyAddSide();   // 启动即按偏好摆放
+        })();
+
+        // 收支按钮顺序：分段选择器（支出在左 / 收入在左）
+        (function(){
+            const seg=$('ioSideSeg');
+            function paint(){
+                const cur=getIoSide();
+                seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===cur));
+            }
+            seg.querySelectorAll('button').forEach(b=>{
+                b.addEventListener('click', ()=>{ setIoSide(b.dataset.v); applyIoSide(); paint(); });
+            });
+            paint();
+            applyIoSide();   // 启动即按偏好对调
         })();
 
         // ============================================================
