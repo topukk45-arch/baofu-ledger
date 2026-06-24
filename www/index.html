@@ -779,6 +779,15 @@
                     </div>
                 </div>
 
+                <!-- 当月支出分类占比（整月维度，复用当日分析的饼图/列表样式） -->
+                <div class="stat-card" id="statMonthCatCard">
+                    <div class="stat-day-title">当月支出分类占比</div>
+                    <div class="stat-pie-row">
+                        <div class="stat-pie-holder" id="statMonthPie"></div>
+                        <div class="stat-cat-list" id="statMonthCatList"></div>
+                    </div>
+                </div>
+
                 <!-- 当日分析 -->
                 <div class="stat-day-wrap" id="statDayWrap" style="display:none">
                     <div class="stat-card">
@@ -3300,6 +3309,9 @@
             $('statMonthIn').textContent='+'+mIn.toFixed(2);
             $('statMonthOut').textContent='−'+mOut.toFixed(2);
 
+            // 当月支出分类占比（复用当日分析的甜甜圈 + 分类列表画法）
+            renderStatMonthCats(recs);
+
             // 画日历格子
             const firstDow=new Date(statYear, statMonth, 1).getDay();   // 0=周日
             const daysInMonth=new Date(statYear, statMonth+1, 0).getDate();
@@ -3376,6 +3388,59 @@
             const hourRecs={};   // 小时 -> 该小时的支出记录数组
             recs.forEach(r=>{ if(r.type==='expense'){ const h=new Date(r.time).getHours(); hours[h]+=Number(r.money||0); (hourRecs[h]=hourRecs[h]||[]).push(r); } });
             renderHourBars(hours, hourRecs);
+        }
+
+        // 当月支出分类占比：入参 recs 已是当月全部记录（含收入），此处只取支出按分类聚合。
+        // 分类多于 6 个时，金额前 6 保留、其余并入「其他」，避免列表过长。
+        // 颜色一律走 catColor()，与当日分析同源，换主题色时一起变。
+        function renderStatMonthCats(recs){
+            const card=$('statMonthCatCard');
+            const pie=$('statMonthPie'), list=$('statMonthCatList');
+            if(!card || !pie || !list) return;
+
+            const byCat={};
+            recs.forEach(r=>{
+                if(r.type==='expense'){
+                    const amt=Number(r.money||0);
+                    byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt;
+                }
+            });
+
+            let cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
+
+            // 当月无支出：整块隐藏（避免显示上个有数据月份的残留）
+            if(!cats.length){
+                card.style.display='none';
+                pie.innerHTML='';
+                list.innerHTML='';
+                return;
+            }
+            card.style.display='';
+
+            // 前 6 + 其余并为「其他」
+            const TOP=6;
+            let items;
+            if(cats.length>TOP){
+                const top=cats.slice(0,TOP).map(c=>({ name:c, val:byCat[c] }));
+                const restSum=cats.slice(TOP).reduce((s,c)=>s+byCat[c],0);
+                items=top.concat([{ name:'其他', val:restSum }]);
+            } else {
+                items=cats.map(c=>({ name:c, val:byCat[c] }));
+            }
+
+            const total=items.reduce((s,it)=>s+it.val,0);
+            const vals=items.map(it=>it.val);
+            const colors=items.map((_,i)=>catColor(i, items.length));
+
+            pie.style.display='';
+            pie.innerHTML=buildDonutSVG(vals, colors);
+            list.innerHTML=items.map((it,i)=>{
+                const pct=total>0 ? Math.round(it.val/total*100) : 0;
+                return `<div class="sc-item">
+                    <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span>${escapeHtml(it.name)} · ${pct}%</span>
+                    <span class="sc-amt neg">−${it.val.toFixed(2)}</span>
+                </div>`;
+            }).join('');
         }
 
         // 手写甜甜圈饼图
