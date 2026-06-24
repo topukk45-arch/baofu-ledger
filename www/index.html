@@ -3355,8 +3355,9 @@
             const vals=cats.map(c=>byCat[c]);
             const colors=cats.map((_,i)=>catColor(i, cats.length));
 
-            // 饼图：有支出就画占比；当天无支出则提示
+            // 饼图：有支出就画占比；当天无支出则只显示一句提示（避免两个并排区域各塞一句、文字重叠）
             if(cats.length){
+                $('statPie').style.display='';
                 $('statPie').innerHTML = buildDonutSVG(vals, colors);
                 $('statCatList').innerHTML = cats.map((c,i)=>
                     `<div class="sc-item">
@@ -3364,8 +3365,10 @@
                         <span class="sc-amt neg">−${byCat[c].toFixed(2)}</span>
                     </div>`).join('');
             } else {
-                $('statPie').innerHTML = '<div style="font-size:12px;color:var(--c-text-soft);text-align:center;padding-top:54px;">当日无支出</div>';
-                $('statCatList').innerHTML = '<div style="font-size:13px;color:var(--c-text-soft);">这天没有支出记录</div>';
+                // 无支出：隐藏饼图占位，分类区显示唯一一句居中提示
+                $('statPie').style.display='none';
+                $('statPie').innerHTML = '';
+                $('statCatList').innerHTML = '<div class="stat-day-empty">当日无支出记录</div>';
             }
 
             // —— 当日按小时支出 ——
