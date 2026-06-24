@@ -55,18 +55,19 @@
         /* ===== 去网页味：让它更像原生 App ===== */
         /* 点击不再出现蓝色/灰色高亮方块 */
         * { -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
-        /* 按钮、标签、可点元素不可选中文字，避免长按选字/出现文本光标 */
-        button, .mini-btn, .link-btn, .cs-display, .cs-opt, .dt-day, .dt-nav,
-        .fab, .pager button, .user-chip, label, h3, .io-tag, .remark-view, .cat-tag,
-        /* 分类管理：整行（含拖动手柄、分类名）都禁选——长按拖动排序时不应框选文字、弹系统菜单。
-           同时给提示文字禁选，避免长按手柄时连带选中旁边的说明。 */
-        .cat-item, .cat-item .cat-left, .cat-item .cat-name, .cat-item .drag-handle,
-        .cat-reorder-tip {
+        /* ===== 文字选择策略：默认全局禁选，避免长按 UI 文字弹出系统「复制/分享/全选/朗读」菜单 =====
+           这是移动端「类原生」应用的标准做法。逐个给标题/标签/提示补禁选总会有漏网（已踩坑多次），
+           故反过来：整体禁选，再对「确实需要选中/复制」的元素显式开放。 */
+        body {
             -webkit-user-select:none; user-select:none;
-            -webkit-touch-callout:none;   /* 安卓/iOS WebView 长按弹出的「复制/分享/全选」系统菜单兜底 */
+            -webkit-touch-callout:none;   /* 兜底安卓/iOS WebView 长按弹出的系统选择菜单 */
         }
-        /* 备注、输入框仍允许选中文字 */
-        input, textarea { -webkit-user-select:text; user-select:text; }
+        /* 仅输入框/多行框可选中文字（编辑需要）。其余只读文本一律禁选——
+           导出当月/当日报表功能会另行覆盖「取数」需求，无需长按复制。 */
+        input, textarea {
+            -webkit-user-select:text; user-select:text;
+            -webkit-touch-callout:default;
+        }
         /* 去掉聚焦时的浏览器默认蓝色描边（保留我们自己的金色高亮） */
         button:focus, button:focus-visible, select:focus-visible,
         .cs-display:focus, .cs-display:focus-visible { outline:none; }
