@@ -57,8 +57,13 @@
         * { -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
         /* 按钮、标签、可点元素不可选中文字，避免长按选字/出现文本光标 */
         button, .mini-btn, .link-btn, .cs-display, .cs-opt, .dt-day, .dt-nav,
-        .fab, .pager button, .user-chip, label, h3, .io-tag, .remark-view, .cat-tag {
+        .fab, .pager button, .user-chip, label, h3, .io-tag, .remark-view, .cat-tag,
+        /* 分类管理：整行（含拖动手柄、分类名）都禁选——长按拖动排序时不应框选文字、弹系统菜单。
+           同时给提示文字禁选，避免长按手柄时连带选中旁边的说明。 */
+        .cat-item, .cat-item .cat-left, .cat-item .cat-name, .cat-item .drag-handle,
+        .cat-reorder-tip {
             -webkit-user-select:none; user-select:none;
+            -webkit-touch-callout:none;   /* 安卓/iOS WebView 长按弹出的「复制/分享/全选」系统菜单兜底 */
         }
         /* 备注、输入框仍允许选中文字 */
         input, textarea { -webkit-user-select:text; user-select:text; }
