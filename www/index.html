@@ -593,6 +593,10 @@
         .sheet-mask.open .sheet { transform:translateY(0); }   /* 打开时滑入 */
         .sheet-handle { width:40px; height:4px; border-radius:2px; background:var(--c-border-mid);
             margin:6px auto 12px; }
+        /* 顶部抓手区：把手 + 标题行作为下滑关闭的拖拽区。touch-action:none 让浏览器
+           不要把这块的手势当成滚动，否则 passive 监听下手势会被滚动抢走、拖不动。 */
+        .sheet-grip { touch-action:none; cursor:grab; }
+        .sheet-grip:active { cursor:grabbing; }
         .sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
         .sheet-head h3 { color:var(--c-primary-dark); }
         .sheet-body { display:flex; flex-direction:column; gap:16px; }
@@ -601,14 +605,19 @@
         .sheet .filter-chips { flex-wrap:wrap; overflow-x:visible; }
         .sheet .dialog-btn { margin-top:18px; }
 
-        /* 键盘弹起时：弹窗改为顶部对齐并限高到可视区，内部 overflow 滚动生效，
+        /* 键盘弹起时：居中弹窗（记一笔/修改/时间选择器）改为顶部对齐并限高到可视区，
            这样标题/时间/金额固定可见，下面的收支、备注可以滑上来，不再被键盘顶出屏幕。
-           mask 的实际高度由 JS(syncMaskHeight) 同步成 visualViewport 高度。 */
-        body.kb-open .mask { align-items:flex-start; padding-top:8px; padding-bottom:8px; }
+           mask 的实际高度由 JS(syncMaskHeight) 同步成 visualViewport 高度。
+           注意：底部筛选浮层(.sheet-mask)不参与——它本就贴底，键盘弹起只需让它停在
+           键盘上方、内部滚动即可，绝不能改成顶部对齐（否则会被顶到状态栏后面）。 */
+        body.kb-open .mask:not(.sheet-mask) { align-items:flex-start; padding-top:8px; padding-bottom:8px; }
         body.kb-open .edit-dialog { max-height:none; }
         /* 限高交给 mask：弹窗最高占满 mask 可用高度，超出则内部滚动 */
         body.kb-open .mask .edit-dialog,
         body.kb-open .mask .dt-dialog { max-height:calc(100% - 16px); overflow-y:auto; }
+        /* 筛选浮层在键盘弹起时：保持贴底，高度收进可视区，内部滚动，顶部留出安全区 */
+        body.kb-open .sheet-mask { align-items:flex-end; }
+        body.kb-open .sheet { max-height:100%; }
 
         .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
         .cat-item { display:flex; justify-content:space-between; align-items:center;
@@ -876,9 +885,11 @@
     <!-- 筛选浮层（bottom sheet）：关键词 / 金额区间 / 日期范围 / 分类，全部筛选条件集中于此 -->
     <div class="mask sheet-mask" id="filterSheetMask">
         <div class="sheet" id="filterSheet">
-            <div class="sheet-handle" aria-hidden="true"></div>
-            <div class="sheet-head">
-                <h3>筛选</h3>
+            <div class="sheet-grip" id="filterSheetGrip">
+                <div class="sheet-handle" aria-hidden="true"></div>
+                <div class="sheet-head">
+                    <h3>筛选</h3>
+                </div>
             </div>
             <div class="sheet-body">
                 <div class="search-field">
@@ -2309,58 +2320,65 @@
                 renderFilterChips();   // 重渲染让分类高亮回到「全部」
             });
 
-            // ===== 下滑手势关闭（按住 sheet 顶部往下拖，超过阈值丢弃关闭，否则回弹）=====
-            const DRAG_DISMISS_PX = 90;     // 位移阈值
-            const DRAG_FLING_PX   = 40;     // 快速下滑的最小位移
-            let dragStartY=0, dragDY=0, dragging=false, dragStartT=0;
+            // ===== 下滑手势关闭 =====
+            // 只在顶部「抓手区」(把手+标题)上接管手势，不碰下面的输入/滚动。
+            // 关键：抓手区 CSS 设了 touch-action:none，move 监听非 passive，可 preventDefault，
+            // 这样在可滚动的 sheet 上手势也不会被滚动抢走（之前 passive+整片 sheet 导致拖不动）。
+            const grip=$('filterSheetGrip');
+            const DRAG_DISMISS_PX = 80;     // 位移阈值：超过即关闭
+            const DRAG_FLING_PX   = 36;     // 快速下滑的最小位移
+            let dragStartY=0, dragDY=0, dragging=false, dragStartT=0, dragId=null;
 
             function resetSheetDrag(){
-                dragging=false; dragDY=0;
+                dragging=false; dragDY=0; dragId=null;
                 sheet.style.transition='';
                 sheet.style.transform='';
             }
-            // 仅当触点起始于 sheet 上半部（避免和内部输入/滚动冲突）才接管拖拽
             function onDragStart(e){
                 if(!sheetMask.classList.contains('open')) return;
-                // sheet 内部已向下滚动时，优先让它滚动，不拦截
-                if(sheet.scrollTop>0) return;
                 const pt=e.touches?e.touches[0]:e;
-                const rect=sheet.getBoundingClientRect();
-                if(pt.clientY - rect.top > 120) return;   // 只在顶部约 120px 区域起拖
                 dragging=true; dragStartY=pt.clientY; dragDY=0; dragStartT=Date.now();
+                dragId = (e.pointerId!=null)?e.pointerId:null;
                 sheet.style.transition='none';
+                // 锁定后续 pointer 事件到 grip，保证 move/up 一定收得到
+                if(dragId!=null && grip.setPointerCapture){
+                    try{ grip.setPointerCapture(dragId); }catch(_){}
+                }
             }
             function onDragMove(e){
                 if(!dragging) return;
                 const pt=e.touches?e.touches[0]:e;
                 dragDY=pt.clientY-dragStartY;
                 if(dragDY<0) dragDY=0;             // 只允许下拉
+                // 非 passive：阻止默认滚动/回弹，手势完全归我们
+                if(e.cancelable) e.preventDefault();
                 sheet.style.transform=`translateY(${dragDY}px)`;
             }
             function onDragEnd(){
                 if(!dragging) return;
                 const dt=Date.now()-dragStartT;
-                const fling = dragDY>DRAG_FLING_PX && dt<250;   // 快速下滑也算关闭
+                const fling = dragDY>DRAG_FLING_PX && dt<260;   // 快速下滑也算关闭
                 sheet.style.transition='';
-                if(dragDY>DRAG_DISMISS_PX || fling){
-                    sheet.style.transform='';
-                    closeSheetDiscard();
-                } else {
-                    sheet.style.transform='';      // 回弹
+                sheet.style.transform='';
+                if(dragId!=null && grip.releasePointerCapture){
+                    try{ grip.releasePointerCapture(dragId); }catch(_){}
                 }
-                dragging=false; dragDY=0;
+                const shouldClose = dragDY>DRAG_DISMISS_PX || fling;
+                dragging=false; dragDY=0; dragId=null;
+                if(shouldClose) closeSheetDiscard();
             }
-            // 有 PointerEvent 用 pointer 一套，否则回退 touch，避免双触发
+            // 有 PointerEvent 用 pointer 一套，否则回退 touch，避免双触发。
+            // move 用 {passive:false} 才能 preventDefault。
             if(window.PointerEvent){
-                sheet.addEventListener('pointerdown', onDragStart, {passive:true});
-                sheet.addEventListener('pointermove', onDragMove, {passive:true});
-                sheet.addEventListener('pointerup', onDragEnd, {passive:true});
-                sheet.addEventListener('pointercancel', onDragEnd, {passive:true});
+                grip.addEventListener('pointerdown', onDragStart, {passive:true});
+                grip.addEventListener('pointermove', onDragMove, {passive:false});
+                grip.addEventListener('pointerup', onDragEnd, {passive:true});
+                grip.addEventListener('pointercancel', onDragEnd, {passive:true});
             } else {
-                sheet.addEventListener('touchstart', onDragStart, {passive:true});
-                sheet.addEventListener('touchmove', onDragMove, {passive:true});
-                sheet.addEventListener('touchend', onDragEnd, {passive:true});
-                sheet.addEventListener('touchcancel', onDragEnd, {passive:true});
+                grip.addEventListener('touchstart', onDragStart, {passive:true});
+                grip.addEventListener('touchmove', onDragMove, {passive:false});
+                grip.addEventListener('touchend', onDragEnd, {passive:true});
+                grip.addEventListener('touchcancel', onDragEnd, {passive:true});
             }
         })();
 
