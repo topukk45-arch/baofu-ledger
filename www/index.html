@@ -596,8 +596,10 @@
            这样标题/时间/金额固定可见，下面的收支、备注可以滑上来，不再被键盘顶出屏幕。
            mask 的实际高度由 JS(syncMaskHeight) 同步成 visualViewport 高度。
            注意：底部筛选浮层(.sheet-mask)不参与——它本就贴底，键盘弹起只需让它停在
-           键盘上方、内部滚动即可，绝不能改成顶部对齐（否则会被顶到状态栏后面）。 */
-        body.kb-open .mask:not(.sheet-mask) { align-items:flex-start; padding-top:8px; padding-bottom:8px; }
+           键盘上方、内部滚动即可，绝不能改成顶部对齐（否则会被顶到状态栏后面）。
+           注意：askMask（金额补全/确认/备注等矮弹窗）也不参与顶部对齐——它内容不高，
+           居中时键盘也顶不没它，强行顶部对齐反而会贴死状态栏，难看。 */
+        body.kb-open .mask:not(.sheet-mask):not(#askMask) { align-items:flex-start; padding-top:8px; padding-bottom:8px; }
         body.kb-open .edit-dialog { max-height:none; }
         /* 限高交给 mask：弹窗最高占满 mask 可用高度，超出则内部滚动 */
         body.kb-open .mask .edit-dialog,
