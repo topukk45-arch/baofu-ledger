@@ -545,6 +545,11 @@
             background:rgba(0,0,0,0.3); display:none;
             align-items:center; justify-content:center; z-index:999;
             padding:16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        /* 消费明细(askMask,z999) → 详情(detailMask) → 修改(editMask) 是层层叠起的，
+           必须让上层盖住下层（否则同 z-index 下按 DOM 顺序，明细反而盖住详情）。
+           仅在「从明细进入」这条链路上抬高；它们单独使用时层级不受影响也无妨。 */
+        #detailMask { z-index:1000; }
+        #editMask.over-detail { z-index:1001; }
         .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
             border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
             max-height:80vh; max-height:80dvh; overflow-y:auto;
@@ -680,6 +685,32 @@
             border:1px solid var(--c-border); border-radius:8px; background:var(--c-surface);
             cursor:pointer; }
         .theme-tip { color:var(--c-text-soft); font-size:12px; margin-top:8px; }
+
+        /* 账单详情（只读）的值：外观近似输入框，但不可编辑，保持与修改弹窗视觉连贯 */
+        .detail-val {
+            padding:12px; border:1px solid var(--c-border); border-radius:8px;
+            background:var(--c-surface); color:var(--c-primary-deep); font-size:14px;
+            min-height:44px; display:flex; align-items:center; }
+        .detail-val.detail-remark {
+            align-items:flex-start; white-space:pre-wrap; word-break:break-word;
+            line-height:1.5; max-height:160px; overflow-y:auto; }
+
+        /* 消费明细行：可点击进入详情；当前查看/修改的那条加高光，回到明细时保持，
+           点别条则移走，重开明细弹窗则清空。 */
+        .hd-row.hd-clickable { cursor:pointer; border-radius:8px; padding-left:8px; padding-right:8px;
+            transition:background .15s; }
+        .hd-row.hd-clickable:hover { background:var(--c-chip); }
+        .hd-row.hd-active { background:var(--c-sel-bg); }
+
+        /* 「记账成功」弹窗里的可选补充入口（添加备注）：单独占一行、居中、轻量描边，
+           不挤占「再记一笔 / 关闭」那一行，也不与主操作抢视觉。 */
+        .ask-extra-btn {
+            display:block; width:auto; margin:14px auto 2px; padding:7px 18px;
+            background:var(--c-surface); color:var(--c-primary-deep);
+            border:1px solid var(--c-border-mid); border-radius:20px;
+            font-size:13.5px; cursor:pointer; transition:0.2s; }
+        .ask-extra-btn:hover { border-color:var(--c-accent);
+            box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.3); }
     </style>
 </head>
 <body>
@@ -997,6 +1028,40 @@
         </div>
     </div>
 
+    <!-- 账单详情（只读）：从消费明细点条目进入。布局沿用修改弹窗，但纯展示不可编辑。
+         「修改」打开修改弹窗，「关闭」回消费明细；两者退出都回消费明细（不层层返回）。 -->
+    <div class="mask" id="detailMask">
+        <div class="edit-dialog">
+            <h3>账单详情</h3>
+            <div class="form-box">
+                <div class="field">
+                    <label class="field-label">记账时间</label>
+                    <div class="detail-val" id="detailTime"></div>
+                </div>
+                <div class="field">
+                    <label class="field-label">金额</label>
+                    <div class="detail-val" id="detailMoney"></div>
+                </div>
+                <div class="field">
+                    <label class="field-label">分类</label>
+                    <div class="detail-val" id="detailCat"></div>
+                </div>
+                <div class="field">
+                    <label class="field-label">收支</label>
+                    <div class="detail-val" id="detailType"></div>
+                </div>
+                <div class="field">
+                    <label class="field-label">备注</label>
+                    <div class="detail-val detail-remark" id="detailRemark"></div>
+                </div>
+            </div>
+            <div class="dialog-btn">
+                <button class="save" id="detailEdit">修改</button>
+                <button class="cancel" id="detailClose">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <div class="mask" id="catMask">
         <div class="edit-dialog">
             <h3>管理账单分类</h3>
@@ -1076,7 +1141,10 @@
             <h3 id="askTitle">提示</h3>
             <p id="askMsg" class="ask-msg"></p>
             <input type="text" id="askInput" style="display:none">
+            <!-- 选项补全容器：缺分类/收支时，在此就地渲染可点选标签（复用 cat-chips 样式） -->
+            <div id="askChoices" class="cat-chips" style="display:none; margin:12px 0 4px;"></div>
             <p id="askErr" class="ask-err" style="display:none"></p>
+            <button class="ask-extra-btn" id="askExtra" style="display:none"></button>
             <div class="dialog-btn">
                 <button class="save" id="askOk">确定</button>
                 <button class="cancel" id="askCancel">取消</button>
@@ -1208,7 +1276,7 @@
         // ===== 自定义 确认 / 输入 弹窗 =====
         const askMask=$('askMask'), askTitle=$('askTitle'), askMsg=$('askMsg'),
               askInput=$('askInput'), askOk=$('askOk'), askCancel=$('askCancel');
-        let askResolve=null, askMode='confirm';
+        let askResolve=null, askMode='confirm', askChosen=null;
 
         const askErr=$('askErr');
         let askValidate=null;
@@ -1220,6 +1288,10 @@
         function closeAsk(result){
             askMask.style.display='none';
             askErr.style.display='none';
+            const choices=$('askChoices');
+            if(choices){ choices.style.display='none'; choices.innerHTML=''; }
+            const extra=$('askExtra');
+            if(extra){ extra.style.display='none'; extra.onclick=null; }
             const r=askResolve; askResolve=null; askValidate=null;
             if(r) r(result);
         }
@@ -1232,17 +1304,23 @@
                     if(err){ showAskErr(err); return; }
                 }
                 closeAsk(v);
+            } else if(askMode==='choose'){
+                if(askChosen===null){ showAskErr('选一个再确定哦～'); return; }
+                closeAsk(askChosen);
             } else closeAsk(true);
         });
-        askCancel.addEventListener('click', ()=>closeAsk(askMode==='prompt'?null:false));
+        askCancel.addEventListener('click', ()=>closeAsk((askMode==='prompt'||askMode==='choose')?null:false));
         // 禁止点击遮罩外部关闭，避免误触丢失输入；仅按钮可关闭
         askInput.addEventListener('keydown', e=>{ if(e.key==='Enter') askOk.click(); });
         askInput.addEventListener('input', ()=>{ if(askErr.style.display!=='none') showAskErr(''); });
 
         // 确认框：回调式。opts.okText / opts.cancelText 可自定义按钮文字
+        //   opts.extra = { text, onClick } 可选第三按钮（弱化样式）：点击先关闭本弹窗再执行 onClick，
+        //   便于在 onClick 里再弹另一个弹窗（两者共用 askMask，必须先关当前的）。
         function customConfirm(msg, onOk, title, opts){
             opts = opts || {};
             askMode='confirm';
+            askValidate=null;   // 防御性复位：本模式不用校验，避免残留上一个 prompt 的校验函数
             askTitle.textContent=title||'确认操作';
             askMsg.textContent=msg;
             askMsg.style.display='';
@@ -1251,6 +1329,19 @@
             askCancel.style.display='';
             askOk.textContent = opts.okText || '确定';
             askCancel.textContent = opts.cancelText || '取消';
+            const extra=$('askExtra');
+            if(opts.extra && opts.extra.text){
+                extra.textContent=opts.extra.text;
+                extra.style.display='';
+                extra.onclick=()=>{
+                    const fn=opts.extra.onClick;
+                    closeAsk(false);          // 先关闭成功弹窗（不触发 onOk，因为传 false）
+                    if(fn) fn();              // 再执行（通常是弹出补备注输入框）
+                };
+            } else {
+                extra.style.display='none';
+                extra.onclick=null;
+            }
             askResolve=(r)=>{
                 askOk.textContent='确定'; askCancel.textContent='取消';   // 用完恢复默认，避免影响其它弹窗
                 if(r && onOk) onOk();
@@ -1268,6 +1359,9 @@
             askInput.style.display='block';
             askInput.value=defVal||'';
             askInput.placeholder = opts.placeholder || '';
+            // 补金额等场景可指定数字键盘；不传则恢复默认文本键盘，避免影响改名等其它调用
+            if(opts.inputmode){ askInput.setAttribute('inputmode', opts.inputmode); }
+            else { askInput.removeAttribute('inputmode'); }
             if(opts.maxlen){ askInput.setAttribute('maxlength', opts.maxlen); }
             else { askInput.removeAttribute('maxlength'); }
             askCancel.style.display='';
@@ -1277,6 +1371,40 @@
             askMask.style.display='flex';
             setTimeout(()=>{ askInput.focus(); askInput.select(); }, 50);
         }
+        // 选项弹窗：在弹窗里就地渲染一组可点选标签，选中点确定回调所选值。
+        //   options: [{ value, label, cls }]  cls 用于收支的红/绿选中态（sel-out/sel-in）
+        //   普通选项（如分类）选中走通用 .sel 态。点取消回调 null。
+        function customChoose(msg, options, onOk, title){
+            askMode='choose';
+            askChosen=null;
+            askValidate=null;   // 防御性复位：本模式不用校验，避免残留上一个 prompt 的校验函数
+            askTitle.textContent=title||'请选择';
+            if(msg){ askMsg.textContent=msg; askMsg.style.display=''; askMsg.style.textAlign=''; }
+            else { askMsg.style.display='none'; }
+            askInput.style.display='none';
+            askCancel.style.display='';
+            askErr.style.display='none';
+            const box=$('askChoices');
+            box.innerHTML='';
+            box.style.display='flex';
+            // 收支两项且带语义色时撑满一行更协调；分类等正常自适应换行
+            box.classList.toggle('io-chips', options.length===2 && options.some(o=>o.cls));
+            options.forEach(o=>{
+                const b=document.createElement('div');
+                b.className='cc';
+                b.textContent=o.label;
+                b.onclick=()=>{
+                    askChosen=o.value;
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.remove('sel','sel-out','sel-in'));
+                    b.classList.add(o.cls || 'sel');
+                    if(askErr.style.display!=='none') showAskErr('');
+                };
+                box.appendChild(b);
+            });
+            askResolve=(r)=>{ if(r!==null && onOk) onOk(r); };
+            askMask.style.display='flex';
+        }
+
         // 信息弹窗：只有“确定”，可选标题；用于替代 alert 和“查看备注”。
         // 安全约定：默认走 textContent，绝不解析 HTML。仅当调用方显式传 isHtml=true
         //   且已对所有插值的用户数据做过 escapeHtml 时，才用 innerHTML 渲染富文本。
@@ -1302,6 +1430,12 @@
             if(val <= 0) return { ok:false, why:'金额要大于 0 哦～' };  // 含 0、负数、以及 0.001 这类四舍五入后归零的值
             return { ok:true, val };
         }
+
+        // 安全数值：把可能是脏数据（null/undefined/""/"abc" 等）的金额转成有限数，
+        // 非法一律按 0，避免 NaN 污染整列汇总（导入不规范 JSON 时尤其有用）。
+        function safeNum(x){ const n=Number(x); return isFinite(n) ? n : 0; }
+        // 对齐到「分」：消除多笔浮点累加的尾差（如 2.9999999 → 3.00）。
+        function round2(n){ return Math.round(n*100)/100; }
 
         // 字符数：按 Unicode 码点计（一个汉字算 1）
         function charLen(s){ return Array.from(s).length; }
@@ -1371,7 +1505,22 @@
             if (corrupted) {
                 // 数据存在但损坏：备份原始串到独立 key，避免被随后的 saveStore 覆盖而永久丢失。
                 // 仍回退到可用结构以保证界面不白屏，但不主动写回，给用户/后续逻辑留出恢复余地。
-                try { localStorage.setItem(`${storeKey(u)}__corrupted_${Date.now()}`, raw); } catch(_){}
+                // 写新备份前清理该用户的旧备份，只保留最近 1 份（连同这次共 2 份），
+                // 避免反复损坏时备份无上限堆积、最终吃满 localStorage 配额。
+                try {
+                    const prefix=`${storeKey(u)}__corrupted_`;
+                    const olds=[];
+                    for(let i=0;i<localStorage.length;i++){
+                        const k=localStorage.key(i);
+                        if(k && k.indexOf(prefix)===0) olds.push(k);
+                    }
+                    // 按时间戳（key 末尾）升序，删掉除最新 1 份外的旧备份
+                    olds.sort();
+                    olds.slice(0, Math.max(0, olds.length-1)).forEach(k=>{
+                        try{ localStorage.removeItem(k); }catch(_){}
+                    });
+                    localStorage.setItem(`${prefix}${Date.now()}`, raw);
+                } catch(_){}
             }
             if (!store) {
                 const old = localStorage.getItem(`billData_${u}`);
@@ -2449,7 +2598,7 @@
                 if(!rk.includes(searchState.keyword)) return false;
             }
             // 金额区间：按绝对金额比较（与收支无关）
-            const amt=Number(r.money||0);
+            const amt=safeNum(r.money);
             if(searchState.min!=null && amt < searchState.min) return false;
             if(searchState.max!=null && amt > searchState.max) return false;
             // 日期范围：取记录日期部分（YYYY-MM-DD）做字符串比较即可（格式定长可比）
@@ -2482,7 +2631,7 @@
             // 后续筛选/反转/分页都带着同一对象走，渲染时按对象取值，不经过 id 查表，
             // 因此旧数据里即便存在偶发重复 id 也绝不会互相覆盖、算错结余。
             allAsc.forEach(item=>{
-                const amt=Number(item.money||0);
+                const amt=safeNum(item.money);
                 running += (item.type==='expense' ? -amt : amt);
                 running = Math.round(running*100)/100;   // 每步对齐到分，避免浮点误差累积（如 19.99 显示成 20.00）
                 item.__bal=running;
@@ -2513,10 +2662,11 @@
             // 汇总：收入/支出/结余。结余始终为全账户净额，不随筛选变化
             let totalIn=0, totalOut=0;
             allAsc.forEach(item=>{
-                const amt=Number(item.money||0);
+                const amt=safeNum(item.money);
                 if(item.type==='expense') totalOut+=amt; else totalIn+=amt;
             });
-            const net=totalIn-totalOut;
+            totalIn=round2(totalIn); totalOut=round2(totalOut);
+            const net=round2(totalIn-totalOut);
 
             // 筛选状态下额外提示当前子集的收支，避免「为什么数字对不上」的疑惑
             // 现在「筛选」= 分类标签筛选 或 搜索条件，任一生效都显示这条小计
@@ -2530,7 +2680,8 @@
             const fBar=$('summaryFilter');
             if(filtering){
                 let fIn=0, fOut=0;
-                asc.forEach(item=>{ const amt=Number(item.money||0); if(item.type==='expense') fOut+=amt; else fIn+=amt; });
+                asc.forEach(item=>{ const amt=safeNum(item.money); if(item.type==='expense') fOut+=amt; else fIn+=amt; });
+                fIn=round2(fIn); fOut=round2(fOut);
                 // 徽标文案：有分类显示分类名，否则显示「搜索」；都为真则合并
                 let badge;
                 if(filterVal!=='__all' && hasActiveSearch()) badge=`${filterVal}·搜索`;
@@ -2547,7 +2698,7 @@
             // 分类统计：始终基于全部记录，按收支净额（收入加、支出减）
             const byCat={};
             allAsc.forEach(r=>{
-                const amt=Number(r.money||0)*(r.type==='expense'?-1:1);
+                const amt=safeNum(r.money)*(r.type==='expense'?-1:1);
                 byCat[r.cat]=(byCat[r.cat]||0)+amt;
             });
             $('catStats').innerHTML = Object.keys(byCat)
@@ -2566,7 +2717,7 @@
             pageItems.forEach(item=>{
                 const balance=item.__bal;
                 const isExp = item.type==='expense';
-                const amt=Number(item.money||0);
+                const amt=safeNum(item.money);
                 const typeTag = isExp
                     ? '<span class="io-tag io-out">支出</span>'
                     : '<span class="io-tag io-in">收入</span>';
@@ -2715,13 +2866,57 @@
             const time=getDtInput(billTime), money=billMoney.value;
             const cat=billCat.value, remark=billRemark.value.trim();
             const type=billType.value;
-            if(!time || money===''){ customAlert('请填写完整时间和金额！'); return; }
-            if(!cat){ customAlert('请选择一个分类～'); return; }
-            if(!type){ customAlert('请选择收支（支出或收入）～'); return; }
+            // ===== 保底机制：点「添加记录」时若有项没填，弹窗就地补这一项 =====
+            // 正常从上往下填完根本走不到这里；漏填时按顺序找第一个缺的项，
+            // 弹对应控件让用户当场补：金额→输入框，分类/收支→可点选标签。
+            // 补完写回原表单，再自动重新触发本提交，接着检查下一个缺项，直到补齐入账。
+            // 用户在补全弹窗点「取消」则中止，原表单保持打开、已填内容不丢。
+            if(!time){
+                customAlert('先选一下记账时间吧～');   // 时间靠日期选择器选，这里只提示
+                billTime.focus();
+                return;
+            }
+            // 金额：空、或已填但格式不对（字母/0/负数等），都走同一个补全弹窗。
+            // 补全框自带就地校验，填错会当场提示、不会入账；合法填入后接力检查后续项。
+            if(money==='' || !normMoney(money).ok){
+                billMoney.value='';   // 清掉非法值，避免补全框带进上次的错值
+                customPrompt('', '', (v)=>{
+                    billMoney.value=v.trim();
+                    addBill.click();                 // 写回后重新提交，继续检查后续项
+                }, '金额',
+                   (v)=>{ const t=normMoney(v.trim()); return t.ok ? '' : t.why; },  // 就地校验金额
+                   { inputmode:'decimal' });
+                return;
+            }
             const m = normMoney(money);
-            if(!m.ok){ customAlert(m.why); return; }
+            if(!cat){
+                const opts=getCats().map(c=>({ value:c, label:c }));
+                customChoose('', opts, (v)=>{
+                    billCatSel=v; billCat.value=v;
+                    $('billCatChips').querySelectorAll('.cc')
+                        .forEach(el=>el.classList.toggle('sel', el.textContent===v));
+                    addBill.click();
+                }, '分类');
+                return;
+            }
+            if(!type){
+                const opts=[ {value:'expense', label:'支出', cls:'sel-out'},
+                             {value:'income',  label:'收入', cls:'sel-in'} ];
+                customChoose('', opts, (v)=>{
+                    billTypeSel=v; billType.value=v;
+                    const box=$('billTypeChips');
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.remove('sel-out','sel-in'));
+                    box.querySelectorAll('.cc').forEach(el=>{
+                        if((el.textContent==='支出'&&v==='expense')||(el.textContent==='收入'&&v==='income'))
+                            el.classList.add(v==='expense'?'sel-out':'sel-in');
+                    });
+                    addBill.click();
+                }, '收支');
+                return;
+            }
             const data=getUserData();
-            data.push({ id:genId(), time, money:m.val, cat, remark, type });
+            const newId=genId();
+            data.push({ id:newId, time, money:m.val, cat, remark, type });
             // 保存失败（如存储配额满）时 saveUserData 已弹出失败提示，这里必须提前返回：
             // 否则会继续弹「记账成功」，造成「提示成功但实际没存上」的丢账假象。
             if(!saveUserData(data)) return;
@@ -2729,10 +2924,31 @@
             refreshAllViews();
             // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
             addMask.style.display='none';
+            // 这一笔没填备注 → 成功弹窗额外给个「添加备注」按钮，方便当场补；填了则不显示。
+            const confirmOpts={ okText:'再记一笔', cancelText:'关闭' };
+            if(!remark){
+                confirmOpts.extra={ text:'添加备注', onClick:()=>addRemarkToRecord(newId) };
+            }
             customConfirm('已记下这一笔，要再记一笔吗？', ()=>{
                 openAddModal();     // 重新打开，且为全新空白表单（不带上次数据）
-            }, '记账成功', { okText:'再记一笔', cancelText:'关闭' });
+            }, '记账成功', confirmOpts);
         });
+
+        // 给某条记录补备注（用于「记账成功」弹窗的「添加备注」按钮）。
+        // 弹输入框拿到内容后按 id 找回那条记录写回、保存、刷新。
+        // 用户点取消（返回 null）则不动数据。记完已是最新存档，直接操作当前数据即可。
+        function addRemarkToRecord(id){
+            customPrompt('', '', (v)=>{
+                const text=(v||'').trim();
+                if(!text) return;                 // 空内容不写（理论上 prompt 已拦空，双保险）
+                const data=getUserData();
+                const rec=data.find(r=>r.id===id);
+                if(!rec) return;                  // 记录意外不存在则放弃
+                rec.remark = text.slice(0, 5000); // 与记账表单一致的长度上限
+                saveUserData(data);               // 写失败时 saveUserData 内部已提示
+                refreshAllViews();
+            }, '备注', null, { maxlen:5000 });
+        }
 
         window.viewRemark=function(id){
             const item=getUserData().find(r=>r.id===id);
@@ -2783,17 +2999,32 @@
         }
 
         let editId=null;
-        window.openEdit=function(id){
+        // 从「详情」进入修改时，退出（保存/取消/删除）后要回到消费明细并刷新它。
+        let editReturnToHourDetail=false;
+        window.openEdit=function(id, opts){
+            opts=opts||{};
+            editReturnToHourDetail = !!opts.fromDetail;
             editId=id;
             const item=getUserData().find(r=>r.id===id);
             if(!item){ customAlert('未找到该记录'); return; }
+            // 从详情进入时，editMask 需盖过仍在底下的消费明细。确认记录存在、确实要显示后再加，
+            // 避免上面早退(记录不存在)时类残留。普通调用(opts.fromDetail假)不加。
+            editMask.classList.toggle('over-detail', !!opts.fromDetail);
             setDtInput(editTime, item.time); editMoney.value=item.money; editRemark.value=item.remark||'';
             // 预选记录原有的分类与收支（标签式）
             renderEditCatChips(item.cat||'未分类');
             renderEditTypeChips(item.type||'income');
             editMask.style.display='flex';
         };
-        cancelEdit.addEventListener('click', ()=>{ editMask.style.display='none'; editId=null; });
+        // 修改弹窗退出后的收尾：若来自详情，刷新并回到消费明细。用完清标志。
+        function afterEditClosed(){
+            editMask.classList.remove('over-detail');   // 复位层级，不影响下次普通调用
+            if(editReturnToHourDetail){
+                editReturnToHourDetail=false;
+                refreshHourDetail();   // 明细弹窗仍在底下，刷新其内容（反映改动/删除）
+            }
+        }
+        cancelEdit.addEventListener('click', ()=>{ editMask.style.display='none'; editId=null; afterEditClosed(); });
         $('deleteInEdit').addEventListener('click', ()=>{
             const id=editId;
             if(id==null) return;
@@ -2807,6 +3038,7 @@
                 }
                 editMask.style.display='none'; editId=null;
                 refreshAllViews();
+                afterEditClosed();
             }, '删除记录');
         });
         // 禁止点击遮罩外部关闭，仅按钮可关闭
@@ -2828,8 +3060,15 @@
                 if(!saveUserData(data)) return;
                 editMask.style.display='none';
                 refreshAllViews();
+                afterEditClosed();
             } else {
-                // 找不到原记录（例如保存前存档被切换/记录已被删）：明确提示而非静默关闭丢失编辑
+                // 找不到原记录（例如保存前存档被切换/记录已被删）：关闭修改弹窗并复位状态，
+                // 再明确提示。复位避免 over-detail 类与回明细标志残留到下次。
+                editMask.style.display='none';
+                editMask.classList.remove('over-detail');
+                editReturnToHourDetail=false;
+                editId=null;
+                refreshAllViews();
                 customAlert('未找到要保存的记录，可能已被删除或切换了存档。');
             }
         });
@@ -3315,7 +3554,7 @@
                 const d=new Date(r.time);
                 if(d.getFullYear()===statYear && d.getMonth()===statMonth){
                     const day=d.getDate();
-                    const amt=Number(r.money||0)*(r.type==='expense'?-1:1);
+                    const amt=safeNum(r.money)*(r.type==='expense'?-1:1);
                     dayNet[day]=(dayNet[day]||0)+amt;
                     dayHas[day]=true;
                 }
@@ -3326,12 +3565,12 @@
             recs.forEach(r=>{
                 const d=new Date(r.time);
                 if(d.getFullYear()===statYear && d.getMonth()===statMonth){
-                    const amt=Number(r.money||0);
+                    const amt=safeNum(r.money);
                     if(r.type==='expense') mOut+=amt; else mIn+=amt;
                 }
             });
-            $('statMonthIn').textContent='+'+mIn.toFixed(2);
-            $('statMonthOut').textContent='−'+mOut.toFixed(2);
+            $('statMonthIn').textContent='+'+round2(mIn).toFixed(2);
+            $('statMonthOut').textContent='−'+round2(mOut).toFixed(2);
 
             // 当月支出分类占比（复用当日分析的甜甜圈 + 分类列表画法）
             renderStatMonthCats(recs);
@@ -3386,7 +3625,7 @@
 
             // —— 当日支出按分类聚合 ——
             const byCat={};
-            recs.forEach(r=>{ if(r.type==='expense'){ const amt=Number(r.money||0); byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt; } });
+            recs.forEach(r=>{ if(r.type==='expense'){ const amt=safeNum(r.money); byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt; } });
             const cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
             const vals=cats.map(c=>byCat[c]);
             const colors=cats.map((_,i)=>catColor(i, cats.length));
@@ -3410,7 +3649,7 @@
             // —— 当日按小时支出 ——
             const hours=new Array(24).fill(0);
             const hourRecs={};   // 小时 -> 该小时的支出记录数组
-            recs.forEach(r=>{ if(r.type==='expense'){ const h=new Date(r.time).getHours(); hours[h]+=Number(r.money||0); (hourRecs[h]=hourRecs[h]||[]).push(r); } });
+            recs.forEach(r=>{ if(r.type==='expense'){ const h=new Date(r.time).getHours(); hours[h]+=safeNum(r.money); (hourRecs[h]=hourRecs[h]||[]).push(r); } });
             renderHourBars(hours, hourRecs);
         }
 
@@ -3428,7 +3667,7 @@
                 // 关键：只统计当前查看月份的支出（recs 是整档全量，需按 statYear/statMonth 过滤，
                 // 与日历格子、当月收支汇总的判定保持一致）
                 if(d.getFullYear()===statYear && d.getMonth()===statMonth && r.type==='expense'){
-                    const amt=Number(r.money||0);
+                    const amt=safeNum(r.money);
                     byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt;
                 }
             });
@@ -3554,25 +3793,104 @@
             }, 30);
         }
 
-        // 点击某个时段的柱子，弹出该小时的消费明细（时间 / 分类 / 金额）
-        window.showHourDetail=function(h){
-            const list=(statHourRecs[h]||[]).slice()
-                .sort((a,b)=>new Date(a.time)-new Date(b.time));
-            if(!list.length) return;
+        // ===== 消费明细 → 详情 → 修改 的串联 =====
+        // 状态：当前明细弹窗对应的小时、以及高光（正在查看/修改）的记录 id。
+        let hdHour=null;     // 当前明细弹窗对应的小时（0-23），null=未打开
+        let hdHlId=null;     // 高光记录 id；点别条移走，重开明细清空
+
+        // 按当前统计选中的「年月日 + 小时」从真实数据取该时段支出记录（不走缓存，
+        // 这样在详情里改过/删过记录后，回到明细能反映最新数据）。
+        function recordsOfHour(h){
+            if(!statSelDay) return [];
+            return getUserData().filter(r=>{
+                if(r.type!=='expense') return false;
+                const d=new Date(r.time);
+                return d.getFullYear()===statYear && d.getMonth()===statMonth
+                    && d.getDate()===statSelDay && d.getHours()===h;
+            }).sort((a,b)=>new Date(a.time)-new Date(b.time));
+        }
+
+        // 渲染明细列表 HTML（可重复调用：打开时、从详情返回时）。按 hdHlId 给对应行上高光。
+        function renderHourDetailBody(h){
+            const list=recordsOfHour(h);
+            if(!list.length){
+                return `<div class="hd-list"><div class="empty-tip" style="padding:18px">该时段已无消费</div></div>`;
+            }
             const rows=list.map(r=>{
                 const t=r.time.replace('T',' ').slice(11,16);
-                const amt=Number(r.money||0);
-                return `<div class="hd-row">`
+                const amt=safeNum(r.money);
+                const active = (r.id===hdHlId) ? ' hd-active' : '';
+                // data-id + 事件委托（不内联 onclick），与账单表格一致，避免属性注入
+                return `<div class="hd-row hd-clickable${active}" data-act="hdItem" data-id="${escapeHtml(r.id)}">`
                     + `<span class="hd-time">${t}</span>`
                     + `<span class="cat-tag">${escapeHtml(r.cat||'未分类')}</span>`
                     + `<span class="hd-amt neg">−${amt.toFixed(2)}</span>`
                     + `</div>`;
             }).join('');
-            const sum=list.reduce((s,r)=> s + (r.type==='expense' ? Number(r.money||0) : 0), 0);
-            const html=`<div class="hd-list">${rows}</div>`
+            const sum=list.reduce((s,r)=> s + safeNum(r.money), 0);
+            return `<div class="hd-list">${rows}</div>`
                 + `<div class="hd-sum">该时段合计支出 <b class="neg">−${sum.toFixed(2)}</b> 元</div>`;
-            customAlert(html, `${pad(h)}:00 – ${pad(h)}:59 消费明细`, 'left', true);
+        }
+
+        // 仅刷新明细弹窗正文（用于从详情/修改返回后；明细弹窗仍开着）
+        function refreshHourDetail(){
+            if(hdHour===null) return;
+            askMsg.innerHTML = renderHourDetailBody(hdHour);
+        }
+
+        // 点击柱子：打开该小时明细。重新打开 → 清空高光，从头开始。
+        window.showHourDetail=function(h){
+            if(!recordsOfHour(h).length) return;
+            hdHour=h;
+            hdHlId=null;
+            customAlert(renderHourDetailBody(h), `${pad(h)}:00 – ${pad(h)}:59 消费明细`, 'left', true);
         };
+
+        // 明细行点击（事件委托绑在 askMsg 上）：进入该条详情，并给它上高光。
+        askMsg.addEventListener('click', (e)=>{
+            const row=e.target.closest('[data-act="hdItem"]');
+            if(!row || hdHour===null) return;
+            const id=row.getAttribute('data-id');
+            if(!id) return;
+            hdHlId=id;
+            // 更新当前列表的高光（点别条则移走）
+            askMsg.querySelectorAll('.hd-row').forEach(el=>
+                el.classList.toggle('hd-active', el.getAttribute('data-id')===id));
+            openDetail(id);
+        });
+
+        // 打开只读详情弹窗（明细弹窗留在底下，不关）。
+        function openDetail(id){
+            const rec=getUserData().find(r=>r.id===id);
+            if(!rec){ customAlert('这条记录不存在了'); refreshHourDetail(); return; }
+            $('detailTime').textContent = rec.time.replace('T',' ');
+            const isExp = rec.type==='expense';
+            const amt=Number(rec.money||0);
+            $('detailMoney').innerHTML = `<span class="${isExp?'neg':'pos'}">${isExp?'−':'+'}${amt.toFixed(2)} 元</span>`;
+            $('detailCat').innerHTML = `<span class="cat-tag">${escapeHtml(rec.cat||'未分类')}</span>`;
+            $('detailType').innerHTML = isExp
+                ? '<span class="io-tag io-out">支出</span>'
+                : '<span class="io-tag io-in">收入</span>';
+            const rk=(rec.remark||'').trim();
+            $('detailRemark').textContent = rk || '（无备注）';
+            detailCurId=id;
+            $('detailMask').style.display='flex';
+        }
+
+        let detailCurId=null;
+        // 详情「关闭」→ 回明细（详情关掉、刷新明细以反映可能的改动）
+        $('detailClose').addEventListener('click', ()=>{
+            $('detailMask').style.display='none';
+            detailCurId=null;
+            refreshHourDetail();
+        });
+        // 详情「修改」→ 关详情、打开修改弹窗。修改弹窗退出（保存/取消/删除）统一回明细。
+        $('detailEdit').addEventListener('click', ()=>{
+            const id=detailCurId;
+            $('detailMask').style.display='none';
+            detailCurId=null;
+            if(id) openEdit(id, { fromDetail:true });
+        });
 
         // 统计页月份切换
         $('statPrevM').addEventListener('click', ()=>{
