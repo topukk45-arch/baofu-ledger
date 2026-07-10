@@ -234,6 +234,8 @@
 
         /* 分类标签：横排，常用靠前，一点即选；多了可横向滑动 */
         .cat-chips { display:flex; gap:8px; flex-wrap:wrap; }
+        /* 选项很多时（如 AI 导出选日期/月份）限高滚动，避免撑破弹窗；选项少时无影响 */
+        #askChoices { max-height:46vh; overflow-y:auto; }
         .cat-chips .cc {
             padding:9px 16px; border:1px solid var(--c-border-mid); border-radius:20px;
             background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer;
@@ -421,11 +423,35 @@
         .stat-day-empty { text-align:center; color:var(--c-text-soft); font-size:13px; }
         /* 时段明细弹窗 */
         .hd-list { margin-bottom:8px; }
-        .hd-row { display:flex; align-items:center; gap:10px; padding:7px 0; border-bottom:1px dashed var(--c-border); }
+        /* 明细弹窗副标题：日期 + 时段，小字弱化，居中，与大标题「消费明细」形成主次层级 */
+        .hd-subtitle { text-align:center; font-size:13px; color:var(--c-text-soft);
+            margin:-4px 0 12px; letter-spacing:.3px; }
+        .hd-row { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px dashed var(--c-border); flex-wrap:nowrap; }
         .hd-row:last-child { border-bottom:none; }
-        .hd-time { color:var(--c-text); font-size:14px; min-width:46px; }
-        .hd-amt { margin-left:auto; font-weight:bold; font-size:14px; }
+        .hd-time { color:var(--c-text); font-size:14px; min-width:46px; flex:0 0 auto; }
+        /* 分类标签不被压缩、不换行 */
+        .hd-row .cat-tag { flex:0 0 auto; }
+        /* 明细行备注：占据中间弹性空间但可被压缩，单行截断加省略号；
+           点整行进详情看完整备注，故此处只作展示、不单独绑点击。 */
+        .hd-remark { color:var(--c-text-soft); font-size:13px; flex:1 1 0; min-width:0;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
+        /* 金额：固定靠右、绝不换行、不被压缩，任何时候都完整显示 */
+        .hd-amt { flex:0 0 auto; margin-left:auto; font-weight:bold; font-size:14px;
+            white-space:nowrap; }
+        /* 有备注时金额紧跟备注（弹性空间已由 hd-remark 撑满，不再靠 auto 推开） */
+        .hd-row.has-remark .hd-amt { margin-left:0; }
         .hd-sum { text-align:right; font-size:13px; color:var(--c-text-soft); padding-top:6px; border-top:1px solid var(--c-border); }
+
+        /* AI 分析导出弹窗 */
+        .ai-exp-dialog { max-width:440px; width:92%; }
+        .ai-exp-sub { font-size:13px; color:var(--c-text-soft); text-align:center; margin:-2px 0 10px; }
+        #aiExpText { width:100%; box-sizing:border-box; height:240px; resize:none;
+            font-size:12.5px; line-height:1.5; padding:10px 12px; border-radius:10px;
+            border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-text); font-family:inherit;
+            -webkit-user-select:text; user-select:text; }
+        .ai-exp-tip { font-size:12px; color:var(--c-text-soft); line-height:1.5; margin:10px 2px 4px; }
+        .ai-exp-btns { flex-wrap:wrap; }
 
         /* 分页控件 */
         .pager { display:flex; align-items:center; justify-content:center; gap:14px;
@@ -550,6 +576,9 @@
            仅在「从明细进入」这条链路上抬高；它们单独使用时层级不受影响也无妨。 */
         #detailMask { z-index:1000; }
         #editMask.over-detail { z-index:1001; }
+        /* AI 导出结果弹窗层级；其上的「复制成功/分享」提示需再高一层，见 openAiExport */
+        #aiExpMask { z-index:1002; }
+        #askMask.over-aiexp { z-index:1003; }
         .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
             border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
             max-height:80vh; max-height:80dvh; overflow-y:auto;
@@ -841,6 +870,7 @@
                         </div>
                     </div>
                     <button class="set-item" id="exportBtn"><span>导出存档（备份）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="exportAiBtn"><span>导出账单给 AI 分析</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="importBtn"><span>导入存档</span><span class="set-arrow">›</span></button>
                     <input type="file" id="importFile" accept=".json" style="display:none">
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
@@ -1154,6 +1184,21 @@
         </div>
     </div>
 
+    <!-- AI 分析导出结果弹窗：展示生成的文本 + 复制 / 分享 -->
+    <div class="mask" id="aiExpMask">
+        <div class="edit-dialog ai-exp-dialog">
+            <h3>导出账单给 AI 分析</h3>
+            <div class="ai-exp-sub" id="aiExpSub"></div>
+            <textarea id="aiExpText" readonly></textarea>
+            <div class="ai-exp-tip">复制或分享后，粘贴给任意 AI（如 Claude、DeepSeek、豆包），让它帮你分析消费、给出建议。</div>
+            <div class="dialog-btn ai-exp-btns">
+                <button class="save" id="aiExpCopy">复制</button>
+                <button class="save" id="aiExpShare">分享</button>
+                <button class="cancel" id="aiExpClose">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 统计页：年月选择器 -->
     <div class="mask" id="ymMask">
         <div class="edit-dialog">
@@ -1289,6 +1334,7 @@
 
         function closeAsk(result){
             askMask.style.display='none';
+            askMask.classList.remove('over-aiexp');   // 复位 AI 导出场景下的临时置顶
             askErr.style.display='none';
             const choices=$('askChoices');
             if(choices){ choices.style.display='none'; choices.innerHTML=''; }
@@ -1846,6 +1892,162 @@
             // 把输入框换成多行更好读
             setTimeout(()=>{ const i=$('askInput'); if(i){ i.select(); } }, 80);
         }
+
+        // ===== 导出账单给 AI 分析 =====
+        // 流程：选维度（日/周/月）→ 选具体时段（仅列出有记录的）→ 生成带 prompt 的纯文本 → 复制/分享。
+        // 口径与统计页一致：周一为一周起始；金额一律走 safeNum，分类空则「未分类」。
+
+        // 把一条记录格式化成「MM-DD HH:mm 支出 餐饮 16.00 元（备注：打车）」这种明细行
+        function aiFmtRecord(r){
+            const d=new Date(r.time);
+            const md=`${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+            const io=r.type==='expense'?'支出':'收入';
+            const amt=safeNum(r.money).toFixed(2);
+            const cat=(r.cat||'未分类');
+            const remark=(r.remark||'').trim();
+            return `${md} ${io} ${cat} ${amt} 元${remark?`（备注：${remark}）`:''}`;
+        }
+
+        // 给定一批记录 + 范围标签，拼出完整的「prompt + 结构化账单」纯文本
+        function buildAiText(records, rangeLabel, dimLabel){
+            const inc=records.filter(r=>r.type==='income').reduce((s,r)=>s+safeNum(r.money),0);
+            const exp=records.filter(r=>r.type==='expense').reduce((s,r)=>s+safeNum(r.money),0);
+            const bal=inc-exp;
+
+            // 分类占比（按支出）
+            const byCat={};
+            records.forEach(r=>{ if(r.type==='expense'){ const c=r.cat||'未分类'; byCat[c]=(byCat[c]||0)+safeNum(r.money); } });
+            const catLines=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]).map(c=>{
+                const pct=exp>0?Math.round(byCat[c]/exp*100):0;
+                return `  · ${c}：${byCat[c].toFixed(2)} 元（${pct}%）`;
+            }).join('\n') || '  （本期无支出）';
+
+            // 明细（按时间正序）
+            const detail=records.slice().sort((a,b)=>new Date(a.time)-new Date(b.time))
+                .map(r=>'  '+aiFmtRecord(r)).join('\n') || '  （本期无记录）';
+
+            const prompt =
+`【记问 · 消费分析请求】
+你是一位务实、直接的个人理财顾问。下面是我某段时间的真实记账数据，请帮我：
+1. 概括这段时间的整体消费情况（钱主要花在哪、收支是否健康）；
+2. 指出其中值得注意的地方（异常大额、占比过高的分类、可优化的开销）；
+3. 给出 3~5 条具体、可执行的省钱或预算建议，别讲空泛的大道理。
+如果数据太少不足以分析，直接说明即可。
+
+────────────────
+■ 统计维度：${dimLabel}
+■ 时间范围：${rangeLabel}
+■ 总览：收入 ${inc.toFixed(2)} 元，支出 ${exp.toFixed(2)} 元，结余 ${bal.toFixed(2)} 元，共 ${records.length} 笔
+■ 支出分类占比：
+${catLines}
+■ 收支明细（按时间正序）：
+${detail}
+────────────────
+请开始你的分析。`;
+            return prompt;
+        }
+
+        // 打开结果弹窗，填入文本，绑定复制/分享
+        function openAiExport(text, sub){
+            $('aiExpText').value = text;
+            $('aiExpSub').textContent = sub || '';
+            $('aiExpMask').style.display='flex';
+        }
+        // 在 AI 导出弹窗之上弹提示：先把 askMask 临时置顶（over-aiexp），closeAsk 时自动复位
+        function aiExpAlert(msg, title){
+            askMask.classList.add('over-aiexp');
+            customAlert(msg, title);
+        }
+        $('aiExpClose').addEventListener('click', ()=>{ $('aiExpMask').style.display='none'; });
+        $('aiExpCopy').addEventListener('click', async ()=>{
+            const text=$('aiExpText').value;
+            let ok=false;
+            try{ await navigator.clipboard.writeText(text); ok=true; }
+            catch(_){
+                // 兜底：选中 textarea 走 execCommand
+                try{ const ta=$('aiExpText'); ta.focus(); ta.select(); ok=document.execCommand('copy'); }catch(__){}
+            }
+            aiExpAlert(ok?'已复制到剪贴板，去粘贴给 AI 吧。':'复制失败，请手动长按文本框全选复制。', ok?'复制成功':'复制未成功');
+        });
+        $('aiExpShare').addEventListener('click', async ()=>{
+            const text=$('aiExpText').value;
+            // 优先系统分享（手机端可发微信/AI App）；不支持则退回复制
+            if(navigator.share){
+                try{ await navigator.share({ text }); return; }
+                catch(err){ if(err && err.name==='AbortError') return; /* 用户取消，不提示 */ }
+            }
+            try{ await navigator.clipboard.writeText(text);
+                aiExpAlert('当前环境不支持直接分享，已复制到剪贴板，可手动粘贴分享。', '已复制'); }
+            catch(_){ aiExpAlert('当前环境不支持分享，请手动长按文本框复制。', '无法分享'); }
+        });
+
+        // 第二步：根据维度列出「有记录的具体时段」，选中后生成文本
+        function aiPickPeriod(dim){
+            const all=getUserData();
+            if(!all.length){ customAlert('当前存档还没有任何记账记录。', '无数据可导出'); return; }
+
+            if(dim==='day'){
+                // 列出有记录的日期（倒序，最近在前），最多列最近 60 个
+                const daySet={};
+                all.forEach(r=>{ const d=new Date(r.time); const key=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; daySet[key]=(daySet[key]||0)+1; });
+                const days=Object.keys(daySet).sort().reverse().slice(0,60);
+                const opts=days.map(k=>({ label:`${k}（${daySet[k]} 笔）`, value:k }));
+                customChoose('选择要分析的日期：', opts, (k)=>{
+                    const [y,m,d]=k.split('-').map(Number);
+                    const recs=all.filter(r=>{ const t=new Date(r.time); return t.getFullYear()===y && t.getMonth()===m-1 && t.getDate()===d; });
+                    const label=`${y}年${m}月${d}日`;
+                    openAiExport(buildAiText(recs, label, '按日'), label);
+                }, '选择日期');
+            }
+            else if(dim==='week'){
+                // 以周一为起始，列出有记录的周（倒序），最多最近 26 周
+                const weekMap={};
+                all.forEach(r=>{
+                    const d=new Date(r.time); d.setHours(0,0,0,0);
+                    const lead=(d.getDay()+6)%7;                 // 距本周一的天数
+                    const mon=new Date(d); mon.setDate(d.getDate()-lead);
+                    const key=`${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`;
+                    (weekMap[key]=weekMap[key]||{cnt:0}).cnt++;
+                });
+                const weeks=Object.keys(weekMap).sort().reverse().slice(0,26);
+                const opts=weeks.map(k=>{
+                    const [y,m,d]=k.split('-').map(Number);
+                    const mon=new Date(y,m-1,d); const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+                    const lbl=`${m}月${d}日 ~ ${sun.getMonth()+1}月${sun.getDate()}日（${weekMap[k].cnt} 笔）`;
+                    return { label:lbl, value:k };
+                });
+                customChoose('选择要分析的周（周一起算）：', opts, (k)=>{
+                    const [y,m,d]=k.split('-').map(Number);
+                    const mon=new Date(y,m-1,d); mon.setHours(0,0,0,0);
+                    const end=new Date(mon); end.setDate(mon.getDate()+7);
+                    const recs=all.filter(r=>{ const t=new Date(r.time); return t>=mon && t<end; });
+                    const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+                    const label=`${mon.getFullYear()}年${mon.getMonth()+1}月${mon.getDate()}日 ~ ${sun.getMonth()+1}月${sun.getDate()}日`;
+                    openAiExport(buildAiText(recs, label, '按周'), label);
+                }, '选择周');
+            }
+            else { // month
+                const monSet={};
+                all.forEach(r=>{ const d=new Date(r.time); const key=`${d.getFullYear()}-${pad(d.getMonth()+1)}`; monSet[key]=(monSet[key]||0)+1; });
+                const months=Object.keys(monSet).sort().reverse().slice(0,36);
+                const opts=months.map(k=>({ label:`${k.replace('-','年')}月（${monSet[k]} 笔）`, value:k }));
+                customChoose('选择要分析的月份：', opts, (k)=>{
+                    const [y,m]=k.split('-').map(Number);
+                    const recs=all.filter(r=>{ const t=new Date(r.time); return t.getFullYear()===y && t.getMonth()===m-1; });
+                    const label=`${y}年${m}月`;
+                    openAiExport(buildAiText(recs, label, '按月'), label);
+                }, '选择月份');
+            }
+        }
+
+        // 第一步：选维度
+        $('exportAiBtn').addEventListener('click', ()=>{
+            customChoose('想按什么维度分析？', [
+                { label:'按日', value:'day' },
+                { label:'按周', value:'week' },
+                { label:'按月', value:'month' }
+            ], (dim)=>aiPickPeriod(dim), '导出账单给 AI 分析');
+        });
         // 校验并清洗导入的单条记录：金额非正数/非法、类型非法都会被拒，避免脏数据污染结余。
         // 返回 { records, stats }，stats 记录做了哪些「静默修正」，供导入后如实提示用户。
         function sanitizeImportedRecords(records){
@@ -3814,23 +4016,36 @@
 
         // 渲染明细列表 HTML（可重复调用：打开时、从详情返回时）。按 hdHlId 给对应行上高光。
         function renderHourDetailBody(h){
+            // 副标题：年份 + 月日 + 时段，小字弱化，放在大标题「消费明细」下方
+            const dateStr = statSelDay
+                ? `${statYear}年${statMonth+1}月${statSelDay}日 `
+                : '';
+            const subtitle = `<div class="hd-subtitle">${dateStr}${pad(h)}:00 – ${pad(h)}:59</div>`;
             const list=recordsOfHour(h);
             if(!list.length){
-                return `<div class="hd-list"><div class="empty-tip" style="padding:18px">该时段已无消费</div></div>`;
+                return subtitle + `<div class="hd-list"><div class="empty-tip" style="padding:18px">该时段已无消费</div></div>`;
             }
             const rows=list.map(r=>{
                 const t=r.time.replace('T',' ').slice(11,16);
                 const amt=safeNum(r.money);
                 const active = (r.id===hdHlId) ? ' hd-active' : '';
+                // 备注：截断展示（点整行进详情看完整）；无备注则不渲染该 span，行内布局回退原样
+                const remarkFull = r.remark || '';
+                const hasRemark = !!remarkFull;
+                const remarkSpan = hasRemark
+                    ? `<span class="hd-remark" title="${escapeHtml(remarkFull)}">${escapeHtml(remarkFull)}</span>`
+                    : '';
                 // data-id + 事件委托（不内联 onclick），与账单表格一致，避免属性注入
-                return `<div class="hd-row hd-clickable${active}" data-act="hdItem" data-id="${escapeHtml(r.id)}">`
+                return `<div class="hd-row hd-clickable${active}${hasRemark?' has-remark':''}" data-act="hdItem" data-id="${escapeHtml(r.id)}">`
                     + `<span class="hd-time">${t}</span>`
                     + `<span class="cat-tag">${escapeHtml(r.cat||'未分类')}</span>`
+                    + remarkSpan
                     + `<span class="hd-amt neg">−${amt.toFixed(2)}</span>`
                     + `</div>`;
             }).join('');
             const sum=list.reduce((s,r)=> s + safeNum(r.money), 0);
-            return `<div class="hd-list">${rows}</div>`
+            return subtitle
+                + `<div class="hd-list">${rows}</div>`
                 + `<div class="hd-sum">该时段合计支出 <b class="neg">−${sum.toFixed(2)}</b> 元</div>`;
         }
 
@@ -3845,7 +4060,8 @@
             if(!recordsOfHour(h).length) return;
             hdHour=h;
             hdHlId=null;
-            customAlert(renderHourDetailBody(h), `${pad(h)}:00 – ${pad(h)}:59 消费明细`, 'left', true);
+            // 大标题只保留「消费明细」；日期+时段作为副标题在正文顶部（renderHourDetailBody 内）
+            customAlert(renderHourDetailBody(h), '消费明细', 'left', true);
         };
 
         // 明细行点击（事件委托绑在 askMsg 上）：进入该条详情，并给它上高光。
