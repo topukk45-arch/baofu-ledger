@@ -434,7 +434,7 @@
         /* 明细行备注：占据中间弹性空间但可被压缩，单行截断加省略号；
            点整行进详情看完整备注，故此处只作展示、不单独绑点击。 */
         .hd-remark { color:var(--c-text-soft); font-size:13px; flex:1 1 0; min-width:0;
-            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:right; }
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
         /* 金额：固定靠右、绝不换行、不被压缩，任何时候都完整显示 */
         .hd-amt { flex:0 0 auto; margin-left:auto; font-weight:bold; font-size:14px;
             white-space:nowrap; }
@@ -1987,17 +1987,17 @@ ${detail}
             if(!all.length){ customAlert('当前存档还没有任何记账记录。', '无数据可导出'); return; }
 
             if(dim==='day'){
-                // 列出有记录的日期（倒序，最近在前），最多列最近 60 个
-                const daySet={};
-                all.forEach(r=>{ const d=new Date(r.time); const key=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; daySet[key]=(daySet[key]||0)+1; });
-                const days=Object.keys(daySet).sort().reverse().slice(0,60);
-                const opts=days.map(k=>({ label:`${k}（${daySet[k]} 笔）`, value:k }));
-                customChoose('选择要分析的日期：', opts, (k)=>{
-                    const [y,m,d]=k.split('-').map(Number);
+                // 用现成的日历选择器选某一天（比长列表更直观，且不随数据增长变长）
+                // 默认定位到今天；选完即生成，选中当天无记录则友好提示。
+                const today=new Date();
+                const initDay=`${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
+                openDtPickerDate(initDay, (dayStr)=>{
+                    const [y,m,d]=dayStr.split('-').map(Number);
                     const recs=all.filter(r=>{ const t=new Date(r.time); return t.getFullYear()===y && t.getMonth()===m-1 && t.getDate()===d; });
                     const label=`${y}年${m}月${d}日`;
+                    if(!recs.length){ customAlert(`${label} 这天没有记账记录，换一天试试。`, '当天无记录'); return; }
                     openAiExport(buildAiText(recs, label, '按日'), label);
-                }, '选择日期');
+                });
             }
             else if(dim==='week'){
                 // 以周一为起始，列出有记录的周（倒序），最多最近 26 周
