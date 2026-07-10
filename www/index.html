@@ -666,8 +666,8 @@
             border:1px solid var(--c-primary); border-radius:14px; width:92%; max-width:340px;
             max-height:90vh; overflow-y:auto;
             box-shadow:0 6px 24px rgba(var(--c-shadow-rgb),0.45); }
-        .dt-preview { text-align:center; font-size:18px; color:var(--c-primary-dark); font-weight:600;
-            margin-bottom:14px; letter-spacing:1px; text-shadow:0 0 6px rgba(var(--c-shadow-rgb),0.4); }
+        .dt-preview { text-align:center; font-size:18px; color:var(--c-primary-deep); font-weight:600;
+            margin-bottom:14px; letter-spacing:1px; }
         .dt-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
         .dt-head span { color:var(--c-primary-deep); font-weight:600; }
         .dt-nav { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer;
@@ -678,6 +678,10 @@
         .dt-days { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
         .dt-day { text-align:center; padding:8px 0; border-radius:8px; cursor:pointer;
             font-size:14px; color:var(--c-primary-deep); transition:0.15s; }
+        /* AI 导出日期选择：格子下方的当日笔数小字 */
+        .dt-day .dt-cnt { display:block; font-size:9px; line-height:1; margin-top:2px;
+            color:var(--c-text-soft); font-weight:400; }
+        .dt-day.selected .dt-cnt { color:var(--c-sel-text); }
         .dt-day:hover { background:var(--c-chip); }
         .dt-day.muted { color:var(--c-border); cursor:default; }
         .dt-day.muted:hover { background:transparent; }
@@ -1327,6 +1331,7 @@
 
         const askErr=$('askErr');
         let askValidate=null;
+        let askOnCancel=null;   // choose 模式取消回调（AI 导出回上一级用）
         function showAskErr(msg){
             askErr.textContent=msg;
             askErr.style.display = msg ? 'block' : 'none';
@@ -1341,7 +1346,10 @@
             const extra=$('askExtra');
             if(extra){ extra.style.display='none'; extra.onclick=null; }
             const r=askResolve; askResolve=null; askValidate=null;
+            const oc=askOnCancel; askOnCancel=null;
             if(r) r(result);
+            // 取消（result 为 null/false）时若设置了回调，回到上一级
+            if(oc && (result===null || result===false)) oc();
         }
         askOk.addEventListener('click', ()=>{
             if(askMode==='prompt'){
@@ -1368,6 +1376,7 @@
         function customConfirm(msg, onOk, title, opts){
             opts = opts || {};
             askMode='confirm';
+            askOnCancel=null;
             askValidate=null;   // 防御性复位：本模式不用校验，避免残留上一个 prompt 的校验函数
             askTitle.textContent=title||'确认操作';
             askMsg.textContent=msg;
@@ -1400,6 +1409,7 @@
         function customPrompt(msg, defVal, onOk, title, validate, opts){
             opts = opts || {};
             askMode='prompt';
+            askOnCancel=null;
             askTitle.textContent=title||'请输入';
             // msg 为空则隐藏正文，避免与标题重复
             if(msg){ askMsg.textContent=msg; askMsg.style.display=''; }
@@ -1422,9 +1432,10 @@
         // 选项弹窗：在弹窗里就地渲染一组可点选标签，选中点确定回调所选值。
         //   options: [{ value, label, cls }]  cls 用于收支的红/绿选中态（sel-out/sel-in）
         //   普通选项（如分类）选中走通用 .sel 态。点取消回调 null。
-        function customChoose(msg, options, onOk, title){
+        function customChoose(msg, options, onOk, title, onCancel){
             askMode='choose';
             askChosen=null;
+            askOnCancel=onCancel||null;   // 取消回调：取消时若设置则调用（用于 AI 导出回上一级）
             askValidate=null;   // 防御性复位：本模式不用校验，避免残留上一个 prompt 的校验函数
             askTitle.textContent=title||'请选择';
             if(msg){ askMsg.textContent=msg; askMsg.style.display=''; askMsg.style.textAlign=''; }
@@ -1459,6 +1470,7 @@
         //   普通文本提示永远不要传 isHtml。
         function customAlert(msg, title, align, isHtml){
             askMode='alert';
+            askOnCancel=null;
             askTitle.textContent=title||'提示';
             if(isHtml===true){ askMsg.innerHTML=msg; } else { askMsg.textContent=String(msg); }
             askMsg.style.display='';
@@ -1981,23 +1993,29 @@ ${detail}
             catch(_){ aiExpAlert('当前环境不支持分享，请手动长按文本框复制。', '无法分享'); }
         });
 
-        // 第二步：根据维度列出「有记录的具体时段」，选中后生成文本
+        // 第二步：根据维度列出「有记录的具体时段」，选中后生成文本。
+        // 各步「取消」回到第一步（选维度），而非直接退回设置页。
         function aiPickPeriod(dim){
             const all=getUserData();
             if(!all.length){ customAlert('当前存档还没有任何记账记录。', '无数据可导出'); return; }
 
             if(dim==='day'){
-                // 用现成的日历选择器选某一天（比长列表更直观，且不随数据增长变长）
-                // 默认定位到今天；选完即生成，选中当天无记录则友好提示。
+                // 用现成的日历选择器选某一天（比长列表更直观，且不随数据增长变长）。
+                // 统计每天笔数（当天 0点~23:59:59），在格子下方显示；取消回到选维度。
+                const dayCounts={};
+                all.forEach(r=>{ const d=new Date(r.time); const key=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; dayCounts[key]=(dayCounts[key]||0)+1; });
                 const today=new Date();
                 const initDay=`${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
                 openDtPickerDate(initDay, (dayStr)=>{
                     const [y,m,d]=dayStr.split('-').map(Number);
-                    const recs=all.filter(r=>{ const t=new Date(r.time); return t.getFullYear()===y && t.getMonth()===m-1 && t.getDate()===d; });
+                    // 边界：当天 00:00:00.000 ~ 23:59:59.999
+                    const start=new Date(y, m-1, d, 0, 0, 0, 0);
+                    const end=new Date(y, m-1, d, 23, 59, 59, 999);
+                    const recs=all.filter(r=>{ const t=new Date(r.time); return t>=start && t<=end; });
                     const label=`${y}年${m}月${d}日`;
                     if(!recs.length){ customAlert(`${label} 这天没有记账记录，换一天试试。`, '当天无记录'); return; }
                     openAiExport(buildAiText(recs, label, '按日'), label);
-                });
+                }, { counts:dayCounts, onCancel:aiChooseDim });
             }
             else if(dim==='week'){
                 // 以周一为起始，列出有记录的周（倒序），最多最近 26 周
@@ -2024,7 +2042,7 @@ ${detail}
                     const sun=new Date(mon); sun.setDate(mon.getDate()+6);
                     const label=`${mon.getFullYear()}年${mon.getMonth()+1}月${mon.getDate()}日 ~ ${sun.getMonth()+1}月${sun.getDate()}日`;
                     openAiExport(buildAiText(recs, label, '按周'), label);
-                }, '选择周');
+                }, '选择周', aiChooseDim);
             }
             else { // month
                 const monSet={};
@@ -2036,18 +2054,19 @@ ${detail}
                     const recs=all.filter(r=>{ const t=new Date(r.time); return t.getFullYear()===y && t.getMonth()===m-1; });
                     const label=`${y}年${m}月`;
                     openAiExport(buildAiText(recs, label, '按月'), label);
-                }, '选择月份');
+                }, '选择月份', aiChooseDim);
             }
         }
 
-        // 第一步：选维度
-        $('exportAiBtn').addEventListener('click', ()=>{
+        // 第一步：选维度（抽出以便各步「取消」回到这里）
+        function aiChooseDim(){
             customChoose('想按什么维度分析？', [
                 { label:'按日', value:'day' },
                 { label:'按周', value:'week' },
                 { label:'按月', value:'month' }
             ], (dim)=>aiPickPeriod(dim), '导出账单给 AI 分析');
-        });
+        }
+        $('exportAiBtn').addEventListener('click', aiChooseDim);
         // 校验并清洗导入的单条记录：金额非正数/非法、类型非法都会被拒，避免脏数据污染结余。
         // 返回 { records, stats }，stats 记录做了哪些「静默修正」，供导入后如实提示用户。
         function sanitizeImportedRecords(records){
@@ -2489,9 +2508,11 @@ ${detail}
 
         let dtDateOnly=false;      // true=仅选日期（隐藏时分，确认时回写 YYYY-MM-DD）
         let dtOnPick=null;         // 仅日期模式下的回调；普通模式为 null，仍走 setDtInput
+        let dtOnCancel=null;       // 取消回调；非空则「取消」调它（回上一级）而非直接关闭
+        let dtDayCounts=null;      // {'YYYY-MM-DD': 笔数}，非空时格子下方显示当日笔数
 
         function openDtPicker(input){
-            dtDateOnly=false; dtOnPick=null;
+            dtDateOnly=false; dtOnPick=null; dtOnCancel=null; dtDayCounts=null;
             $('dtTimeRow').style.display='';
             dtTargetInput=input;
             const p=parseInputDt(getDtInput(input));
@@ -2504,8 +2525,11 @@ ${detail}
         }
 
         // 仅日期选择器：initialDay 为 'YYYY-MM-DD' 或空；选定后回调 onPick(day) / 清空时 onPick('')
-        function openDtPickerDate(initialDay, onPick){
+        // opts（可选）：{ counts:{日期串:笔数} 格子显示笔数, onCancel:fn 取消时回上级 }
+        function openDtPickerDate(initialDay, onPick, opts){
             dtDateOnly=true; dtOnPick=onPick; dtTargetInput=null;
+            dtOnCancel=(opts && opts.onCancel) || null;
+            dtDayCounts=(opts && opts.counts) || null;
             $('dtTimeRow').style.display='none';
             let y,mo,d;
             const m=initialDay && initialDay.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -2528,7 +2552,20 @@ ${detail}
             const today=new Date();
             for(let i=0;i<lead;i++){ const e=document.createElement('div'); e.className='dt-day muted'; dtDays.appendChild(e); }
             for(let d=1; d<=daysInMonth; d++){
-                const el=document.createElement('div'); el.className='dt-day'; el.textContent=d;
+                const el=document.createElement('div'); el.className='dt-day';
+                // 日期数字（含可选笔数时用子节点，避免 textContent 覆盖）
+                if(dtDayCounts){
+                    const key=`${dtView.year}-${pad(dtView.month+1)}-${pad(d)}`;
+                    const cnt=dtDayCounts[key]||0;
+                    const numSpan=document.createElement('span'); numSpan.textContent=d;
+                    el.appendChild(numSpan);
+                    if(cnt>0){
+                        const c=document.createElement('span'); c.className='dt-cnt'; c.textContent=`${cnt}笔`;
+                        el.appendChild(c);
+                    }
+                } else {
+                    el.textContent=d;
+                }
                 if(today.getFullYear()===dtView.year && today.getMonth()===dtView.month && today.getDate()===d) el.classList.add('today');
                 if(dtSel.y===dtView.year && dtSel.m===dtView.month && dtSel.d===d) el.classList.add('selected');
                 el.onclick=()=>{
@@ -2563,8 +2600,13 @@ ${detail}
             dtHour.value=now.getHours(); dtMin.value=now.getMinutes();
             renderDtDays(); updateDtPreview();
         };
-        function closeDtPicker(){ dtMask.style.display='none'; dtTargetInput=null; dtOnPick=null; $('dtTimeRow').style.display=''; }
-        $('dtCancel').onclick=closeDtPicker;
+        function closeDtPicker(){ dtMask.style.display='none'; dtTargetInput=null; dtOnPick=null; dtOnCancel=null; dtDayCounts=null; $('dtTimeRow').style.display=''; }
+        $('dtCancel').onclick=()=>{
+            // AI 导出场景：取消回到「选日/周/月」那一步，而非直接退回设置页
+            const back=dtOnCancel;
+            closeDtPicker();
+            if(back) back();
+        };
         // 禁止点击遮罩外部关闭，仅按钮可关闭
         $('dtConfirm').onclick=()=>{
             if(dtSel.d==null){ customAlert('请先选择日期！'); return; }
