@@ -217,7 +217,7 @@
         .cs-panel.cs-open { display:block; }
         .cs-panel.cs-portal {
             position:fixed; right:auto;      /* right:auto 覆盖上面的 right:0，宽度改由 JS 按触发器实测 */
-            z-index:2000;                    /* 盖过 .mask(999) / #editMask.over-detail(1001) / #askMask.over-aiexp(1003) */
+            z-index:2000;                    /* 盖过所有弹窗：.mask(999) / #dtMask(1005) 等 */
         }
         .cs-opt { padding:10px 12px; border-radius:7px; cursor:pointer; color:var(--c-primary-deep);
             font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -379,15 +379,16 @@
         #statMonthLabel { cursor:pointer; padding:4px 12px; border-radius:9px; border:1px solid var(--c-border); }
         #statMonthLabel:active { background:var(--c-chip); }
         /* 年月选择器 */
-        .ym-year-row { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
-        .ym-year-row span { font-size:18px; font-weight:bold; color:var(--c-text); }
-        .ym-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-        .ym-grid button { padding:12px 0; border:1px solid var(--c-border); border-radius:10px;
-            background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer; position:relative; transition:0.12s; }
-        .ym-grid button.cur { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:bold; border-color:var(--c-sel-border); }
-        .ym-grid button.has::after { content:''; position:absolute; top:6px; right:6px;
-            width:6px; height:6px; border-radius:50%; background:var(--c-accent); }
-        .ym-grid button.cur.has::after { background:var(--c-sel-border); }
+        .ym-year-row { display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:14px; }
+        /* 等高盒：月网格与年网格都是 12 格，切层级时弹窗高度不跳变。
+           240px 与日期选择器的网格区高度相当，两个选择器视觉体量一致。 */
+        .ym-box { min-height:240px; display:flex; flex-direction:column; touch-action:pan-y;
+            user-select:none; -webkit-user-select:none; }
+        /* 「有记账数据」的标记用 ::before（左上角），避开 .dt-cell 的 today 标记（::after 右上角），
+           否则同一个格子既是今天又有数据时，两个点会重叠成一个。 */
+        .dt-cell.has::before { content:''; position:absolute; top:5px; left:6px;
+            width:5px; height:5px; border-radius:50%; background:var(--c-accent); }
+        .dt-cell.selected.has::before { background:var(--c-sel-text); }
         .stat-week { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:5px; }
         .stat-week span { text-align:center; font-size:11px; color:var(--c-text-soft); }
         .stat-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
@@ -584,9 +585,21 @@
            仅在「从明细进入」这条链路上抬高；它们单独使用时层级不受影响也无妨。 */
         #detailMask { z-index:1000; }
         #editMask.over-detail { z-index:1001; }
+        /* 日期/时间选择器永远是「从某个弹窗里唤起」的二级弹窗，必须盖过所有表单弹窗。
+           此前它没有显式层级，靠的是「dtMask 在 DOM 里排在 editMask 之后」这个巧合
+           —— 同为 z-index:999 时后出现的元素赢。新增的 dayMask 排在 dtMask 之后，
+           巧合就失效了：日期选择器其实弹出来了，只是被 dayMask 盖住，表现为「点了没反应」。
+           给它一个显式且足够高的层级，杜绝这种依赖 DOM 顺序的脆弱性。 */
+        #dtMask { z-index:1005; }
         /* AI 导出结果弹窗层级；其上的「复制成功/分享」提示需再高一层，见 openAiExport */
         #aiExpMask { z-index:1002; }
-        #askMask.over-aiexp { z-index:1003; }
+        /* askMask 是全应用通用的提示/确认框，任何弹窗里都可能唤起它（校验失败、删除确认…），
+           所以它必须永远在最顶层。此前只在 over-aiexp 这一种场景下提层，其余靠 DOM 顺序侥幸。
+           新增的 dayMask 排在 askMask 之后，就把它盖住了 —— 表现为「点保存没反应」
+           （其实校验提示弹出来了，只是看不见）。这里给它一个高于所有表单弹窗的基础层级。
+           注意要高于 #dtMask(1005)：日期选择器里也可能弹提示。 */
+        #askMask { z-index:1010; }
+        #askMask.over-aiexp { z-index:1010; }
         .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
             border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
             max-height:80vh; max-height:80dvh; overflow-y:auto;
@@ -676,14 +689,54 @@
             box-shadow:0 6px 24px rgba(var(--c-shadow-rgb),0.45); }
         .dt-preview { text-align:center; font-size:18px; color:var(--c-primary-deep); font-weight:600;
             margin-bottom:14px; letter-spacing:1px; }
-        .dt-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-        .dt-head span { color:var(--c-primary-deep); font-weight:600; }
+        /* 头部：‹ 标题 ›。标题是按钮（点击下钻一级），做成看不出边框的样子。 */
+        .dt-head { display:flex; justify-content:center; align-items:center; gap:6px; margin-bottom:10px; }
+        .dt-label { flex:1; border:none; background:transparent; cursor:pointer;
+            color:var(--c-primary-deep); font-weight:600; font-size:15px; text-align:center;
+            font-variant-numeric:tabular-nums; padding:7px 4px; border-radius:8px; transition:0.15s;
+            font-family:inherit; letter-spacing:0.5px; }
+        .dt-label:hover  { background:var(--c-chip); }
+        .dt-label:active { background:var(--c-accent-soft); }
+        /* 标题右侧的小三角，提示「这里可以点」——否则用户不会发现这是个入口 */
+        .dt-label::after { content:' ⌄'; font-size:12px; color:var(--c-text-soft); }
+        .dt-label.top::after { content:''; }   /* 已在最顶层(年)，没得再钻了 */
         .dt-nav { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer;
-            background:var(--c-accent-soft); color:#5c4500; font-size:18px; line-height:1; transition:0.2s; }
+            background:var(--c-accent-soft); color:#5c4500; font-size:18px; line-height:1; transition:0.2s;
+            flex-shrink:0; }
         .dt-nav:hover { filter:brightness(1.06); }
+
+        /* ★ 等高容器：日/月/年三个网格共用同一高度，切层级时弹窗高度不跳变。
+           高度 = 星期表头(约26) + 6 行日期(6×34 + 5×3 间距) ≈ 245px。
+           月/年网格只有 12 格，在这个高度里撑开——格子更大、更好点，而不是挤在顶上一小块。
+           touch-action:pan-y —— 保留纵向滚动，横向手势交给 JS 处理（网格内左右滑动翻页）。 */
+        .dt-grid-box { min-height:245px; display:flex; flex-direction:column;
+            touch-action:pan-y; user-select:none; -webkit-user-select:none; }
+        .dt-pane { flex:1; display:flex; flex-direction:column; }
+
         .dt-week { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px; }
         .dt-week span { text-align:center; font-size:12px; color:var(--c-text-soft); padding:4px 0; }
-        .dt-days { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+        .dt-days { display:grid; grid-template-columns:repeat(7,1fr); gap:3px;
+            grid-auto-rows:34px; align-content:start; }
+
+        /* 月/年网格：4 列 × 3 行，在等高容器里平分空间 */
+        .dt-grid-12 { flex:1; display:grid; grid-template-columns:repeat(4,1fr);
+            grid-template-rows:repeat(3,1fr); gap:8px; }
+        .dt-cell { display:flex; align-items:center; justify-content:center;
+            border:1px solid var(--c-border); border-radius:10px; cursor:pointer;
+            background:var(--c-surface); color:var(--c-primary-deep);
+            font-size:15px; font-weight:500; transition:0.15s;
+            font-variant-numeric:tabular-nums; position:relative; }
+        .dt-cell:hover  { background:var(--c-chip); }
+        .dt-cell:active { background:var(--c-accent-soft); }
+        .dt-cell.selected { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-sel-text); border-color:var(--c-primary-dark); font-weight:bold; }
+        /* 「今天」所在的月/年：右上角一个小点，和日网格里的 today 标记呼应 */
+        .dt-cell.today::after { content:''; position:absolute; top:5px; right:6px;
+            width:5px; height:5px; border-radius:50%; background:var(--c-primary); }
+        .dt-cell.selected.today::after { background:var(--c-sel-text); }
+        .dt-cell.muted { color:var(--c-border); cursor:default; }
+        .dt-cell.muted:hover { background:var(--c-surface); }
+
         .dt-day { text-align:center; padding:8px 0; border-radius:8px; cursor:pointer;
             font-size:14px; color:var(--c-primary-deep); transition:0.15s; }
         /* AI 导出日期选择：格子下方的当日笔数小字 */
@@ -729,6 +782,78 @@
             cursor:pointer; }
         .theme-tip { color:var(--c-text-soft); font-size:12px; margin-top:8px; }
 
+        /* ===== 日子（倒数日）=====
+           全部走既有主题变量，换肤时自动跟随，不引入任何写死的颜色。 */
+        /* 记账页的入口卡 */
+        .days-card { background:linear-gradient(135deg,var(--c-card-1) 0%,var(--c-card-2) 100%);
+            border:1px solid var(--c-primary-mid); border-radius:14px;
+            padding:10px 12px 6px; margin-bottom:12px;
+            box-shadow:0 2px 10px rgba(var(--c-shadow-rgb),.2); }
+        .days-card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+        .days-card-title { font-size:14px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; }
+        .days-card-more { font-size:12px; color:var(--c-text-soft); cursor:pointer; padding:4px 6px; margin:-4px -6px; }
+        .days-card-more:active { color:var(--c-primary-dark); }
+        .days-row { display:flex; justify-content:space-between; align-items:center;
+            padding:8px 2px; border-top:1px dashed var(--c-border); cursor:pointer; }
+        .days-row:first-of-type { border-top:none; }
+        .days-row:active { background:var(--c-chip); border-radius:6px; }
+        .days-row .d-name { font-size:14px; color:var(--c-primary-deep); font-weight:500;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+        .days-row .d-name .pin { font-size:11px; color:var(--c-primary); margin-right:3px; }
+        .days-row .d-right { display:flex; align-items:baseline; gap:5px; flex-shrink:0; }
+        .days-row .d-word { font-size:12px; color:var(--c-text-soft); }
+        .days-row .d-num { font-size:19px; font-weight:bold; color:var(--c-primary-dark);
+            font-variant-numeric:tabular-nums; }
+        .days-row .d-num.future { color:var(--c-pos); }
+        .days-row .d-unit { font-size:12px; color:var(--c-text-soft); }
+        /* 「就是今天」：不显示数字，整句话当作一个高亮标签 */
+        .days-row .d-today { font-size:14px; font-weight:bold; color:var(--c-pos); }
+        /* 空态：整卡变成一个添加入口 */
+        .days-empty-row { text-align:center; padding:10px 2px 12px; font-size:13px;
+            color:var(--c-text-soft); cursor:pointer; }
+
+        /* 管理页 */
+        .days-head { display:flex; align-items:center; gap:10px; margin-bottom:16px;
+            padding-bottom:15px; border-bottom:1px solid var(--c-border); }
+        .days-back { border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-text-soft); border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; }
+        .days-title { font-size:17px; font-weight:bold; color:var(--c-primary-dark);
+            letter-spacing:1px; flex:1; }
+        .days-add { border:none; border-radius:8px; padding:8px 16px; font-size:14px; cursor:pointer;
+            background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),.35); }
+        .day-item { background:var(--c-surface); border:1px solid var(--c-border);
+            border-radius:12px; padding:12px 14px; margin-bottom:10px; cursor:pointer;
+            display:flex; justify-content:space-between; align-items:center; gap:10px; }
+        .day-item:active { box-shadow:0 0 8px rgba(var(--c-shadow-rgb),.4); }
+        .day-item.pinned { border-color:var(--c-primary-mid);
+            background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); }
+        .day-item .di-l { min-width:0; }
+        .day-item .di-name { font-size:15px; font-weight:600; color:var(--c-primary-deep);
+            margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .day-item .di-name .pin { font-size:11px; color:var(--c-primary); margin-right:4px; }
+        .day-item .di-date { font-size:12px; color:var(--c-text-soft); }
+        .day-item .di-r { text-align:right; flex-shrink:0; }
+        .day-item .di-word { font-size:12px; color:var(--c-text-soft); }
+        .day-item .di-num { font-size:24px; font-weight:bold; color:var(--c-primary-dark);
+            font-variant-numeric:tabular-nums; line-height:1.1; }
+        .day-item .di-num.future { color:var(--c-pos); }
+        .day-item .di-unit { font-size:12px; color:var(--c-text-soft); }
+        .day-item .di-today { font-size:17px; font-weight:bold; color:var(--c-pos); }
+        .days-empty { text-align:center; padding:40px 20px; color:var(--c-text-soft);
+            font-size:14px; line-height:2; }
+
+        /* 编辑弹窗里的预览行与置顶开关 */
+        .day-preview { font-size:12.5px; color:var(--c-text-soft); background:var(--c-chip);
+            border-radius:8px; padding:9px 11px; line-height:1.6; }
+        .day-pin-row { display:flex; align-items:center; justify-content:space-between; }
+        .day-switch { width:46px; height:26px; border-radius:13px; background:var(--c-border);
+            position:relative; cursor:pointer; transition:.2s; flex-shrink:0; }
+        .day-switch.on { background:var(--c-primary); }
+        .day-switch::after { content:''; position:absolute; top:3px; left:3px; width:20px; height:20px;
+            border-radius:50%; background:#fff; transition:.2s; }
+        .day-switch.on::after { left:23px; }
+
         /* 账单详情（只读）的值：外观近似输入框，但不可编辑，保持与修改弹窗视觉连贯 */
         .detail-val {
             padding:12px; border:1px solid var(--c-border); border-radius:8px;
@@ -760,7 +885,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-D</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-H</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -785,6 +910,17 @@
                 <div class="summary-overall" id="summaryOverall"></div>
                 <div class="summary-filter" id="summaryFilter" style="display:none"></div>
                 <div class="cat-stats" id="catStats"></div>
+
+                <!-- 「日子」入口卡：显示最近的几个倒数日，点「管理 ›」进管理页。
+                     放在汇总下方、账单上方——用户每次进记账页顺带就瞥到了，
+                     不必主动切页；90% 的需求（看一眼还有几天）在这里就满足。 -->
+                <div class="days-card" id="daysCard">
+                    <div class="days-card-head">
+                        <span class="days-card-title">日子</span>
+                        <span class="days-card-more" id="daysManageBtn">管理 ›</span>
+                    </div>
+                    <div id="daysEntryRows"></div>
+                </div>
 
                 <div class="bill-head" id="billHead">账单</div>
 
@@ -919,6 +1055,22 @@
                     <button class="set-item" id="themeBtn"><span>外观主题</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="editNameBtn"><span>修改用户名</span><span class="set-arrow">›</span></button>
                     <button class="set-item set-danger" id="logoutBtn"><span>退出登录</span><span class="set-arrow">›</span></button>
+                </div>
+            </div>
+
+            <!-- ========== 子页面：日子管理 ==========
+                 不是第四个 tab —— 它是记账页的子页，从入口卡的「管理 ›」进来、按返回回去。
+                 理由：倒数日与账单无数据关联，频次也远低于记账；提到 tab 级会挤掉
+                 「记账」的居中位置（拇指最易触达处），为辅助功能牺牲核心功能不划算。 -->
+            <div class="tab-page" id="pageDays" style="display:none">
+                <div class="days-head">
+                    <button class="days-back" id="daysBack">‹ 返回</button>
+                    <span class="days-title">日子</span>
+                    <button class="days-add" id="daysAdd">＋ 添加</button>
+                </div>
+                <div id="daysList"></div>
+                <div class="days-empty" id="daysEmpty" style="display:none">
+                    还没有记录任何日子<br>点右上角「＋ 添加」记下第一个吧
                 </div>
             </div>
         </div>
@@ -1148,19 +1300,42 @@
         </div>
     </div>
 
-    <!-- 自定义时间选择器 -->
+    <!-- 自定义时间选择器：日 → 月 → 年 三级下钻 -->
     <div class="mask" id="dtMask">
         <div class="dt-dialog">
             <div class="dt-preview" id="dtPreview">2026-01-01 00:00</div>
+            <!-- 头部：‹ 标题 › 三个元素。点标题下钻一级（日→月→年）。
+                 此前这里还有一对 « » 翻年按钮，已删除——既然点标题能直接进年份网格，
+                 翻年按钮就是冗余入口，还把头部挤成五个元素、显得拥挤。
+                 ‹ › 始终翻「当前层级」：日层级翻月、月层级翻年、年层级翻年组。 -->
             <div class="dt-head">
-                <button class="dt-nav" id="dtPrevMonth">‹</button>
-                <span id="dtMonthLabel">2026年01月</span>
-                <button class="dt-nav" id="dtNextMonth">›</button>
+                <button class="dt-nav" id="dtPrev" aria-label="上一页">‹</button>
+                <button class="dt-label" id="dtLabel">2026年01月</button>
+                <button class="dt-nav" id="dtNext" aria-label="下一页">›</button>
             </div>
-            <div class="dt-week">
-                <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+
+            <!-- 三个层级的网格共用一个等高容器 .dt-grid-box：
+                 日网格最多 6 行 42 格，月/年只有 12 格。若不锁高，层级切换时弹窗会
+                 剧烈跳变（缩掉一大半）。故容器高度按日网格算死，月/年网格在其中撑开
+                 —— 副作用是好的：12 个格子分摊 42 格的空间，按钮更大更好点。 -->
+            <div class="dt-grid-box" id="dtGridBox">
+                <!-- 日 -->
+                <div class="dt-pane" id="dtPaneDay">
+                    <div class="dt-week">
+                        <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+                    </div>
+                    <div class="dt-days" id="dtDays"></div>
+                </div>
+                <!-- 月 -->
+                <div class="dt-pane" id="dtPaneMonth" style="display:none">
+                    <div class="dt-grid-12" id="dtMonths"></div>
+                </div>
+                <!-- 年 -->
+                <div class="dt-pane" id="dtPaneYear" style="display:none">
+                    <div class="dt-grid-12" id="dtYears"></div>
+                </div>
             </div>
-            <div class="dt-days" id="dtDays"></div>
+
             <div class="dt-time" id="dtTimeRow">
                 <div class="dt-time-col">
                     <label>时</label>
@@ -1213,15 +1388,52 @@
         </div>
     </div>
 
+    <!-- 日子 编辑/添加 弹窗。
+         刻意复用现有的 .mask + .edit-dialog（居中弹窗），而非草图里的 bottom sheet：
+         ① 与「记一笔 / 修改账单」形态一致，不引入第二种弹窗交互；
+         ② 直接继承既有的键盘处理(kb-open / syncMaskHeight)与滚动锁定，省掉一堆坑。 -->
+    <div class="mask" id="dayMask">
+        <div class="edit-dialog">
+            <h3 id="dayDlgTitle">添加日子</h3>
+            <div class="form-box">
+                <div class="field">
+                    <label class="field-label">名称（最多 8 字）</label>
+                    <input type="text" id="dayName" maxlength="8" placeholder="例如：入职">
+                </div>
+                <div class="field">
+                    <label class="field-label">目标日期</label>
+                    <input type="text" id="dayDate" placeholder="选择日期" readonly class="dt-input">
+                </div>
+                <div class="day-preview" id="dayPreview"></div>
+                <div class="field">
+                    <div class="day-pin-row">
+                        <label class="field-label" style="margin:0;">置顶（排在入口卡首位）</label>
+                        <div class="day-switch" id="dayPin"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="dialog-btn">
+                <button class="save" id="daySave">保存</button>
+                <button class="cancel" id="dayCancel">取消</button>
+            </div>
+            <button class="edit-del-btn" id="dayDelete" style="display:none">删除这个日子</button>
+        </div>
+    </div>
+
     <!-- 统计页：年月选择器 -->
     <div class="mask" id="ymMask">
         <div class="edit-dialog">
+            <!-- 头部与日期选择器同构：‹ 标题 ›，点标题下钻（月网格 → 年网格）。
+                 统计页没有「日」这一级，所以从月开始，只有两级。 -->
             <div class="ym-year-row">
                 <button class="dt-nav" id="ymPrevY">‹</button>
-                <span id="ymYearLabel">2026</span>
+                <button class="dt-label" id="ymYearLabel">2026</button>
                 <button class="dt-nav" id="ymNextY">›</button>
             </div>
-            <div class="ym-grid" id="ymGrid"></div>
+            <div class="ym-box" id="ymBox">
+                <div class="dt-grid-12" id="ymGrid"></div>
+                <div class="dt-grid-12" id="ymYearGrid" style="display:none"></div>
+            </div>
             <div class="dialog-btn">
                 <button class="save" id="ymToCurrent">回到当月</button>
                 <button class="cancel" id="ymCancel">取消</button>
@@ -1680,10 +1892,12 @@
                 customPrompt('把这份存档导入到哪个账号？（不存在会自动创建）', preset, (acct)=>{
                     acct=acct.trim();
                     try{
-                        const { finalName, stats }=importArchiveFromText(text, acct);
+                        const { finalName, stats, daysAdded }=importArchiveFromText(text, acct);
                         recordUser(acct);            // 让该账号出现在最近账号里
                         renderRecentUsers();
-                        customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。${importFixSuffix(stats)}\n\n现在进入该账号吗？`, ()=>{
+                        // 这里 daysAdded 通常是 0：用户手输的目标账号多半与文件里的 user 不同，
+                        // 倒数日按规则跳过。只有原样填回自己的账号名（换手机自导自）才会带进来。
+                        customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。${importFixSuffix(stats)}${importDaysSuffix(daysAdded)}\n\n现在进入该账号吗？`, ()=>{
                             login(acct);             // 进入后会自动定位到 last（即刚导入的存档）
                         }, '导入成功', { okText:'立即进入', cancelText:'稍后' });
                     }catch(err){
@@ -1774,6 +1988,7 @@
             refreshCatSelectors();
             setDtInput(billTime, nowDtValue());   // 进入主界面即默认当前时间
             renderBill();
+            renderDaysCard();             // 「日子」入口卡（数据独立于存档，跟账号走）
             switchTab(getDefaultTab());   // 按用户设置进入默认页（默认记账）
             // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
             // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
@@ -1826,6 +2041,14 @@
                         try{ localStorage.setItem(`store_${newName}__corrupted_${suffix}`, v); }catch(_){}
                         localStorage.removeItem(k);
                     });
+                }catch(_){}
+                // 迁移「日子」数据（独立 key，不在 store 里，必须单独搬）
+                try{
+                    const dayData=localStorage.getItem(`days_${oldName}`);
+                    if(dayData!==null){
+                        localStorage.setItem(`days_${newName}`, dayData);
+                        localStorage.removeItem(`days_${oldName}`);
+                    }
                 }catch(_){}
                 // 迁移「已修复历史时间」标记，否则改名后会对同一份数据重复扫描一次
                 try{
@@ -1921,8 +2144,13 @@
 
         $('exportBtn').addEventListener('click', async () => {
             const store=loadStore(); const a=curArchive(store);
+            // days：倒数日随存档一起导出，让换手机时能一并带走。
+            // 注意它是账号级的（全局一份），不是存档级的——多存档时每份导出文件都会
+            // 各带一份相同副本。这是可接受的冗余：真把它挪进 archives[x] 才是错的
+            // （切到「旅行」存档，「入职纪念日」难道就不存在了）。
             const payload={ app:'记问', user:currentUser, archive:currentArchive,
-                cats:a.cats, data:a.records, exportedAt:new Date().toLocaleString() };
+                cats:a.cats, data:a.records, days:loadDays(),
+                exportedAt:new Date().toLocaleString() };
             const json=JSON.stringify(payload,null,2);
             const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;
 
@@ -2194,6 +2422,48 @@ ${detail}
             return { records:out, stats };
         }
 
+        // 导入的倒数日条数上限。倒数日是账号级的唯一一份（不像存档能并存多个），
+        // 没有「新建一个」的退路，所以必须挡住构造出来的超大 days 数组撑爆 localStorage。
+        const MAX_IMPORT_DAYS = 200;
+
+        // 清洗导入文件里的 days。口径与 sanitizeImportedRecords 一致：
+        // 结构不对一律静默丢弃，绝不抛错——一个坏掉的 days 字段不该拖垮整个账单导入。
+        function sanitizeImportedDays(raw){
+            if(!Array.isArray(raw)) return [];
+            const out=[];
+            for(const d of raw){
+                if(out.length >= MAX_IMPORT_DAYS) break;
+                if(!d || typeof d!=='object') continue;
+                const name=(typeof d.name==='string') ? charSlice(d.name.trim(), 8) : '';
+                if(!name) continue;
+                if(!isValidDay(d.date)) continue;   // '2026-02-30' 在此被拒
+                out.push({ id:genId(), name, date:d.date, pin:!!d.pin });
+            }
+            return out;
+        }
+
+        // 把导入的倒数日并进目标账号已有的那份。
+        // 按 name+date 去重，已存在的跳过——不覆盖用户自己的数据。
+        // 返回实际新增的条数（0 表示全是重复的，或没得可导）。
+        function mergeImportedDays(list, targetUser){
+            if(!list.length) return 0;
+            const cur=loadDays(targetUser);
+            const seen=new Set(cur.map(d=>`${d.name}|${d.date}`));
+            let added=0;
+            for(const d of list){
+                const k=`${d.name}|${d.date}`;
+                if(seen.has(k)) continue;
+                if(cur.length >= MAX_IMPORT_DAYS) break;   // 合并后的总量也受同一上限约束
+                seen.add(k); cur.push(d); added++;
+            }
+            if(added){
+                // 存不下就当没导——倒数日不该让已经成功的账单导入回滚
+                try{ localStorage.setItem(`days_${targetUser}`, JSON.stringify(cur)); }
+                catch(_){ return 0; }
+            }
+            return added;
+        }
+
         // 核心导入逻辑：解析文本 → 清洗 → 存为目标用户名下的新存档。
         // 返回 { finalName, stats } 或抛错；stats 用于导入后提示静默修正情况。
         function importArchiveFromText(text, targetUser){
@@ -2226,7 +2496,18 @@ ${detail}
             store.archives[finalName]={ records, cats };
             store.last=finalName;
             saveStore(store, targetUser);   // 抛错（配额满等）由调用方 catch 处理
-            return { finalName, stats };
+
+            // 倒数日：只在「文件里的账号 === 要导进的账号」时才收。
+            //   存档可以并存十份（重名自动加序号，从不覆盖），倒数日却是账号级的唯一一份，
+            //   没有「新建一个」的退路——写进去就只能是合并或覆盖。所以别人的倒数日一律不收，
+            //   宁可少搬，不可污染。主流场景是换手机自导自，user 天然相等，无感还原。
+            //   登录页那条路让用户手输目标账号，走的正是「不相等」分支 → 跳过，符合预期。
+            //   旧备份文件没有 days 字段 → sanitize 收到 undefined 返回 []，向后兼容。
+            let daysAdded=0;
+            if(parsed && typeof parsed.user==='string' && parsed.user===targetUser){
+                daysAdded=mergeImportedDays(sanitizeImportedDays(parsed.days), targetUser);
+            }
+            return { finalName, stats, daysAdded };
         }
 
         // 把清洗统计拼成一句人类可读的提示尾巴（没有任何修正则返回空串）
@@ -2239,6 +2520,10 @@ ${detail}
             return parts.length ? `\n\n注意：其中 ${parts.join('；')}。` : '';
         }
 
+        // 倒数日导入结果的提示尾巴。0 条时返回空串——没导进来就别提，避免噪音
+        // （文件里没有 days、是别人的存档、或全是重复项，都会是 0，用户不需要区分）。
+        function importDaysSuffix(n){ return n>0 ? `\n\n同时导入了 ${n} 个日子。` : ''; }
+
         $('importBtn').addEventListener('click', () => $('importFile').click());
         $('importFile').addEventListener('change', e => {
             const file=e.target.files[0]; if(!file) return;
@@ -2249,11 +2534,12 @@ ${detail}
             const reader=new FileReader();
             reader.onload=ev=>{
                 try{
-                    const { finalName, stats }=importArchiveFromText(ev.target.result, currentUser);
+                    const { finalName, stats, daysAdded }=importArchiveFromText(ev.target.result, currentUser);
                     // importArchiveFromText 内部已把新存档写盘并设好 store.last，无需再重读重写一遍
                     currentArchive=finalName;
+                    // refreshAllViews 里已含 renderDaysCard，导进来的倒数日会一并刷新到入口卡
                     refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
-                    customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}`, '导入成功', 'left');
+                    customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}${importDaysSuffix(daysAdded)}`, '导入成功', 'left');
                 }catch(err){
                     const msg = err && err.message;
                     let tip;
@@ -2571,10 +2857,13 @@ ${detail}
         function refreshAllViews(){
             renderBill();
             if(currentTab==='stats') renderStats();
+            // 「日子」入口卡也一并刷新：它虽与账单无关，但改名等路径会换 currentUser，
+            // 收在这里就不必在每个调用点各加一行（漏一个就是显示旧账号的日子）。
+            if(typeof renderDaysCard==='function') renderDaysCard();
         }
 
         // ===== 自定义时间选择器 =====
-        const dtMask=$('dtMask'), dtDays=$('dtDays'), dtMonthLabel=$('dtMonthLabel');
+        const dtMask=$('dtMask'), dtDays=$('dtDays'), dtLabel=$('dtLabel');
         const dtHour=$('dtHour'), dtMin=$('dtMin'), dtPreview=$('dtPreview');
         let dtTargetInput=null;   // 当前正在编辑哪个输入框
         let dtView={ year:new Date().getFullYear(), month:new Date().getMonth() };  // month 0-11，当前显示的月份
@@ -2601,6 +2890,7 @@ ${detail}
 
         function openDtPicker(input){
             dtDateOnly=false; dtOnPick=null; dtOnCancel=null; dtDayCounts=null;
+            dtLevel='day';             // 每次打开都从日网格开始，不残留上次的层级
             $('dtTimeRow').style.display='';
             dtTargetInput=input;
             const p=parseInputDt(getDtInput(input));
@@ -2616,6 +2906,7 @@ ${detail}
         // opts（可选）：{ counts:{日期串:笔数} 格子显示笔数, onCancel:fn 取消时回上级 }
         function openDtPickerDate(initialDay, onPick, opts){
             dtDateOnly=true; dtOnPick=onPick; dtTargetInput=null;
+            dtLevel='day';             // 同上，从日网格开始
             dtOnCancel=(opts && opts.onCancel) || null;
             dtDayCounts=(opts && opts.counts) || null;
             $('dtTimeRow').style.display='none';
@@ -2630,8 +2921,8 @@ ${detail}
             dtMask.style.display='flex';
         }
 
-        function renderDtDays(){
-            dtMonthLabel.textContent=`${dtView.year}年${pad(dtView.month+1)}月`;
+        function renderDtDayGrid(){
+            dtLabel.textContent=`${dtView.year}年${pad(dtView.month+1)}月`;
             dtDays.innerHTML='';
             const first=new Date(dtView.year, dtView.month, 1);
             // 周一为起始：getDay() 0=周日
@@ -2673,16 +2964,143 @@ ${detail}
             }
         }
 
-        $('dtPrevMonth').onclick=()=>{
-            dtView.month--; if(dtView.month<0){ dtView.month=11; dtView.year--; } renderDtDays();
+        // ===== 三级下钻：日 → 月 → 年 =====
+        // dtLevel: 'day' | 'month' | 'year'
+        // 点标题下钻一级；选中后逐级收回（选年→回月网格，选月→回日网格）。
+        // ‹ › 与「网格内左右滑动」是同一动作的两个入口，都翻「当前层级」：
+        //   日层级翻月、月层级翻年、年层级翻年组（12 年一组）。
+        let dtLevel='day';
+        // 年份范围：当前年 ±100。足够覆盖任何倒数日（出生纪念、退休、还贷到期…），
+        // 又不至于让用户翻到 9999 年。
+        const DT_YEAR_MIN=new Date().getFullYear()-100;
+        const DT_YEAR_MAX=new Date().getFullYear()+100;
+        const DT_YEARS_PER_PAGE=12;
+        let dtYearPageStart=0;   // 年网格当前页的起始年
+
+        // 统一入口：按当前层级渲染对应网格 + 头部标题。
+        // 保留 renderDtDays 这个名字（其它地方在调），让它变成一个分发器。
+        function renderDtDays(){
+            $('dtPaneDay').style.display   = dtLevel==='day'   ? 'flex' : 'none';
+            $('dtPaneMonth').style.display = dtLevel==='month' ? 'flex' : 'none';
+            $('dtPaneYear').style.display  = dtLevel==='year'  ? 'flex' : 'none';
+            // 已在最顶层(年)时去掉标题的下钻箭头提示
+            $('dtLabel').classList.toggle('top', dtLevel==='year');
+            if(dtLevel==='day')        renderDtDayGrid();
+            else if(dtLevel==='month') renderDtMonthGrid();
+            else                       renderDtYearGrid();
+        }
+
+        function renderDtMonthGrid(){
+            dtLabel.textContent=`${dtView.year}`;
+            const box=$('dtMonths');
+            box.innerHTML='';
+            const now=new Date();
+            for(let m=0;m<12;m++){
+                const el=document.createElement('div');
+                el.className='dt-cell';
+                el.textContent=`${m+1}月`;
+                if(dtSel.d!=null && dtSel.y===dtView.year && dtSel.m===m) el.classList.add('selected');
+                if(now.getFullYear()===dtView.year && now.getMonth()===m) el.classList.add('today');
+                el.onclick=()=>{
+                    dtView.month=m;
+                    dtLevel='day';        // 选完月 → 收回日网格
+                    renderDtDays();
+                };
+                box.appendChild(el);
+            }
+        }
+
+        function renderDtYearGrid(){
+            const end=dtYearPageStart+DT_YEARS_PER_PAGE-1;
+            dtLabel.textContent=`${dtYearPageStart} - ${end}`;
+            const box=$('dtYears');
+            box.innerHTML='';
+            const nowY=new Date().getFullYear();
+            for(let i=0;i<DT_YEARS_PER_PAGE;i++){
+                const y=dtYearPageStart+i;
+                const el=document.createElement('div');
+                el.className='dt-cell';
+                el.textContent=y;
+                if(y<DT_YEAR_MIN || y>DT_YEAR_MAX){
+                    el.classList.add('muted');           // 超范围的年份不可选
+                    box.appendChild(el);
+                    continue;
+                }
+                if(dtSel.d!=null && dtSel.y===y) el.classList.add('selected');
+                if(y===nowY) el.classList.add('today');
+                el.onclick=()=>{
+                    dtView.year=y;
+                    dtLevel='month';      // 选完年 → 收回月网格
+                    renderDtDays();
+                };
+                box.appendChild(el);
+            }
+        }
+
+        // 点标题：下钻一级（日→月→年）。年是顶层，再点无效。
+        dtLabel.onclick=()=>{
+            if(dtLevel==='day'){
+                dtLevel='month';
+            } else if(dtLevel==='month'){
+                dtLevel='year';
+                // 年网格开在「包含当前视图年份」的那一页
+                dtYearPageStart = dtView.year - ((dtView.year % DT_YEARS_PER_PAGE) + DT_YEARS_PER_PAGE) % DT_YEARS_PER_PAGE;
+            }
+            renderDtDays();
         };
-        $('dtNextMonth').onclick=()=>{
-            dtView.month++; if(dtView.month>11){ dtView.month=0; dtView.year++; } renderDtDays();
-        };
+
+        // 翻页：按当前层级决定翻什么。dir = -1 上一页 / +1 下一页
+        function dtNav(dir){
+            if(dtLevel==='day'){
+                dtView.month += dir;
+                if(dtView.month<0){ dtView.month=11; dtView.year--; }
+                if(dtView.month>11){ dtView.month=0;  dtView.year++; }
+            } else if(dtLevel==='month'){
+                const y=dtView.year+dir;
+                if(y<DT_YEAR_MIN || y>DT_YEAR_MAX) return;
+                dtView.year=y;
+            } else {
+                const s=dtYearPageStart + dir*DT_YEARS_PER_PAGE;
+                // 整页都超出范围就不翻了
+                if(s+DT_YEARS_PER_PAGE-1 < DT_YEAR_MIN || s > DT_YEAR_MAX) return;
+                dtYearPageStart=s;
+            }
+            renderDtDays();
+        }
+        $('dtPrev').onclick=()=>dtNav(-1);
+        $('dtNext').onclick=()=>dtNav(1);
+
+        // ===== 网格内左右滑动翻页 =====
+        // 只挂在网格容器上，不是整个弹窗：.dt-dialog 有 overflow-y:auto（内容超出要能上下滚），
+        // 若整个弹窗吃横向手势，会和纵向滚动打架。
+        // 容器 CSS 设了 touch-action:pan-y —— 纵向仍交给浏览器，横向归我们。
+        // 判定：位移超过阈值，且横向分量明显大于纵向（避免斜着滑或纵向滚动被误判为翻页）。
+        function attachSwipe(el, onSwipe){
+            let x0=0, y0=0, tracking=false;
+            const MIN_DIST=40;     // 至少滑这么远才算翻页，避免误触
+            const RATIO=1.5;       // 横向要比纵向明显（dx > 1.5×dy）才认定为横滑
+            el.addEventListener('touchstart', e=>{
+                if(e.touches.length!==1){ tracking=false; return; }
+                x0=e.touches[0].clientX; y0=e.touches[0].clientY; tracking=true;
+            }, {passive:true});
+            el.addEventListener('touchend', e=>{
+                if(!tracking) return;
+                tracking=false;
+                const t=e.changedTouches && e.changedTouches[0];
+                if(!t) return;
+                const dx=t.clientX-x0, dy=t.clientY-y0;
+                if(Math.abs(dx) < MIN_DIST) return;
+                if(Math.abs(dx) < Math.abs(dy)*RATIO) return;   // 更像纵向滚动，不处理
+                onSwipe(dx<0 ? 1 : -1);   // 左滑(dx<0) = 下一页
+            }, {passive:true});
+        }
+        // 左滑 → 下一页，右滑 → 上一页（与 › ‹ 一致）
+        attachSwipe($('dtGridBox'), dir=>dtNav(dir));
         dtHour.onchange=updateDtPreview;
         dtMin.onchange=updateDtPreview;
         $('dtNow').onclick=()=>{
             const now=new Date();
+            dtLevel='day';   // 「此刻」选的是具体某一天，若正停在月/年网格要收回日网格
             dtView={ year:now.getFullYear(), month:now.getMonth() };
             dtSel={ y:now.getFullYear(), m:now.getMonth(), d:now.getDate() };
             dtHour.value=now.getHours(); dtMin.value=now.getMinutes();
@@ -2699,7 +3117,17 @@ ${detail}
         };
         // 禁止点击遮罩外部关闭，仅按钮可关闭
         $('dtConfirm').onclick=()=>{
+            // 还停在月/年网格时不能确认——此时根本没在选「日」。引导回日网格。
+            if(dtLevel!=='day'){ customAlert('请先选到具体的某一天～'); return; }
             if(dtSel.d==null){ customAlert('请先选择日期！'); return; }
+            // 选中项必须落在当前正在看的那个月里，否则要求重新点一次。
+            // 场景：用户翻年/翻月到 2025年2月，但 dtSel 还停在翻页前选中的 2024年2月29日
+            // —— 此时点「确认」会静默提交 2024 年，和用户眼前看到的 2025 年不是一回事。
+            // 翻页不改选中项（这是对的，避免误改），但提交前必须确认两者一致。
+            if(dtSel.y!==dtView.year || dtSel.m!==dtView.month){
+                customAlert('请点选一个日期～');
+                return;
+            }
             if(dtDateOnly){
                 const day=`${dtSel.y}-${pad(dtSel.m+1)}-${pad(dtSel.d)}`;
                 const cb=dtOnPick;
@@ -3872,6 +4300,9 @@ ${detail}
         function switchTab(tab){
             closeAllCs();   // 收起可能展开的下拉：其面板已传送到 body，切页隐藏容器不会带走它
             currentTab=tab;
+            // 「日子」管理页是记账页的子页，不属于任何 tab。切 tab 时必须把它关掉，
+            // 否则从子页点底栏会出现「子页与目标页同时显示」。
+            const pd=$('pageDays'); if(pd) pd.style.display='none';
             $('pageLedger').style.display   = tab==='ledger'   ? 'block':'none';
             $('pageStats').style.display    = tab==='stats'    ? 'block':'none';
             $('pageSettings').style.display = tab==='settings' ? 'block':'none';
@@ -4395,10 +4826,14 @@ ${detail}
             statSelDay=null; renderStatCalendar();
         });
 
-        // ===== 年月选择器 =====
+        // ===== 年月选择器（统计页）=====
+        // 与日期选择器同构，只是没有「日」这一级：月网格 → 点标题 → 年网格。
+        // 复用同一套 .dt-cell 样式与 attachSwipe，保证两个选择器的外观和手势完全一致。
         (function(){
-            const mask=$('ymMask'), grid=$('ymGrid'), yearLabel=$('ymYearLabel');
-            let pickYear;   // 选择器里临时浏览的年份
+            const mask=$('ymMask'), grid=$('ymGrid'), yearGrid=$('ymYearGrid'), yearLabel=$('ymYearLabel');
+            let pickYear;              // 选择器里临时浏览的年份
+            let ymLevel='month';       // 'month' | 'year'
+            let ymYearPageStart=0;
 
             // 找出某年里有记账记录的月份集合（用于打点标记）
             function monthsWithData(year){
@@ -4409,16 +4844,33 @@ ${detail}
                 });
                 return set;
             }
+            // 有记账记录的年份集合
+            function yearsWithData(){
+                const set=new Set();
+                statRecords().forEach(r=>set.add(new Date(r.time).getFullYear()));
+                return set;
+            }
+
             function paint(){
+                grid.style.display     = ymLevel==='month' ? 'grid' : 'none';
+                yearGrid.style.display = ymLevel==='year'  ? 'grid' : 'none';
+                yearLabel.classList.toggle('top', ymLevel==='year');
+                if(ymLevel==='month') paintMonths();
+                else                  paintYears();
+            }
+
+            function paintMonths(){
                 yearLabel.textContent=pickYear;
                 const has=monthsWithData(pickYear);
                 const now=new Date();
                 grid.innerHTML='';
                 for(let m=0;m<12;m++){
-                    const b=document.createElement('button');
+                    const b=document.createElement('div');
+                    b.className='dt-cell';
                     b.textContent=(m+1)+'月';
-                    if(pickYear===statYear && m===statMonth) b.classList.add('cur');
-                    if(has.has(m)) b.classList.add('has');
+                    if(pickYear===statYear && m===statMonth) b.classList.add('selected');
+                    if(now.getFullYear()===pickYear && now.getMonth()===m) b.classList.add('today');
+                    if(has.has(m)) b.classList.add('has');   // 有数据的月份打点
                     b.onclick=()=>{
                         statYear=pickYear; statMonth=m; statSelDay=null;
                         mask.style.display='none'; renderStatCalendar();
@@ -4426,11 +4878,55 @@ ${detail}
                     grid.appendChild(b);
                 }
             }
-            function open(){ pickYear=statYear; paint(); mask.style.display='flex'; }
+
+            function paintYears(){
+                const end=ymYearPageStart+11;
+                yearLabel.textContent=`${ymYearPageStart} - ${end}`;
+                const has=yearsWithData();
+                const nowY=new Date().getFullYear();
+                yearGrid.innerHTML='';
+                for(let i=0;i<12;i++){
+                    const y=ymYearPageStart+i;
+                    const b=document.createElement('div');
+                    b.className='dt-cell';
+                    b.textContent=y;
+                    if(y===statYear) b.classList.add('selected');
+                    if(y===nowY)     b.classList.add('today');
+                    if(has.has(y))   b.classList.add('has');
+                    b.onclick=()=>{
+                        pickYear=y;
+                        ymLevel='month';    // 选完年 → 收回月网格
+                        paint();
+                    };
+                    yearGrid.appendChild(b);
+                }
+            }
+
+            // 翻页：按当前层级
+            function ymNav(dir){
+                if(ymLevel==='month') pickYear += dir;
+                else                  ymYearPageStart += dir*12;
+                paint();
+            }
+
+            function open(){
+                pickYear=statYear;
+                ymLevel='month';        // 每次打开都从月网格开始
+                paint();
+                mask.style.display='flex';
+            }
 
             $('statMonthLabel').addEventListener('click', open);
-            $('ymPrevY').addEventListener('click', ()=>{ pickYear--; paint(); });
-            $('ymNextY').addEventListener('click', ()=>{ pickYear++; paint(); });
+            // 点标题：月 → 年。年是顶层，再点无效。
+            yearLabel.addEventListener('click', ()=>{
+                if(ymLevel!=='month') return;
+                ymLevel='year';
+                ymYearPageStart = pickYear - ((pickYear % 12) + 12) % 12;   // 开在包含当前年的那一页
+                paint();
+            });
+            $('ymPrevY').addEventListener('click', ()=>ymNav(-1));
+            $('ymNextY').addEventListener('click', ()=>ymNav(1));
+            attachSwipe($('ymBox'), dir=>ymNav(dir));   // 网格内左右滑动翻页，与日期选择器一致
             $('ymCancel').addEventListener('click', ()=>{ mask.style.display='none'; });
             $('ymToCurrent').addEventListener('click', ()=>{
                 const now=new Date();
@@ -4543,6 +5039,260 @@ ${detail}
                 `金额、分类、备注均未改动。`,
                 '已修复历史数据', 'left'
             );
+        }
+
+        // ============================================================
+        // ===== 日子（倒数日） =====
+        // ============================================================
+        // 【数据独立存储，不进 store】key = days_${user}
+        //   倒数日与「哪个存档」没有任何语义关联——切到「旅行」存档，「入职纪念日」
+        //   难道就不存在了？塞进 store.archives[x] 会污染数据模型，还会连带影响导出/导入
+        //   （用户导出的是账单存档，里面却夹着倒数日，导入到别人账号就串了）。
+        //   独立 key 还意味着倒数日的增删改完全不碰 saveStore，不会因账单数据配额满而丢失。
+        //   【导出/导入】存储归存储，传输归传输：导出存档时会把 days 一起写进文件（换手机
+        //   能带走），但导入只在「文件里的 user === 目标账号」时才收，否则跳过——见
+        //   importArchiveFromText。多存档时每份导出各带一份相同副本，这是可接受的冗余。
+        function daysKey(user){ return `days_${user!==undefined ? user : currentUser}`; }
+        function loadDays(user){
+            try{
+                const raw=localStorage.getItem(daysKey(user));
+                const arr=raw ? JSON.parse(raw) : [];
+                if(!Array.isArray(arr)) return [];
+                // 清洗：只保留结构合法的项，避免脏数据让整页崩掉
+                return arr.filter(d=> d && typeof d==='object'
+                    && typeof d.name==='string' && isValidDay(d.date));
+            }catch(_){ return []; }
+        }
+        function saveDays(list, user){
+            try{
+                localStorage.setItem(daysKey(user), JSON.stringify(list));
+                return true;
+            }catch(err){
+                customAlert('存储空间已满，这个日子没能保存。请删除部分记录后重试。', '保存失败');
+                return false;
+            }
+        }
+
+        // 校验 'YYYY-MM-DD' 是否为真实存在的日期。
+        // 复用与账单时间同一套思路：逐项比对解析结果，杜绝 JS 对越界日期的静默滚动
+        // （'2026-02-30' 会被 new Date 滚到 3月2日而不报错——我们在账单侧已经栽过一次）。
+        function isValidDay(s){
+            if(typeof s!=='string') return false;
+            const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+            if(!m) return false;
+            const y=+m[1], mo=+m[2], d=+m[3];
+            if(mo<1||mo>12||d<1||d>31) return false;
+            const dt=new Date(y, mo-1, d);
+            return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d;
+        }
+
+        // 计算天数差。
+        // 【不用 (t1-t0)/86400000】那种毫秒除法在有夏令时的时区会算错（少/多一天），
+        //   国内虽无夏令时，但没必要留这个坑。直接把两个日期都归一到「当天 00:00 的本地时刻」
+        //   再比较，语义清楚且与时区无关。
+        // 返回 { state:'today'|'future'|'past', n }，n 为天数（today 时为 0）。
+        function calcDay(dateStr){
+            const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+            if(!m) return { state:'today', n:0 };
+            const target=new Date(+m[1], +m[2]-1, +m[3]);   // 本地 00:00
+            const now=new Date();
+            const today=new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            // 两者都是本地零点，相差必为整数天（夏令时下也用 round 兜一层）
+            const diff=Math.round((target-today)/86400000);
+            if(diff===0) return { state:'today',  n:0 };
+            if(diff>0)   return { state:'future', n:diff };
+            return { state:'past', n:-diff };
+        }
+
+        const DAY_WEEK=['日','一','二','三','四','五','六'];
+        function fmtDayDate(s){
+            const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+            if(!m) return s;
+            const d=new Date(+m[1], +m[2]-1, +m[3]);
+            return `${s} 星期${DAY_WEEK[d.getDay()]}`;
+        }
+
+        // 排序：置顶优先，其余按「距今天数」升序（最近的在前）。
+        // 【只做置顶 + 自动排序，不做拖拽】草图里两者并存是矛盾的——用户手动拖完，
+        //   下次打开又被自动排序打乱。倒数日的核心诉求就是「最近的那个」，自动排序
+        //   天然满足；「置顶」已经提供了「我要它在最上面」的能力，够用了。
+        function sortedDays(list){
+            return list.slice().sort((a,b)=>{
+                const pa=a.pin?1:0, pb=b.pin?1:0;
+                if(pa!==pb) return pb-pa;                     // 置顶在前
+                return calcDay(a.date).n - calcDay(b.date).n; // 距今越近越靠前（today 的 n=0，最前）
+            });
+        }
+
+        // 渲染一行的「还有/已经 N 天」右侧部分（入口卡与管理页共用同一套口径）
+        function dayNumHtml(c, cls){
+            if(c.state==='today') return `<span class="${cls}-today">就是今天</span>`;
+            const word = c.state==='future' ? '还有' : '已经';
+            const fut  = c.state==='future' ? ' future' : '';
+            return `<span class="${cls}-word">${word}</span>`
+                 + `<span class="${cls}-num${fut}">${c.n}</span>`
+                 + `<span class="${cls}-unit">天</span>`;
+        }
+
+        // ===== 记账页的入口卡：显示前 3 条 =====
+        function renderDaysCard(){
+            const box=$('daysEntryRows');
+            if(!box) return;
+            const list=sortedDays(loadDays());
+            if(!list.length){
+                // 空态：整行变成添加入口，点一下直接进管理页并弹出添加表单
+                box.innerHTML='<div class="days-empty-row" data-day-act="add">＋ 添加你的第一个日子</div>';
+                return;
+            }
+            box.innerHTML=list.slice(0,3).map(d=>{
+                const c=calcDay(d.date);
+                return `<div class="days-row" data-day-act="edit" data-day-id="${escapeHtml(d.id)}">`
+                    + `<span class="d-name">${d.pin?'<span class="pin">★</span>':''}${escapeHtml(d.name)}</span>`
+                    + `<span class="d-right">${dayNumHtml(c,'d')}</span>`
+                    + `</div>`;
+            }).join('');
+        }
+
+        // 入口卡事件委托：点某一条 → 直接编辑它（常用操作不必先进管理页）；点空态 → 去添加
+        $('daysEntryRows').addEventListener('click', e=>{
+            const el=e.target.closest('[data-day-act]');
+            if(!el) return;
+            if(el.dataset.dayAct==='add'){ gotoDaysPage(); openDayDialog(null); }
+            else if(el.dataset.dayAct==='edit'){ openDayDialog(el.dataset.dayId); }
+        });
+        $('daysManageBtn').addEventListener('click', gotoDaysPage);
+
+        // ===== 管理页 =====
+        // 它是记账页的子页：进入时把 pageLedger 藏起来、pageDays 显示，底部 tab 仍停在「记账」。
+        function gotoDaysPage(){
+            $('pageLedger').style.display='none';
+            $('pageDays').style.display='block';
+            $('actionBar').style.display='none';    // 子页里不该有「筛选 / 记一笔」
+            const tt=$('toTopBtn');        if(tt) tt.classList.remove('show');
+            const cf=$('clearFilterFab');  if(cf) cf.classList.remove('show');
+            document.body.classList.remove('tab-ledger');   // 去掉为记账页底部常驻条留的内边距
+            renderDaysList();
+            window.scrollTo(0,0);
+        }
+        function backFromDaysPage(){
+            $('pageDays').style.display='none';
+            switchTab('ledger');            // 交回 switchTab 统一处理显隐/底栏/浮钮，别自己拼
+            renderDaysCard();               // 可能改过，刷新入口卡
+        }
+        $('daysBack').addEventListener('click', backFromDaysPage);
+        $('daysAdd').addEventListener('click', ()=>openDayDialog(null));
+
+        function renderDaysList(){
+            const box=$('daysList'), empty=$('daysEmpty');
+            const list=sortedDays(loadDays());
+            if(!list.length){
+                box.innerHTML='';
+                empty.style.display='block';
+                return;
+            }
+            empty.style.display='none';
+            box.innerHTML=list.map(d=>{
+                const c=calcDay(d.date);
+                return `<div class="day-item${d.pin?' pinned':''}" data-day-id="${escapeHtml(d.id)}">`
+                    + `<div class="di-l">`
+                    +   `<div class="di-name">${d.pin?'<span class="pin">★置顶</span>':''}${escapeHtml(d.name)}</div>`
+                    +   `<div class="di-date">${escapeHtml(fmtDayDate(d.date))}</div>`
+                    + `</div>`
+                    + `<div class="di-r">${dayNumHtml(c,'di')}</div>`
+                    + `</div>`;
+            }).join('');
+        }
+        // 管理页列表：事件委托（与账单表格/明细行同一套模式，不写内联 onclick）
+        $('daysList').addEventListener('click', e=>{
+            const el=e.target.closest('[data-day-id]');
+            if(el) openDayDialog(el.dataset.dayId);
+        });
+
+        // ===== 编辑/添加弹窗 =====
+        let dayEditId=null;   // null = 新增
+        const dayMask=$('dayMask'), dayName=$('dayName'), dayDate=$('dayDate'), dayPin=$('dayPin');
+
+        function todayStr(){
+            const n=new Date();
+            return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
+        }
+        // 预览行：实时告诉用户这个日期会显示成什么，省得存完才发现方向反了
+        function updateDayPreview(){
+            const s=dayDate.dataset.day || '';
+            const el=$('dayPreview');
+            if(!isValidDay(s)){ el.textContent='请选择一个目标日期'; return; }
+            const c=calcDay(s);
+            if(c.state==='today')      el.textContent='就是今天 —— 将显示为「就是今天」';
+            else if(c.state==='future') el.textContent=`该日在今天之后 → 将显示为「还有 ${c.n} 天」`;
+            else                        el.textContent=`该日在今天之前 → 将显示为「已经 ${c.n} 天」`;
+        }
+        function setDayDate(s){
+            dayDate.dataset.day=s||'';
+            dayDate.value = s ? fmtDayDate(s) : '';
+            updateDayPreview();
+        }
+        // 复用现有的纯日期选择器（openDtPickerDate），不另造一个
+        dayDate.addEventListener('click', ()=>{
+            openDtPickerDate(dayDate.dataset.day || todayStr(), (day)=>setDayDate(day));
+        });
+        dayPin.addEventListener('click', ()=>dayPin.classList.toggle('on'));
+
+        function openDayDialog(id){
+            dayEditId = id || null;
+            const list=loadDays();
+            const rec = dayEditId ? list.find(d=>d.id===dayEditId) : null;
+            if(dayEditId && !rec){ customAlert('这个日子不存在了'); return; }
+
+            $('dayDlgTitle').textContent = rec ? '编辑日子' : '添加日子';
+            dayName.value = rec ? rec.name : '';
+            setDayDate(rec ? rec.date : todayStr());
+            dayPin.classList.toggle('on', !!(rec && rec.pin));
+            $('dayDelete').style.display = rec ? 'block' : 'none';
+            dayMask.style.display='flex';
+        }
+        function closeDayDialog(){
+            dayMask.style.display='none';
+            dayEditId=null;
+        }
+        $('dayCancel').addEventListener('click', closeDayDialog);
+
+        $('daySave').addEventListener('click', ()=>{
+            const name=dayName.value.trim();
+            const date=dayDate.dataset.day || '';
+            if(!name){ customAlert('给这个日子起个名字吧～'); return; }
+            if(charLen(name) > 8){ customAlert('名称最多 8 个字～'); return; }
+            if(!isValidDay(date)){ customAlert('请选择一个目标日期～'); return; }
+
+            const list=loadDays();
+            const pin=dayPin.classList.contains('on');
+            if(dayEditId){
+                const i=list.findIndex(d=>d.id===dayEditId);
+                if(i<0){ closeDayDialog(); customAlert('这个日子不存在了，可能已被删除。'); renderDaysAll(); return; }
+                list[i]={ ...list[i], name, date, pin };
+            } else {
+                list.push({ id:genId(), name, date, pin });
+            }
+            if(!saveDays(list)) return;    // 写失败已提示，保持弹窗开着别关
+            closeDayDialog();
+            renderDaysAll();
+        });
+
+        $('dayDelete').addEventListener('click', ()=>{
+            const id=dayEditId;
+            if(!id) return;
+            const rec=loadDays().find(d=>d.id===id);
+            customConfirm(`确定删除「${rec?rec.name:''}」吗？`, ()=>{
+                const list=loadDays().filter(d=>d.id!==id);
+                if(!saveDays(list)) return;
+                closeDayDialog();
+                renderDaysAll();
+            }, '删除日子');
+        });
+
+        // 数据变更后统一刷新两处视图（入口卡 + 管理页，管理页没显示时刷了也无害）
+        function renderDaysAll(){
+            renderDaysCard();
+            if($('pageDays').style.display!=='none') renderDaysList();
         }
 
         // ===== 页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页 =====
