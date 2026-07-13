@@ -760,7 +760,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-B</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-C</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -3443,6 +3443,10 @@ ${detail}
         // 所有已增强下拉的关闭函数登记表。全局「点空白关下拉」的监听要调真正的 close()，
         // 而不能只 remove('open') —— 那样面板会永远留在 body 上、fixed 定位不动，变成甩不掉的幽灵浮层。
         const csClosers = [];
+        // 「正在展开」标志：open() 期间置真，短暂屏蔽滚动/视口监听。
+        // 因为 open() 内部的 scrollIntoView()、以及 WebView 在点击时附带的滚动/视口抖动，
+        // 都会冒出事件被那两个监听逮到，把刚打开的面板立刻关掉（表现为「点了没反应」）。
+        let csOpening = false;
 
         function enhanceSelect(sel){
             if(!sel || sel.dataset.csReady) return;
@@ -3509,6 +3513,7 @@ ${detail}
             }
 
             function open(){
+                csOpening = true;                  // 屏蔽滚动/视口监听，避免刚开就被自己关掉
                 closeAllCs(panel);                 // 先关掉其它已展开的下拉（含它们的 portal 收回）
                 buildPanel();
                 wrap.classList.add('open');
@@ -3516,8 +3521,18 @@ ${detail}
                 document.body.appendChild(panel);
                 panel.classList.add('cs-portal','cs-open');
                 positionPanel();
+                // 把选中项滚进可视区（分钟有 60 项，53 这种靠后的值不滚就看不见）。
+                // 这里**不能用 scrollIntoView**：
+                //   ① 面板是 fixed 定位，scrollIntoView 可能连带滚动整个页面去「够」它；
+                //   ② 它产生的 scroll 事件会被全局监听逮到，把面板自己关掉。
+                // 直接算 scrollTop 更准，也完全不产生页面滚动。
                 const selEl=panel.querySelector('.cs-opt.sel');
-                if(selEl) selEl.scrollIntoView({block:'nearest'});
+                if(selEl){
+                    panel.scrollTop = Math.max(0,
+                        selEl.offsetTop - (panel.clientHeight - selEl.offsetHeight)/2);
+                }
+                // 本次点击引发的滚动/视口抖动都发生在同一批任务里，下一帧再解除屏蔽
+                requestAnimationFrame(()=>{ csOpening = false; });
             }
             function close(){
                 wrap.classList.remove('open');
@@ -3568,14 +3583,29 @@ ${detail}
         // 这只关「下拉面板」，不关任何 .mask 弹窗 —— 弹窗一律只能按按钮关闭（既有设计，未改动）。
         document.addEventListener('click', ()=>closeAllCs());
 
-        // 页面/弹窗内滚动或视口变化时：fixed 面板不会跟着内容走，会「飘」在错误位置。
-        // 直接收起，比持续跟随重定位更简单也更不容易出错。
-        // capture:true 以便捕获弹窗内部可滚动区域(.dt-dialog 等)的滚动，而不只是 window 的。
-        window.addEventListener('scroll', ()=>closeAllCs(), {passive:true, capture:true});
+        // 页面/弹窗内滚动或视口变化时：fixed 面板不会跟着内容走，会「飘」在错误位置，故收起。
+        //
+        // 【这里踩过一个自杀式的坑，务必留意】
+        //   最初写成 window.addEventListener('scroll', closeAllCs, {capture:true})，结果是
+        //   「点时/分完全没反应」—— 因为 open() 里会调 selEl.scrollIntoView() 把选中项滚进可视区，
+        //   那是**面板自己内部的滚动**，同样会冒出 scroll 事件，被 capture 的监听逮到，
+        //   于是面板刚打开就被自己关掉了。分钟有 60 项、面板必定可滚，所以每次必中。
+        //   两道防线：
+        //     ① 事件源在任何 .cs-panel 内部 → 直接忽略（那是面板自己的内部滚动，不该关它）
+        //     ② open() 期间置 csOpening 标志，短暂屏蔽（兜住 WebView 在点击时附带触发的滚动）
+        function onAnyScroll(e){
+            if(csOpening) return;                                   // ② 开启序列中，忽略
+            const t=e.target;
+            // ① 滚动源自面板内部（含面板本身）→ 是它自己的内容在滚，不关
+            if(t && t.nodeType===1 && t.closest && t.closest('.cs-panel')) return;
+            closeAllCs();
+        }
+        window.addEventListener('scroll', onAnyScroll, {passive:true, capture:true});
         window.addEventListener('resize', ()=>closeAllCs(), {passive:true});
         if(window.visualViewport){
-            // 键盘弹起/收起会改变可视区高度，此时面板的 top/maxHeight 都失效了
-            window.visualViewport.addEventListener('resize', ()=>closeAllCs());
+            // 键盘弹起/收起会改变可视区高度，此时面板的 top/maxHeight 都失效了。
+            // 同样要避开开启序列：安卓上点击输入区常伴随一次 viewport 抖动。
+            window.visualViewport.addEventListener('resize', ()=>{ if(!csOpening) closeAllCs(); });
         }
 
         // 初始化页面里所有原生下拉
