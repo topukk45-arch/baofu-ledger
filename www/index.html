@@ -760,7 +760,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-C</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build DIAG</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -3546,7 +3546,42 @@ ${detail}
 
             csClosers.push({ close, isOpen, panel, reposition:positionPanel });
 
-            display.onclick=(e)=>{ e.stopPropagation(); isOpen()?close():open(); };
+            display.onclick=(e)=>{
+                e.stopPropagation();
+                const wasOpen=isOpen();
+                if(wasOpen){ close(); }
+                else {
+                    open();
+                    // ==== 诊断：把面板真实状态打出来 ====
+                    setTimeout(()=>{
+                        const cs=getComputedStyle(panel);
+                        const pr=panel.getBoundingClientRect();
+                        const dr=display.getBoundingClientRect();
+                        const info=
+                          'sel.id='+sel.id+
+                          '\n面板父节点='+panel.parentNode.tagName+
+                          '\nclass='+panel.className+
+                          '\n--- 计算样式 ---'+
+                          '\ndisplay='+cs.display+
+                          '\nposition='+cs.position+
+                          '\nz-index='+cs.zIndex+
+                          '\nvisibility='+cs.visibility+
+                          '\nopacity='+cs.opacity+
+                          '\n--- 面板矩形 ---'+
+                          '\ntop='+pr.top.toFixed(0)+' left='+pr.left.toFixed(0)+
+                          '\nw='+pr.width.toFixed(0)+' h='+pr.height.toFixed(0)+
+                          '\n--- 触发器矩形 ---'+
+                          '\nbottom='+dr.bottom.toFixed(0)+' left='+dr.left.toFixed(0)+' w='+dr.width.toFixed(0)+
+                          '\n--- 视口 ---'+
+                          '\ninnerH='+window.innerHeight+
+                          '\nvvH='+(window.visualViewport?Math.round(window.visualViewport.height):'无')+
+                          '\nbody.position='+getComputedStyle(document.body).position+
+                          '\nbody.top='+getComputedStyle(document.body).top+
+                          '\n内联style='+(panel.getAttribute('style')||'(空)');
+                        alert(info);
+                    }, 120);
+                }
+            };
             // 面板内部点击不冒泡到 document，避免刚展开就被全局「点空白关闭」收掉
             panel.addEventListener('click', e=>e.stopPropagation());
 
