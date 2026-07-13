@@ -713,6 +713,25 @@
             touch-action:pan-y; user-select:none; -webkit-user-select:none; }
         .dt-pane { flex:1; display:flex; flex-direction:column; }
 
+        /* 翻页入场动画：只做「切换后的方向性入场」，不做跟手拖拽。
+           跟手拖拽必须预渲染左右邻页（日网格 42 个节点 × 3 页 = 126 个，每次滑动重建），
+           在 WebView 里不划算；而且翻月份时用户根本不关心「11月到12月的过渡过程」，
+           只关心「到了没」——跟手带来的信息量是零。
+           真正缺的信息只有一个：往哪边翻的。方向性入场就把它补上了，这就是全部。
+           ‹ › 按钮与左右滑动共用 dtNav，所以两个入口都能吃到同一个动画。 */
+        @keyframes dtSlideFromRight { from { opacity:0; transform:translateX(14px); } }
+        @keyframes dtSlideFromLeft  { from { opacity:0; transform:translateX(-14px); } }
+        /* 下一页（左滑 / ›）：新内容从右侧进来 */
+        .dt-pane.in-next, #ymGrid.in-next, #ymYearGrid.in-next { animation:dtSlideFromRight 0.18s ease-out; }
+        /* 上一页（右滑 / ‹）：新内容从左侧进来 */
+        .dt-pane.in-prev, #ymGrid.in-prev, #ymYearGrid.in-prev { animation:dtSlideFromLeft 0.18s ease-out; }
+        /* 尊重系统的「减少动态效果」设置 */
+        @media (prefers-reduced-motion: reduce){
+            .dt-pane.in-next, .dt-pane.in-prev,
+            #ymGrid.in-next, #ymGrid.in-prev,
+            #ymYearGrid.in-next, #ymYearGrid.in-prev { animation:none; }
+        }
+
         .dt-week { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px; }
         .dt-week span { text-align:center; font-size:12px; color:var(--c-text-soft); padding:4px 0; }
         .dt-days { display:grid; grid-template-columns:repeat(7,1fr); gap:3px;
@@ -885,7 +904,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-H</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-I</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -2977,9 +2996,21 @@ ${detail}
         const DT_YEARS_PER_PAGE=12;
         let dtYearPageStart=0;   // 年网格当前页的起始年
 
+        // 给元素重放一次方向性入场动画。
+        // 必须先移除 class 并强制回流（读一次 offsetWidth）——否则连续往同一方向翻页时，
+        // class 一直在，浏览器认为没变化，动画不会重新触发（第二次翻页就没动效了）。
+        function playSlide(el, dir){
+            if(!el || !dir) return;
+            el.classList.remove('in-next','in-prev');
+            void el.offsetWidth;                                  // 强制回流，重置动画状态
+            el.classList.add(dir>0 ? 'in-next' : 'in-prev');
+        }
+
         // 统一入口：按当前层级渲染对应网格 + 头部标题。
         // 保留 renderDtDays 这个名字（其它地方在调），让它变成一个分发器。
-        function renderDtDays(){
+        // dir：翻页方向（+1 下一页 / -1 上一页），仅由 dtNav 传入；点标题下钻、
+        //      「此刻」、打开弹窗等场景不传 —— 那些不是「翻页」，不该有方向性入场。
+        function renderDtDays(dir){
             $('dtPaneDay').style.display   = dtLevel==='day'   ? 'flex' : 'none';
             $('dtPaneMonth').style.display = dtLevel==='month' ? 'flex' : 'none';
             $('dtPaneYear').style.display  = dtLevel==='year'  ? 'flex' : 'none';
@@ -2988,6 +3019,8 @@ ${detail}
             if(dtLevel==='day')        renderDtDayGrid();
             else if(dtLevel==='month') renderDtMonthGrid();
             else                       renderDtYearGrid();
+            // 动画挂在 pane 上（而非网格上），三个层级共用同一套，视觉一致
+            if(dir) playSlide($(dtLevel==='day' ? 'dtPaneDay' : dtLevel==='month' ? 'dtPaneMonth' : 'dtPaneYear'), dir);
         }
 
         function renderDtMonthGrid(){
@@ -3065,7 +3098,9 @@ ${detail}
                 if(s+DT_YEARS_PER_PAGE-1 < DT_YEAR_MIN || s > DT_YEAR_MAX) return;
                 dtYearPageStart=s;
             }
-            renderDtDays();
+            // 越界的早退分支在上面就 return 了 —— 没翻动就不该有入场动画，
+            // 否则用户在边界反复滑，画面一直在动却什么也没变，反而误导。
+            renderDtDays(dir);
         }
         $('dtPrev').onclick=()=>dtNav(-1);
         $('dtNext').onclick=()=>dtNav(1);
@@ -4851,12 +4886,14 @@ ${detail}
                 return set;
             }
 
-            function paint(){
+            // dir 同 renderDtDays：仅翻页时传，下钻/打开不传
+            function paint(dir){
                 grid.style.display     = ymLevel==='month' ? 'grid' : 'none';
                 yearGrid.style.display = ymLevel==='year'  ? 'grid' : 'none';
                 yearLabel.classList.toggle('top', ymLevel==='year');
                 if(ymLevel==='month') paintMonths();
                 else                  paintYears();
+                if(dir) playSlide(ymLevel==='month' ? grid : yearGrid, dir);
             }
 
             function paintMonths(){
@@ -4903,10 +4940,19 @@ ${detail}
             }
 
             // 翻页：按当前层级
+            // 顺带补上年份钳位 —— 之前这里没有边界，一直左滑能翻到负数年/9999 年。
+            // 复用日期选择器的 DT_YEAR_MIN/MAX，两个选择器的可选范围保持一致。
             function ymNav(dir){
-                if(ymLevel==='month') pickYear += dir;
-                else                  ymYearPageStart += dir*12;
-                paint();
+                if(ymLevel==='month'){
+                    const y=pickYear+dir;
+                    if(y<DT_YEAR_MIN || y>DT_YEAR_MAX) return;
+                    pickYear=y;
+                } else {
+                    const s=ymYearPageStart + dir*12;
+                    if(s+11 < DT_YEAR_MIN || s > DT_YEAR_MAX) return;   // 整页都出界就不翻
+                    ymYearPageStart=s;
+                }
+                paint(dir);
             }
 
             function open(){
