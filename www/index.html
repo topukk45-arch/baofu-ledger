@@ -210,7 +210,15 @@
             background:var(--c-surface-2); border:1px solid var(--c-border-mid); border-radius:10px;
             box-shadow:0 6px 20px rgba(var(--c-shadow-rgb),0.35);
             max-height:240px; overflow-y:auto; padding:4px; display:none; }
-        .cs-wrap.open .cs-panel { display:block; }
+        /* 展开态：面板打开时会被「传送」到 <body> 下并改为 fixed 定位（见 enhanceSelect 的 open()），
+           目的是让它能画到弹窗外面去——既不被 .dt-dialog 的 overflow 裁掉，也不会把弹窗从内部撑高。
+           因此显隐不能再靠「.cs-wrap.open .cs-panel」这种后代选择器（面板一旦离开 wrap 就不匹配了），
+           改用挂在面板自身上的 .cs-open，父级是谁都成立。 */
+        .cs-panel.cs-open { display:block; }
+        .cs-panel.cs-portal {
+            position:fixed; right:auto;      /* right:auto 覆盖上面的 right:0，宽度改由 JS 按触发器实测 */
+            z-index:2000;                    /* 盖过 .mask(999) / #editMask.over-detail(1001) / #askMask.over-aiexp(1003) */
+        }
         .cs-opt { padding:10px 12px; border-radius:7px; cursor:pointer; color:var(--c-primary-deep);
             font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .cs-opt:hover { background:var(--c-chip); }
@@ -752,7 +760,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0623-B</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-B</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -810,7 +818,7 @@
                         <button class="dt-nav" id="statNextM">›</button>
                     </div>
                     <div class="stat-week">
-                        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+                        <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
                     </div>
                     <div class="stat-cal" id="statCal"></div>
                 </div>
@@ -1188,13 +1196,15 @@
         </div>
     </div>
 
-    <!-- AI 分析导出结果弹窗：展示生成的文本 + 复制 / 分享 -->
+    <!-- 文本导出结果弹窗：展示生成的文本 + 复制 / 分享。
+         两处复用：① 导出账单给 AI 分析；② 存档导出的兜底（文件写入全失败时供手动复制）。
+         标题/提示文案由 openAiExport(opts) 按场景填入。 -->
     <div class="mask" id="aiExpMask">
         <div class="edit-dialog ai-exp-dialog">
-            <h3>导出账单给 AI 分析</h3>
+            <h3 id="aiExpTitle">导出账单给 AI 分析</h3>
             <div class="ai-exp-sub" id="aiExpSub"></div>
             <textarea id="aiExpText" readonly></textarea>
-            <div class="ai-exp-tip">复制或分享后，粘贴给任意 AI（如 Claude、DeepSeek、豆包），让它帮你分析消费、给出建议。</div>
+            <div class="ai-exp-tip" id="aiExpTip">复制或分享后，粘贴给任意 AI（如 Claude、DeepSeek、豆包），让它帮你分析消费、给出建议。</div>
             <div class="dialog-btn ai-exp-btns">
                 <button class="save" id="aiExpCopy">复制</button>
                 <button class="save" id="aiExpShare">分享</button>
@@ -1464,15 +1474,37 @@
             askMask.style.display='flex';
         }
 
-        // 信息弹窗：只有“确定”，可选标题；用于替代 alert 和“查看备注”。
-        // 安全约定：默认走 textContent，绝不解析 HTML。仅当调用方显式传 isHtml=true
-        //   且已对所有插值的用户数据做过 escapeHtml 时，才用 innerHTML 渲染富文本。
-        //   普通文本提示永远不要传 isHtml。
-        function customAlert(msg, title, align, isHtml){
+        // 信息弹窗（纯文本）：只有「确定」，可选标题；用于替代 alert 和「查看备注」。
+        // 一律走 textContent，无论调用方传什么都不会解析 HTML —— 这是本函数的安全保证。
+        // 需要渲染富文本时改用下面的 customAlertHtml()，不要在这里加开关。
+        //
+        // 【为什么拆成两个函数】原先是 customAlert(msg, title, align, isHtml)，第四个位置参数是
+        //   布尔，传个 true 就切到 innerHTML。这种设计在调用处一点都不显眼：customAlert(x,y,z,true)
+        //   看上去人畜无害，但它就是全应用唯一的 XSS 入口。哪天有人想弹个带链接的提示，顺手补个
+        //   true，再把没转义的备注拼进去，就出事了。
+        //   现在把危险路径独立成一个名字里写着 Html 的函数：想用它必须显式写出来，函数名本身就是警告。
+        function customAlert(msg, title, align){
             askMode='alert';
             askOnCancel=null;
             askTitle.textContent=title||'提示';
-            if(isHtml===true){ askMsg.innerHTML=msg; } else { askMsg.textContent=String(msg); }
+            askMsg.textContent=String(msg);          // 恒为 textContent，无分支、无开关
+            askMsg.style.display='';
+            askMsg.style.textAlign = (align==='left') ? 'left' : '';
+            askInput.style.display='none';
+            askCancel.style.display='none';
+            askResolve=null;
+            askMask.style.display='flex';
+        }
+
+        // 信息弹窗（富文本）：走 innerHTML，仅供确实需要结构化排版的少数场景。
+        // 【调用方契约】传进来的 html 必须是「自己拼的安全模板 + 对所有用户数据做过 escapeHtml」。
+        //   凡是用户可控的内容（备注、分类名、存档名…）一律先 escapeHtml，绝不能直接拼进来。
+        // 目前仅两处调用：renderHourDetailBody（消费明细列表）与历史数据修复提示，两者均已逐字段转义。
+        function customAlertHtml(html, title, align){
+            askMode='alert';
+            askOnCancel=null;
+            askTitle.textContent=title||'提示';
+            askMsg.innerHTML=html;
             askMsg.style.display='';
             askMsg.style.textAlign = (align==='left') ? 'left' : '';
             askInput.style.display='none';
@@ -1743,6 +1775,9 @@
             setDtInput(billTime, nowDtValue());   // 进入主界面即默认当前时间
             renderBill();
             switchTab(getDefaultTab());   // 按用户设置进入默认页（默认记账）
+            // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
+            // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
+            runTimeRepairOnce(name);
         }
 
         logoutBtn.addEventListener('click', () => {
@@ -1764,9 +1799,41 @@
                 newName=newName.trim();
                 if(newName===oldName) return;
                 // 迁移数据：store_old -> store_new
+                // 写入可能因配额满而抛错。必须先确认新键写成功，再删旧键——
+                // 否则异常会从这里逃出去，弹窗已关、提示也没有，用户看到的是「改名静默失败」。
                 const data=localStorage.getItem(`store_${oldName}`);
-                if(data!==null){ localStorage.setItem(`store_${newName}`, data); }
+                if(data!==null){
+                    try{
+                        localStorage.setItem(`store_${newName}`, data);
+                    }catch(err){
+                        customAlert('存储空间不足，改名未能完成。原用户名和数据都没有变动，请删除部分存档或记录后重试。', '改名失败');
+                        return;   // 旧键原封不动，数据安全
+                    }
+                }
                 localStorage.removeItem(`store_${oldName}`);
+                // 顺带迁移该用户的「损坏备份」键（store_旧名__corrupted_*），
+                // 否则它们会永远挂在旧名下，既取不回也清不掉，白占配额。
+                try{
+                    const oldPrefix=`store_${oldName}__corrupted_`;
+                    const moved=[];
+                    for(let i=0;i<localStorage.length;i++){
+                        const k=localStorage.key(i);
+                        if(k && k.indexOf(oldPrefix)===0) moved.push(k);
+                    }
+                    moved.forEach(k=>{
+                        const suffix=k.slice(oldPrefix.length);
+                        const v=localStorage.getItem(k);
+                        try{ localStorage.setItem(`store_${newName}__corrupted_${suffix}`, v); }catch(_){}
+                        localStorage.removeItem(k);
+                    });
+                }catch(_){}
+                // 迁移「已修复历史时间」标记，否则改名后会对同一份数据重复扫描一次
+                try{
+                    if(localStorage.getItem(`app_time_repaired_${oldName}`)==='1'){
+                        localStorage.setItem(`app_time_repaired_${newName}`, '1');
+                    }
+                    localStorage.removeItem(`app_time_repaired_${oldName}`);
+                }catch(_){}
                 // 更新账号索引：移除旧名、加入新名（保持在最前）
                 let list=getUsers().filter(u=>u!==oldName && u!==newName);
                 list.unshift(newName);
@@ -1898,11 +1965,16 @@
                 showExportCopy(json);
             }
         });
-        // 兜底：弹出存档内容供手动复制
+        // 兜底：文件写入/下载全失败时，把存档内容放进导出弹窗供复制/分享。
+        // 复用 aiExpMask（textarea + navigator.clipboard/execCommand 双兜底 + 系统分享），
+        // 而不是塞进单行 <input>——几千条记录的 JSON 在单行框里既读不了、也没法可靠全选复制，
+        // 那等于「最后的救命通道」实际拿不到数据。
         function showExportCopy(json){
-            customPrompt('下载不可用，已为你准备好存档内容，请全选复制保存到记事本/文件：', json, ()=>{}, '导出存档（复制）', null, { placeholder:'' });
-            // 把输入框换成多行更好读
-            setTimeout(()=>{ const i=$('askInput'); if(i){ i.select(); } }, 80);
+            openAiExport(json, `${currentArchive} · ${(json.length/1024).toFixed(1)} KB`, {
+                mode: 'backup',
+                title: '导出存档（手动保存）',
+                tip: '无法直接写入文件，请点「复制」或「分享」，把内容保存到记事本 / 云笔记 / 聊天收藏。这段文本就是完整备份，之后可用「导入存档」还原。'
+            });
         }
 
         // ===== 导出账单给 AI 分析 =====
@@ -1959,8 +2031,17 @@ ${detail}
             return prompt;
         }
 
-        // 打开结果弹窗，填入文本，绑定复制/分享
-        function openAiExport(text, sub){
+        // 打开结果弹窗，填入文本，绑定复制/分享。
+        // opts（可选）：{ title, tip } 用于复用到「存档导出兜底」场景；不传则用 AI 分析的默认文案。
+        const AIEXP_DEFAULT_TITLE = '导出账单给 AI 分析';
+        const AIEXP_DEFAULT_TIP   = '复制或分享后，粘贴给任意 AI（如 Claude、DeepSeek、豆包），让它帮你分析消费、给出建议。';
+        // 当前弹窗用途：'ai'=给 AI 分析；'backup'=存档兜底。仅用于让「复制成功」的提示语对得上场景。
+        let aiExpMode='ai';
+        function openAiExport(text, sub, opts){
+            opts = opts || {};
+            aiExpMode = opts.mode || 'ai';
+            $('aiExpTitle').textContent = opts.title || AIEXP_DEFAULT_TITLE;
+            $('aiExpTip').textContent   = opts.tip   || AIEXP_DEFAULT_TIP;
             $('aiExpText').value = text;
             $('aiExpSub').textContent = sub || '';
             $('aiExpMask').style.display='flex';
@@ -1979,7 +2060,12 @@ ${detail}
                 // 兜底：选中 textarea 走 execCommand
                 try{ const ta=$('aiExpText'); ta.focus(); ta.select(); ok=document.execCommand('copy'); }catch(__){}
             }
-            aiExpAlert(ok?'已复制到剪贴板，去粘贴给 AI 吧。':'复制失败，请手动长按文本框全选复制。', ok?'复制成功':'复制未成功');
+            aiExpAlert(
+                ok ? (aiExpMode==='backup'
+                        ? '已复制到剪贴板，请尽快粘贴保存到记事本 / 云笔记，避免剪贴板被覆盖。'
+                        : '已复制到剪贴板，去粘贴给 AI 吧。')
+                   : '复制失败，请手动长按文本框全选复制。',
+                ok ? '复制成功' : '复制未成功');
         });
         $('aiExpShare').addEventListener('click', async ()=>{
             const text=$('aiExpText').value;
@@ -2074,28 +2160,30 @@ ${detail}
             if(records.length > MAX_IMPORT_RECORDS){ throw new Error('toomany'); }
             const out=[];
             const stats={ dropped:0, timeFixed:0, typeFilled:0 };
-            const reFull=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;          // 恰好到分钟
-            const reWithSec=/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):\d{2}/; // 带秒/毫秒，可安全截断
-            const validDt = s => isFinite(new Date(s).getTime());   // 截断后再确认是真实存在的时刻
             for(const r of records){
                 if(!r || typeof r!=='object'){ stats.dropped++; continue; }
                 const m=normMoney(r.money);
                 if(!m.ok){ stats.dropped++; continue; }              // 金额非法直接丢弃这条
 
                 // 类型：仅接受 expense/income，缺失或非法补为 income 并计数
-                let type, mSec;
+                let type;
                 if(r.type==='expense'||r.type==='income'){ type=r.type; }
                 else { type='income'; stats.typeFilled++; }
 
-                // 时间：完整分钟格式且为真实时刻直接用；带秒/毫秒则截断到分钟后再校验；
-                //       格式对但日期非法（如 9999-99-99）或其余情况一律补为当前时刻并计数
+                // 时间：与存量数据的自检修复共用同一套判定/修复逻辑（isDirtyTime / repairTime），
+                //   避免「导入」和「自检」两条路对同一个脏值给出不同结果。
+                //   干净值原样保留；脏值优先按「钳制到当月最后一天」修（保住月份归属，
+                //   2月30 → 2月28，而不是滚成 3月2 或直接抹成导入时刻）；实在修不出来才回退当前时刻。
                 let time;
-                if(typeof r.time==='string' && reFull.test(r.time) && validDt(r.time)){
-                    time=r.time;
-                } else if(typeof r.time==='string' && (mSec=r.time.match(reWithSec)) && validDt(mSec[1])){
-                    time=mSec[1];
+                const canon=(typeof r.time==='string') ? r.time.trim().replace(' ','T') : r.time;
+                // 带秒/毫秒/时区的先截到分钟，再判定
+                const mSec=(typeof canon==='string') && canon.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}):\d{2}/);
+                const cand=mSec ? mSec[1] : canon;
+                if(!isDirtyTime(cand)){
+                    time=cand;
                 } else {
-                    time=nowDtValue(); stats.timeFixed++;
+                    time=repairTime(r.time) || nowDtValue();
+                    stats.timeFixed++;
                 }
 
                 // 分类名限长，与手动输入的 8 字校验对齐，防止超长名污染分类表/下拉
@@ -2145,7 +2233,7 @@ ${detail}
         function importFixSuffix(stats){
             if(!stats) return '';
             const parts=[];
-            if(stats.timeFixed>0)  parts.push(`${stats.timeFixed} 条时间格式异常，已改为导入时刻`);
+            if(stats.timeFixed>0)  parts.push(`${stats.timeFixed} 条时间不合法（如 2 月 30 日），已修正为该月的有效日期`);
             if(stats.typeFilled>0) parts.push(`${stats.typeFilled} 条缺收支类型，已默认按收入`);
             if(stats.dropped>0)    parts.push(`${stats.dropped} 条金额无效，已跳过`);
             return parts.length ? `\n\n注意：其中 ${parts.join('；')}。` : '';
@@ -2600,7 +2688,9 @@ ${detail}
             dtHour.value=now.getHours(); dtMin.value=now.getMinutes();
             renderDtDays(); updateDtPreview();
         };
-        function closeDtPicker(){ dtMask.style.display='none'; dtTargetInput=null; dtOnPick=null; dtOnCancel=null; dtDayCounts=null; $('dtTimeRow').style.display=''; }
+        // 关闭时务必一并收起时/分下拉：面板展开时被传送到 <body> 下，
+        // 它已不是 dtMask 的后代，隐藏 dtMask 并不会连带隐藏它 —— 不收起就会留下一个悬空浮层。
+        function closeDtPicker(){ closeAllCs(); dtMask.style.display='none'; dtTargetInput=null; dtOnPick=null; dtOnCancel=null; dtDayCounts=null; $('dtTimeRow').style.display=''; }
         $('dtCancel').onclick=()=>{
             // AI 导出场景：取消回到「选日/周/月」那一步，而非直接退回设置页
             const back=dtOnCancel;
@@ -2677,7 +2767,7 @@ ${detail}
                 filterCat.value = draftCat;
                 curPage=1;
                 renderBill();
-                syncFilterFab();
+                window.syncFilterFab();
             }
             // 暴露给分类标签点击用：只更新草稿分类，不提交
             window.setDraftCat = function(v){ draftCat = v; };
@@ -3110,8 +3200,11 @@ ${detail}
 
         addBill.addEventListener('click', () => {
             const time=getDtInput(billTime), money=billMoney.value;
-            const cat=billCat.value, remark=billRemark.value.trim();
-            const type=billType.value;
+            // 分类/收支一律以 chips 的选中状态(billCatSel/billTypeSel)为准，不读隐藏 select 的 value。
+            // 原因：<select> 没有空 option 时，赋 '' 是无效操作，value 会保持在第一个 option 上，
+            // 导致「未选分类」被误判为「已选第一个分类」，必选校验形同虚设、静默入账。
+            const cat=billCatSel, remark=billRemark.value.trim();
+            const type=billTypeSel;
             // ===== 保底机制：点「添加记录」时若有项没填，弹窗就地补这一项 =====
             // 正常从上往下填完根本走不到这里；漏填时按顺序找第一个缺的项，
             // 弹对应控件让用户当场补：金额→输入框，分类/收支→可点选标签。
@@ -3262,15 +3355,36 @@ ${detail}
             renderEditTypeChips(item.type||'income');
             editMask.style.display='flex';
         };
-        // 修改弹窗退出后的收尾：若来自详情，刷新并回到消费明细。用完清标志。
-        function afterEditClosed(){
+        // 修改弹窗的唯一退出口。所有关闭路径（保存 / 取消 / 删除 / 记录已不存在）都走这里，
+        // 保证复位动作只写一遍、不会漏。
+        //
+        // 【为什么要收口】此前四个出口各自手写复位，已经出现不一致：saveEdit 成功分支
+        //   调了 afterEditClosed() 却没清 editId，而其余三处都清了。当下无害（openEdit 每次都会
+        //   重新赋值），但这类「加一条新路径就得记得在 N 处补复位」的结构，漏一个就是幽灵状态
+        //   ——不崩不报错，只是某次点击后层级错了、或高光留在了错的行上，极难复现。
+        //
+        // opts.refresh            为真则刷新账单/统计视图（保存、删除后需要；单纯取消不需要）
+        // opts.skipDetailRefresh  为真则不回明细（用于随后要弹 customAlert 的异常路径——
+        //                         明细与提示共用 askMsg，回明细会被提示覆盖，留下过期内容）
+        // 返回后若本次是「从消费明细进来的」，自动刷新并回到明细弹窗（它一直在底下没关）。
+        function closeEditModal(opts){
+            opts=opts||{};
+            const backToDetail=editReturnToHourDetail && !opts.skipDetailRefresh;
+            // —— 复位全部相关状态（一处写全，别处不再各自维护）——
+            editMask.style.display='none';
             editMask.classList.remove('over-detail');   // 复位层级，不影响下次普通调用
-            if(editReturnToHourDetail){
-                editReturnToHourDetail=false;
-                refreshHourDetail();   // 明细弹窗仍在底下，刷新其内容（反映改动/删除）
+            editId=null;
+            editReturnToHourDetail=false;
+            if(opts.skipDetailRefresh){
+                // 不回明细：连同明细弹窗的状态一并放弃，避免留下一个内容过期的 askMsg
+                hdHour=null; hdHlId=null;
             }
+
+            if(opts.refresh) refreshAllViews();
+            if(backToDetail) refreshHourDetail();       // 明细弹窗仍在底下，刷新其内容（反映改动/删除）
         }
-        cancelEdit.addEventListener('click', ()=>{ editMask.style.display='none'; editId=null; afterEditClosed(); });
+
+        cancelEdit.addEventListener('click', ()=>closeEditModal());
         $('deleteInEdit').addEventListener('click', ()=>{
             const id=editId;
             if(id==null) return;
@@ -3282,16 +3396,16 @@ ${detail}
                     customAlert('删除未能保存，这条记录仍然存在，请稍后重试。', '删除失败');
                     return;
                 }
-                editMask.style.display='none'; editId=null;
-                refreshAllViews();
-                afterEditClosed();
+                closeEditModal({ refresh:true });
             }, '删除记录');
         });
         // 禁止点击遮罩外部关闭，仅按钮可关闭
         saveEdit.addEventListener('click', () => {
             const time=getDtInput(editTime), money=editMoney.value;
-            const cat=editCat.value, remark=editRemark.value.trim();
-            const type=editType.value;
+            // 与记账弹窗同理：以 chips 选中态为准，避免隐藏 select 无空 option 时
+            // 「未选」被误读成「已选第一项」。
+            const cat=editCatSel, remark=editRemark.value.trim();
+            const type=editTypeSel;
             if(!time || money===''){ customAlert('时间和金额不能为空！'); return; }
             if(!cat){ customAlert('请选择一个分类～'); return; }
             if(!type){ customAlert('请选择收支（支出或收入）～'); return; }
@@ -3304,22 +3418,32 @@ ${detail}
                 // 保存失败时 saveUserData 已弹失败提示；提前返回，保持弹窗打开、不刷新，
                 // 避免「提示失败但弹窗已关、看似已保存」的不一致。
                 if(!saveUserData(data)) return;
-                editMask.style.display='none';
-                refreshAllViews();
-                afterEditClosed();
+                closeEditModal({ refresh:true });
             } else {
-                // 找不到原记录（例如保存前存档被切换/记录已被删）：关闭修改弹窗并复位状态，
-                // 再明确提示。复位避免 over-detail 类与回明细标志残留到下次。
-                editMask.style.display='none';
-                editMask.classList.remove('over-detail');
-                editReturnToHourDetail=false;
-                editId=null;
-                refreshAllViews();
+                // 找不到原记录（例如保存前存档被切换/记录已被删）：先复位关闭，再明确提示。
+                // 注意 skipDetailRefresh：closeEditModal 的「回明细」会往 askMsg 写内容，
+                // 而紧接着的 customAlert 也用 askMsg —— 两者抢同一个弹窗，提示会把明细覆盖掉，
+                // 底下留一个内容已过期的明细。这条异常路径直接放弃回明细，只给用户明确提示。
+                closeEditModal({ refresh:true, skipDetailRefresh:true });
                 customAlert('未找到要保存的记录，可能已被删除或切换了存档。');
             }
         });
 
         // ===== 自定义金色下拉：包裹原生 select，保留全部 value/事件逻辑 =====
+        // 面板采用「传送(portal)」策略：展开时把 .cs-panel 移到 <body> 下并改为 fixed 定位。
+        // 为什么必须这么做：面板原本是 .cs-wrap 的 absolute 子元素，而时间选择器容器 .dt-dialog
+        //   带 overflow-y:auto —— 只要祖先链上有 overflow，absolute 后代就一定被裁剪（规范行为）。
+        //   于是旧实现里面板只能塞在弹窗内部，把弹窗从内部撑高（截图里弹窗底部那截空白就是证据）；
+        //   撑到 max-height 上限后又改为内部滚动 —— 同一个操作两种表现，这才是「有时顶起来、有时顶不起来」的根源。
+        //   移到 body 后，面板既不被裁剪、也不参与撑高，弹窗尺寸纹丝不动，面板可以自由画到弹窗外面。
+        // 展开方向：永远向下（不做上下翻转，翻转会让同一个控件出现两种视觉行为，反而更乱）。
+        //   若下方空间不足以完整显示，面板自身内部滚动（它本来就有 overflow-y:auto），
+        //   并把选中项 scrollIntoView 到可视区，所以「53 分」这种靠后的值一打开就能看见。
+
+        // 所有已增强下拉的关闭函数登记表。全局「点空白关下拉」的监听要调真正的 close()，
+        // 而不能只 remove('open') —— 那样面板会永远留在 body 上、fixed 定位不动，变成甩不掉的幽灵浮层。
+        const csClosers = [];
+
         function enhanceSelect(sel){
             if(!sel || sel.dataset.csReady) return;
             sel.dataset.csReady='1';
@@ -3368,18 +3492,54 @@ ${detail}
                     el.classList.toggle('sel', sel.options[i] && sel.options[i].value===sel.value);
                 });
             }
+
+            // 按触发器(display)的实时屏幕坐标摆放面板：永远在其正下方、同宽。
+            // 高度取「240px」与「到可视区底部的剩余空间」的较小值，超出部分面板内部滚动。
+            // 用 visualViewport.height 而非 innerHeight：键盘弹起时前者会收缩，面板才不会被键盘盖住。
+            function positionPanel(){
+                const r=display.getBoundingClientRect();
+                const vh=(window.visualViewport && window.visualViewport.height) || window.innerHeight;
+                const GAP=4, EDGE=12;              // 与触发器的间距 / 与屏幕底部的安全距离
+                const room=vh - r.bottom - GAP - EDGE;
+                panel.style.left  = r.left + 'px';
+                panel.style.width = r.width + 'px';
+                panel.style.top   = (r.bottom + GAP) + 'px';
+                // 下方空间再小也保底 120px，宁可略微出屏也不要挤成一条缝（实际用不到，此处纯兜底）
+                panel.style.maxHeight = Math.max(120, Math.min(240, room)) + 'px';
+            }
+
             function open(){
-                // 关闭其它打开的下拉
-                document.querySelectorAll('.cs-wrap.open').forEach(w=>{ if(w!==wrap) w.classList.remove('open'); });
-                buildPanel(); wrap.classList.add('open');
+                closeAllCs(panel);                 // 先关掉其它已展开的下拉（含它们的 portal 收回）
+                buildPanel();
+                wrap.classList.add('open');
+                // 传送到 body：脱离 .dt-dialog 的 overflow 裁剪与高度计算
+                document.body.appendChild(panel);
+                panel.classList.add('cs-portal','cs-open');
+                positionPanel();
                 const selEl=panel.querySelector('.cs-opt.sel');
                 if(selEl) selEl.scrollIntoView({block:'nearest'});
             }
-            function close(){ wrap.classList.remove('open'); }
-            display.onclick=(e)=>{ e.stopPropagation(); wrap.classList.contains('open')?close():open(); };
+            function close(){
+                wrap.classList.remove('open');
+                panel.classList.remove('cs-portal','cs-open');
+                // 清掉 JS 写的内联定位，收回 wrap，保证 DOM 与样式都回到初始状态（可反复开关）
+                panel.style.left=''; panel.style.top='';
+                panel.style.width=''; panel.style.maxHeight='';
+                if(panel.parentNode!==wrap) wrap.appendChild(panel);
+            }
+            function isOpen(){ return wrap.classList.contains('open'); }
 
-            // 选项变化（如分类/存档动态重建）时重建并同步
-            const mo=new MutationObserver(()=>{ buildPanel(); syncDisplay(); });
+            csClosers.push({ close, isOpen, panel, reposition:positionPanel });
+
+            display.onclick=(e)=>{ e.stopPropagation(); isOpen()?close():open(); };
+            // 面板内部点击不冒泡到 document，避免刚展开就被全局「点空白关闭」收掉
+            panel.addEventListener('click', e=>e.stopPropagation());
+
+            // 选项变化（如分类/存档动态重建）时重建并同步；若正展开着，重建后尺寸可能变，需重新摆位
+            const mo=new MutationObserver(()=>{
+                buildPanel(); syncDisplay();
+                if(isOpen()) positionPanel();
+            });
             mo.observe(sel, {childList:true});
 
             // 当代码用 sel.value=... 赋值时，同步显示
@@ -3397,8 +3557,26 @@ ${detail}
             buildPanel(); syncDisplay();
         }
 
-        // 点击空白处关闭所有自定义下拉
-        document.addEventListener('click', ()=>{ document.querySelectorAll('.cs-wrap.open').forEach(w=>w.classList.remove('open')); });
+        // 关闭全部已展开的下拉（except 传入的面板则跳过，供 open() 内部复用）
+        function closeAllCs(except){
+            csClosers.forEach(c=>{ if(c.panel!==except && c.isOpen()) c.close(); });
+        }
+
+        // 点击空白处关闭所有自定义下拉。
+        // 注意：这里必须调真正的 close()（会把 portal 面板收回并清掉 fixed 样式），
+        // 只 remove('open') 会留下永远浮在 body 上的幽灵面板。
+        // 这只关「下拉面板」，不关任何 .mask 弹窗 —— 弹窗一律只能按按钮关闭（既有设计，未改动）。
+        document.addEventListener('click', ()=>closeAllCs());
+
+        // 页面/弹窗内滚动或视口变化时：fixed 面板不会跟着内容走，会「飘」在错误位置。
+        // 直接收起，比持续跟随重定位更简单也更不容易出错。
+        // capture:true 以便捕获弹窗内部可滚动区域(.dt-dialog 等)的滚动，而不只是 window 的。
+        window.addEventListener('scroll', ()=>closeAllCs(), {passive:true, capture:true});
+        window.addEventListener('resize', ()=>closeAllCs(), {passive:true});
+        if(window.visualViewport){
+            // 键盘弹起/收起会改变可视区高度，此时面板的 top/maxHeight 都失效了
+            window.visualViewport.addEventListener('resize', ()=>closeAllCs());
+        }
 
         // 初始化页面里所有原生下拉
         // 注意：billCat 不再增强为可见下拉——它已被分类标签(chips)取代，仅作隐藏取值用
@@ -3662,6 +3840,7 @@ ${detail}
         }
 
         function switchTab(tab){
+            closeAllCs();   // 收起可能展开的下拉：其面板已传送到 body，切页隐藏容器不会带走它
             currentTab=tab;
             $('pageLedger').style.display   = tab==='ledger'   ? 'block':'none';
             $('pageStats').style.display    = tab==='stats'    ? 'block':'none';
@@ -3822,7 +4001,9 @@ ${detail}
             renderStatMonthCats(recs);
 
             // 画日历格子
-            const firstDow=new Date(statYear, statMonth, 1).getDay();   // 0=周日
+            // 周一为一周起始：与记账/筛选/AI导出的日期选择器（renderDtDays）以及
+            // AI「按周」分组（(getDay()+6)%7）保持一致，避免同一 App 里两套周起始。
+            const firstDow=(new Date(statYear, statMonth, 1).getDay()+6)%7;   // 0=周一
             const daysInMonth=new Date(statYear, statMonth+1, 0).getDate();
             const today=new Date();
             const isThisMonth = today.getFullYear()===statYear && today.getMonth()===statMonth;
@@ -3893,10 +4074,11 @@ ${detail}
             }
 
             // —— 当日按小时支出 ——
+            // 只需要每小时的支出合计用于画柱高；点柱子看明细时由 recordsOfHour(h) 现查，
+            // 故这里不再额外累积一份「小时 -> 记录数组」的缓存（那份缓存曾存在但从未被读取）。
             const hours=new Array(24).fill(0);
-            const hourRecs={};   // 小时 -> 该小时的支出记录数组
-            recs.forEach(r=>{ if(r.type==='expense'){ const h=new Date(r.time).getHours(); hours[h]+=safeNum(r.money); (hourRecs[h]=hourRecs[h]||[]).push(r); } });
-            renderHourBars(hours, hourRecs);
+            recs.forEach(r=>{ if(r.type==='expense'){ const h=new Date(r.time).getHours(); hours[h]+=safeNum(r.money); } });
+            renderHourBars(hours);
         }
 
         // 当月支出分类占比：入参 recs 已是当月全部记录（含收入），此处只取支出按分类聚合。
@@ -3982,9 +4164,25 @@ ${detail}
         }
 
         // 手写柱状图（24 小时，可横向滚动，自动定位高峰，点击看该时段明细）
-        let statHourRecs={};   // 供点击明细使用：小时 -> 记录数组
-        function renderHourBars(hours, hourRecs){
-            statHourRecs = hourRecs || {};
+        // 柱子点击走事件委托：statBarInner 是静态容器，只在此绑一次，
+        // renderHourBars 反复重写 innerHTML 也不会重复挂监听、不会泄漏。
+        (function(){
+            const box=$('statBarInner');
+            if(!box) return;
+            box.addEventListener('click', e=>{
+                // SVG 内点击命中的多半是 <g> 里的 <rect>/<text> 子节点，需要向上找带 data-act 的 <g>。
+                // 不用 closest()：部分老 WebView 的 SVGElement 上没有实现它，这里手动上溯更稳。
+                let el=e.target;
+                while(el && el!==box && !(el.dataset && el.dataset.act==='hourBar')) el=el.parentNode;
+                if(!el || el===box) return;
+                const h=parseInt(el.dataset.h, 10);
+                if(isFinite(h)) showHourDetail(h);
+            });
+        })();
+        // 注：此前这里有个 statHourRecs 缓存（小时 -> 记录数组），已删除——
+        // 它只写不读：showHourDetail 走的是 recordsOfHour(h)，每次从真实数据重查，
+        // 这样在详情里改过/删过记录后回到明细能反映最新数据。缓存留着只会误导。
+        function renderHourBars(hours){
             const max=Math.max(...hours, 1);
             const colW=30, gap=6, padL=4, padBottom=22, padTop=8;
             const innerW=padL*2 + hours.length*colW + (hours.length-1)*gap;
@@ -4012,8 +4210,12 @@ ${detail}
                     } else {
                         cell+=`<text x="${x+colW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${txtCol}">${label}</text>`;
                     }
-                    // 透明热区，扩大点击范围（含柱子上方空白），方便手指点
-                    bars+=`<g style="cursor:pointer" onclick="showHourDetail(${h})">`
+                    // 透明热区，扩大点击范围（含柱子上方空白），方便手指点。
+                    // 用 data-act/data-h + 事件委托（见下方 statBarInner 的监听），不写内联 onclick——
+                    // 与账单表格、消费明细行保持同一套模式。h 虽是 0-23 的整数、拼进属性本身安全，
+                    // 但留着内联写法就等于给后来者一个「照抄即可」的坏样板：下次有人想多带个分类名
+                    // 进去，很自然就写成 onclick="fn(${h}, '${cat}')"，那一下就出事了。
+                    bars+=`<g style="cursor:pointer" data-act="hourBar" data-h="${h}">`
                         + `<rect x="${x}" y="${padTop}" width="${colW}" height="${plotH}" fill="transparent"/>`
                         + cell + `</g>`;
                 } else {
@@ -4098,13 +4300,14 @@ ${detail}
         }
 
         // 点击柱子：打开该小时明细。重新打开 → 清空高光，从头开始。
-        window.showHourDetail=function(h){
+        // 已改为事件委托调用，不再需要挂到 window（此前是为了让 SVG 的内联 onclick 能找到它）。
+        function showHourDetail(h){
             if(!recordsOfHour(h).length) return;
             hdHour=h;
             hdHlId=null;
             // 大标题只保留「消费明细」；日期+时段作为副标题在正文顶部（renderHourDetailBody 内）
-            customAlert(renderHourDetailBody(h), '消费明细', 'left', true);
-        };
+            customAlertHtml(renderHourDetailBody(h), '消费明细', 'left');
+        }
 
         // 明细行点击（事件委托绑在 askMsg 上）：进入该条详情，并给它上高光。
         askMsg.addEventListener('click', (e)=>{
@@ -4149,7 +4352,7 @@ ${detail}
             const id=detailCurId;
             $('detailMask').style.display='none';
             detailCurId=null;
-            if(id) openEdit(id, { fromDetail:true });
+            if(id) window.openEdit(id, { fromDetail:true });
         });
 
         // 统计页月份切换
@@ -4205,6 +4408,112 @@ ${detail}
                 mask.style.display='none'; renderStatCalendar();
             });
         })();
+
+        // ============================================================
+        // ===== 历史脏数据自检与修复：time 字面量 vs Date 解析不一致 =====
+        // ============================================================
+        // 背景：旧版导入清洗用 isFinite(new Date(s)) 判定时间是否合法，但 JS 对越界日期
+        //   是「静默滚动」而非报错——'2026-02-30T10:30' 会被解析成 3月2日，isFinite 仍为真，
+        //   于是这个字符串被原样入库。而本 App 对 r.time 有两套读法：
+        //     · 字符串口径（账单列表显示、日期范围筛选 slice(0,10)）→ 认 2月30日
+        //     · Date 口径（统计日历、当月汇总、AI 导出）        → 认 3月2日
+        //   同一条记录在两个页面落到不同月份，且日期筛选永远匹配不到它实际所在的月。
+        //   新版导入已用严格校验堵住入口，但**存量脏数据仍在库里**，故需要这一次性修复。
+        //
+        // 修复口径：钳制到当月最后一天（2月30 → 2月28/29），而不是跟随 Date 的滚动（→3月2）。
+        //   理由：用户记账时想表达的是「二月的这笔支出」，月份归属比具体某天更重要；
+        //   滚动会把它推进下个月，直接改变统计页和 AI 导出的月度口径。
+        //   月份本身就越界的（如 13 月）无法推断意图，回退为「该年 1 月 1 日 00:00」并单独计数。
+
+        // 判定一条 time 是否「脏」（非规范格式，或解析回来与字面量不一致）
+        function isDirtyTime(t){
+            if(typeof t!=='string') return true;
+            const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(t);
+            if(!m) return true;
+            const y=+m[1], mo=+m[2], d=+m[3], h=+m[4], mi=+m[5];
+            const dt=new Date(y, mo-1, d, h, mi, 0, 0);
+            return !(dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d
+                  && dt.getHours()===h && dt.getMinutes()===mi);
+        }
+
+        // 把一条脏 time 修成合法的规范串。修不出来则返回 null（调用方回退为当前时刻）。
+        function repairTime(t){
+            if(typeof t!=='string') return null;
+            const s=t.trim().replace(' ', 'T');          // 兼容「YYYY-MM-DD HH:mm」显示格式
+            const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s);   // 宽松：允许尾部有秒/毫秒/时区
+            if(!m) return null;
+            const y=+m[1];
+            let mo=+m[2], d=+m[3], h=+m[4], mi=+m[5];
+            if(!isFinite(y) || y<1970 || y>9999) return null;
+            if(mo<1 || mo>12) return `${y}-01-01T00:00`;  // 月份越界：意图无从推断，落到该年年初
+            const lastDay=new Date(y, mo, 0).getDate();   // 该年该月的最后一天（自动处理闰年）
+            d = Math.min(Math.max(d, 1), lastDay);        // 钳制：2月30 → 2月28/29
+            h = Math.min(Math.max(h, 0), 23);
+            mi= Math.min(Math.max(mi, 0), 59);
+            return `${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}`;
+        }
+
+        // 扫描并修复某用户 store 里所有存档的脏时间。
+        // 返回 { scanned, fixed, samples[] }；不写盘（由调用方决定，便于「先看结果再确认」）。
+        function scanAndRepairStore(store){
+            let scanned=0, fixed=0;
+            const samples=[];
+            Object.keys(store.archives).forEach(name=>{
+                const a=store.archives[name];
+                if(!a || !Array.isArray(a.records)) return;
+                a.records.forEach(r=>{
+                    scanned++;
+                    if(!isDirtyTime(r.time)) return;
+                    const before=r.time;
+                    const after=repairTime(before) || nowDtValue();
+                    r.time=after;
+                    fixed++;
+                    if(samples.length<5){
+                        samples.push({ archive:name, before:String(before), after });
+                    }
+                });
+            });
+            return { scanned, fixed, samples };
+        }
+
+        // 登录后自检：只在该用户尚未修过时跑一次（用 localStorage 打标记，避免每次登录都全表扫描）。
+        // 修复结果如实告知用户——静默改动用户的账目数据是不可接受的。
+        function runTimeRepairOnce(user){
+            const flagKey=`app_time_repaired_${user}`;
+            if(localStorage.getItem(flagKey)==='1') return;   // 已修过，跳过
+            let store;
+            try{ store=loadStore(user); }catch(_){ return; }
+            if(!store || !store.archives) return;
+
+            const { fixed, samples }=scanAndRepairStore(store);
+            if(fixed===0){
+                // 没有脏数据：直接打标记，以后不再扫
+                try{ localStorage.setItem(flagKey,'1'); }catch(_){}
+                return;
+            }
+            // 有修改：先写盘。写失败就不打标记，下次启动再试（不能只改内存不落盘）
+            try{
+                saveStore(store, user);
+            }catch(_){
+                return;   // 配额满等，本次放弃，保持原样，下次再修
+            }
+            try{ localStorage.setItem(flagKey,'1'); }catch(_){}
+
+            // 修完必须刷新视图，否则界面还停在修复前的旧数据上
+            refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
+
+            const lines=samples.map(s=>
+                `　·【${escapeHtml(s.archive)}】${escapeHtml(s.before)} → ${escapeHtml(s.after)}`
+            ).join('<br>');
+            const more = fixed>samples.length ? `<br>　…等共 ${fixed} 条` : '';
+            customAlertHtml(
+                `检测到 <b>${fixed}</b> 条记录的时间是不存在的日期（如 2 月 30 日），`+
+                `它们会导致「账单列表」和「统计页」把同一笔账算到不同月份。<br><br>`+
+                `已把这些时间修正到当月的最后一天（保持原本的月份归属）：<br>${lines}${more}<br><br>`+
+                `金额、分类、备注均未改动。`,
+                '已修复历史数据', 'left'
+            );
+        }
 
         // ===== 页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页 =====
         (function initApp(){
