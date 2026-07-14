@@ -841,6 +841,54 @@
         .days-add { border:none; border-radius:8px; padding:8px 16px; font-size:14px; cursor:pointer;
             background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
             color:var(--c-on-primary); box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),.35); }
+        /* 「管理」按钮：跟「＋添加」并排在右侧。头部原本三格已铺满，
+           所以它做成弱化的次级按钮（无填充、字号小），两个加起来才占一格的视觉重量。 */
+        .days-manage { border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-text-soft); border-radius:8px; padding:6px 10px; font-size:13px; cursor:pointer; }
+        .days-manage:active { background:var(--c-chip); }
+
+        /* ===== 选择模式（批量删除）=====
+           不新开弹窗，而是把同一个列表就地切成可勾选状态：
+           小屏上「弹窗里再套一个可滚动列表」会产生嵌套滚动，且要再压一层 z-index。 */
+        .days-sel-head { display:flex; align-items:center; justify-content:space-between;
+            gap:10px; margin-bottom:16px; padding:10px 12px; border-radius:10px;
+            background:var(--c-chip); border:1px solid var(--c-border-mid); }
+        .days-sel-head .ds-btn { border:none; background:none; color:var(--c-text);
+            font-size:14px; cursor:pointer; padding:4px 6px; }
+        .days-sel-head .ds-count { font-size:15px; font-weight:bold; color:var(--c-primary-dark); }
+        /* 勾选圈：未选是空心描边，选中填主色 */
+        .day-item .di-check { width:22px; height:22px; border-radius:50%; flex-shrink:0;
+            border:1px solid var(--c-border-mid); display:none;
+            align-items:center; justify-content:center;
+            font-size:13px; color:var(--c-on-primary); }
+        body.days-selecting .day-item .di-check { display:flex; }
+        body.days-selecting .day-item.sel { border-color:var(--c-primary);
+            background:var(--c-chip); }
+        body.days-selecting .day-item.sel .di-check {
+            background:var(--c-primary); border-color:var(--c-primary); }
+        /* 底部删除条：选择模式下常驻页面底部 */
+        .days-del-bar { display:none; position:sticky; bottom:0; padding:10px 0 4px;
+            background:linear-gradient(to top, var(--c-bg) 70%, transparent); }
+        body.days-selecting .days-del-bar { display:block; }
+        .days-del-btn { width:100%; padding:12px; border:none; border-radius:10px;
+            font-size:15px; cursor:pointer; background:var(--c-neg); color:#fff; }
+        .days-del-btn:disabled { background:var(--c-border); color:var(--c-text-soft); cursor:default; }
+
+        /* ===== 日子管理弹窗：入口卡条数 ===== */
+        .dm-label { font-size:13px; color:var(--c-primary-deep); font-weight:500; }
+        .dm-hint { font-size:11px; color:var(--c-text-soft); margin:4px 0 10px; line-height:1.5; }
+        /* 数字输入：居中、大字号，inputmode=numeric 让手机直接弹数字键盘 */
+        .dm-num { width:100%; text-align:center; font-size:22px; font-weight:bold;
+            color:var(--c-primary-deep); padding:10px; border:1px solid var(--c-border-mid);
+            border-radius:8px; background:var(--c-surface); outline:none;
+            font-variant-numeric:tabular-nums; }
+        .dm-num:focus { border-color:var(--c-primary); box-shadow:0 0 6px rgba(var(--c-shadow-rgb),.4); }
+        .dm-sep { border-top:1px solid var(--c-border); margin:16px 0 14px; }
+        .dm-batch { width:100%; padding:11px; border:1px solid var(--c-border-mid);
+            border-radius:8px; background:var(--c-surface); color:var(--c-text);
+            font-size:14px; cursor:pointer; }
+        .dm-batch:active { background:var(--c-chip); }
+        .dm-batch:disabled { color:var(--c-text-soft); opacity:.55; cursor:default; }
         .day-item { background:var(--c-surface); border:1px solid var(--c-border);
             border-radius:12px; padding:12px 14px; margin-bottom:10px; cursor:pointer;
             display:flex; justify-content:space-between; align-items:center; gap:10px; }
@@ -904,7 +952,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0713-I</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0714-C</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1082,14 +1130,24 @@
                  理由：倒数日与账单无数据关联，频次也远低于记账；提到 tab 级会挤掉
                  「记账」的居中位置（拇指最易触达处），为辅助功能牺牲核心功能不划算。 -->
             <div class="tab-page" id="pageDays" style="display:none">
-                <div class="days-head">
+                <div class="days-head" id="daysHeadNormal">
                     <button class="days-back" id="daysBack">‹ 返回</button>
                     <span class="days-title">日子</span>
+                    <button class="days-manage" id="daysManage">管理</button>
                     <button class="days-add" id="daysAdd">＋ 添加</button>
+                </div>
+                <!-- 选择模式下顶替上面那条：取消 / 已选N项 / 全选 -->
+                <div class="days-sel-head" id="daysHeadSelect" style="display:none">
+                    <button class="ds-btn" id="daysSelCancel">取消</button>
+                    <span class="ds-count" id="daysSelCount">已选 0 项</span>
+                    <button class="ds-btn" id="daysSelAll">全选</button>
                 </div>
                 <div id="daysList"></div>
                 <div class="days-empty" id="daysEmpty" style="display:none">
                     还没有记录任何日子<br>点右上角「＋ 添加」记下第一个吧
+                </div>
+                <div class="days-del-bar" id="daysDelBar">
+                    <button class="days-del-btn" id="daysDelBtn" disabled>删除选中的 0 项</button>
                 </div>
             </div>
         </div>
@@ -1436,6 +1494,23 @@
                 <button class="cancel" id="dayCancel">取消</button>
             </div>
             <button class="edit-del-btn" id="dayDelete" style="display:none">删除这个日子</button>
+        </div>
+    </div>
+
+    <!-- 日子管理弹窗：入口卡条数 + 批量删除入口 -->
+    <div class="mask" id="dayMgrMask">
+        <div class="edit-dialog">
+            <h3>日子管理</h3>
+            <div class="dm-label">记账页入口卡显示条数</div>
+            <div class="dm-hint">最少 3 条，最多 99 条。超出的日子仍可在本页看到，不会丢。</div>
+            <input type="text" id="dmCount" class="dm-num"
+                   inputmode="numeric" maxlength="2" placeholder="3">
+            <div class="dm-sep"></div>
+            <button class="dm-batch" id="dmBatch">批量删除日子</button>
+            <div class="dialog-btn">
+                <button class="save" id="dmSave">保存</button>
+                <button class="cancel" id="dmClose">取消</button>
+            </div>
         </div>
     </div>
 
@@ -2230,7 +2305,7 @@
 
         // 把一条记录格式化成「MM-DD HH:mm 支出 餐饮 16.00 元（备注：打车）」这种明细行
         function aiFmtRecord(r){
-            const d=new Date(r.time);
+            const d=parseRecTime(r.time);
             const md=`${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
             const io=r.type==='expense'?'支出':'收入';
             const amt=safeNum(r.money).toFixed(2);
@@ -2254,7 +2329,7 @@
             }).join('\n') || '  （本期无支出）';
 
             // 明细（按时间正序）
-            const detail=records.slice().sort((a,b)=>new Date(a.time)-new Date(b.time))
+            const detail=records.slice().sort((a,b)=>parseRecTime(a.time)-parseRecTime(b.time))
                 .map(r=>'  '+aiFmtRecord(r)).join('\n') || '  （本期无记录）';
 
             const prompt =
@@ -2336,7 +2411,7 @@ ${detail}
                 // 用现成的日历选择器选某一天（比长列表更直观，且不随数据增长变长）。
                 // 统计每天笔数（当天 0点~23:59:59），在格子下方显示；取消回到选维度。
                 const dayCounts={};
-                all.forEach(r=>{ const d=new Date(r.time); const key=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; dayCounts[key]=(dayCounts[key]||0)+1; });
+                all.forEach(r=>{ const d=parseRecTime(r.time); const key=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; dayCounts[key]=(dayCounts[key]||0)+1; });
                 const today=new Date();
                 const initDay=`${today.getFullYear()}-${pad(today.getMonth()+1)}-${pad(today.getDate())}`;
                 openDtPickerDate(initDay, (dayStr)=>{
@@ -2344,7 +2419,7 @@ ${detail}
                     // 边界：当天 00:00:00.000 ~ 23:59:59.999
                     const start=new Date(y, m-1, d, 0, 0, 0, 0);
                     const end=new Date(y, m-1, d, 23, 59, 59, 999);
-                    const recs=all.filter(r=>{ const t=new Date(r.time); return t>=start && t<=end; });
+                    const recs=all.filter(r=>{ const t=parseRecTime(r.time); return t>=start && t<=end; });
                     const label=`${y}年${m}月${d}日`;
                     if(!recs.length){ customAlert(`${label} 这天没有记账记录，换一天试试。`, '当天无记录'); return; }
                     openAiExport(buildAiText(recs, label, '按日'), label);
@@ -2354,7 +2429,7 @@ ${detail}
                 // 以周一为起始，列出有记录的周（倒序），最多最近 26 周
                 const weekMap={};
                 all.forEach(r=>{
-                    const d=new Date(r.time); d.setHours(0,0,0,0);
+                    const d=parseRecTime(r.time); d.setHours(0,0,0,0);
                     const lead=(d.getDay()+6)%7;                 // 距本周一的天数
                     const mon=new Date(d); mon.setDate(d.getDate()-lead);
                     const key=`${mon.getFullYear()}-${pad(mon.getMonth()+1)}-${pad(mon.getDate())}`;
@@ -2371,7 +2446,7 @@ ${detail}
                     const [y,m,d]=k.split('-').map(Number);
                     const mon=new Date(y,m-1,d); mon.setHours(0,0,0,0);
                     const end=new Date(mon); end.setDate(mon.getDate()+7);
-                    const recs=all.filter(r=>{ const t=new Date(r.time); return t>=mon && t<end; });
+                    const recs=all.filter(r=>{ const t=parseRecTime(r.time); return t>=mon && t<end; });
                     const sun=new Date(mon); sun.setDate(mon.getDate()+6);
                     const label=`${mon.getFullYear()}年${mon.getMonth()+1}月${mon.getDate()}日 ~ ${sun.getMonth()+1}月${sun.getDate()}日`;
                     openAiExport(buildAiText(recs, label, '按周'), label);
@@ -2379,12 +2454,12 @@ ${detail}
             }
             else { // month
                 const monSet={};
-                all.forEach(r=>{ const d=new Date(r.time); const key=`${d.getFullYear()}-${pad(d.getMonth()+1)}`; monSet[key]=(monSet[key]||0)+1; });
+                all.forEach(r=>{ const d=parseRecTime(r.time); const key=`${d.getFullYear()}-${pad(d.getMonth()+1)}`; monSet[key]=(monSet[key]||0)+1; });
                 const months=Object.keys(monSet).sort().reverse().slice(0,36);
                 const opts=months.map(k=>({ label:`${k.replace('-','年')}月（${monSet[k]} 笔）`, value:k }));
                 customChoose('选择要分析的月份：', opts, (k)=>{
                     const [y,m]=k.split('-').map(Number);
-                    const recs=all.filter(r=>{ const t=new Date(r.time); return t.getFullYear()===y && t.getMonth()===m-1; });
+                    const recs=all.filter(r=>{ const t=parseRecTime(r.time); return t.getFullYear()===y && t.getMonth()===m-1; });
                     const label=`${y}年${m}月`;
                     openAiExport(buildAiText(recs, label, '按月'), label);
                 }, '选择月份', aiChooseDim);
@@ -3259,6 +3334,10 @@ ${detail}
                 resetSheetDrag();
                 setTimeout(()=>{ sheetMask.style.display='none'; loadCommittedIntoControls(); }, 260);
             }
+            // 暴露给系统返回键处理器：它在这个 IIFE 之外，但必须走这个正规出口
+            // ——只 remove('open') 会漏掉 display 复位和拖拽 transform 复位，
+            // 下次再开就会闪一下旧位置。
+            window.closeFilterSheet = closeSheetDiscard;
             // 完成：提交后关闭
             function closeSheetApply(){
                 commitDraft();
@@ -3269,7 +3348,10 @@ ${detail}
             fab.addEventListener('click', openSheet);
             applyBtn.addEventListener('click', closeSheetApply);
             // 点浮层外的遮罩区域 = 丢弃关闭
-            sheetMask.addEventListener('click', (e)=>{ if(e.target===sheetMask) closeSheetDiscard(); });
+            // 【不做「点遮罩关闭」】全应用统一：所有浮层只能通过明确的按钮/手势关闭。
+            //   误触遮罩把已填的筛选条件丢掉，代价远大于省下的一次点击；
+            //   而且此前只有这一个浮层能点外部关闭，行为不一致本身就是坑。
+            //   这里保留 grip 下拉手势和「关闭」按钮两条正规出口，足够了。
 
             // 日期：选定后只写控件草稿（显示值 + dataset.day），不提交、不刷新列表
             from.addEventListener('click', ()=>{
@@ -3419,7 +3501,7 @@ ${detail}
             const allAsc=raw
                 .map((r,origIdx)=>({ r, origIdx }))
                 .sort((a,b)=>{
-                    const t=new Date(a.r.time)-new Date(b.r.time);
+                    const t=parseRecTime(a.r.time)-parseRecTime(b.r.time);
                     if(t!==0) return t;
                     return a.origIdx-b.origIdx;
                 })
@@ -4472,7 +4554,7 @@ ${detail}
             // 按「日」聚合当月净额，并记录哪天有数据
             const dayNet={}, dayHas={};
             recs.forEach(r=>{
-                const d=new Date(r.time);
+                const d=parseRecTime(r.time);
                 if(d.getFullYear()===statYear && d.getMonth()===statMonth){
                     const day=d.getDate();
                     const amt=safeNum(r.money)*(r.type==='expense'?-1:1);
@@ -4484,7 +4566,7 @@ ${detail}
             // 当月收入/支出汇总
             let mIn=0, mOut=0;
             recs.forEach(r=>{
-                const d=new Date(r.time);
+                const d=parseRecTime(r.time);
                 if(d.getFullYear()===statYear && d.getMonth()===statMonth){
                     const amt=safeNum(r.money);
                     if(r.type==='expense') mOut+=amt; else mIn+=amt;
@@ -4539,7 +4621,7 @@ ${detail}
 
         function renderStatDay(day){
             const recs=statRecords().filter(r=>{
-                const d=new Date(r.time);
+                const d=parseRecTime(r.time);
                 return d.getFullYear()===statYear && d.getMonth()===statMonth && d.getDate()===day;
             });
             $('statDayEmpty').style.display='none';
@@ -4573,7 +4655,7 @@ ${detail}
             // 只需要每小时的支出合计用于画柱高；点柱子看明细时由 recordsOfHour(h) 现查，
             // 故这里不再额外累积一份「小时 -> 记录数组」的缓存（那份缓存曾存在但从未被读取）。
             const hours=new Array(24).fill(0);
-            recs.forEach(r=>{ if(r.type==='expense'){ const h=new Date(r.time).getHours(); hours[h]+=safeNum(r.money); } });
+            recs.forEach(r=>{ if(r.type==='expense'){ const h=parseRecTime(r.time).getHours(); hours[h]+=safeNum(r.money); } });
             renderHourBars(hours);
         }
 
@@ -4587,7 +4669,7 @@ ${detail}
 
             const byCat={};
             recs.forEach(r=>{
-                const d=new Date(r.time);
+                const d=parseRecTime(r.time);
                 // 关键：只统计当前查看月份的支出（recs 是整档全量，需按 statYear/statMonth 过滤，
                 // 与日历格子、当月收支汇总的判定保持一致）
                 if(d.getFullYear()===statYear && d.getMonth()===statMonth && r.type==='expense'){
@@ -4748,10 +4830,10 @@ ${detail}
             if(!statSelDay) return [];
             return getUserData().filter(r=>{
                 if(r.type!=='expense') return false;
-                const d=new Date(r.time);
+                const d=parseRecTime(r.time);
                 return d.getFullYear()===statYear && d.getMonth()===statMonth
                     && d.getDate()===statSelDay && d.getHours()===h;
-            }).sort((a,b)=>new Date(a.time)-new Date(b.time));
+            }).sort((a,b)=>parseRecTime(a.time)-parseRecTime(b.time));
         }
 
         // 渲染明细列表 HTML（可重复调用：打开时、从详情返回时）。按 hdHlId 给对应行上高光。
@@ -4874,7 +4956,7 @@ ${detail}
             function monthsWithData(year){
                 const set=new Set();
                 statRecords().forEach(r=>{
-                    const d=new Date(r.time);
+                    const d=parseRecTime(r.time);
                     if(d.getFullYear()===year) set.add(d.getMonth());
                 });
                 return set;
@@ -4882,7 +4964,7 @@ ${detail}
             // 有记账记录的年份集合
             function yearsWithData(){
                 const set=new Set();
-                statRecords().forEach(r=>set.add(new Date(r.time).getFullYear()));
+                statRecords().forEach(r=>set.add(parseRecTime(r.time).getFullYear()));
                 return set;
             }
 
@@ -4998,6 +5080,22 @@ ${detail}
         //   月份本身就越界的（如 13 月）无法推断意图，回退为「该年 1 月 1 日 00:00」并单独计数。
 
         // 判定一条 time 是否「脏」（非规范格式，或解析回来与字面量不一致）
+        // ===== 记录时间的唯一解析口 =====
+        // r.time 的规范格式是「YYYY-MM-DDTHH:mm」（由 isDirtyTime / repairTime 保证）。
+        //
+        // 【为什么不直接 new Date(r.time)】按 ES2015+ 规范，这种「日期+时间、不带时区」的串
+        //   应当按本地时间解析；现代 WebView 也确实如此。但同一份代码里，calcDay / isDirtyTime
+        //   都是手写正则拆字段再 new Date(y, m-1, d)，唯独统计那边直接把字符串丢给 Date——
+        //   两套口径并存，等于把「这里依赖引擎按本地时区解析」这个前提藏在了 15 个调用点里。
+        //   一旦哪天喂进来的是「YYYY-MM-DD」（纯日期，规范里按 UTC 解析）或带了尾巴，
+        //   跨月/跨日的记录就会静默错位一格，还极难复现。
+        //   统一走这里：显式按本地时区构造，与 calcDay 同口径，前提写死在一处。
+        function parseRecTime(t){
+            const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(t||''));
+            if(!m) return new Date(t);                       // 兜底：非规范串交回引擎，行为不变
+            return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], 0, 0);
+        }
+
         function isDirtyTime(t){
             if(typeof t!=='string') return true;
             const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(t);
@@ -5158,15 +5256,24 @@ ${detail}
             return `${s} 星期${DAY_WEEK[d.getDay()]}`;
         }
 
-        // 排序：置顶优先，其余按「距今天数」升序（最近的在前）。
+        // 排序：置顶优先 → 今天 → 未来（近→远）→ 过去（近→远）。
         // 【只做置顶 + 自动排序，不做拖拽】草图里两者并存是矛盾的——用户手动拖完，
         //   下次打开又被自动排序打乱。倒数日的核心诉求就是「最近的那个」，自动排序
         //   天然满足；「置顶」已经提供了「我要它在最上面」的能力，够用了。
+        //
+        // 【坑】calcDay().n 是绝对值：3 天前和 3 天后都是 n=3。早先直接拿 n 升序排，
+        //   等于把过去和未来混在一起——「3 天前的纪念日」会压在「5 天后的截止日」上面，
+        //   「100 天前的旧事」又插在「200 天后的远期」前面。倒数日的重心是未来，
+        //   必须先按 state 分组，再在组内比距离。
+        const DAY_STATE_RANK={ today:0, future:1, past:2 };
         function sortedDays(list){
             return list.slice().sort((a,b)=>{
                 const pa=a.pin?1:0, pb=b.pin?1:0;
                 if(pa!==pb) return pb-pa;                     // 置顶在前
-                return calcDay(a.date).n - calcDay(b.date).n; // 距今越近越靠前（today 的 n=0，最前）
+                const ca=calcDay(a.date), cb=calcDay(b.date);
+                const ra=DAY_STATE_RANK[ca.state], rb=DAY_STATE_RANK[cb.state];
+                if(ra!==rb) return ra-rb;                     // 今天 → 未来 → 过去
+                return ca.n - cb.n;                           // 组内：距今越近越靠前
             });
         }
 
@@ -5180,7 +5287,25 @@ ${detail}
                  + `<span class="${cls}-unit">天</span>`;
         }
 
-        // ===== 记账页的入口卡：显示前 3 条 =====
+        // ===== 入口卡显示条数（可配置）=====
+        // 【为什么有上限 99】需求是「上不封顶」，但输入框只允许两位数，所以实际天花板就是 99。
+        //   这没有削弱需求：入口卡是记账页顶部的一张小卡，真要展示 99 条也早就滚出屏幕了；
+        //   而且超出的条目在日子页里一条不少，纯粹是「露多少」的问题，不涉及丢数据。
+        const DAYS_CARD_MIN=3, DAYS_CARD_MAX=99, DAYS_CARD_DEFAULT=3;
+        function daysCardKey(user){ return `days_card_n_${user!==undefined ? user : currentUser}`; }
+        // 读取时也钳一道：localStorage 是用户可改的，别信它写回来的值
+        function getDaysCardN(){
+            const raw=parseInt(localStorage.getItem(daysCardKey()), 10);
+            if(!isFinite(raw)) return DAYS_CARD_DEFAULT;
+            return Math.min(Math.max(raw, DAYS_CARD_MIN), DAYS_CARD_MAX);
+        }
+        function setDaysCardN(n){
+            const v=Math.min(Math.max(safeNum(n)|0, DAYS_CARD_MIN), DAYS_CARD_MAX);
+            localStorage.setItem(daysCardKey(), String(v));
+            return v;
+        }
+
+        // ===== 记账页的入口卡 =====
         function renderDaysCard(){
             const box=$('daysEntryRows');
             if(!box) return;
@@ -5190,7 +5315,7 @@ ${detail}
                 box.innerHTML='<div class="days-empty-row" data-day-act="add">＋ 添加你的第一个日子</div>';
                 return;
             }
-            box.innerHTML=list.slice(0,3).map(d=>{
+            box.innerHTML=list.slice(0, getDaysCardN()).map(d=>{
                 const c=calcDay(d.date);
                 return `<div class="days-row" data-day-act="edit" data-day-id="${escapeHtml(d.id)}">`
                     + `<span class="d-name">${d.pin?'<span class="pin">★</span>':''}${escapeHtml(d.name)}</span>`
@@ -5221,6 +5346,7 @@ ${detail}
             window.scrollTo(0,0);
         }
         function backFromDaysPage(){
+            if(daysSelecting) exitSelectMode();   // 别把选择模式带出这一页
             $('pageDays').style.display='none';
             switchTab('ledger');            // 交回 switchTab 统一处理显隐/底栏/浮钮，别自己拼
             renderDaysCard();               // 可能改过，刷新入口卡
@@ -5228,18 +5354,221 @@ ${detail}
         $('daysBack').addEventListener('click', backFromDaysPage);
         $('daysAdd').addEventListener('click', ()=>openDayDialog(null));
 
+        // ===== 系统返回键 / 侧滑返回 =====
+        // 【问题】日子管理页是「记账页的子页」——只是把 pageLedger 藏起来、pageDays 显示，
+        //   并没有产生任何浏览器历史。安卓的返回手势只认 WebView 的 history，看不到这层 UI 状态，
+        //   于是直接把唯一那条历史 pop 掉 —— 表现为「在子页里侧滑返回，整个 App 退了」。
+        //   同理，所有弹窗（修改、日期选择、分类管理…）在返回键眼里也都不存在。
+        //
+        // 【做法：单哨兵】不去维护一个跟 UI 状态一一对应的真实历史栈——那种做法要在每个
+        //   open/close 里配对 push/back，漏一次就错位，且用户连点返回时时序无法保证。
+        //   这里只压**一条**哨兵历史：只要「有任何东西可以被关掉」，就保证哨兵在。
+        //   返回键触发 popstate → 关掉最上面那一层 → 若还有东西开着，把哨兵补回去。
+        //   UI 状态是唯一事实来源，历史只是个「拦一下返回键」的钩子，二者不需要同步。
+        //
+        // 【层级顺序】必须按**视觉最上层**先关，否则会出现「返回键关掉了被盖住的那个」。
+        //   顺序直接对应上面 CSS 里写死的 z-index：
+        //   askMask(1010) > dtMask(1005) > aiExpMask(1002) > editMask(1001,over-detail)
+        //   > detailMask(1000) > 其余同级弹窗(999) > 筛选浮层 > 日子子页。
+        (function(){
+            const SENTINEL='__back_guard__';
+
+            function isOpen(id){
+                const el=$(id);
+                if(!el) return false;
+                const d=el.style.display;
+                // 弹窗用 display:flex 显示、none 隐藏；空串表示「没被显式设过」= 未显示
+                return d!=='none' && d!=='';
+            }
+            function hide(id){ const el=$(id); if(el) el.style.display='none'; }
+
+            // 从上到下的可关闭层。每层：能否关 + 怎么关。
+            // 一次返回只关一层（和用户对返回键的预期一致）。
+            const LAYERS=[
+                // 通用提示/确认框：走 closeAsk(null)，等价于「取消」，会触发它自己的 onCancel
+                { can:()=>isOpen('askMask'),    close:()=>closeAsk(null) },
+                // 日期时间选择器
+                { can:()=>isOpen('dtMask'),     close:()=>closeDtPicker() },
+                { can:()=>isOpen('aiExpMask'),  close:()=>hide('aiExpMask') },
+                // 修改弹窗：必须走唯一出口，否则 editId / over-detail / 回明细等状态复位不掉
+                { can:()=>isOpen('editMask'),   close:()=>closeEditModal() },
+                { can:()=>isOpen('detailMask'), close:()=>hide('detailMask') },
+                { can:()=>isOpen('dayMask'),    close:()=>closeDayDialog() },
+                { can:()=>isOpen('dayMgrMask'), close:()=>closeDayMgr() },
+                { can:()=>isOpen('catMask'),    close:()=>hide('catMask') },
+                { can:()=>isOpen('themeMask'),  close:()=>hide('themeMask') },
+                { can:()=>isOpen('addMask'),    close:()=>hide('addMask') },
+                // 筛选浮层是 class 驱动（.open），不是 display
+                { can:()=>{ const m=$('filterSheetMask'); return !!m && m.classList.contains('open'); },
+                  close:()=>{ if(window.closeFilterSheet) window.closeFilterSheet(); } },
+                // 选择模式排在子页之前：返回键应先退出选择、留在页上，
+                // 而不是带着一堆勾选状态直接跳回记账页。
+                { can:()=>daysSelecting, close:()=>exitSelectMode() },
+                // 最后才是子页：前面所有弹窗都关完了，返回键才把子页收回记账页
+                { can:()=>{ const p=$('pageDays'); return !!p && p.style.display==='block'; },
+                  close:()=>backFromDaysPage() },
+            ];
+
+            function topLayer(){ return LAYERS.find(l=>{ try{ return l.can(); }catch(_){ return false; } }); }
+            function anyOpen(){ return !!topLayer(); }
+
+            // 只要有东西开着，就确保哨兵在栈里；全关完了就不再补——
+            // 此时再按返回键就该正常退出 App（用户的预期本来就是这样）。
+            function ensureSentinel(){
+                if(!anyOpen()) return;
+                // 不用 history.state?.g —— 全文都刻意避开可选链（同样的理由：迁就老 WebView）
+                const st=history.state;
+                if(!st || st.g!==SENTINEL){
+                    history.pushState({ g:SENTINEL }, '');
+                }
+            }
+
+            window.addEventListener('popstate', ()=>{
+                const l=topLayer();
+                if(!l) return;              // 没东西可关 → 放行，正常退出 App
+                try{ l.close(); }catch(_){}
+                // 关完这层后如果下面还压着别的（比如「明细 → 详情 → 修改」这种叠层），
+                // 把哨兵补回去，好接住下一次返回键。
+                ensureSentinel();
+            });
+
+            // 【为什么用轮询而不是在每个 open() 里手动 push】
+            //   弹窗的打开入口散在几十处（按钮、事件委托、校验失败自动弹 ask…），
+            //   逐个去插 pushState 必漏，而且漏了不报错——只在某条冷门路径上返回键失灵。
+            //   这里反过来：不管谁、怎么把弹窗打开的，只要它「显示出来了」，
+            //   下一帧就自动补上哨兵。UI 是事实，代码只负责跟上。
+            //   250ms 一次、只做几个 style.display 读取，开销可以忽略。
+            setInterval(ensureSentinel, 250);
+            document.addEventListener('click', ()=>setTimeout(ensureSentinel, 0), true);
+        })();
+
+        // ===== 日子管理弹窗 =====
+        const dayMgrMask=$('dayMgrMask'), dmCount=$('dmCount');
+
+        // 只放行数字。参照 sanitizeMoney 的做法：不用 <input type=number>
+        //  —— 它在安卓 WebView 上仍能通过键盘/粘贴塞进 'e'、'+'、'-'，而且拿到的 value 会是空串，
+        //     校验反而更难写。用 text + inputmode=numeric：手机照样弹数字键盘，
+        //     同时这里手工过滤，粘贴、长按输入法、物理键盘三条路径全都拦住。
+        function sanitizeCount(v){
+            return String(v||'').replace(/[^\d]/g, '').slice(0, 2);   // 只留数字，最多两位
+        }
+        dmCount.addEventListener('input', ()=>{
+            const s=sanitizeCount(dmCount.value);
+            if(dmCount.value!==s) dmCount.value=s;   // 只在真被改动时写回，避免打断光标
+        });
+        // 【不在 input 里钳到 3】用户想输 12，必然先经过「1」这个中间态；
+        //   当场纠正成 3 会让人根本没法往下打。钳制只在失焦和保存时做。
+        dmCount.addEventListener('blur', ()=>{ dmCount.value=String(clampCount(dmCount.value)); });
+        function clampCount(v){
+            const n=parseInt(sanitizeCount(v), 10);
+            if(!isFinite(n)) return DAYS_CARD_DEFAULT;
+            return Math.min(Math.max(n, DAYS_CARD_MIN), DAYS_CARD_MAX);
+        }
+
+        function openDayMgr(){
+            dmCount.value=String(getDaysCardN());
+            // 没有日子时，「批量删除」无意义，禁用掉而不是让人点进去看空列表
+            const has=loadDays().length>0;
+            $('dmBatch').disabled=!has;
+            $('dmBatch').textContent = has ? '批量删除日子' : '批量删除日子（暂无日子）';
+            // 走既有的键盘安全打开口：不留透明帧、不抢在绘制前聚焦。
+            // 但这里不自动 focus —— 一进来就弹键盘会盖住下面的「批量删除」按钮，
+            // 用户多半只是想点它。要改条数的人自己点输入框即可。
+            window.__openModalAfterKeyboard(dayMgrMask, null);
+        }
+        function closeDayMgr(){
+            dmCount.blur();               // 收键盘，避免弹窗关了键盘还杵着
+            dayMgrMask.style.display='none';
+        }
+        $('daysManage').addEventListener('click', openDayMgr);
+        $('dmClose').addEventListener('click', closeDayMgr);
+        $('dmSave').addEventListener('click', ()=>{
+            const n=clampCount(dmCount.value);
+            setDaysCardN(n);
+            closeDayMgr();
+            renderDaysCard();             // 入口卡立刻按新条数重绘
+            customAlert(`入口卡将显示最多 ${n} 条日子`);
+        });
+        // 批量删除：先关掉弹窗，再把列表原地切成选择模式（不叠层）
+        $('dmBatch').addEventListener('click', ()=>{
+            closeDayMgr();
+            enterSelectMode();
+        });
+
+        // ===== 选择模式（批量删除）=====
+        let daysSelecting=false;
+        const daysSel=new Set();   // 选中的 id
+
+        function enterSelectMode(){
+            daysSelecting=true;
+            daysSel.clear();
+            document.body.classList.add('days-selecting');
+            $('daysHeadNormal').style.display='none';
+            $('daysHeadSelect').style.display='flex';
+            renderDaysList();
+            syncSelBar();
+        }
+        function exitSelectMode(){
+            daysSelecting=false;
+            daysSel.clear();
+            document.body.classList.remove('days-selecting');
+            $('daysHeadNormal').style.display='flex';
+            $('daysHeadSelect').style.display='none';
+            renderDaysList();
+        }
+        function toggleDaySel(id){
+            if(daysSel.has(id)) daysSel.delete(id); else daysSel.add(id);
+            renderDaysList();
+            syncSelBar();
+        }
+        // 头部计数 + 底部删除按钮，统一在这里同步（别在三个地方各写一遍）
+        function syncSelBar(){
+            const n=daysSel.size;
+            const total=loadDays().length;
+            $('daysSelCount').textContent=`已选 ${n} 项`;
+            $('daysSelAll').textContent = (n>0 && n===total) ? '取消全选' : '全选';
+            const btn=$('daysDelBtn');
+            btn.disabled = n===0;
+            btn.textContent = `删除选中的 ${n} 项`;
+        }
+        $('daysSelCancel').addEventListener('click', exitSelectMode);
+        $('daysSelAll').addEventListener('click', ()=>{
+            const list=loadDays();
+            if(daysSel.size===list.length) daysSel.clear();       // 已全选 → 取消全选
+            else list.forEach(d=>daysSel.add(d.id));
+            renderDaysList();
+            syncSelBar();
+        });
+        $('daysDelBtn').addEventListener('click', ()=>{
+            const n=daysSel.size;
+            if(!n) return;
+            // 二次确认：批量删除不可撤销，不能一下就没了
+            customConfirm(`确定删除选中的 ${n} 个日子吗？此操作不可撤销。`, ()=>{
+                const left=loadDays().filter(d=>!daysSel.has(d.id));
+                saveDays(left);
+                exitSelectMode();      // 内部会 renderDaysList
+                renderDaysCard();      // 入口卡同步
+                customAlert(`已删除 ${n} 个日子`);
+            }, '批量删除');
+        });
+
         function renderDaysList(){
             const box=$('daysList'), empty=$('daysEmpty');
             const list=sortedDays(loadDays());
             if(!list.length){
                 box.innerHTML='';
                 empty.style.display='block';
+                if(daysSelecting) exitSelectMode();   // 全删光了就自动退出选择模式
                 return;
             }
             empty.style.display='none';
             box.innerHTML=list.map(d=>{
                 const c=calcDay(d.date);
-                return `<div class="day-item${d.pin?' pinned':''}" data-day-id="${escapeHtml(d.id)}">`
+                const on=daysSel.has(d.id);
+                // 勾选圈平时 display:none（由 body.days-selecting 控制显隐），
+                // 所以常态下这段 DOM 是不可见的、不影响布局，不必分两套模板。
+                return `<div class="day-item${d.pin?' pinned':''}${on?' sel':''}" data-day-id="${escapeHtml(d.id)}">`
+                    + `<div class="di-check">${on?'✓':''}</div>`
                     + `<div class="di-l">`
                     +   `<div class="di-name">${d.pin?'<span class="pin">★置顶</span>':''}${escapeHtml(d.name)}</div>`
                     +   `<div class="di-date">${escapeHtml(fmtDayDate(d.date))}</div>`
@@ -5249,9 +5578,12 @@ ${detail}
             }).join('');
         }
         // 管理页列表：事件委托（与账单表格/明细行同一套模式，不写内联 onclick）
+        // 选择模式下改为「点行 = 勾选/取消」，不再进编辑——同一个 DOM，两种语义。
         $('daysList').addEventListener('click', e=>{
             const el=e.target.closest('[data-day-id]');
-            if(el) openDayDialog(el.dataset.dayId);
+            if(!el) return;
+            if(daysSelecting) toggleDaySel(el.dataset.dayId);
+            else openDayDialog(el.dataset.dayId);
         });
 
         // ===== 编辑/添加弹窗 =====
