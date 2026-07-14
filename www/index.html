@@ -575,31 +575,35 @@
 
         /* 弹窗在可视区内居中。height 用 dvh：键盘弹出时浏览器自动把它收缩到键盘上方，
            居中点随之上移，因此「先弹键盘、后显示弹窗」时，弹窗一次性出现在最终居中位置，全程不动。 */
+        /* ===== 弹窗层级阶梯 =====
+           此前是一路「哪儿盖住了就给哪儿加一档」堆出来的，每加一个新弹窗就要再打一个补丁。
+           这里一次列清楚，新增弹窗照着挑一档即可，不要再就地 +1。
+
+             1000  普通表单弹窗（.mask 默认）：记一笔、修改、分类、外观、日子、日子管理…
+                   它们互不叠加，同级即可。
+             1010  内容型二级弹窗：从某个一级弹窗「点进去」的下一层内容。
+                   —— 消费明细(askMask.as-page) → 账单详情(detailMask) 就是这条链。
+             1020  从二级弹窗再点进去的三级：详情里点「修改」。
+             1030  选择器：日期/时间。它永远由某个表单弹窗唤起，必须盖过上面所有。
+             1040  瞬时提示/确认（askMask 默认）：校验失败、删除确认、复制成功…
+                   任何层里都可能唤起它，所以它必须在最顶。
+
+           【为什么 askMask 要分两档】它身兼二职：既是「消费明细」这种内容页，
+             又是全局的提示/确认框。之前统一给了 1010，结果从明细里点开的
+             detailMask(1000) 反而被压在明细底下 —— 就是「点了列表没反应」的真相。
+             现在：默认 1040（当提示用）；当内容页用时加 .as-page 降到 1010，
+             让它上面的 detailMask/editMask 能正常盖住它。 */
         .mask { position:fixed; top:0; left:0; width:100%;
             height:100vh; height:100dvh;
             background:rgba(0,0,0,0.3); display:none;
-            align-items:center; justify-content:center; z-index:999;
+            align-items:center; justify-content:center; z-index:1000;
             padding:16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-        /* 消费明细(askMask,z999) → 详情(detailMask) → 修改(editMask) 是层层叠起的，
-           必须让上层盖住下层（否则同 z-index 下按 DOM 顺序，明细反而盖住详情）。
-           仅在「从明细进入」这条链路上抬高；它们单独使用时层级不受影响也无妨。 */
-        #detailMask { z-index:1000; }
-        #editMask.over-detail { z-index:1001; }
-        /* 日期/时间选择器永远是「从某个弹窗里唤起」的二级弹窗，必须盖过所有表单弹窗。
-           此前它没有显式层级，靠的是「dtMask 在 DOM 里排在 editMask 之后」这个巧合
-           —— 同为 z-index:999 时后出现的元素赢。新增的 dayMask 排在 dtMask 之后，
-           巧合就失效了：日期选择器其实弹出来了，只是被 dayMask 盖住，表现为「点了没反应」。
-           给它一个显式且足够高的层级，杜绝这种依赖 DOM 顺序的脆弱性。 */
-        #dtMask { z-index:1005; }
-        /* AI 导出结果弹窗层级；其上的「复制成功/分享」提示需再高一层，见 openAiExport */
-        #aiExpMask { z-index:1002; }
-        /* askMask 是全应用通用的提示/确认框，任何弹窗里都可能唤起它（校验失败、删除确认…），
-           所以它必须永远在最顶层。此前只在 over-aiexp 这一种场景下提层，其余靠 DOM 顺序侥幸。
-           新增的 dayMask 排在 askMask 之后，就把它盖住了 —— 表现为「点保存没反应」
-           （其实校验提示弹出来了，只是看不见）。这里给它一个高于所有表单弹窗的基础层级。
-           注意要高于 #dtMask(1005)：日期选择器里也可能弹提示。 */
-        #askMask { z-index:1010; }
-        #askMask.over-aiexp { z-index:1010; }
+        #askMask            { z-index:1040; }   /* 提示/确认：永远最顶 */
+        #askMask.as-page    { z-index:1010; }   /* 当内容页用（消费明细）：降档，好让详情盖上来 */
+        #detailMask         { z-index:1020; }   /* 账单详情：从明细点进来的下一层 */
+        #editMask.over-detail { z-index:1030; } /* 详情里点「修改」：再上一层 */
+        #aiExpMask          { z-index:1010; }
+        #dtMask             { z-index:1035; }   /* 日期选择器：盖过所有表单弹窗，但低于提示 */
         .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
             border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
             max-height:80vh; max-height:80dvh; overflow-y:auto;
@@ -952,7 +956,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0714-C</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0714-D</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1655,7 +1659,7 @@
 
         function closeAsk(result){
             askMask.style.display='none';
-            askMask.classList.remove('over-aiexp');   // 复位 AI 导出场景下的临时置顶
+            askMask.classList.remove('as-page');   // 复位「当内容页用」的降档，下次当提示用时回到最顶
             askErr.style.display='none';
             const choices=$('askChoices');
             if(choices){ choices.style.display='none'; choices.innerHTML=''; }
@@ -2368,9 +2372,11 @@ ${detail}
             $('aiExpSub').textContent = sub || '';
             $('aiExpMask').style.display='flex';
         }
-        // 在 AI 导出弹窗之上弹提示：先把 askMask 临时置顶（over-aiexp），closeAsk 时自动复位
+        // 在 AI 导出弹窗之上弹提示。
+        // 【原先的 over-aiexp 已废除】askMask 默认就是 1040，本来就高于 aiExpMask(1010)，
+        //   不需要再临时提层。留着一个只在单一场景生效的特例，反而掩盖了「askMask 该始终最顶」
+        //   这个真正的规则。
         function aiExpAlert(msg, title){
-            askMask.classList.add('over-aiexp');
             customAlert(msg, title);
         }
         $('aiExpClose').addEventListener('click', ()=>{ $('aiExpMask').style.display='none'; });
@@ -4885,6 +4891,11 @@ ${detail}
             hdHlId=null;
             // 大标题只保留「消费明细」；日期+时段作为副标题在正文顶部（renderHourDetailBody 内）
             customAlertHtml(renderHourDetailBody(h), '消费明细', 'left');
+            // 【关键】这次 askMask 是当「内容页」用的，不是提示框：接下来还要从它里面
+            //   点开账单详情(detailMask)。不降档的话，askMask(1040) 会把 detailMask 压在底下
+            //   —— 表现就是「点明细里的条目没反应」。必须在 customAlertHtml 之后加，
+            //   因为 closeAsk 里会 remove 掉它。
+            askMask.classList.add('as-page');
         }
 
         // 明细行点击（事件委托绑在 askMsg 上）：进入该条详情，并给它上高光。
@@ -4920,11 +4931,14 @@ ${detail}
 
         let detailCurId=null;
         // 详情「关闭」→ 回明细（详情关掉、刷新明细以反映可能的改动）
-        $('detailClose').addEventListener('click', ()=>{
+        // 抽成具名函数：返回键也要走这个正规出口，不能只 display='none'
+        // —— 那样 detailCurId 不复位、底下的明细也不会刷新已改动的数据。
+        function closeDetail(){
             $('detailMask').style.display='none';
             detailCurId=null;
             refreshHourDetail();
-        });
+        }
+        $('detailClose').addEventListener('click', closeDetail);
         // 详情「修改」→ 关详情、打开修改弹窗。修改弹窗退出（保存/取消/删除）统一回明细。
         $('detailEdit').addEventListener('click', ()=>{
             const id=detailCurId;
@@ -5382,17 +5396,31 @@ ${detail}
             }
             function hide(id){ const el=$(id); if(el) el.style.display='none'; }
 
-            // 从上到下的可关闭层。每层：能否关 + 怎么关。
-            // 一次返回只关一层（和用户对返回键的预期一致）。
+            // 从上到下的可关闭层，顺序**必须**与 CSS 里的 z-index 阶梯一致，
+            // 否则会出现「返回键关掉了被盖住的那个」。一次返回只关一层。
+            //
+            // 【askMask 要拆成两条】它身兼二职（见 CSS 注释）：
+            //   - 当提示/确认用（无 .as-page，z1040）：最顶层，第一个关。
+            //   - 当内容页用（有 .as-page，z1010，即消费明细）：它下面还压着详情/修改，
+            //     必须排到 detailMask/editMask **之后**才关，否则会先把明细关掉、
+            //     把详情孤零零留在屏幕上。
+            function askIsPrompt(){ return isOpen('askMask') && !askMask.classList.contains('as-page'); }
+            function askIsPage(){   return isOpen('askMask') &&  askMask.classList.contains('as-page'); }
+
             const LAYERS=[
-                // 通用提示/确认框：走 closeAsk(null)，等价于「取消」，会触发它自己的 onCancel
-                { can:()=>isOpen('askMask'),    close:()=>closeAsk(null) },
-                // 日期时间选择器
+                // 1040 提示/确认：走 closeAsk(null)，等价于「取消」，会触发它自己的 onCancel
+                { can:askIsPrompt,              close:()=>closeAsk(null) },
+                // 1035 日期时间选择器
                 { can:()=>isOpen('dtMask'),     close:()=>closeDtPicker() },
-                { can:()=>isOpen('aiExpMask'),  close:()=>hide('aiExpMask') },
-                // 修改弹窗：必须走唯一出口，否则 editId / over-detail / 回明细等状态复位不掉
+                // 1030 详情里点进来的「修改」：必须走唯一出口，
+                //      否则 editId / over-detail / 回明细等状态复位不掉
                 { can:()=>isOpen('editMask'),   close:()=>closeEditModal() },
-                { can:()=>isOpen('detailMask'), close:()=>hide('detailMask') },
+                // 1020 账单详情
+                { can:()=>isOpen('detailMask'), close:()=>closeDetail() },
+                // 1010 消费明细（askMask 当内容页用）—— 排在详情之后
+                { can:askIsPage,                close:()=>closeAsk(null) },
+                { can:()=>isOpen('aiExpMask'),  close:()=>hide('aiExpMask') },
+                // 1000 普通表单弹窗，互不叠加
                 { can:()=>isOpen('dayMask'),    close:()=>closeDayDialog() },
                 { can:()=>isOpen('dayMgrMask'), close:()=>closeDayMgr() },
                 { can:()=>isOpen('catMask'),    close:()=>hide('catMask') },
@@ -5401,10 +5429,10 @@ ${detail}
                 // 筛选浮层是 class 驱动（.open），不是 display
                 { can:()=>{ const m=$('filterSheetMask'); return !!m && m.classList.contains('open'); },
                   close:()=>{ if(window.closeFilterSheet) window.closeFilterSheet(); } },
-                // 选择模式排在子页之前：返回键应先退出选择、留在页上，
+                // 选择模式排在子页之前：返回键先退出选择、**留在日子页**，
                 // 而不是带着一堆勾选状态直接跳回记账页。
                 { can:()=>daysSelecting, close:()=>exitSelectMode() },
-                // 最后才是子页：前面所有弹窗都关完了，返回键才把子页收回记账页
+                // 最后才是子页：前面全关完了，返回键才把日子页收回记账页
                 { can:()=>{ const p=$('pageDays'); return !!p && p.style.display==='block'; },
                   close:()=>backFromDaysPage() },
             ];
@@ -5423,14 +5451,50 @@ ${detail}
                 }
             }
 
-            window.addEventListener('popstate', ()=>{
+            // 【真正的关键：安卓上返回手势根本不走 popstate】
+            //   在 Capacitor 里，硬件返回键/侧滑返回先交给**原生层**。默认行为是直接
+            //   finish() 掉 Activity —— 也就是退出 App，WebView 的 history 压根没被碰。
+            //   所以只监听 popstate 是不够的：它在浏览器里测得好好的，装到手机上却毫无反应，
+            //   因为那个事件从来没被触发过。
+            //
+            //   正确做法是同时接住原生的 backButton 事件。两条路都绑，谁先到算谁的：
+            //   - 有 Capacitor App 插件 → 走 backButton（安卓真机的实际路径）
+            //   - 没有插件 / 纯浏览器调试 → 走 popstate（哨兵机制照旧）
+            //   handleBack 是唯一的处理入口，两条路复用同一套层级逻辑，不会有两套行为。
+            let backLock=false;   // 防抖：两条路都触发时别关掉两层
+            function handleBack(){
+                if(backLock) return true;
                 const l=topLayer();
-                if(!l) return;              // 没东西可关 → 放行，正常退出 App
+                if(!l) return false;                 // 没东西可关 → 让调用方决定（退出 App）
+                backLock=true;
                 try{ l.close(); }catch(_){}
-                // 关完这层后如果下面还压着别的（比如「明细 → 详情 → 修改」这种叠层），
-                // 把哨兵补回去，好接住下一次返回键。
-                ensureSentinel();
+                setTimeout(()=>{ backLock=false; }, 120);
+                ensureSentinel();                    // 下面还压着别的就把哨兵补回去
+                return true;                         // 已消费掉这次返回
+            }
+
+            window.addEventListener('popstate', ()=>{
+                if(!handleBack()) return;            // 没东西可关 → 放行，正常退出
             });
+
+            // Capacitor 原生返回键。插件不一定存在（纯 HTML 项目里 Plugins.App 可能没打进来），
+            // 所以全程防御式取值，取不到就静默降级到上面的 popstate。
+            (function bindNativeBack(){
+                function tryBind(){
+                    const cap=window.Capacitor;
+                    if(!cap || !cap.Plugins || !cap.Plugins.App) return false;
+                    cap.Plugins.App.addListener('backButton', ()=>{
+                        if(handleBack()) return;     // 关掉一层，吃掉这次返回
+                        // 没东西可关：不在子页、不在弹窗 → 才真的退出 App
+                        try{ cap.Plugins.App.exitApp(); }catch(_){}
+                    });
+                    return true;
+                }
+                if(tryBind()) return;
+                // 插件可能比这段脚本晚就绪，等一拍再试；仍失败就认了（浏览器里本就没有）
+                document.addEventListener('deviceready', tryBind, { once:true });
+                setTimeout(tryBind, 800);
+            })();
 
             // 【为什么用轮询而不是在每个 open() 里手动 push】
             //   弹窗的打开入口散在几十处（按钮、事件委托、校验失败自动弹 ask…），
