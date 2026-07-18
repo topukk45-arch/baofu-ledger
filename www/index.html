@@ -2,6 +2,13 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <!-- ===== 启动耗时探针（临时版，测完请换回正式包） ===== -->
+    <script>
+    window.__T0 = Date.now();
+    window.__MARKS = [];
+    window.__mark = function(name){ window.__MARKS.push([name, Date.now() - window.__T0]); };
+    __mark('head开始解析');
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <!-- maximum-scale=1.0 + user-scalable=no：禁止捏合/双击缩放。本应用为固定布局，
          不需要用户放大；这样在 WebView 套壳、PWA、各端浏览器下行为一致，避免误触双击放大。 -->
@@ -951,12 +958,14 @@
         .ask-extra-btn:hover { border-color:var(--c-accent);
             box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.3); }
     </style>
+    <script>__mark("CSS解析完");</script>
 </head>
 <body>
+<script>__mark("body开始");</script>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0718-A</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0718-A-探针</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1540,6 +1549,7 @@
     </div>
     </div>
 
+    <script>__mark("DOM结构解析完");</script>
     <script>
         // ===== 软键盘处理（极简、稳健版） =====
         // 关键教训：之前"先把弹窗设透明、等键盘信号再淡入"的做法，会在键盘弹起、WebView 重排的
@@ -5748,6 +5758,7 @@ ${detail}
         }
 
         // ===== 页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页 =====
+        __mark("脚本定义完(即将initApp)");
         (function initApp(){
             const remembered=localStorage.getItem('app_logged_in_user');
             if(remembered && localStorage.getItem(`store_${remembered}`)!==null){
@@ -5757,7 +5768,34 @@ ${detail}
                 document.body.classList.add('login-mode');
                 renderRecentUsers();
             }
+            __mark('initApp完(主界面已渲染)');
         })();
+
+        // 首帧真正画到屏幕之后
+        requestAnimationFrame(function(){
+            requestAnimationFrame(function(){
+                __mark('首帧绘制完');
+                __showProbe();
+            });
+        });
+
+        // 把结果直接显示在屏幕上
+        function __showProbe(){
+            var box = document.createElement('div');
+            box.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;'
+                + 'background:rgba(0,0,0,.88);color:#0f0;font:12px/1.7 monospace;'
+                + 'padding:10px 12px;white-space:pre;';
+            var lines = ['=== 启动耗时（ms） ===  点此关闭'];
+            var prev = 0;
+            for (var i=0; i<window.__MARKS.length; i++){
+                var n = window.__MARKS[i][0], t = window.__MARKS[i][1];
+                var d = t - prev; prev = t;
+                lines.push(('+' + d).padStart(6) + '  ' + String(t).padStart(5) + '  ' + n);
+            }
+            box.textContent = lines.join('\n');
+            box.onclick = function(){ box.remove(); };
+            document.body.appendChild(box);
+        }
 
     </script>
 
