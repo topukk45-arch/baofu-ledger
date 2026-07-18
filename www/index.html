@@ -5425,6 +5425,10 @@ ${detail}
                 { can:()=>isOpen('dayMgrMask'), close:()=>closeDayMgr() },
                 { can:()=>isOpen('catMask'),    close:()=>hide('catMask') },
                 { can:()=>isOpen('themeMask'),  close:()=>hide('themeMask') },
+                // 统计页的年月选择器。它和 dtMask 是两套独立实现，别忘了这一个
+                // —— 漏掉的后果不是"关不掉"，而是 handleBack 返回 false、
+                // Capacitor 直接 exitApp()：选择器开着时按返回键会退出整个 App。
+                { can:()=>isOpen('ymMask'),     close:()=>hide('ymMask') },
                 { can:()=>isOpen('addMask'),    close:()=>hide('addMask') },
                 // 筛选浮层是 class 驱动（.open），不是 display
                 { can:()=>{ const m=$('filterSheetMask'); return !!m && m.classList.contains('open'); },
