@@ -414,18 +414,53 @@
         .smb-val { font-size:20px; font-weight:bold; }
 
         .stat-day-title { font-size:15px; font-weight:bold; color:var(--c-text); margin-bottom:12px; }
+        .stat-month-cat-head { display:flex; align-items:center; justify-content:space-between;
+            gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+        #statMonthCatSeg button { padding:5px 12px; font-size:13px; }
         .stat-pie-row { display:flex; gap:12px; align-items:center; }
         .stat-pie-holder { width:140px; height:140px; flex-shrink:0; }
         .stat-cat-list { flex:1; min-width:0; }
-        .stat-cat-list .sc-item { display:flex; align-items:center; justify-content:space-between;
-            padding:5px 0; font-size:13px; border-bottom:1px dashed var(--c-border); }
+        .stat-cat-list .sc-item { display:flex; flex-direction:column; align-items:stretch; gap:2px;
+            padding:6px 0; font-size:13px; border-bottom:1px dashed var(--c-border); }
         .stat-cat-list .sc-item:last-child { border-bottom:none; }
-        .sc-name { display:flex; align-items:center; gap:6px; min-width:0; color:var(--c-text); }
+        .sc-top { display:flex; align-items:center; gap:8px; min-width:0; }
+        .sc-name { display:flex; align-items:center; gap:6px; min-width:0; flex:1 1 auto; color:var(--c-text); }
         .sc-dot { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
-        .sc-amt { font-weight:bold; white-space:nowrap; }
+        .sc-cat-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sc-pct { flex:0 0 auto; text-align:right; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .sc-amt { align-self:flex-end; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+        /* 当日收支明细：一条一「行卡」。上行=时间/类型/分类/备注，金额错位到右下角。整行可点进账单详情 */
+        .stat-flow { display:flex; flex-direction:column; }
+        .stat-flow .sf-item { display:flex; flex-direction:column; align-items:stretch;
+            gap:4px; padding:9px 6px; margin:0 -6px; border-radius:6px;
+            border-bottom:1px dashed var(--c-border); cursor:pointer; transition:background 0.15s; }
+        .stat-flow .sf-item:last-child { border-bottom:none; }
+        .stat-flow .sf-item:hover { background:var(--c-chip); }
+        .stat-flow .sf-item:active { background:var(--c-chip); filter:brightness(0.97); }
+        .sf-top { display:flex; align-items:center; gap:6px; min-width:0; }
+        .sf-time { flex:0 0 auto; font-size:12px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .sf-io { flex:0 0 auto; font-size:11px; line-height:1; padding:2px 5px; border-radius:3px;
+            border:1px solid var(--c-accent-soft); }
+        .sf-io.in { color:#3a7a2e; background:rgba(58,122,46,0.08); }
+        .sf-io.out { color:#b5482e; background:rgba(181,72,46,0.08); }
+        .sf-cat { flex:0 0 auto; font-size:13px; color:var(--c-text); font-weight:600;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:96px; }
+        /* 备注：宽度跟着文字走（虚线只包住文字，不拖满整行），过长则在上限内省略号；仍带虚线，跟记账详情统一 */
+        .sf-remark { flex:0 1 auto; min-width:0; max-width:100%; font-size:12px;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+            color:var(--c-primary-dark); border-bottom:1px dashed var(--c-primary); }
+        /* 金额：错位到右下角，完整显示不截断 */
+        .sf-amt { align-self:flex-end; font-weight:bold; white-space:nowrap;
+            font-variant-numeric:tabular-nums; font-size:15px; }
 
         .stat-bar-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
         .stat-bar-title { font-size:14px; font-weight:bold; color:var(--c-text); }
+        .stat-bar-legend { display:flex; align-items:center; gap:10px; font-size:11px; color:var(--c-text-soft); }
+        .stat-bar-legend .sbl-item { display:flex; align-items:center; gap:4px; }
+        .stat-bar-legend .sbl-dot { width:9px; height:9px; border-radius:2px; }
+        .stat-bar-legend .sbl-out { background:var(--c-primary); }
+        .stat-bar-legend .sbl-in { background:#3a7a2e; }
         .stat-peak-hint { font-size:11px; color:var(--c-text-soft); margin-bottom:8px; }
         .stat-bar-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
         .stat-bar-inner { height:170px; }
@@ -1042,9 +1077,15 @@
                     </div>
                 </div>
 
-                <!-- 当月支出分类占比（整月维度，复用当日分析的饼图/列表样式） -->
+                <!-- 当月支出/收入分类占比（整月维度，复用当日分析的饼图/列表样式；顶部胶囊切换口径） -->
                 <div class="stat-card" id="statMonthCatCard">
-                    <div class="stat-day-title">当月支出分类占比</div>
+                    <div class="stat-month-cat-head">
+                        <div class="stat-day-title" id="statMonthCatTitle" style="margin-bottom:0;">当月支出分类占比</div>
+                        <div class="seg" id="statMonthCatSeg">
+                            <button data-v="expense" class="on">支出</button>
+                            <button data-v="income">收入</button>
+                        </div>
+                    </div>
                     <div class="stat-pie-row">
                         <div class="stat-pie-holder" id="statMonthPie"></div>
                         <div class="stat-cat-list" id="statMonthCatList"></div>
@@ -1055,14 +1096,15 @@
                 <div class="stat-day-wrap" id="statDayWrap" style="display:none">
                     <div class="stat-card">
                         <div class="stat-day-title" id="statDayTitle"></div>
-                        <div class="stat-pie-row">
-                            <div class="stat-pie-holder" id="statPie"></div>
-                            <div class="stat-cat-list" id="statCatList"></div>
-                        </div>
+                        <div class="stat-flow" id="statFlowList"></div>
                     </div>
                     <div class="stat-card">
                         <div class="stat-bar-head">
-                            <span class="stat-bar-title">消费时间分布</span>
+                            <span class="stat-bar-title">收支时间分布</span>
+                            <span class="stat-bar-legend">
+                                <span class="sbl-item"><span class="sbl-dot sbl-out"></span>支出</span>
+                                <span class="sbl-item"><span class="sbl-dot sbl-in"></span>收入</span>
+                            </span>
                         </div>
                         <div class="stat-peak-hint" id="statPeakHint"></div>
                         <div class="stat-bar-scroll" id="statBarScroll">
@@ -4638,53 +4680,83 @@ ${detail}
             });
             $('statDayEmpty').style.display='none';
             $('statDayWrap').style.display='block';
-            $('statDayTitle').textContent=`${statYear}-${pad(statMonth+1)}-${pad(day)} · 当日支出分析`;
+            $('statDayTitle').textContent=`${statYear}-${pad(statMonth+1)}-${pad(day)} · 当日收支分析`;
 
-            // —— 当日支出按分类聚合 ——
-            const byCat={};
-            recs.forEach(r=>{ if(r.type==='expense'){ const amt=safeNum(r.money); byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt; } });
-            const cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
-            const vals=cats.map(c=>byCat[c]);
-            const colors=cats.map((_,i)=>catColor(i, cats.length));
-
-            // 饼图：有支出就画占比；当天无支出则只显示一句提示（避免两个并排区域各塞一句、文字重叠）
-            if(cats.length){
-                $('statPie').style.display='';
-                $('statPie').innerHTML = buildDonutSVG(vals, colors);
-                $('statCatList').innerHTML = cats.map((c,i)=>
-                    `<div class="sc-item">
-                        <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span>${escapeHtml(c)}</span>
-                        <span class="sc-amt neg">−${byCat[c].toFixed(2)}</span>
-                    </div>`).join('');
+            // —— 当日收支明细：一条一行，按时间正序（含收入与支出）——
+            const flow=recs.slice().sort((a,b)=>parseRecTime(a.time)-parseRecTime(b.time));
+            if(flow.length){
+                $('statFlowList').innerHTML = flow.map(r=>{
+                    const d=parseRecTime(r.time);
+                    const hm=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                    const isOut=r.type==='expense';
+                    const io=isOut?'支出':'收入';
+                    const cat=r.cat||'未分类';
+                    const remark=(r.remark||'').trim();
+                    const amt=safeNum(r.money).toFixed(2);
+                    return `<div class="sf-item" data-act="sfItem" data-id="${escapeHtml(r.id)}">
+                        <div class="sf-top">
+                            <span class="sf-time">${hm}</span>
+                            <span class="sf-io ${isOut?'out':'in'}">${io}</span>
+                            <span class="sf-cat">${escapeHtml(cat)}</span>
+                            ${remark?`<span class="sf-remark">${escapeHtml(remark)}</span>`:''}
+                        </div>
+                        <span class="sf-amt ${isOut?'neg':'pos'}">${isOut?'−':'+'}${amt}</span>
+                    </div>`;
+                }).join('');
             } else {
-                // 无支出：隐藏饼图占位，分类区显示唯一一句居中提示
-                $('statPie').style.display='none';
-                $('statPie').innerHTML = '';
-                $('statCatList').innerHTML = '<div class="stat-day-empty">当日无支出记录</div>';
+                $('statFlowList').innerHTML = '<div class="stat-day-empty">当日无收支记录</div>';
             }
 
-            // —— 当日按小时支出 ——
-            // 只需要每小时的支出合计用于画柱高；点柱子看明细时由 recordsOfHour(h) 现查，
-            // 故这里不再额外累积一份「小时 -> 记录数组」的缓存（那份缓存曾存在但从未被读取）。
-            const hours=new Array(24).fill(0);
-            recs.forEach(r=>{ if(r.type==='expense'){ const h=parseRecTime(r.time).getHours(); hours[h]+=safeNum(r.money); } });
-            renderHourBars(hours);
+            // —— 当日按小时收/支 ——
+            // 分别累积每小时的支出、收入合计用于画两色柱；点柱子看明细时由 recordsOfHour(h) 现查，
+            // 故这里不额外缓存「小时 -> 记录数组」。
+            const expHours=new Array(24).fill(0);
+            const incHours=new Array(24).fill(0);
+            recs.forEach(r=>{
+                const h=parseRecTime(r.time).getHours();
+                const amt=safeNum(r.money);
+                if(r.type==='expense') expHours[h]+=amt;
+                else if(r.type==='income') incHours[h]+=amt;
+            });
+            renderHourBars(expHours, incHours);
         }
 
-        // 当月支出分类占比：入参 recs 已是当月全部记录（含收入），此处只取支出按分类聚合。
+        // 当日收支明细：点整行进「账单详情」（复用消费明细同款 openDetail 弹窗）。
+        // statFlowList 是静态容器，事件委托只绑一次，反复重写 innerHTML 不重复挂监听。
+        (function(){
+            const box=$('statFlowList');
+            if(!box) return;
+            box.addEventListener('click', e=>{
+                const row=e.target.closest('[data-act="sfItem"]');
+                if(!row || !box.contains(row)) return;
+                const id=row.getAttribute('data-id');
+                if(id) openDetail(id);
+            });
+        })();
+
+        // 当月分类占比：可按「支出」或「收入」两种口径渲染（由 statMonthCatMode 决定）。
+        // 入参 recs 已是整档全量，此处按 statYear/statMonth + 收支类型过滤后按分类聚合。
         // 分类多于 6 个时，金额前 6 保留、其余并入「其他」，避免列表过长。
         // 颜色一律走 catColor()，与当日分析同源，换主题色时一起变。
+        let statMonthCatMode='expense';   // 'expense' | 'income'
+        let statMonthCatRecs=null;        // 缓存最近一次的 recs，供胶囊切换时就地重渲染
         function renderStatMonthCats(recs){
+            if(recs) statMonthCatRecs=recs;      // 首次/刷新时更新缓存；切换口径时传 null 复用缓存
+            recs=statMonthCatRecs||[];
             const card=$('statMonthCatCard');
             const pie=$('statMonthPie'), list=$('statMonthCatList');
+            const title=$('statMonthCatTitle');
             if(!card || !pie || !list) return;
+
+            const isExp=statMonthCatMode==='expense';
+            const wantType=isExp?'expense':'income';
+            if(title) title.textContent = isExp ? '当月支出分类占比' : '当月收入分类占比';
 
             const byCat={};
             recs.forEach(r=>{
                 const d=parseRecTime(r.time);
-                // 关键：只统计当前查看月份的支出（recs 是整档全量，需按 statYear/statMonth 过滤，
-                // 与日历格子、当月收支汇总的判定保持一致）
-                if(d.getFullYear()===statYear && d.getMonth()===statMonth && r.type==='expense'){
+                // 关键：只统计当前查看月份、且符合当前口径（支出/收入）的记录
+                if(d.getFullYear()===statYear && d.getMonth()===statMonth && r.type===wantType){
                     const amt=safeNum(r.money);
                     byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt;
                 }
@@ -4692,14 +4764,13 @@ ${detail}
 
             let cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
 
-            // 当月无支出：整块隐藏（避免显示上个有数据月份的残留）
+            // 当月该口径无记录：卡片保持可见（胶囊常在），只把内容区替换成一句提示。
             if(!cats.length){
-                card.style.display='none';
-                pie.innerHTML='';
-                list.innerHTML='';
+                card.style.display='';
+                pie.style.display='none'; pie.innerHTML='';
+                list.innerHTML=`<div class="stat-day-empty">当月无${isExp?'支出':'收入'}记录</div>`;
                 return;
             }
-            card.style.display='';
 
             // 前 6 + 其余并为「其他」
             const TOP=6;
@@ -4716,16 +4787,37 @@ ${detail}
             const vals=items.map(it=>it.val);
             const colors=items.map((_,i)=>catColor(i, items.length));
 
+            card.style.display='';
             pie.style.display='';
             pie.innerHTML=buildDonutSVG(vals, colors);
             list.innerHTML=items.map((it,i)=>{
-                const pct=total>0 ? Math.round(it.val/total*100) : 0;
+                const pct=total>0 ? (it.val/total*100).toFixed(2) : '0.00';
+                const sign=isExp?'−':'+';
+                const cls=isExp?'neg':'pos';
                 return `<div class="sc-item">
-                    <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span>${escapeHtml(it.name)} · ${pct}%</span>
-                    <span class="sc-amt neg">−${it.val.toFixed(2)}</span>
+                    <div class="sc-top">
+                        <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span><span class="sc-cat-name">${escapeHtml(it.name)}</span></span>
+                        <span class="sc-pct">${pct}%</span>
+                    </div>
+                    <span class="sc-amt ${cls}">${sign}${it.val.toFixed(2)}</span>
                 </div>`;
             }).join('');
         }
+
+        // 支出/收入胶囊切换：只改口径 + 就地重渲染（复用缓存的 recs，不重跑整页统计）
+        (function(){
+            const seg=$('statMonthCatSeg');
+            if(!seg) return;
+            seg.addEventListener('click', e=>{
+                const btn=e.target.closest('button[data-v]');
+                if(!btn) return;
+                const mode=btn.getAttribute('data-v');
+                if(mode===statMonthCatMode) return;
+                statMonthCatMode=mode;
+                seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b===btn));
+                renderStatMonthCats(null);   // 传 null 复用缓存
+            });
+        })();
 
         // 手写甜甜圈饼图
         function buildDonutSVG(vals, colors){
@@ -4772,55 +4864,65 @@ ${detail}
         // 注：此前这里有个 statHourRecs 缓存（小时 -> 记录数组），已删除——
         // 它只写不读：showHourDetail 走的是 recordsOfHour(h)，每次从真实数据重查，
         // 这样在详情里改过/删过记录后回到明细能反映最新数据。缓存留着只会误导。
-        function renderHourBars(hours){
-            const max=Math.max(...hours, 1);
-            const colW=30, gap=6, padL=4, padBottom=22, padTop=8;
-            const innerW=padL*2 + hours.length*colW + (hours.length-1)*gap;
+        function renderHourBars(expHours, incHours){
+            incHours = incHours || new Array(24).fill(0);
+            const max=Math.max(...expHours, ...incHours, 1);
+            // 每个小时槽放两根细柱（支出 | 收入）并排
+            const barW=12, barGap=3, gap=8, padL=4, padBottom=22, padTop=8;
+            const colW=barW*2+barGap;                 // 一个小时占的宽度（两柱+间隙）
+            const n=24;
+            const innerW=padL*2 + n*colW + (n-1)*gap;
             const H=170, plotH=H-padBottom-padTop;
-            const barCol=cssVar('--c-primary')||'#d4af37';
+            const outCol=cssVar('--c-primary')||'#d4af37';
+            const inCol='#3a7a2e';
             const emptyCol=cssVar('--c-chip')||'#fff5cc';
             const txtCol=cssVar('--c-text-soft')||'#888';
-            const onBar=cssVar('--c-on-primary')||'#fff';
+
+            // 高峰：按「当小时收支合计（收入+支出）」最高的小时；用于提示 + 自动滚动定位
+            let peak=0, peakV=-1;
+            for(let h=0;h<n;h++){ const tot=expHours[h]+incHours[h]; if(tot>peakV){ peakV=tot; peak=h; } }
 
             let bars='';
-            let peak=0, peakV=-1;
-            hours.forEach((v,h)=>{ if(v>peakV){ peakV=v; peak=h; } });
-
-            hours.forEach((v,h)=>{
+            for(let h=0;h<n;h++){
                 const x=padL + h*(colW+gap);
-                const bh=v>0 ? Math.max(3, (v/max)*plotH) : 0;
-                const y=padTop+plotH-bh;
-                if(v>0){
-                    // 整根柱子包一个可点击的 group
-                    let cell=`<rect x="${x}" y="${y}" width="${colW}" height="${bh}" rx="4" fill="${barCol}"/>`;
-                    const label=v.toFixed(0);
-                    // 金额放进柱子内部（柱子够高时），否则放柱子上方
-                    if(bh>=18){
-                        cell+=`<text x="${x+colW/2}" y="${y+13}" text-anchor="middle" font-size="9" fill="${onBar}">${label}</text>`;
-                    } else {
-                        cell+=`<text x="${x+colW/2}" y="${y-3}" text-anchor="middle" font-size="9" fill="${txtCol}">${label}</text>`;
+                const ev=expHours[h], iv=incHours[h];
+                const hasAny = ev>0 || iv>0;
+
+                // 单根柱子的绘制：给定值、左上角 x、颜色
+                const drawBar=(v,bx,col)=>{
+                    if(v<=0){
+                        return `<rect x="${bx}" y="${padTop+plotH-3}" width="${barW}" height="3" rx="1.5" fill="${emptyCol}"/>`;
                     }
-                    // 透明热区，扩大点击范围（含柱子上方空白），方便手指点。
-                    // 用 data-act/data-h + 事件委托（见下方 statBarInner 的监听），不写内联 onclick——
-                    // 与账单表格、消费明细行保持同一套模式。h 虽是 0-23 的整数、拼进属性本身安全，
-                    // 但留着内联写法就等于给后来者一个「照抄即可」的坏样板：下次有人想多带个分类名
-                    // 进去，很自然就写成 onclick="fn(${h}, '${cat}')"，那一下就出事了。
+                    const bh=Math.max(3,(v/max)*plotH);
+                    const by=padTop+plotH-bh;
+                    let s=`<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3" fill="${col}"/>`;
+                    // 金额标签放柱子上方（细柱内部塞不下）
+                    s+=`<text x="${bx+barW/2}" y="${by-3}" text-anchor="middle" font-size="8" fill="${txtCol}">${v.toFixed(0)}</text>`;
+                    return s;
+                };
+
+                const exX=x, inX=x+barW+barGap;
+                const cell=drawBar(ev,exX,outCol)+drawBar(iv,inX,inCol);
+
+                if(hasAny){
+                    // 透明热区覆盖整个小时槽，点它看该时段收支明细
                     bars+=`<g style="cursor:pointer" data-act="hourBar" data-h="${h}">`
                         + `<rect x="${x}" y="${padTop}" width="${colW}" height="${plotH}" fill="transparent"/>`
                         + cell + `</g>`;
                 } else {
-                    bars+=`<rect x="${x}" y="${padTop+plotH-3}" width="${colW}" height="3" rx="1.5" fill="${emptyCol}"/>`;
+                    bars+=cell;
                 }
+                // 小时刻度
                 bars+=`<text x="${x+colW/2}" y="${H-7}" text-anchor="middle" font-size="9" fill="${txtCol}">${h}</text>`;
-            });
+            }
 
             $('statBarInner').innerHTML=
-                `<svg viewBox="0 0 ${innerW} ${H}" width="${innerW}" height="${H}" role="img" aria-label="当日按小时支出，可横向滑动，点柱子看该时段明细">${bars}</svg>`;
+                `<svg viewBox="0 0 ${innerW} ${H}" width="${innerW}" height="${H}" role="img" aria-label="当日按小时收支，可横向滑动，点柱子看该时段明细">${bars}</svg>`;
 
             const peakHour = peakV>0 ? peak : null;
             $('statPeakHint').textContent = peakHour!==null
-                ? `消费高峰在 ${peakHour}:00 前后`
-                : '这天没有支出，无时间分布';
+                ? `收支高峰在 ${peakHour}:00 前后`
+                : '这天没有收支记录，无时间分布';
 
             // 自动滚动定位到高峰
             const scroll=$('statBarScroll');
@@ -4836,12 +4938,12 @@ ${detail}
         let hdHour=null;     // 当前明细弹窗对应的小时（0-23），null=未打开
         let hdHlId=null;     // 高光记录 id；点别条移走，重开明细清空
 
-        // 按当前统计选中的「年月日 + 小时」从真实数据取该时段支出记录（不走缓存，
+        // 按当前统计选中的「年月日 + 小时」从真实数据取该时段收支记录（含收入与支出，不走缓存，
         // 这样在详情里改过/删过记录后，回到明细能反映最新数据）。
         function recordsOfHour(h){
             if(!statSelDay) return [];
             return getUserData().filter(r=>{
-                if(r.type!=='expense') return false;
+                if(r.type!=='expense' && r.type!=='income') return false;
                 const d=parseRecTime(r.time);
                 return d.getFullYear()===statYear && d.getMonth()===statMonth
                     && d.getDate()===statSelDay && d.getHours()===h;
@@ -4857,11 +4959,12 @@ ${detail}
             const subtitle = `<div class="hd-subtitle">${dateStr}${pad(h)}:00 – ${pad(h)}:59</div>`;
             const list=recordsOfHour(h);
             if(!list.length){
-                return subtitle + `<div class="hd-list"><div class="empty-tip" style="padding:18px">该时段已无消费</div></div>`;
+                return subtitle + `<div class="hd-list"><div class="empty-tip" style="padding:18px">该时段已无收支记录</div></div>`;
             }
             const rows=list.map(r=>{
                 const t=r.time.replace('T',' ').slice(11,16);
                 const amt=safeNum(r.money);
+                const isOut=r.type==='expense';
                 const active = (r.id===hdHlId) ? ' hd-active' : '';
                 // 备注：截断展示（点整行进详情看完整）；无备注则不渲染该 span，行内布局回退原样
                 const remarkFull = r.remark || '';
@@ -4874,13 +4977,17 @@ ${detail}
                     + `<span class="hd-time">${t}</span>`
                     + `<span class="cat-tag">${escapeHtml(r.cat||'未分类')}</span>`
                     + remarkSpan
-                    + `<span class="hd-amt neg">−${amt.toFixed(2)}</span>`
+                    + `<span class="hd-amt ${isOut?'neg':'pos'}">${isOut?'−':'+'}${amt.toFixed(2)}</span>`
                     + `</div>`;
             }).join('');
-            const sum=list.reduce((s,r)=> s + safeNum(r.money), 0);
+            let sumOut=0, sumIn=0;
+            list.forEach(r=>{ const a=safeNum(r.money); if(r.type==='expense') sumOut+=a; else sumIn+=a; });
+            const sumParts=[];
+            if(sumOut>0) sumParts.push(`支出 <b class="neg">−${sumOut.toFixed(2)}</b>`);
+            if(sumIn>0)  sumParts.push(`收入 <b class="pos">+${sumIn.toFixed(2)}</b>`);
             return subtitle
                 + `<div class="hd-list">${rows}</div>`
-                + `<div class="hd-sum">该时段合计支出 <b class="neg">−${sum.toFixed(2)}</b> 元</div>`;
+                + `<div class="hd-sum">该时段${sumParts.join('，')} 元</div>`;
         }
 
         // 仅刷新明细弹窗正文（用于从详情/修改返回后；明细弹窗仍开着）
@@ -4895,8 +5002,8 @@ ${detail}
             if(!recordsOfHour(h).length) return;
             hdHour=h;
             hdHlId=null;
-            // 大标题只保留「消费明细」；日期+时段作为副标题在正文顶部（renderHourDetailBody 内）
-            customAlertHtml(renderHourDetailBody(h), '消费明细', 'left');
+            // 大标题「收支明细」；日期+时段作为副标题在正文顶部（renderHourDetailBody 内）
+            customAlertHtml(renderHourDetailBody(h), '收支明细', 'left');
             // 【关键】这次 askMask 是当「内容页」用的，不是提示框：接下来还要从它里面
             //   点开账单详情(detailMask)。不降档的话，askMask(1040) 会把 detailMask 压在底下
             //   —— 表现就是「点明细里的条目没反应」。必须在 customAlertHtml 之后加，
