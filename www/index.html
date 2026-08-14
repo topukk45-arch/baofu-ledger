@@ -68,6 +68,13 @@
             -webkit-user-select:text; user-select:text;
             -webkit-touch-callout:default;
         }
+        /* .dt-input 是日期/时间选择器的触发框（readonly，点击弹出自定义选择面板，不支持手动输入），
+           本质是「只读展示」而非「可编辑输入」，不应被上面 input 的通用选中规则覆盖——
+           否则长按会弹出系统复制菜单，属遗留 bug，这里改回禁选。 */
+        input.dt-input {
+            -webkit-user-select:none; user-select:none;
+            -webkit-touch-callout:none;
+        }
         /* 去掉聚焦时的浏览器默认蓝色描边（保留我们自己的金色高亮） */
         button:focus, button:focus-visible, select:focus-visible,
         .cs-display:focus, .cs-display:focus-visible { outline:none; }
@@ -1115,6 +1122,24 @@
                     <button class="set-item" id="importBtn"><span>导入存档</span><span class="set-arrow">›</span></button>
                     <input type="file" id="importFile" accept=".json" style="display:none">
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
+                </div>
+
+                <!-- 云备份：不走微软官方登录，借助手机上已登录的 OneDrive App，
+                     通过系统文档选择器（Storage Access Framework）直接连一个 OneDrive 里的文件，
+                     以后每次记账/修改当前存档会自动写进去。仅安卓原生 App 内可用。 -->
+                <div class="set-group">
+                    <div class="set-group-title">云备份</div>
+                    <div class="set-item set-static" style="flex-direction:column; align-items:stretch; gap:10px;">
+                        <span id="odStatus">加载中…</span>
+                        <div class="archive-bar" style="margin-bottom:0;">
+                            <button class="mini-btn gold" id="odConnectBtn" style="flex:1;">连接 OneDrive 自动备份</button>
+                            <button class="mini-btn" id="odDisconnectBtn" style="display:none;">取消同步</button>
+                        </div>
+                        <span style="font-size:12px; color:var(--c-text-soft); line-height:1.5;">
+                            连接后，当前存档「<span id="odArchiveName"></span>」每次记账/修改会自动同步到你选的 OneDrive 文件里；
+                            切换存档要分别连接。手机需联网才能同步，断网时会静默失败、下次记账自动重试。
+                        </span>
+                    </div>
                 </div>
 
                 <div class="set-group">
@@ -2211,11 +2236,13 @@
                 if(name===currentArchive) opt.selected=true;
                 archiveSelect.appendChild(opt);
             });
+            odRefreshStatusUI();
         }
         archiveSelect.addEventListener('change', () => {
             currentArchive = archiveSelect.value;
             const store=loadStore(); store.last=currentArchive; saveStoreSafe(store);
             curPage=1; statSelDay=null; resetSearch(); refreshCatSelectors(); refreshAllViews();
+            odRefreshStatusUI();
         });
         $('newArchive').addEventListener('click', () => {
             customPrompt('', '', (name)=>{
@@ -2322,6 +2349,125 @@
                 mode: 'backup',
                 title: '导出存档（手动保存）',
                 tip: '无法直接写入文件，请点「复制」或「分享」，把内容保存到记事本 / 云笔记 / 聊天收藏。这段文本就是完整备份，之后可用「导入存档」还原。'
+            });
+        }
+
+        // ===== 云备份：自动同步到 OneDrive（不走微软官方登录）=====
+        // 原理：调用安卓系统的「创建/打开文档」选择器（Storage Access Framework）。用户选一次
+        // OneDrive 里的目标文件后，系统会给我们一个可持久使用的读写授权
+        // （ContentResolver.takePersistableUriPermission，见原生插件 OneDriveLinkPlugin），
+        // 之后每次记账/修改都能直接往这个文件写，不用重新弹窗，也不需要登录微软账号——
+        // OneDrive App 自己早就登录了，SAF 只是把它当一个「文档提供方」接进来。
+        // 局限：手机 OneDrive 是「云端优先」，写入这一下需要联网；断网时静默失败，
+        // 不重试轰炸、不打断记账，下次保存成功时自然补上。
+        // 每个「账号+存档」独立连接一个文件（跟导出/导入的粒度保持一致）。
+        function odBuildPayload(){
+            const store=loadStore(); const a=curArchive(store);
+            return { app:'记问', user:currentUser, archive:currentArchive,
+                cats:a.cats, data:a.records, days:loadDays(),
+                exportedAt:new Date().toLocaleString() };
+        }
+        function odPlugin(){
+            const cap = window.Capacitor;
+            return (cap && cap.isNativePlatform && cap.isNativePlatform() && cap.Plugins && cap.Plugins.OneDriveLink) || null;
+        }
+        function odKey(user, archive){ return `onedrive_link_${user}__${archive}`; }
+        function odGetLink(user, archive){
+            try{
+                const raw = localStorage.getItem(odKey(
+                    user!==undefined ? user : currentUser,
+                    archive!==undefined ? archive : currentArchive
+                ));
+                return raw ? JSON.parse(raw) : null;
+            }catch(_){ return null; }
+        }
+        function odSetLink(user, archive, link){
+            try{ localStorage.setItem(odKey(user, archive), JSON.stringify(link)); }catch(_){}
+        }
+        function odClearLink(user, archive){
+            try{ localStorage.removeItem(odKey(user, archive)); }catch(_){}
+        }
+
+        let odTimer=null;
+        function odScheduleSync(){
+            const plugin = odPlugin();
+            if(!plugin) return;
+            const link = odGetLink();
+            if(!link || !link.uri) return;
+            clearTimeout(odTimer);
+            odTimer = setTimeout(odSyncNow, 1500);
+        }
+        async function odSyncNow(){
+            const plugin = odPlugin();
+            const user = currentUser, archive = currentArchive;
+            const link = odGetLink(user, archive);
+            if(!plugin || !link || !link.uri) return;
+            try{
+                const json = JSON.stringify(odBuildPayload(), null, 2);
+                await plugin.writeText({ uri: link.uri, text: json });
+                link.lastSyncAt = Date.now();
+                link.lastError = null;
+            }catch(err){
+                link.lastError = String((err && err.message) || err || '未知错误');
+            }
+            odSetLink(user, archive, link);
+            odRefreshStatusUI();
+        }
+        function odRefreshStatusUI(){
+            const statusEl = $('odStatus'), connBtn = $('odConnectBtn'), disBtn = $('odDisconnectBtn'), nameEl = $('odArchiveName');
+            if(!statusEl) return;
+            if(nameEl) nameEl.textContent = currentArchive || '';
+            const plugin = odPlugin();
+            if(!plugin){
+                statusEl.textContent = '当前平台不支持（仅安卓 App 内可用）';
+                if(connBtn) connBtn.style.display='none';
+                if(disBtn) disBtn.style.display='none';
+                return;
+            }
+            if(connBtn) connBtn.style.display='';
+            const link = odGetLink();
+            if(!link || !link.uri){
+                statusEl.textContent = '未连接，记账不会自动同步到 OneDrive';
+                if(disBtn) disBtn.style.display='none';
+                connBtn.textContent = '连接 OneDrive 自动备份';
+            } else {
+                if(disBtn) disBtn.style.display='';
+                connBtn.textContent = '重新选择备份文件';
+                if(link.lastError){
+                    statusEl.textContent = `已连接「${link.name||'备份文件'}」，最近一次同步失败（${link.lastError}），下次记账会自动重试`;
+                } else if(link.lastSyncAt){
+                    statusEl.textContent = `已连接「${link.name||'备份文件'}」，最近同步于 ${new Date(link.lastSyncAt).toLocaleString()}`;
+                } else {
+                    statusEl.textContent = `已连接「${link.name||'备份文件'}」，等待下一次记账/修改后首次同步`;
+                }
+            }
+        }
+        if($('odConnectBtn')){
+            $('odConnectBtn').addEventListener('click', async () => {
+                const plugin = odPlugin();
+                if(!plugin){ customAlert('这个功能目前只支持安装到手机上的 App，网页版暂不支持。'); return; }
+                try{
+                    const suggested = `记问存档_${currentArchive}.json`;
+                    const res = await plugin.pickFile({ mode:'create', suggestedName: suggested });
+                    if(!res || !res.uri) return;
+                    odSetLink(currentUser, currentArchive, { uri: res.uri, name: res.name || suggested, lastSyncAt:null, lastError:null });
+                    odRefreshStatusUI();
+                    customAlert('已连接，之后每次记账/修改会自动同步到这个文件。现在先手动同步一次试试。', '连接成功');
+                    odSyncNow();
+                }catch(err){
+                    // 用户取消选择时也会走到这里，静默即可，不用报错打扰
+                }
+            });
+        }
+        if($('odDisconnectBtn')){
+            $('odDisconnectBtn').addEventListener('click', () => {
+                customConfirm('取消后不会删除 OneDrive 上已有的文件，只是停止自动同步，需要的话可以重新连接。确定取消吗？', () => {
+                    const plugin = odPlugin();
+                    const link = odGetLink();
+                    if(plugin && link && link.uri){ plugin.forget({ uri: link.uri }).catch(()=>{}); }
+                    odClearLink(currentUser, currentArchive);
+                    odRefreshStatusUI();
+                }, '取消自动同步');
             });
         }
 
@@ -2968,11 +3114,15 @@ ${detail}
         function saveUserData(data, silent){
             const store=loadStore(); curArchive(store).records=data;
             store.last=currentArchive;
+            let ok;
             if(silent){
-                try{ return saveStore(store); }
-                catch(_){ return false; }
+                try{ ok = saveStore(store); }
+                catch(_){ ok = false; }
+            } else {
+                ok = saveStoreSafe(store);
             }
-            return saveStoreSafe(store);
+            if(ok) odScheduleSync(); // 记一笔/改一笔成功后，防抖着自动同步到已连接的 OneDrive 文件
+            return ok;
         }
         // 数据变更后统一刷新：账单页总是刷新；统计页若正在显示也立即重算，
         // 避免「新增/删除记录后切到统计页数字没更新」的问题
