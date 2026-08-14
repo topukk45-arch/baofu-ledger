@@ -1124,19 +1124,21 @@
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                 </div>
 
-                <!-- 云备份：不走微软官方登录，借助手机上已登录的 OneDrive App，
-                     通过系统文档选择器（Storage Access Framework）直接连一个 OneDrive 里的文件，
+                <!-- 云备份：不走任何官方登录，借助手机上已装好的网盘 App（Google Drive/OneDrive 等，
+                     哪个在系统保存文件的弹窗里能选中就用哪个），通过系统文档选择器
+                     （Storage Access Framework）直接连一个网盘里的文件，
                      以后每次记账/修改当前存档会自动写进去。仅安卓原生 App 内可用。 -->
                 <div class="set-group">
                     <div class="set-group-title">云备份</div>
                     <div class="set-item set-static" style="flex-direction:column; align-items:stretch; gap:10px;">
                         <span id="odStatus">加载中…</span>
                         <div class="archive-bar" style="margin-bottom:0;">
-                            <button class="mini-btn gold" id="odConnectBtn" style="flex:1;">连接 OneDrive 自动备份</button>
+                            <button class="mini-btn gold" id="odConnectBtn" style="flex:1;">连接云盘自动备份</button>
                             <button class="mini-btn" id="odDisconnectBtn" style="display:none;">取消同步</button>
                         </div>
                         <span style="font-size:12px; color:var(--c-text-soft); line-height:1.5;">
-                            连接后，当前存档「<span id="odArchiveName"></span>」每次记账/修改会自动同步到你选的 OneDrive 文件里；
+                            连接后，当前存档「<span id="odArchiveName"></span>」每次记账/修改会自动同步到你选的网盘文件里
+                            （弹出的系统选择框里能看到哪个云盘就能选哪个，比如 Google Drive、OneDrive）；
                             切换存档要分别连接。手机需联网才能同步，断网时会静默失败、下次记账自动重试。
                         </span>
                     </div>
@@ -1690,6 +1692,17 @@
         const saveEdit=$('saveEdit'), cancelEdit=$('cancelEdit');
         const userNameInput=$('userNameInput'), loginBtn=$('loginBtn');
         const archiveSelect=$('archiveSelect'), filterCat=$('filterCat');
+
+        // ===== .dt-input 长按仍可选中复制的兜底修复 =====
+        // CSS 里 user-select:none 对普通元素管用，但安卓 WebView（Chromium）对 <input> 这类
+        // 表单控件的长按选字/系统复制条，很多版本不完全受 user-select 约束——实测 CSS 单独
+        // 那条规则挡不住。这里在 JS 层再挡一道：拦掉 selectstart（不让选区真正建立起来，
+        // 复制条本身就是跟着选区出现的，没有选区就不会弹）和 contextmenu，双重兜底。
+        // 不拦 touchstart/click，不影响点击弹出日期选择器的正常功能。
+        document.querySelectorAll('input.dt-input').forEach(el => {
+            el.addEventListener('selectstart', e => e.preventDefault());
+            el.addEventListener('contextmenu', e => e.preventDefault());
+        });
 
         // ===== 自定义 确认 / 输入 弹窗 =====
         const askMask=$('askMask'), askTitle=$('askTitle'), askMsg=$('askMsg'),
@@ -2427,9 +2440,9 @@
             if(connBtn) connBtn.style.display='';
             const link = odGetLink();
             if(!link || !link.uri){
-                statusEl.textContent = '未连接，记账不会自动同步到 OneDrive';
+                statusEl.textContent = '未连接，记账不会自动同步到云盘';
                 if(disBtn) disBtn.style.display='none';
-                connBtn.textContent = '连接 OneDrive 自动备份';
+                connBtn.textContent = '连接云盘自动备份';
             } else {
                 if(disBtn) disBtn.style.display='';
                 connBtn.textContent = '重新选择备份文件';
@@ -2461,7 +2474,7 @@
         }
         if($('odDisconnectBtn')){
             $('odDisconnectBtn').addEventListener('click', () => {
-                customConfirm('取消后不会删除 OneDrive 上已有的文件，只是停止自动同步，需要的话可以重新连接。确定取消吗？', () => {
+                customConfirm('取消后不会删除云盘上已有的文件，只是停止自动同步，需要的话可以重新连接。确定取消吗？', () => {
                     const plugin = odPlugin();
                     const link = odGetLink();
                     if(plugin && link && link.uri){ plugin.forget({ uri: link.uri }).catch(()=>{}); }
