@@ -68,13 +68,31 @@
             -webkit-user-select:text; user-select:text;
             -webkit-touch-callout:default;
         }
-        /* .dt-input 是日期/时间选择器的触发框（readonly，点击弹出自定义选择面板，不支持手动输入），
-           本质是「只读展示」而非「可编辑输入」，不应被上面 input 的通用选中规则覆盖——
-           否则长按会弹出系统复制菜单，属遗留 bug，这里改回禁选。 */
-        input.dt-input {
+        /* .dt-input 是日期/时间选择器的触发框：readonly 展示 + 点击弹出自定义面板，从不接受键入。
+           【为什么是 div 而不是 input】此前它是 <input readonly>，长按仍会弹出系统选字手柄与复制条，
+           CSS 的 user-select:none 与 JS 的 selectstart 拦截都挡不住——原因是这两道打的都不是
+           真正的路径：Blink 中 user-select 明确不作用于表单控件的内部文本，而长按选字由 WebView
+           的原生 selection controller 处理，位于 DOM 事件层之下，selectstart 不保证派发。
+           既然它本质是「只读展示」，就不该是文本编辑控件。换成 div 后没有可编辑控件供平台挂手柄，
+           user-select:none 也真正生效。JS 侧通过 value 属性垫片保持读写接口不变（见 dtShim）。 */
+        .dt-input {
             -webkit-user-select:none; user-select:none;
             -webkit-touch-callout:none;
+            cursor:pointer;
+            font-size:16px;
+            /* 空值时也要撑住与 input 等高的行高，否则未选日期的框会塌陷 */
+            min-height:1.2em; line-height:1.2;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
         }
+        /* 占位符：div 没有 ::placeholder，用 data-placeholder + :empty 模拟 */
+        .dt-input:empty::before {
+            content:attr(data-placeholder);
+            color:var(--c-text-soft); opacity:0.7;
+        }
+        /* 让 div 版触发框继承与同弹窗内 input 完全一致的盒子外观 */
+        .edit-dialog .dt-input { width:100%; margin:8px 0; padding:10px;
+            border:1px solid var(--c-primary); border-radius:6px; outline:none;
+            background:var(--c-surface); }
         /* 去掉聚焦时的浏览器默认蓝色描边（保留我们自己的金色高亮） */
         button:focus, button:focus-visible, select:focus-visible,
         .cs-display:focus, .cs-display:focus-visible { outline:none; }
@@ -991,7 +1009,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0820-A</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0820-B</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1255,9 +1273,9 @@
                 <div class="search-field">
                     <span class="search-label">日期范围</span>
                     <div class="search-range">
-                        <input type="text" id="searchFrom" class="search-input dt-input" placeholder="起始日期" readonly>
+                        <div id="searchFrom" class="search-input dt-input" data-placeholder="起始日期"></div>
                         <span class="search-sep">—</span>
-                        <input type="text" id="searchTo" class="search-input dt-input" placeholder="结束日期" readonly>
+                        <div id="searchTo" class="search-input dt-input" data-placeholder="结束日期"></div>
                     </div>
                 </div>
                 <div class="search-field">
@@ -1281,7 +1299,7 @@
             <div class="form-box">
                 <div class="field">
                     <label class="field-label">记账时间</label>
-                    <input type="text" id="billTime" placeholder="选择记账时间" readonly class="dt-input">
+                    <div id="billTime" class="dt-input" data-placeholder="选择记账时间"></div>
                 </div>
                 <div class="field">
                     <label class="field-label">金额</label>
@@ -1322,7 +1340,7 @@
             <div class="form-box">
                 <div class="field">
                     <label class="field-label">记账时间</label>
-                    <input type="text" id="editTime" placeholder="选择记账时间" readonly class="dt-input">
+                    <div id="editTime" class="dt-input" data-placeholder="选择记账时间"></div>
                 </div>
                 <div class="field">
                     <label class="field-label">金额</label>
@@ -1532,7 +1550,7 @@
                 </div>
                 <div class="field">
                     <label class="field-label">目标日期</label>
-                    <input type="text" id="dayDate" placeholder="选择日期" readonly class="dt-input">
+                    <div id="dayDate" class="dt-input" data-placeholder="选择日期"></div>
                 </div>
                 <div class="day-preview" id="dayPreview"></div>
                 <div class="field">
@@ -1693,14 +1711,22 @@
         const userNameInput=$('userNameInput'), loginBtn=$('loginBtn');
         const archiveSelect=$('archiveSelect'), filterCat=$('filterCat');
 
-        // ===== .dt-input 长按仍可选中复制的兜底修复 =====
-        // CSS 里 user-select:none 对普通元素管用，但安卓 WebView（Chromium）对 <input> 这类
-        // 表单控件的长按选字/系统复制条，很多版本不完全受 user-select 约束——实测 CSS 单独
-        // 那条规则挡不住。这里在 JS 层再挡一道：拦掉 selectstart（不让选区真正建立起来，
-        // 复制条本身就是跟着选区出现的，没有选区就不会弹）和 contextmenu，双重兜底。
-        // 不拦 touchstart/click，不影响点击弹出日期选择器的正常功能。
-        document.querySelectorAll('input.dt-input').forEach(el => {
-            el.addEventListener('selectstart', e => e.preventDefault());
+        // ===== .dt-input 的 value 垫片 =====
+        // 这五个触发框已从 <input readonly> 换成 <div>（原因见 CSS 中 .dt-input 处的长注释）。
+        // div 没有 value 属性，而现有代码有十余处直接读写 .value（setDtInput/getDtInput、
+        // 筛选草稿的回填与提交等）。与其逐处改调用方，不如在元素上补一个同名属性：
+        // 读 → textContent，写 → textContent。空串时 textContent 为空，:empty::before 自动显示占位符。
+        // 这样上层代码一行不用动，行为与原 input 完全一致。
+        document.querySelectorAll('.dt-input').forEach(el => {
+            Object.defineProperty(el, 'value', {
+                get(){ return el.textContent; },
+                set(v){ el.textContent = (v==null) ? '' : String(v); },
+                configurable: true
+            });
+            // 表单校验里有一处 billTime.focus()。div 继承 HTMLElement.focus，调用不会报错，
+            // 但没有 tabindex 时是静默空操作——这正是我们要的：它不可编辑，聚焦本就无事可做。
+            // 不加 tabindex，避免把只读展示框带进键盘 Tab 序列。
+            // 长按菜单再兜一道。div + user-select:none 已能挡住，这里只是成本极低的双保险。
             el.addEventListener('contextmenu', e => e.preventDefault());
         });
 
