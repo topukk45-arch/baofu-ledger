@@ -991,7 +991,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0722-A</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0820-A</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1953,6 +1953,14 @@
             return a;
         }
 
+        // 【P0 守卫】本次会话中「曾被检测到损坏」的 store key 集合。
+        //   loadStore 发现损坏时会回退一个空结构以保证界面不白屏——这是对的，
+        //   但云同步（odSyncNow）也是通过 loadStore 取数据的，于是形成一条致命链路：
+        //     存档损坏 → 界面显示空账本 → 用户记一笔 → 触发同步 → 空数据覆盖云端完好备份。
+        //   偏偏这正是最需要备份的时刻。所以在此登记，同步前据此拒绝写入。
+        //   只存在于内存：重启 App 后若数据已正常，自然解除；仍损坏则会被重新登记。
+        const __corruptedStores = new Set();
+
         function loadStore(user){
             const u = (user!==undefined) ? user : currentUser;
             const raw = localStorage.getItem(storeKey(u));
@@ -1965,6 +1973,8 @@
                 }
             }
             if (corrupted) {
+                // 登记到会话级损坏名单，供云同步据此拒绝写入（见 odSyncNow）
+                __corruptedStores.add(storeKey(u));
                 // 数据存在但损坏：备份原始串到独立 key，避免被随后的 saveStore 覆盖而永久丢失。
                 // 仍回退到可用结构以保证界面不白屏，但不主动写回，给用户/后续逻辑留出恢复余地。
                 // 写新备份前清理该用户的旧备份，只保留最近 1 份（连同这次共 2 份），
@@ -2010,8 +2020,17 @@
             }
         }
         // 安全写：吞掉异常并弹窗提示，用于「写失败也不该中断流程」的高频场景
+        // 【P1】odBuildPayload 打包的是 records + cats + days 三样，但此前只有 saveUserData
+        //   一条路会触发同步，改分类、排序、建/删存档全都不同步——得等下次记一笔才顺带补上。
+        //   收在这里统一触发：saveStoreSafe 是所有「当前用户」写存档的必经之路。
+        //   带 user 参数且不是当前用户的（导入到别的账号）不触发，避免把 A 的操作
+        //   记成 B 的同步时机。odScheduleSync 本身有 1.5s 防抖，连续操作不会打满。
         function saveStoreSafe(store, user){
-            try{ return saveStore(store, user); }
+            try{
+                const ok = saveStore(store, user);
+                if(ok && (user===undefined || user===currentUser)) odScheduleSync();
+                return ok;
+            }
             catch(err){
                 customAlert(err && err.message==='quota'
                     ? '存储空间已满，本次修改未能保存。请删除部分存档或记录后重试。'
@@ -2415,11 +2434,38 @@
             const user = currentUser, archive = currentArchive;
             const link = odGetLink(user, archive);
             if(!plugin || !link || !link.uri) return;
+
+            // 【守卫一】本地存档本次会话被检测到损坏过：坚决不写。
+            //   此时 loadStore 给出的是空回退结构，写上去等于亲手销毁唯一的完好备份。
+            if(__corruptedStores.has(storeKey(user))){
+                link.lastError = '本地存档曾损坏，已暂停自动同步以保护云端备份';
+                link.blocked = true;
+                odSetLink(user, archive, link);
+                odRefreshStatusUI();
+                return;
+            }
+
+            const payload = odBuildPayload();
+            const cnt = Array.isArray(payload.data) ? payload.data.length : 0;
+
+            // 【守卫二】记录数从「有」塌到「零」：兜住守卫一覆盖不到的未知路径。
+            //   正常使用绝不会出现这种跳变，出现即说明本地数据异常。
+            //   （真要清空存档重来，点「重新选择备份文件」即可解除——那是明确的用户意图。）
+            if(link.lastCount > 0 && cnt === 0){
+                link.lastError = `本地记录为 0（云端有 ${link.lastCount} 条），已暂停自动同步以防误覆盖`;
+                link.blocked = true;
+                odSetLink(user, archive, link);
+                odRefreshStatusUI();
+                return;
+            }
+
             try{
-                const json = JSON.stringify(odBuildPayload(), null, 2);
+                const json = JSON.stringify(payload, null, 2);
                 await plugin.writeText({ uri: link.uri, text: json });
                 link.lastSyncAt = Date.now();
                 link.lastError = null;
+                link.blocked = false;
+                link.lastCount = cnt;      // 供下次做塌陷判定
             }catch(err){
                 link.lastError = String((err && err.message) || err || '未知错误');
             }
@@ -2446,7 +2492,12 @@
             } else {
                 if(disBtn) disBtn.style.display='';
                 connBtn.textContent = '重新选择备份文件';
-                if(link.lastError){
+                if(link.blocked){
+                    // 守卫拦下：这不是「会自动重试」的失败，是刻意停住。文案必须说清，
+                    // 否则用户以为过会儿就好了，实际永远不会好。
+                    statusEl.textContent = `⚠ 自动同步已暂停：${link.lastError}。云端文件保持原样未被改动；`
+                        + `确认本地数据无误后，点「重新选择备份文件」恢复同步。`;
+                } else if(link.lastError){
                     statusEl.textContent = `已连接「${link.name||'备份文件'}」，最近一次同步失败（${link.lastError}），下次记账会自动重试`;
                 } else if(link.lastSyncAt){
                     statusEl.textContent = `已连接「${link.name||'备份文件'}」，最近同步于 ${new Date(link.lastSyncAt).toLocaleString()}`;
@@ -2463,7 +2514,10 @@
                     const suggested = `记问存档_${currentArchive}.json`;
                     const res = await plugin.pickFile({ mode:'create', suggestedName: suggested });
                     if(!res || !res.uri) return;
-                    odSetLink(currentUser, currentArchive, { uri: res.uri, name: res.name || suggested, lastSyncAt:null, lastError:null });
+                    // 重新选择 = 明确的用户意图，解除守卫（含损坏名单），否则一旦拦下就再也恢复不了
+                    __corruptedStores.delete(storeKey(currentUser));
+                    odSetLink(currentUser, currentArchive, { uri: res.uri, name: res.name || suggested,
+                        lastSyncAt:null, lastError:null, blocked:false, lastCount:0 });
                     odRefreshStatusUI();
                     customAlert('已连接，之后每次记账/修改会自动同步到这个文件。现在先手动同步一次试试。', '连接成功');
                     odSyncNow();
@@ -3784,7 +3838,7 @@ ${detail}
                 byCat[r.cat]=(byCat[r.cat]||0)+amt;
             });
             $('catStats').innerHTML = Object.keys(byCat)
-                .map(c=>`<span class="chip">${escapeHtml(c)}：${byCat[c].toFixed(2)} 元</span>`).join('');
+                .map(c=>`<span class="chip">${escapeHtml(c)}：${round2(byCat[c]).toFixed(2)} 元</span>`).join('');
 
             // 显示按时间倒序（最新在上）；结余取自全账户累计
             const desc = asc.slice().reverse();
@@ -4762,6 +4816,17 @@ ${detail}
             return getUserData().slice();
         }
 
+        // 给每条记录预解析出年/月/日/时间戳，供统计页各处共用。
+        // 每条只调一次 parseRecTime（正则 + new Date），把 O(遍历次数 × n) 压成 O(n)。
+        // 返回的是包装对象，原记录挂在 .r 上——不改动原对象，避免脏字段流回存储。
+        function decorateRecs(recs){
+            return recs.map(r=>{
+                const t=parseRecTime(r.time);
+                return { r, y:t.getFullYear(), mo:t.getMonth(), d:t.getDate(),
+                         hh:t.getHours(), mi:t.getMinutes(), ts:t.getTime() };
+            });
+        }
+
         function renderStats(){
             if(statYear===undefined){
                 const now=new Date();
@@ -4772,34 +4837,28 @@ ${detail}
 
         function renderStatCalendar(){
             $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
-            const recs=statRecords();
+            // 【P4】统计页此前的形状与当初 renderBill 的性能坑同源：
+            //   statRecords() 每次都把整个 store（含所有存档）重新 JSON.parse，
+            //   而日净额、当月汇总、分类占比、当日明细四处各自把全表 parseRecTime 遍历一遍。
+            //   点一次日历格子就要付 3 次 JSON.parse + 3 趟正则解析。
+            //   改法同 renderBill：取一次数、给每条只解析一次时间，四个消费点共用同一份。
+            const dec=decorateRecs(statRecords());
 
-            // 按「日」聚合当月净额，并记录哪天有数据
+            // 日净额 / 有无数据 / 当月收支汇总——原先三趟遍历，合并为一趟
             const dayNet={}, dayHas={};
-            recs.forEach(r=>{
-                const d=parseRecTime(r.time);
-                if(d.getFullYear()===statYear && d.getMonth()===statMonth){
-                    const day=d.getDate();
-                    const amt=safeNum(r.money)*(r.type==='expense'?-1:1);
-                    dayNet[day]=(dayNet[day]||0)+amt;
-                    dayHas[day]=true;
-                }
-            });
-
-            // 当月收入/支出汇总
             let mIn=0, mOut=0;
-            recs.forEach(r=>{
-                const d=parseRecTime(r.time);
-                if(d.getFullYear()===statYear && d.getMonth()===statMonth){
-                    const amt=safeNum(r.money);
-                    if(r.type==='expense') mOut+=amt; else mIn+=amt;
-                }
+            dec.forEach(x=>{
+                if(x.y!==statYear || x.mo!==statMonth) return;
+                const amt=safeNum(x.r.money);
+                dayNet[x.d]=(dayNet[x.d]||0)+amt*(x.r.type==='expense'?-1:1);
+                dayHas[x.d]=true;
+                if(x.r.type==='expense') mOut+=amt; else mIn+=amt;
             });
             $('statMonthIn').textContent='+'+round2(mIn).toFixed(2);
             $('statMonthOut').textContent='−'+round2(mOut).toFixed(2);
 
             // 当月支出分类占比（复用当日分析的甜甜圈 + 分类列表画法）
-            renderStatMonthCats(recs);
+            renderStatMonthCats(dec);
 
             // 画日历格子
             // 周一为一周起始：与记账/筛选/AI导出的日期选择器（renderDtDays）以及
@@ -4821,20 +4880,22 @@ ${detail}
 
                 let inner=`<div class="dn">${day}</div>`;
                 if(has){
-                    const n=dayNet[day];
+                    const n=round2(dayNet[day]);   // 收支浮点相消可能剩 -5e-17，不归整会渲染成「-0」
                     const col = n>=0 ? 'var(--c-pos,#2f7d57)' : 'var(--c-neg,#d05a52)';
                     inner+=`<div class="da" style="color:${col}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
                 }
                 cell.innerHTML=inner;
                 if(has){
-                    cell.addEventListener('click', ()=>{ statSelDay=day; renderStatCalendar(); renderStatDay(day); });
+                    // 只设选中天 + 重绘日历即可：renderStatCalendar 末尾会依据 statSelDay
+                    // 自行调用 renderStatDay。此处若再调一次就是整份数据白算一遍。
+                    cell.addEventListener('click', ()=>{ statSelDay=day; renderStatCalendar(); });
                 }
                 grid.appendChild(cell);
             }
 
             // 若已选中某天且该天仍在本月有数据，刷新当日分析；否则隐藏
             if(statSelDay && dayHas[statSelDay]){
-                renderStatDay(statSelDay);
+                renderStatDay(statSelDay, dec);   // 共用同一份预解析结果
             } else {
                 statSelDay=null;
                 $('statDayWrap').style.display='none';
@@ -4842,21 +4903,25 @@ ${detail}
             }
         }
 
-        function renderStatDay(day){
-            const recs=statRecords().filter(r=>{
-                const d=parseRecTime(r.time);
-                return d.getFullYear()===statYear && d.getMonth()===statMonth && d.getDate()===day;
-            });
+        // dec 由调用方（renderStatCalendar）传入，避免又一次 loadStore + 全表解析。
+        // 不传则自行取数，保留独立可调用性——但正常路径下不会走到那个分支。
+        function renderStatDay(day, dec){
+            const src = dec || decorateRecs(statRecords());
+            const flow = src
+                .filter(x=> x.y===statYear && x.mo===statMonth && x.d===day)
+                // 排序比较器里不再调 parseRecTime：ts 已预算好，比的是纯数字。
+                // 同分钟多笔的相对次序由 sort 的稳定性保证，与原实现一致。
+                .sort((a,b)=> a.ts-b.ts);
+
             $('statDayEmpty').style.display='none';
             $('statDayWrap').style.display='block';
             $('statDayTitle').textContent=`${statYear}-${pad(statMonth+1)}-${pad(day)} · 当日收支分析`;
 
             // —— 当日收支明细：一条一行，按时间正序（含收入与支出）——
-            const flow=recs.slice().sort((a,b)=>parseRecTime(a.time)-parseRecTime(b.time));
             if(flow.length){
-                $('statFlowList').innerHTML = flow.map(r=>{
-                    const d=parseRecTime(r.time);
-                    const hm=`${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                $('statFlowList').innerHTML = flow.map(x=>{
+                    const r=x.r;
+                    const hm=`${pad(x.hh)}:${pad(x.mi)}`;
                     const isOut=r.type==='expense';
                     const io=isOut?'支出':'收入';
                     const cat=r.cat||'未分类';
@@ -4895,10 +4960,10 @@ ${detail}
         // 分类多于 6 个时，金额前 6 保留、其余并入「其他」，避免列表过长。
         // 颜色一律走 catColor()，与当日分析同源，换主题色时一起变。
         let statMonthCatMode='expense';   // 'expense' | 'income'
-        let statMonthCatRecs=null;        // 缓存最近一次的 recs，供胶囊切换时就地重渲染
-        function renderStatMonthCats(recs){
-            if(recs) statMonthCatRecs=recs;      // 首次/刷新时更新缓存；切换口径时传 null 复用缓存
-            recs=statMonthCatRecs||[];
+        let statMonthCatRecs=null;        // 缓存最近一次的 dec（已预解析日期），供胶囊切换时就地重渲染
+        function renderStatMonthCats(dec){
+            if(dec) statMonthCatRecs=dec;        // 首次/刷新时更新缓存；切换口径时传 null 复用缓存
+            dec=statMonthCatRecs||[];
             const card=$('statMonthCatCard');
             const pie=$('statMonthPie'), list=$('statMonthCatList');
             const title=$('statMonthCatTitle');
@@ -4909,12 +4974,12 @@ ${detail}
             if(title) title.textContent = isExp ? '当月支出分类占比' : '当月收入分类占比';
 
             const byCat={};
-            recs.forEach(r=>{
-                const d=parseRecTime(r.time);
+            dec.forEach(x=>{
                 // 关键：只统计当前查看月份、且符合当前口径（支出/收入）的记录
-                if(d.getFullYear()===statYear && d.getMonth()===statMonth && r.type===wantType){
-                    const amt=safeNum(r.money);
-                    byCat[r.cat||'未分类']=(byCat[r.cat||'未分类']||0)+amt;
+                if(x.y===statYear && x.mo===statMonth && x.r.type===wantType){
+                    const amt=safeNum(x.r.money);
+                    const c=x.r.cat||'未分类';
+                    byCat[c]=(byCat[c]||0)+amt;
                 }
             });
 
@@ -5482,19 +5547,41 @@ ${detail}
         //   能带走），但导入只在「文件里的 user === 目标账号」时才收，否则跳过——见
         //   importArchiveFromText。多存档时每份导出各带一份相同副本，这是可接受的冗余。
         function daysKey(user){ return `days_${user!==undefined ? user : currentUser}`; }
-        function loadDays(user){
+        // 【P3】损坏处理向 loadStore 看齐：原先直接 return []，下一次 saveDays 就把坏数据
+        //   永久覆盖了，连人工抢救的机会都没有。倒数日虽小，但同一份代码里两套存储对
+        //   「数据坏了」给出两种处理，本身就是将来会看走眼的坑。只留最近 1 份，不堆积。
+        function backupCorruptedDays(user, raw){
+            if(raw==null) return;
             try{
-                const raw=localStorage.getItem(daysKey(user));
+                const prefix=`${daysKey(user)}__corrupted_`;
+                const olds=[];
+                for(let i=0;i<localStorage.length;i++){
+                    const k=localStorage.key(i);
+                    if(k && k.indexOf(prefix)===0) olds.push(k);
+                }
+                olds.sort();
+                olds.slice(0, Math.max(0, olds.length-1)).forEach(k=>{
+                    try{ localStorage.removeItem(k); }catch(_){}
+                });
+                localStorage.setItem(`${prefix}${Date.now()}`, raw);
+            }catch(_){}
+        }
+        function loadDays(user){
+            let raw=null;
+            try{
+                raw=localStorage.getItem(daysKey(user));
                 const arr=raw ? JSON.parse(raw) : [];
-                if(!Array.isArray(arr)) return [];
+                if(!Array.isArray(arr)){ backupCorruptedDays(user, raw); return []; }
                 // 清洗：只保留结构合法的项，避免脏数据让整页崩掉
                 return arr.filter(d=> d && typeof d==='object'
                     && typeof d.name==='string' && isValidDay(d.date));
-            }catch(_){ return []; }
+            }catch(_){ backupCorruptedDays(user, raw); return []; }
         }
         function saveDays(list, user){
             try{
                 localStorage.setItem(daysKey(user), JSON.stringify(list));
+                // 倒数日也在 odBuildPayload 的打包范围内，改完同样要同步（见 saveStoreSafe 处注释）
+                if(user===undefined || user===currentUser) odScheduleSync();
                 return true;
             }catch(err){
                 customAlert('存储空间已满，这个日子没能保存。请删除部分记录后重试。', '保存失败');
