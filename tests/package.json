@@ -1,0 +1,12 @@
+{
+  "name": "jiwen-tests",
+  "private": true,
+  "description": "记问自动化测试（jsdom），不参与打包",
+  "scripts": {
+    "test": "node run-all.js",
+    "regress": "node regress.js"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1"
+  }
+}
