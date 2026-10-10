@@ -1073,14 +1073,56 @@
         /* 统计日历：当天只有「不计入 / 只算结余」的记录——有账，但不进收支 */
         .stat-cal .day.has.excl { background:#eef0f3; border:1px dashed #c6cdd5; }
         .stat-cal .day.excl.sel { background:var(--c-sel-bg); border:1px solid transparent; }
-        .stat-cal .day .da-ex { font-size:9px; line-height:1.1; color:#8a96a3; }
+
+        /* ===== 1010-E：账户总览 / 日历重构 / 批量入口 ===== */
+        /* 账户总览：标题行 + 结余大字 + 收入支出两栏。数字各占一格、尽量撑满，
+           放不下时由 fitNums() 逐级缩字号（下限 12px），而不是挤成一行小字或折行。 */
+        .summary-overall { text-align:left; padding:12px 14px; }
+        .ov-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+        .ov-title { font-size:14px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; }
+        .ov-count { font-size:12.5px; color:var(--c-text-soft); }
+        .summary-overall .ov-count b { font-size:13px; color:var(--c-text); }
+        .ov-label { font-size:12px; color:var(--c-text-soft); margin-bottom:2px; }
+        .ov-num { display:block; font-weight:bold; font-variant-numeric:tabular-nums; white-space:nowrap;
+            overflow:hidden; line-height:1.25; }
+        .ov-bal { padding:2px 0 10px; margin-bottom:10px; border-bottom:1px dashed var(--c-border); }
+        .ov-net { font-size:30px; color:var(--c-primary-deep); letter-spacing:.3px; }
+        .ov-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .ov-cell { min-width:0; }
+        .ov-cell + .ov-cell { padding-left:12px; border-left:1px dashed var(--c-border); }
+        .ov-cell .ov-num { font-size:20px; }
+
+        /* 筛选小计：按「段」折行，一段内不拆开 */
+        .summary-filter .filter-nums { display:flex; flex-wrap:wrap; column-gap:12px; row-gap:2px; }
+        .fn-seg { white-space:nowrap; }
+        .fn-ex { font-style:normal; font-size:12px; color:var(--c-text-soft); }
+
+        /* 批量入口：日子与账单之间的整行按钮，不再挤在小计条里 */
+        .batch-bar { margin:0 0 12px; }
+        .batch-btn { width:100%; display:flex; justify-content:space-between; align-items:center; gap:10px;
+            padding:11px 14px; border:1px solid var(--c-border-mid); border-radius:12px;
+            background:var(--c-surface); color:var(--c-primary-dark); font-size:14.5px; font-weight:bold;
+            cursor:pointer; box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),.15); }
+        .batch-btn .bb-sub { font-size:12.5px; font-weight:normal; color:var(--c-text-soft); white-space:nowrap; }
+
+        /* 统计日历：格子加高，三层——日期 / 计入净额 / 口径标签（结余、不计） */
+        .stat-cal { gap:4px; }
+        .stat-cal .day { aspect-ratio:auto; min-height:62px; padding:5px 1px 4px; justify-content:flex-start; gap:2px; }
+        .stat-cal .day .dn { font-size:13.5px; line-height:1.2; }
+        .stat-cal .day .da { font-size:10.5px; line-height:1.2; }
+        .day-tags { display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:1px; }
+        .dtag { font-size:9px; line-height:1; padding:2px 4px; border-radius:4px; white-space:nowrap; }
+        .dtag.flow { background:#e1e9f3; color:#4b6380; }
+        .dtag.skip { background:#e9e9e9; color:#767676; }
+        .stat-cal .day.sel .dtag.flow { background:#d2deec; }
+        .stat-cal .day.sel .dtag.skip { background:#dcdcdc; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-D</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-E</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1109,8 +1151,8 @@
                     <div class="cat-card-head">
                         <span class="cat-card-title">分类汇总</span>
                         <div class="seg" id="catSortSeg">
-                            <button data-v="amount">按金额</button>
-                            <button data-v="cat">按分类</button>
+                            <button data-v="desc">从大到小</button>
+                            <button data-v="asc">从小到大</button>
                         </div>
                     </div>
                     <div class="cat-stats" id="catStats"></div>
@@ -1126,6 +1168,9 @@
                     </div>
                     <div id="daysEntryRows"></div>
                 </div>
+
+                <!-- 批量操作入口：仅筛选生效时出现，放在账单正上方，离列表近、点起来顺手 -->
+                <div class="batch-bar" id="batchBar" style="display:none"></div>
 
                 <div class="bill-head" id="billHead">账单</div>
 
@@ -4047,6 +4092,7 @@ ${detail}
                 // 无记录时连同容器一起隐藏，避免留下带底色/内边距的空白色块
                 $('summaryOverall').innerHTML=''; $('summaryOverall').style.display='none';
                 $('summaryFilter').style.display='none';
+                $('batchBar').innerHTML=''; $('batchBar').style.display='none';
                 $('catStats').innerHTML=''; $('catStatsCard').style.display='none';
                 $('pager').innerHTML='';
                 return;
@@ -4072,10 +4118,13 @@ ${detail}
             // 现在「筛选」= 分类标签筛选 或 搜索条件，任一生效都显示这条小计
             const filtering = filterVal!=='__all' || hasActiveSearch();
             $('summaryOverall').innerHTML=
-                `共 <b>${allAsc.length}</b> 条　`+
-                `收入 <b class="pos">${totalIn.toFixed(2)}</b>　`+
-                `支出 <b class="neg">${totalOut.toFixed(2)}</b>　`+
-                `结余 <b>${net.toFixed(2)}</b> 元`;
+                `<div class="ov-head"><span class="ov-title">账户总览</span><span class="ov-count">共 <b>${allAsc.length}</b> 条</span></div>`+
+                `<div class="ov-bal"><div class="ov-label">结余（元）</div><div class="ov-num ov-net" data-fit>${net.toFixed(2)}</div></div>`+
+                `<div class="ov-row">`+
+                    `<div class="ov-cell"><div class="ov-label">累计收入</div><div class="ov-num ov-in pos" data-fit>+${totalIn.toFixed(2)}</div></div>`+
+                    `<div class="ov-cell"><div class="ov-label">累计支出</div><div class="ov-num ov-out neg" data-fit>−${totalOut.toFixed(2)}</div></div>`+
+                `</div>`;
+            fitNums($('summaryOverall'));
 
             const fBar=$('summaryFilter');
             if(filtering){
@@ -4093,12 +4142,24 @@ ${detail}
                 fBar.innerHTML=
                     `<span class="filter-badge">${escapeHtml(badge)}</span>`+
                     // 「其中 N 条不计入」：否则会出现「命中 4 条、支出 0.00」这种看着像 bug 的组合
-                    `<span class="filter-nums">命中 <b>${asc.length}</b> 条${fEx.length?`（其中 ${fEx.join('、')}）`:''}　收入 <b class="pos">${fIn.toFixed(2)}</b>　支出 <b class="neg">${fOut.toFixed(2)}</b></span>`+
-                    // 批量操作只在筛选生效时出现：没有筛选就等于「全部记录」，一不小心就改了整本账
-                    (asc.length ? `<button class="filter-batch" data-act="batch">批量</button>` : '');
+                    // 分「段」排：命中 / 收入 / 支出各一段，窄屏折行时只在段与段之间断开
+                    `<span class="filter-nums">`+
+                        `<span class="fn-seg">命中 <b>${asc.length}</b> 条${fEx.length?`<em class="fn-ex">（其中 ${fEx.join('、')}）</em>`:''}</span>`+
+                        `<span class="fn-seg">收入 <b class="pos">${fIn.toFixed(2)}</b></span>`+
+                        `<span class="fn-seg">支出 <b class="neg">${fOut.toFixed(2)}</b></span>`+
+                    `</span>`;
                 fBar.style.display='flex';
             } else {
                 fBar.style.display='none';
+            }
+            // 批量入口：日子卡与账单之间的整行按钮。只在筛选生效且有命中时出现——
+            // 没有筛选就等于「全部记录」，一不小心就改了整本账。
+            const bBar=$('batchBar');
+            if(filtering && asc.length){
+                bBar.innerHTML=`<button class="batch-btn" data-act="batch"><span>批量操作</span><span class="bb-sub">当前筛选命中 ${asc.length} 条 ›</span></button>`;
+                bBar.style.display='';
+            } else {
+                bBar.innerHTML=''; bBar.style.display='none';
             }
 
             // 分类统计：始终基于全部记录，按收支净额（收入加、支出减）
@@ -4166,7 +4227,7 @@ ${detail}
         // 不可逆操作的保护：确认框写明条数并列出样例；完成后给一次「撤销」。
         // 撤销只记被改记录的旧分类和口径（体积很小），只在完成弹窗里提供一次。
         let batchUndo=null;
-        $('summaryFilter').addEventListener('click', e=>{
+        $('batchBar').addEventListener('click', e=>{
             if(e.target.closest('[data-act="batch"]')) openBatchMenu();
         });
         function openBatchMenu(){
@@ -4238,12 +4299,29 @@ ${detail}
             customAlert(`已撤销，${map.size} 条记录恢复原样。`);
         }
 
+        // ===== 数字自适应字号 =====
+        // 带 data-fit 的数字先用 CSS 里的大字号；放不下（scrollWidth > clientWidth）就逐级缩小，
+        // 下限 12px。账户结余到 7、8 位时不至于被截断，平时又能用大字撑满格子。
+        function fitNums(root){
+            if(!root) return;
+            root.querySelectorAll('[data-fit]').forEach(el=>{
+                el.style.fontSize='';
+                let size=parseFloat(getComputedStyle(el).fontSize)||16;
+                let guard=0;
+                while(el.scrollWidth>el.clientWidth && size>12 && guard++<30){
+                    size-=1; el.style.fontSize=size+'px';
+                }
+            });
+        }
+        window.addEventListener('resize', ()=>fitNums($('summaryOverall')), { passive:true });
+
         // ===== 分类汇总卡片 =====
-        // 排序：按金额（绝对值从大到小，收支混排时大头在上）/ 按分类（「管理分类」里拖出来的顺序）。
+        // 排序：按金额绝对值，收支混排时看的是「量级」——工资 +10604 与餐饮 −5347 比的是 10604 与 5347。
         // 偏好是全局的，存 localStorage；读写都包 try/catch，取不到就用默认（按金额）。
         let lastCatStats=null;
+        // 只按金额（绝对值）排：从大到小 / 从小到大。旧版存过的 'amount' / 'cat' 一律当「从大到小」。
         function getCatSort(){
-            try{ return localStorage.getItem('app_catstats_sort')==='cat' ? 'cat' : 'amount'; }catch(_){ return 'amount'; }
+            try{ return localStorage.getItem('app_catstats_sort')==='asc' ? 'asc' : 'desc'; }catch(_){ return 'desc'; }
         }
         function renderCatStats(byCat){
             if(byCat) lastCatStats=byCat;          // 切排序时传 null，复用上次结果，不重算整本账
@@ -4251,13 +4329,9 @@ ${detail}
             const sort=getCatSort();
             $('catSortSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===sort));
             const keys=Object.keys(byCat);
-            if(sort==='amount'){
-                keys.sort((a,b)=>Math.abs(byCat[b])-Math.abs(byCat[a]));
-            } else {
-                const order=getCats();
-                const idx=c=>{ const i=order.indexOf(c); return i<0 ? 1e9 : i; };
-                keys.sort((a,b)=>idx(a)-idx(b));
-            }
+            keys.sort((a,b)=> sort==='asc'
+                ? Math.abs(byCat[a])-Math.abs(byCat[b])
+                : Math.abs(byCat[b])-Math.abs(byCat[a]));
             if(!keys.length){
                 $('catStats').innerHTML='<div class="cs-empty">暂无计入收支的记录</div>';
                 return;
@@ -5289,12 +5363,15 @@ ${detail}
             const dec=decorateRecs(statRecords());
 
             // 日净额 / 有无数据 / 当月收支汇总——原先三趟遍历，合并为一趟
-            const dayNet={}, dayHas={};
+            const dayNet={}, dayHas={}, dayFlow={}, daySkip={};
             let mIn=0, mOut=0;
             dec.forEach(x=>{
                 if(x.y!==statYear || x.mo!==statMonth) return;
                 dayHas[x.d]=true;               // 不计入的记录也算「这天有账」：格子照样能点开看明细
-                if(recMode(x.r)!=='normal') return;   // ……但不计金额（不计入 / 只算结余都不进收支统计）
+                // ……但不计金额（不计入 / 只算结余都不进收支统计），只记下「这天有这类记录」用来打标签
+                const m=recMode(x.r);
+                if(m==='flow'){ dayFlow[x.d]=true; return; }
+                if(m==='skip'){ daySkip[x.d]=true; return; }
                 const c=statContrib(x.r);
                 dayNet[x.d]=(dayNet[x.d]||0)+(c.inc-c.exp);
                 mIn+=c.inc; mOut+=c.exp;
@@ -5332,8 +5409,11 @@ ${detail}
                     const n=round2(dayNet[day]);   // 收支浮点相消可能剩 -5e-17，不归整会渲染成「-0」
                     const col = n>=0 ? 'var(--c-pos,#2f7d57)' : 'var(--c-neg,#d05a52)';
                     inner+=`<div class="da" style="color:${col}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
-                } else if(excl){
-                    inner+=`<div class="da-ex">不计</div>`;
+                }
+                // 口径标签：当天有「只算结余」就标「结余」，有「不计入」就标「不计」，两者都有就都标。
+                // 普通日子里夹着这类记录也照样标，免得以为那天的净额就是全部。
+                if(dayFlow[day] || daySkip[day]){
+                    inner+=`<div class="day-tags">${dayFlow[day]?'<span class="dtag flow">结余</span>':''}${daySkip[day]?'<span class="dtag skip">不计</span>':''}</div>`;
                 }
                 cell.innerHTML=inner;
                 if(has){
