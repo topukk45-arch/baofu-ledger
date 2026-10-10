@@ -483,26 +483,6 @@
             font-variant-numeric:tabular-nums; font-size:15px; }
 
         .stat-day-empty { text-align:center; color:var(--c-text-soft); font-size:13px; }
-        /* 时段明细弹窗 */
-        .hd-list { margin-bottom:8px; }
-        /* 明细弹窗副标题：日期 + 时段，小字弱化，居中，与大标题「消费明细」形成主次层级 */
-        .hd-subtitle { text-align:center; font-size:13px; color:var(--c-text-soft);
-            margin:-4px 0 12px; letter-spacing:.3px; }
-        .hd-row { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px dashed var(--c-border); flex-wrap:nowrap; }
-        .hd-row:last-child { border-bottom:none; }
-        .hd-time { color:var(--c-text); font-size:14px; min-width:46px; flex:0 0 auto; }
-        /* 分类标签不被压缩、不换行 */
-        .hd-row .cat-tag { flex:0 0 auto; }
-        /* 明细行备注：占据中间弹性空间但可被压缩，单行截断加省略号；
-           点整行进详情看完整备注，故此处只作展示、不单独绑点击。 */
-        .hd-remark { color:var(--c-text-soft); font-size:13px; flex:1 1 0; min-width:0;
-            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
-        /* 金额：固定靠右、绝不换行、不被压缩，任何时候都完整显示 */
-        .hd-amt { flex:0 0 auto; margin-left:auto; font-weight:bold; font-size:14px;
-            white-space:nowrap; }
-        /* 有备注时金额紧跟备注（弹性空间已由 hd-remark 撑满，不再靠 auto 推开） */
-        .hd-row.has-remark .hd-amt { margin-left:0; }
-        .hd-sum { text-align:right; font-size:13px; color:var(--c-text-soft); padding-top:6px; border-top:1px solid var(--c-border); }
 
         /* AI 分析导出弹窗 */
         .ai-exp-dialog { max-width:440px; width:92%; }
@@ -574,8 +554,6 @@
         .bill-head { font-size:16px; font-weight:bold; color:var(--c-primary-dark);
             padding:4px 2px 8px; border-bottom:2px solid var(--c-border); margin-bottom:4px;
             scroll-margin-top:12px; }
-        .cat-stats .chip { display:inline-block; background:var(--c-chip); border:1px solid var(--c-accent-soft);
-            border-radius:12px; padding:3px 10px; margin:3px; color:var(--c-primary-deep); }
 
         table { width:100%; border-collapse:collapse; margin-top:10px; }
         th, td { padding:12px 8px; text-align:center; border:1px solid var(--c-border); font-size:14px; }
@@ -635,15 +613,15 @@
              1000  普通表单弹窗（.mask 默认）：记一笔、修改、分类、外观、日子、日子管理…
                    它们互不叠加，同级即可。
              1010  内容型二级弹窗：从某个一级弹窗「点进去」的下一层内容。
-                   —— 消费明细(askMask.as-page) → 账单详情(detailMask) 就是这条链。
+                   —— 批量确认清单(askMask.as-page) → 账单详情(detailMask) 就是这条链。
              1020  从二级弹窗再点进去的三级：详情里点「修改」。
              1030  选择器：日期/时间。它永远由某个表单弹窗唤起，必须盖过上面所有。
              1040  瞬时提示/确认（askMask 默认）：校验失败、删除确认、复制成功…
                    任何层里都可能唤起它，所以它必须在最顶。
 
-           【为什么 askMask 要分两档】它身兼二职：既是「消费明细」这种内容页，
-             又是全局的提示/确认框。之前统一给了 1010，结果从明细里点开的
-             detailMask(1000) 反而被压在明细底下 —— 就是「点了列表没反应」的真相。
+           【为什么 askMask 要分两档】它身兼二职：既是「批量确认清单」这种内容页，
+             又是全局的提示/确认框。之前统一给了 1010，结果从内容页里点开的
+             detailMask(1000) 反而被压在底下 —— 就是「点了列表没反应」的真相。
              现在：默认 1040（当提示用）；当内容页用时加 .as-page 降到 1010，
              让它上面的 detailMask/editMask 能正常盖住它。 */
         .mask { position:fixed; top:0; left:0; width:100%;
@@ -652,8 +630,8 @@
             align-items:center; justify-content:center; z-index:1000;
             padding:16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
         #askMask            { z-index:1040; }   /* 提示/确认：永远最顶 */
-        #askMask.as-page    { z-index:1010; }   /* 当内容页用（消费明细）：降档，好让详情盖上来 */
-        #detailMask         { z-index:1020; }   /* 账单详情：从明细点进来的下一层 */
+        #askMask.as-page    { z-index:1010; }   /* 当内容页用（批量确认清单）：降档，好让详情盖上来 */
+        #detailMask         { z-index:1020; }   /* 账单详情：从清单/当日明细点进来的下一层 */
         #editMask.over-detail { z-index:1030; } /* 详情里点「修改」：再上一层 */
         #aiExpMask          { z-index:1010; }
         #dtMask             { z-index:1035; }   /* 日期选择器：盖过所有表单弹窗，但低于提示 */
@@ -987,13 +965,6 @@
             align-items:flex-start; white-space:pre-wrap; word-break:break-word;
             line-height:1.5; max-height:160px; overflow-y:auto; }
 
-        /* 消费明细行：可点击进入详情；当前查看/修改的那条加高光，回到明细时保持，
-           点别条则移走，重开明细弹窗则清空。 */
-        .hd-row.hd-clickable { cursor:pointer; border-radius:8px; padding-left:8px; padding-right:8px;
-            transition:background .15s; }
-        .hd-row.hd-clickable:hover { background:var(--c-chip); }
-        .hd-row.hd-active { background:var(--c-sel-bg); }
-
         /* 「记账成功」弹窗里的可选补充入口（添加备注）：单独占一行、居中、轻量描边，
            不挤占「再记一笔 / 关闭」那一行，也不与主操作抢视觉。 */
         .ask-extra-btn {
@@ -1013,9 +984,6 @@
         .skip-hint { font-size:11.5px; color:var(--c-text-soft); line-height:1.5; }
         .summary-filter { flex-wrap:wrap; }
         .summary-filter .filter-nums { min-width:0; flex:1 1 auto; }
-        .filter-batch { flex-shrink:0; padding:5px 12px; border:1px solid var(--c-border-mid);
-            border-radius:9px; background:var(--c-surface); color:var(--c-primary-dark);
-            font-size:13px; cursor:pointer; }
 
         /* ===== 只算结余 / 统计口径选择 / 确认弹窗清单（1010-C）=====
            「只算结余」用灰蓝，和「不计入」的灰区分开；都不沾语义色的红/绿。 */
@@ -1216,13 +1184,20 @@
             color:var(--c-primary-dark); border-radius:8px; padding:5px 10px; font-size:12.5px; cursor:pointer; }
         .bg-empty { text-align:center; padding:10px 4px 4px; color:var(--c-text-soft); font-size:13.5px; line-height:1.8; }
         .bg-empty button { margin-top:8px; }
+
+        /* ===== 1010-H：分类占比的「较上月」 ===== */
+        .sc-bot { display:flex; align-items:baseline; gap:8px; }
+        .sc-bot .sc-amt { margin-left:auto; }
+        .sc-delta { font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .sc-delta.bad { color:var(--c-neg); }
+        .sc-delta.good { color:var(--c-pos); }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-G</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-H</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1636,8 +1611,8 @@
         </div>
     </div>
 
-    <!-- 账单详情（只读）：从消费明细点条目进入。布局沿用修改弹窗，但纯展示不可编辑。
-         「修改」打开修改弹窗，「关闭」回消费明细；两者退出都回消费明细（不层层返回）。 -->
+    <!-- 账单详情（只读）：从统计页当日明细、预算明细、批量确认清单点条目进入。布局沿用修改弹窗，纯展示。
+         「修改」打开修改弹窗（清单里进来的隐藏此按钮）。 -->
     <div class="mask" id="detailMask">
         <div class="edit-dialog">
             <h3>账单详情</h3>
@@ -2107,7 +2082,7 @@
             box.style.display='';
             box.scrollTop=0;
             // 清单行可点开详情 → 详情弹窗(1020)要盖在这个确认框上面。askMask 默认是最顶的 1040，
-            // 这里按「内容页」降到 1010（同消费明细的做法）；closeAsk 会复位。
+            // 这里按「内容页」降到 1010；closeAsk 会复位。
             askMask.classList.add('as-page');
         }
 
@@ -2212,7 +2187,7 @@
         // 信息弹窗（富文本）：走 innerHTML，仅供确实需要结构化排版的少数场景。
         // 【调用方契约】传进来的 html 必须是「自己拼的安全模板 + 对所有用户数据做过 escapeHtml」。
         //   凡是用户可控的内容（备注、分类名、存档名…）一律先 escapeHtml，绝不能直接拼进来。
-        // 目前仅两处调用：renderHourDetailBody（消费明细列表）与历史数据修复提示，两者均已逐字段转义。
+        // 目前仅一处调用：历史数据修复提示，已逐字段转义。
         function customAlertHtml(html, title, align){
             askMode='alert';
             askOnCancel=null;
@@ -5142,16 +5117,13 @@ ${detail}
         }
 
         let editId=null;
-        // 从「详情」进入修改时，退出（保存/取消/删除）后要回到消费明细并刷新它。
-        let editReturnToHourDetail=false;
         window.openEdit=function(id, opts){
             opts=opts||{};
-            editReturnToHourDetail = !!opts.fromDetail;
             editId=id;
             const item=getUserData().find(r=>r.id===id);
             if(!item){ customAlert('未找到该记录'); return; }
-            // 从详情进入时，editMask 需盖过仍在底下的消费明细。确认记录存在、确实要显示后再加，
-            // 避免上面早退(记录不存在)时类残留。普通调用(opts.fromDetail假)不加。
+            // 从详情进入时提一层（z-index 1030），保证盖过任何可能还开着的内容层。
+            // 确认记录存在、确实要显示后再加，避免上面早退(记录不存在)时类残留。
             editMask.classList.toggle('over-detail', !!opts.fromDetail);
             setDtInput(editTime, item.time); editMoney.value=item.money; editRemark.value=item.remark||'';
             // 预选记录原有的分类与收支（标签式）
@@ -5168,25 +5140,14 @@ ${detail}
         //   重新赋值），但这类「加一条新路径就得记得在 N 处补复位」的结构，漏一个就是幽灵状态
         //   ——不崩不报错，只是某次点击后层级错了、或高光留在了错的行上，极难复现。
         //
-        // opts.refresh            为真则刷新账单/统计视图（保存、删除后需要；单纯取消不需要）
-        // opts.skipDetailRefresh  为真则不回明细（用于随后要弹 customAlert 的异常路径——
-        //                         明细与提示共用 askMsg，回明细会被提示覆盖，留下过期内容）
-        // 返回后若本次是「从消费明细进来的」，自动刷新并回到明细弹窗（它一直在底下没关）。
+        // opts.refresh  为真则刷新账单/统计视图（保存、删除后需要；单纯取消不需要）
         function closeEditModal(opts){
             opts=opts||{};
-            const backToDetail=editReturnToHourDetail && !opts.skipDetailRefresh;
             // —— 复位全部相关状态（一处写全，别处不再各自维护）——
             editMask.style.display='none';
             editMask.classList.remove('over-detail');   // 复位层级，不影响下次普通调用
             editId=null;
-            editReturnToHourDetail=false;
-            if(opts.skipDetailRefresh){
-                // 不回明细：连同明细弹窗的状态一并放弃，避免留下一个内容过期的 askMsg
-                hdHour=null; hdHlId=null;
-            }
-
             if(opts.refresh) refreshAllViews();
-            if(backToDetail) refreshHourDetail();       // 明细弹窗仍在底下，刷新其内容（反映改动/删除）
         }
 
         cancelEdit.addEventListener('click', ()=>closeEditModal());
@@ -5229,10 +5190,7 @@ ${detail}
                 closeEditModal({ refresh:true });
             } else {
                 // 找不到原记录（例如保存前存档被切换/记录已被删）：先复位关闭，再明确提示。
-                // 注意 skipDetailRefresh：closeEditModal 的「回明细」会往 askMsg 写内容，
-                // 而紧接着的 customAlert 也用 askMsg —— 两者抢同一个弹窗，提示会把明细覆盖掉，
-                // 底下留一个内容已过期的明细。这条异常路径直接放弃回明细，只给用户明确提示。
-                closeEditModal({ refresh:true, skipDetailRefresh:true });
+                closeEditModal({ refresh:true });
                 customAlert('未找到要保存的记录，可能已被删除或切换了存档。');
             }
         });
@@ -5968,7 +5926,7 @@ ${detail}
             }
         }
 
-        // 当日收支明细：点整行进「账单详情」（复用消费明细同款 openDetail 弹窗）。
+        // 当日收支明细：点整行进「账单详情」（openDetail 弹窗）。
         // statFlowList 是静态容器，事件委托只绑一次，反复重写 innerHTML 不重复挂监听。
         (function(){
             const box=$('statFlowList');
@@ -6009,6 +5967,16 @@ ${detail}
                 }
             });
 
+            // 上个月同口径的分类金额，用来算「较上月」
+            const pY = statMonth===0 ? statYear-1 : statYear, pM = statMonth===0 ? 11 : statMonth-1;
+            const prevByCat={};
+            dec.forEach(x=>{
+                if(x.y===pY && x.mo===pM && x.r.type===wantType && recMode(x.r)==='normal'){
+                    const c=x.r.cat||'未分类';
+                    prevByCat[c]=(prevByCat[c]||0)+safeNum(x.r.money);
+                }
+            });
+
             let cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
 
             // 当月该口径无记录：卡片保持可见（胶囊常在），只把内容区替换成一句提示。
@@ -6023,11 +5991,14 @@ ${detail}
             const TOP=6;
             let items;
             if(cats.length>TOP){
-                const top=cats.slice(0,TOP).map(c=>({ name:c, val:byCat[c] }));
-                const restSum=cats.slice(TOP).reduce((s,c)=>s+byCat[c],0);
-                items=top.concat([{ name:'其他', val:restSum }]);
+                const top=cats.slice(0,TOP).map(c=>({ name:c, val:byCat[c], prev:prevByCat[c]||0 }));
+                const rest=cats.slice(TOP);
+                const restSum=rest.reduce((s,c)=>s+byCat[c],0);
+                const restPrev=rest.reduce((s,c)=>s+(prevByCat[c]||0),0);
+                // 合并项不叫「其他」：用户自己就有一个叫「其他」的分类，同名会混成两行「其他」
+                items=top.concat([{ name:`其余 ${rest.length} 类`, val:restSum, prev:restPrev }]);
             } else {
-                items=cats.map(c=>({ name:c, val:byCat[c] }));
+                items=cats.map(c=>({ name:c, val:byCat[c], prev:prevByCat[c]||0 }));
             }
 
             const total=items.reduce((s,it)=>s+it.val,0);
@@ -6046,9 +6017,18 @@ ${detail}
                         <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span><span class="sc-cat-name">${escapeHtml(it.name)}</span></span>
                         <span class="sc-pct">${pct}%</span>
                     </div>
-                    <span class="sc-amt ${cls}">${sign}${it.val.toFixed(2)}</span>
+                    <div class="sc-bot">${monthDeltaHtml(it.val, it.prev, isExp)}<span class="sc-amt ${cls}">${sign}${it.val.toFixed(2)}</span></div>
                 </div>`;
             }).join('');
+        }
+        // 「较上月 ↑12%」。支出涨了标红、降了标绿；收入相反。上月为 0 时写「上月无」。
+        function monthDeltaHtml(cur, prev, isExp){
+            cur=round2(cur); prev=round2(prev);
+            if(prev<=0) return cur>0 ? '<span class="sc-delta">上月无</span>' : '';
+            const pct=Math.round((cur-prev)/prev*100);
+            if(pct===0) return '<span class="sc-delta">与上月持平</span>';
+            const up=pct>0, bad = isExp ? up : !up;
+            return `<span class="sc-delta ${bad?'bad':'good'}">较上月 ${up?'↑':'↓'}${Math.abs(pct)}%</span>`;
         }
 
         // 支出/收入胶囊切换：只改口径 + 就地重渲染（复用缓存的 recs，不重跑整页统计）
@@ -6092,192 +6072,15 @@ ${detail}
             return `<svg viewBox="0 0 140 140" width="140" height="140" role="img" aria-label="当日支出分类占比">${paths}</svg>`;
         }
 
-        // 手写柱状图（24 小时，可横向滚动，自动定位高峰，点击看该时段明细）
-        // 柱子点击走事件委托：statBarInner 是静态容器，只在此绑一次，
-        // renderHourBars 反复重写 innerHTML 也不会重复挂监听、不会泄漏。
-        (function(){
-            const box=$('statBarInner');
-            if(!box) return;
-            box.addEventListener('click', e=>{
-                // SVG 内点击命中的多半是 <g> 里的 <rect>/<text> 子节点，需要向上找带 data-act 的 <g>。
-                // 不用 closest()：部分老 WebView 的 SVGElement 上没有实现它，这里手动上溯更稳。
-                let el=e.target;
-                while(el && el!==box && !(el.dataset && el.dataset.act==='hourBar')) el=el.parentNode;
-                if(!el || el===box) return;
-                const h=parseInt(el.dataset.h, 10);
-                if(isFinite(h)) showHourDetail(h);
-            });
-        })();
-        // 注：此前这里有个 statHourRecs 缓存（小时 -> 记录数组），已删除——
-        // 它只写不读：showHourDetail 走的是 recordsOfHour(h)，每次从真实数据重查，
-        // 这样在详情里改过/删过记录后回到明细能反映最新数据。缓存留着只会误导。
-        function renderHourBars(expHours, incHours){
-            incHours = incHours || new Array(24).fill(0);
-            const max=Math.max(...expHours, ...incHours, 1);
-            // 每个小时槽放两根细柱（支出 | 收入）并排
-            const barW=12, barGap=3, gap=8, padL=4, padBottom=22, padTop=24;
-            const colW=barW*2+barGap;                 // 一个小时占的宽度（两柱+间隙）
-            const n=24;
-            const innerW=padL*2 + n*colW + (n-1)*gap;
-            const H=188, plotH=H-padBottom-padTop;
-            const outCol=cssVar('--c-primary')||'#d4af37';
-            const inCol='#3a7a2e';
-            const emptyCol=cssVar('--c-chip')||'#fff5cc';
-            const txtCol=cssVar('--c-text-soft')||'#888';
+        // 【1010-H】此处原有「按小时柱状图 → 时段明细 → 详情」一整条链，对应的页面元素早在
+        //   统计页改版时就删掉了，代码却一直留着（有判空保护，不报错但也执行不到）。已整体移除。
+        //   详情弹窗现在只从两处进入：统计页当日明细 / 预算明细（可修改），批量确认清单（只读）。
 
-            // 高峰：按「当小时收支合计（收入+支出）」最高的小时；用于提示 + 自动滚动定位
-            let peak=0, peakV=-1;
-            for(let h=0;h<n;h++){ const tot=expHours[h]+incHours[h]; if(tot>peakV){ peakV=tot; peak=h; } }
-
-            let bars='';
-            for(let h=0;h<n;h++){
-                const x=padL + h*(colW+gap);
-                const ev=expHours[h], iv=incHours[h];
-                const hasAny = ev>0 || iv>0;
-
-                // 单根柱子的绘制：给定值、左上角 x、颜色
-                const drawBar=(v,bx,col)=>{
-                    if(v<=0){
-                        return `<rect x="${bx}" y="${padTop+plotH-3}" width="${barW}" height="3" rx="1.5" fill="${emptyCol}"/>`;
-                    }
-                    const bh=Math.max(3,(v/max)*plotH);
-                    const by=padTop+plotH-bh;
-                    let s=`<rect x="${bx}" y="${by}" width="${barW}" height="${bh}" rx="3" fill="${col}"/>`;
-                    // 金额标签放柱子上方（细柱内部塞不下）。padTop=24 已为最高柱的标签留足空间；
-                    // 再 clamp 一道 y≥12 作为保险，任何情况下都不会顶出 viewBox 被裁。
-                    const labelY=Math.max(by-4, 12);
-                    s+=`<text x="${bx+barW/2}" y="${labelY}" text-anchor="middle" font-size="8" fill="${txtCol}">${v.toFixed(0)}</text>`;
-                    return s;
-                };
-
-                const exX=x, inX=x+barW+barGap;
-                const cell=drawBar(ev,exX,outCol)+drawBar(iv,inX,inCol);
-
-                if(hasAny){
-                    // 透明热区覆盖整个小时槽，点它看该时段收支明细
-                    bars+=`<g style="cursor:pointer" data-act="hourBar" data-h="${h}">`
-                        + `<rect x="${x}" y="${padTop}" width="${colW}" height="${plotH}" fill="transparent"/>`
-                        + cell + `</g>`;
-                } else {
-                    bars+=cell;
-                }
-                // 小时刻度
-                bars+=`<text x="${x+colW/2}" y="${H-7}" text-anchor="middle" font-size="9" fill="${txtCol}">${h}</text>`;
-            }
-
-            $('statBarInner').innerHTML=
-                `<svg viewBox="0 0 ${innerW} ${H}" width="${innerW}" height="${H}" role="img" aria-label="当日按小时收支，可横向滑动，点柱子看该时段明细">${bars}</svg>`;
-
-            const peakHour = peakV>0 ? peak : null;
-            $('statPeakHint').textContent = peakHour!==null
-                ? `收支高峰在 ${peakHour}:00 前后`
-                : '这天没有收支记录，无时间分布';
-
-            // 自动滚动定位到高峰
-            const scroll=$('statBarScroll');
-            setTimeout(()=>{
-                if(peakHour===null){ scroll.scrollLeft=0; return; }
-                const center=padL + peakHour*(colW+gap) + colW/2;
-                scroll.scrollLeft=Math.max(0, center - scroll.clientWidth/2);
-            }, 30);
-        }
-
-        // ===== 消费明细 → 详情 → 修改 的串联 =====
-        // 状态：当前明细弹窗对应的小时、以及高光（正在查看/修改）的记录 id。
-        let hdHour=null;     // 当前明细弹窗对应的小时（0-23），null=未打开
-        let hdHlId=null;     // 高光记录 id；点别条移走，重开明细清空
-
-        // 按当前统计选中的「年月日 + 小时」从真实数据取该时段收支记录（含收入与支出，不走缓存，
-        // 这样在详情里改过/删过记录后，回到明细能反映最新数据）。
-        function recordsOfHour(h){
-            if(!statSelDay) return [];
-            return getUserData().filter(r=>{
-                if(r.type!=='expense' && r.type!=='income') return false;
-                const d=parseRecTime(r.time);
-                return d.getFullYear()===statYear && d.getMonth()===statMonth
-                    && d.getDate()===statSelDay && d.getHours()===h;
-            }).sort((a,b)=>parseRecTime(a.time)-parseRecTime(b.time));
-        }
-
-        // 渲染明细列表 HTML（可重复调用：打开时、从详情返回时）。按 hdHlId 给对应行上高光。
-        function renderHourDetailBody(h){
-            // 副标题：年份 + 月日 + 时段，小字弱化，放在大标题「消费明细」下方
-            const dateStr = statSelDay
-                ? `${statYear}年${statMonth+1}月${statSelDay}日 `
-                : '';
-            const subtitle = `<div class="hd-subtitle">${dateStr}${pad(h)}:00 – ${pad(h)}:59</div>`;
-            const list=recordsOfHour(h);
-            if(!list.length){
-                return subtitle + `<div class="hd-list"><div class="empty-tip" style="padding:18px">该时段已无收支记录</div></div>`;
-            }
-            const rows=list.map(r=>{
-                const t=r.time.replace('T',' ').slice(11,16);
-                const amt=safeNum(r.money);
-                const isOut=r.type==='expense';
-                const active = (r.id===hdHlId) ? ' hd-active' : '';
-                // 备注：截断展示（点整行进详情看完整）；无备注则不渲染该 span，行内布局回退原样
-                const remarkFull = r.remark || '';
-                const hasRemark = !!remarkFull;
-                const remarkSpan = hasRemark
-                    ? `<span class="hd-remark" title="${escapeHtml(remarkFull)}">${escapeHtml(remarkFull)}</span>`
-                    : '';
-                // data-id + 事件委托（不内联 onclick），与账单表格一致，避免属性注入
-                return `<div class="hd-row hd-clickable${active}${hasRemark?' has-remark':''}" data-act="hdItem" data-id="${escapeHtml(r.id)}">`
-                    + `<span class="hd-time">${t}</span>`
-                    + `<span class="cat-tag">${escapeHtml(r.cat||'未分类')}</span>`
-                    + remarkSpan
-                    + `<span class="hd-amt ${isOut?'neg':'pos'}">${isOut?'−':'+'}${amt.toFixed(2)}</span>`
-                    + `</div>`;
-            }).join('');
-            let sumOut=0, sumIn=0;
-            list.forEach(r=>{ const a=safeNum(r.money); if(r.type==='expense') sumOut+=a; else sumIn+=a; });
-            const sumParts=[];
-            if(sumOut>0) sumParts.push(`支出 <b class="neg">−${sumOut.toFixed(2)}</b>`);
-            if(sumIn>0)  sumParts.push(`收入 <b class="pos">+${sumIn.toFixed(2)}</b>`);
-            return subtitle
-                + `<div class="hd-list">${rows}</div>`
-                + `<div class="hd-sum">该时段${sumParts.join('，')} 元</div>`;
-        }
-
-        // 仅刷新明细弹窗正文（用于从详情/修改返回后；明细弹窗仍开着）
-        function refreshHourDetail(){
-            if(hdHour===null) return;
-            askMsg.innerHTML = renderHourDetailBody(hdHour);
-        }
-
-        // 点击柱子：打开该小时明细。重新打开 → 清空高光，从头开始。
-        // 已改为事件委托调用，不再需要挂到 window（此前是为了让 SVG 的内联 onclick 能找到它）。
-        function showHourDetail(h){
-            if(!recordsOfHour(h).length) return;
-            hdHour=h;
-            hdHlId=null;
-            // 大标题「收支明细」；日期+时段作为副标题在正文顶部（renderHourDetailBody 内）
-            customAlertHtml(renderHourDetailBody(h), '收支明细', 'left');
-            // 【关键】这次 askMask 是当「内容页」用的，不是提示框：接下来还要从它里面
-            //   点开账单详情(detailMask)。不降档的话，askMask(1040) 会把 detailMask 压在底下
-            //   —— 表现就是「点明细里的条目没反应」。必须在 customAlertHtml 之后加，
-            //   因为 closeAsk 里会 remove 掉它。
-            askMask.classList.add('as-page');
-        }
-
-        // 明细行点击（事件委托绑在 askMsg 上）：进入该条详情，并给它上高光。
-        askMsg.addEventListener('click', (e)=>{
-            const row=e.target.closest('[data-act="hdItem"]');
-            if(!row || hdHour===null) return;
-            const id=row.getAttribute('data-id');
-            if(!id) return;
-            hdHlId=id;
-            // 更新当前列表的高光（点别条则移走）
-            askMsg.querySelectorAll('.hd-row').forEach(el=>
-                el.classList.toggle('hd-active', el.getAttribute('data-id')===id));
-            openDetail(id);
-        });
-
-        // 打开只读详情弹窗（明细弹窗留在底下，不关）。
+        // 打开账单详情弹窗。opts.readonly 时隐藏「修改」（批量确认清单里进来的）。
         function openDetail(id, opts){
             const rec=getUserData().find(r=>r.id===id);
             $('detailEdit').style.display = (opts && opts.readonly) ? 'none' : '';
-            if(!rec){ customAlert('这条记录不存在了'); refreshHourDetail(); return; }
+            if(!rec){ customAlert('这条记录不存在了'); return; }
             $('detailTime').textContent = rec.time.replace('T',' ');
             const isExp = rec.type==='expense';
             const amt=safeNum(rec.money);
@@ -6293,16 +6096,14 @@ ${detail}
         }
 
         let detailCurId=null;
-        // 详情「关闭」→ 回明细（详情关掉、刷新明细以反映可能的改动）
-        // 抽成具名函数：返回键也要走这个正规出口，不能只 display='none'
-        // —— 那样 detailCurId 不复位、底下的明细也不会刷新已改动的数据。
+        // 详情「关闭」。抽成具名函数：返回键也要走这个正规出口，不能只 display='none'
+        // —— 那样 detailCurId 不会复位。
         function closeDetail(){
             $('detailMask').style.display='none';
             detailCurId=null;
-            refreshHourDetail();
         }
         $('detailClose').addEventListener('click', closeDetail);
-        // 详情「修改」→ 关详情、打开修改弹窗。修改弹窗退出（保存/取消/删除）统一回明细。
+        // 详情「修改」→ 关详情、打开修改弹窗。保存/删除后由 closeEditModal 统一刷新视图。
         $('detailEdit').addEventListener('click', ()=>{
             const id=detailCurId;
             $('detailMask').style.display='none';
@@ -6786,8 +6587,8 @@ ${detail}
             //
             // 【askMask 要拆成两条】它身兼二职（见 CSS 注释）：
             //   - 当提示/确认用（无 .as-page，z1040）：最顶层，第一个关。
-            //   - 当内容页用（有 .as-page，z1010，即消费明细）：它下面还压着详情/修改，
-            //     必须排到 detailMask/editMask **之后**才关，否则会先把明细关掉、
+            //   - 当内容页用（有 .as-page，z1010，即批量确认清单）：它上面还压着详情，
+            //     必须排到 detailMask/editMask **之后**才关，否则会先把清单关掉、
             //     把详情孤零零留在屏幕上。
             function askIsPrompt(){ return isOpen('askMask') && !askMask.classList.contains('as-page'); }
             function askIsPage(){   return isOpen('askMask') &&  askMask.classList.contains('as-page'); }
@@ -6798,11 +6599,11 @@ ${detail}
                 // 1035 日期时间选择器
                 { can:()=>isOpen('dtMask'),     close:()=>closeDtPicker() },
                 // 1030 详情里点进来的「修改」：必须走唯一出口，
-                //      否则 editId / over-detail / 回明细等状态复位不掉
+                //      否则 editId / over-detail 等状态复位不掉
                 { can:()=>isOpen('editMask'),   close:()=>closeEditModal() },
                 // 1020 账单详情
                 { can:()=>isOpen('detailMask'), close:()=>closeDetail() },
-                // 1010 消费明细（askMask 当内容页用）—— 排在详情之后
+                // 1010 批量确认清单（askMask 当内容页用）—— 排在详情之后
                 { can:askIsPage,                close:()=>closeAsk(null) },
                 { can:()=>isOpen('aiExpMask'),  close:()=>hide('aiExpMask') },
                 // 1000 普通表单弹窗，互不叠加
