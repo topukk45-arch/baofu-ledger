@@ -250,6 +250,10 @@
         .cs-opt.sel { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; }
         /* 让自定义下拉在各布局里占据原 select 的位置 */
         .archive-bar .cs-wrap { flex:1; min-width:140px; }
+        /* 1010-J3：设置页的存档栏——下拉框独占一行，三个按钮一行等分 */
+        .arc-bar { display:grid; grid-template-columns:repeat(3, 1fr); }
+        .arc-bar > :first-child { grid-column:1 / -1; }
+        .arc-bar .mini-btn { width:100%; margin:0; }
         .edit-dialog .cs-wrap { display:block; width:100%; margin:8px 0; }
         .dt-time .cs-wrap { flex:1; width:100%; }
         .dt-time .cs-display { padding:8px 10px; }
@@ -1085,6 +1089,8 @@
         .dtag.skip { background:#e9e9e9; color:#767676; }
         .stat-cal .day.sel .dtag.flow { background:#d2deec; }
         .stat-cal .day.sel .dtag.skip { background:#dcdcdc; }
+        .dtag.refund { background:#dcefea; color:#2f7a6a; }
+        .stat-cal .day.sel .dtag.refund { background:#cde6df; }
 
         /* ===== 1010-F：选项说明 / 筛选口径 ===== */
         /* 列表式选项下方的灰色说明（与记一笔里的口径说明同一口吻） */
@@ -1199,10 +1205,9 @@
         .sf-io.refund { color:#2f7a6a; background:rgba(47,122,106,0.10); }
         .io-refunded { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
             color:#2f7a6a; background:#eef7f4; border:1px dashed #b5dcd3; white-space:nowrap; }
-        .refund-link { margin-top:6px; font-size:12.5px; color:var(--c-text-soft); line-height:1.6; }
         .refund-note { font-size:13px; line-height:1.65; color:var(--c-text); background:var(--c-chip);
             border:1px solid var(--c-border); border-radius:10px; padding:9px 12px; margin-bottom:6px; }
-        .refund-note .refund-link { margin-top:0; }
+        .refund-note .detail-refund { margin-top:6px; font-size:13px; }
         #editMask.is-refund .lock-on-refund { display:none; }
         .refund-btn { color:#2f7a6a; }
         .refund-btn:disabled { opacity:0.5; cursor:default; }
@@ -1214,6 +1219,13 @@
         .refund-sum .rs-nums b { color:var(--c-text); font-variant-numeric:tabular-nums; }
         .refund-sum .rs-nums b.pos { color:#3a7a2e; }
         #refundMoney.ro { background:var(--c-chip); color:var(--c-text-soft); }
+
+        .detail-refund { display:block; }
+        .detail-refund .dr-line { display:flex; align-items:baseline; gap:10px; padding:2px 0; width:100%; }
+        .detail-refund .dr-line + .dr-line { border-top:1px dashed var(--c-border); padding-top:6px; margin-top:4px; }
+        .detail-refund .dr-when { flex-shrink:0; color:var(--c-text-soft); font-size:13px; font-variant-numeric:tabular-nums; }
+        .detail-refund .dr-what { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .detail-refund .dr-amt { flex-shrink:0; margin-left:auto; font-variant-numeric:tabular-nums; }
 
         /* ===== 1010-I：常用模板 ===== */
         .tpl-chips .cc { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1246,6 +1258,7 @@
         .bgo-sub .over { color:var(--c-neg); }
         /* 1010-I3：年度预算展开的月度进度 */
         .bgy-head.open .bg-chev { transform:rotate(90deg); }
+        .bgy-v-head { white-space:nowrap; }
         .bgy-list { padding:4px 0 6px; }
         .bgy-row { display:grid; grid-template-columns:36px 1fr auto; align-items:center; column-gap:10px;
             padding:7px 4px; border-radius:8px; cursor:pointer; }
@@ -1264,7 +1277,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-J</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1420,7 +1433,7 @@
                     <div class="set-group-title">存档管理</div>
                     <div class="set-item set-static" style="flex-direction:column; align-items:stretch; gap:10px;">
                         <span>当前存档</span>
-                        <div class="archive-bar" style="margin-bottom:0;">
+                        <div class="archive-bar arc-bar" style="margin-bottom:0;">
                             <select id="archiveSelect"></select>
                             <button class="mini-btn gold" id="newArchive">新建存档</button>
                             <button class="mini-btn" id="renameArchive">重命名</button>
@@ -1713,6 +1726,11 @@
                 <div class="field">
                     <label class="field-label">收支</label>
                     <div class="detail-val" id="detailType"></div>
+                </div>
+                <!-- 1010-J2：退款 → 原账单是哪笔；原账单 → 退了哪几笔。没有关联时整栏隐藏 -->
+                <div class="field" id="detailRefundField" style="display:none">
+                    <label class="field-label" id="detailRefundLabel">原账单</label>
+                    <div class="detail-val detail-refund" id="detailRefundVal"></div>
                 </div>
                 <div class="field">
                     <label class="field-label">备注</label>
@@ -4917,7 +4935,7 @@ ${detail}
                     + `<div class="bgo-chips">`
                     + `<span class="bgc over">超支 ${n.over}</span><span class="bgc warn">接近上限 ${n.warn}</span><span class="bgc ok">正常 ${n.ok}</span>`
                     + `</div>`
-                    + (B.timePct!=null ? `<div class="bgo-legend">竖线 = 今天（${B.day}/${B.dim} 天）。花销条跑到竖线前面，就是花得比时间快。</div>` : '')
+                    + (B.timePct!=null ? `<div class="bgo-legend">竖线是今天（${B.day}/${B.dim}），条越过竖线就是花得偏快。</div>` : '')
                     + budgetExtraRowsHtml(dec, B);
 
                 // —— 分组：超支 → 接近 → 正常，组内按已用比例从高到低 ——
@@ -5010,7 +5028,7 @@ ${detail}
             }
             let h=`<div class="bgo-row bgo-click bgy-head${bgYearOpen?' open':''}" data-act="bgYearToggle">`
                 + `<span class="bgo-k">年度预算（${Y.start+1}–12月）<i class="bg-chev">›</i></span>`
-                + `<span class="bgo-v"><b>${Y.used.toFixed(2)}</b> / ${Y.yearLim.toFixed(2)} · <span class="${st}">${pct.toFixed(0)}%</span></span>`
+                + `<span class="bgo-v bgy-v-head"><b>${Y.used.toFixed(0)}</b> / ${Y.yearLim.toFixed(0)} · <span class="${st}">${pct.toFixed(0)}%</span></span>`
                 + `<span class="bgo-sub">${subs.join(' · ')}</span></div>`;
             if(bgYearOpen && Y.months.length){
                 h+=`<div class="bgy-list">` + Y.months.map(m=>{
@@ -5674,7 +5692,9 @@ ${detail}
                 note.style.display='';
             } else if(item.type==='expense' && refundsOf(data,item.id).length){
                 const dn=refundedTotal(data,item.id), rm=round2(safeNum(item.money)-dn);
-                note.innerHTML=`<b>${rm<=0?'已全额退款':`已退 ${dn.toFixed(2)}，还能退 ${rm.toFixed(2)}`}</b>` + refundLinkHtml(item, data);
+                const rs=refundsOf(data,item.id).sort((a,b)=>a.time<b.time?-1:1);
+                note.innerHTML=`<b>${rm<=0?'已全额退款':`已退 ${dn.toFixed(2)}，还能退 ${rm.toFixed(2)}`}</b>`
+                    + `<div class="detail-refund">${rs.map(r=>refundLineHtml(r,1)).join('')}</div>`;
                 note.style.display='';
             } else { note.innerHTML=''; note.style.display='none'; }
             const btn=$('editRefundBtn');
@@ -6396,7 +6416,7 @@ ${detail}
             const dec=decorateRecs(statRecords());
 
             // 日净额 / 有无数据 / 当月收支汇总——原先三趟遍历，合并为一趟
-            const dayNet={}, dayHas={}, dayFlow={}, daySkip={};
+            const dayNet={}, dayHas={}, dayFlow={}, daySkip={}, dayRefund={};
             let mIn=0, mOut=0;
             dec.forEach(x=>{
                 if(x.y!==statYear || x.mo!==statMonth) return;
@@ -6405,6 +6425,7 @@ ${detail}
                 const m=recMode(x.r);
                 if(m==='flow'){ dayFlow[x.d]=true; return; }
                 if(m==='skip'){ daySkip[x.d]=true; return; }
+                if(isRefund(x.r)) dayRefund[x.d]=true;    // 1010-J2：这天的净额里含退款，标出来
                 const c=statContrib(x.r);
                 dayNet[x.d]=(dayNet[x.d]||0)+(c.inc-c.exp);
                 mIn+=c.inc; mOut+=c.exp;
@@ -6448,8 +6469,8 @@ ${detail}
                 }
                 // 口径标签：当天有「只算结余」就标「结余」，有「不计入」就标「不计」，两者都有就都标。
                 // 普通日子里夹着这类记录也照样标，免得以为那天的净额就是全部。
-                if(dayFlow[day] || daySkip[day]){
-                    inner+=`<div class="day-tags">${dayFlow[day]?'<span class="dtag flow">结余</span>':''}${daySkip[day]?'<span class="dtag skip">不计</span>':''}</div>`;
+                if(dayFlow[day] || daySkip[day] || dayRefund[day]){
+                    inner+=`<div class="day-tags">${dayRefund[day]?'<span class="dtag refund">退款</span>':''}${dayFlow[day]?'<span class="dtag flow">结余</span>':''}${daySkip[day]?'<span class="dtag skip">不计</span>':''}</div>`;
                 }
                 cell.innerHTML=inner;
                 if(has){
@@ -6680,25 +6701,36 @@ ${detail}
             $('detailType').innerHTML = (isExp
                 ? '<span class="io-tag io-out">支出</span>'
                 : (isRefund(rec) ? '<span class="io-tag io-refund">退款</span>' : '<span class="io-tag io-in">收入</span>'))
-                + modeTag(rec, true) + refundedTag(rec, refundedMap(all)) + refundLinkHtml(rec, all);
+                + modeTag(rec, true) + refundedTag(rec, refundedMap(all));
+            paintDetailRefund(rec, all);
             const rk=(rec.remark||'').trim();
             $('detailRemark').textContent = rk || '（无备注）';
             detailCurId=id;
             $('detailMask').style.display='flex';
         }
 
-        // 详情 / 修改弹窗里的一行关联说明：退款 → 原账单是哪笔；原账单 → 退了哪几笔
-        function refundLinkHtml(rec, data){
-            const fmt=r=>`${String(r.time).slice(5,16).replace('T',' ')} · ${escapeHtml((r.remark||'').trim()||r.cat||'未分类')}`;
+        // 一笔关联记录的一行：时间 / 备注 / 金额（详情与修改弹窗共用）
+        function refundLineHtml(r, sign){
+            return `<div class="dr-line"><span class="dr-when">${String(r.time).slice(5,16).replace('T',' ')}</span>`
+                + `<span class="dr-what">${escapeHtml((r.remark||'').trim()||r.cat||'未分类')}</span>`
+                + `<span class="dr-amt ${sign>0?'pos':'neg'}">${sign>0?'+':'−'}${safeNum(r.money).toFixed(2)}</span></div>`;
+        }
+        function paintDetailRefund(rec, data){
+            const f=$('detailRefundField'), lab=$('detailRefundLabel'), val=$('detailRefundVal');
+            const line=refundLineHtml;
             if(isRefund(rec)){
                 const o=data.find(r=>r.id===rec.refundOf);
-                return o ? `<div class="refund-link">原账单：${fmt(o)} · −${safeNum(o.money).toFixed(2)}</div>`
-                         : `<div class="refund-link">原账单已不存在</div>`;
+                lab.textContent='原账单';
+                val.innerHTML = o ? line(o, -1) : '<div class="dr-line">原账单已不存在</div>';
+                f.style.display='';
+                return;
             }
-            if(rec.type!=='expense') return '';
-            const rs=refundsOf(data, rec.id);
-            if(!rs.length) return '';
-            return `<div class="refund-link">` + rs.map(r=>`退款：${fmt(r)} · +${safeNum(r.money).toFixed(2)}`).join('<br>') + `</div>`;
+            const rs = rec.type==='expense' ? refundsOf(data, rec.id).sort((a,b)=>a.time<b.time?-1:1) : [];
+            if(!rs.length){ f.style.display='none'; val.innerHTML=''; return; }
+            const done=refundedTotal(data, rec.id), rem=round2(safeNum(rec.money)-done);
+            lab.textContent = rem<=0 ? `退款记录 · 已全额退款` : `退款记录 · 还能退 ${rem.toFixed(2)}`;
+            val.innerHTML=rs.map(r=>line(r, 1)).join('');
+            f.style.display='';
         }
         let detailCurId=null;
         // 详情「关闭」。抽成具名函数：返回键也要走这个正规出口，不能只 display='none'
