@@ -1027,7 +1027,7 @@
         .mode-chips .cc { flex:1 1 0; text-align:center; padding:9px 0; font-size:14px; }
         /* 确认弹窗里的记录清单：四列固定（时间 / 分类 / 备注 / 金额），
            时间和金额用等宽数字，金额靠右；分类标签定宽，备注过长省略。多了在框内滑动。 */
-        .ask-list { margin:12px 0 2px; max-height:42vh; overflow-y:auto; text-align:left;
+        .ask-list { margin:12px 0 2px; max-height:50vh; overflow-y:auto; text-align:left;
             border:1px solid var(--c-border); border-radius:10px; background:var(--c-surface);
             -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
         .ask-list .al-row { display:flex; align-items:center; gap:8px; padding:9px 10px;
@@ -1039,13 +1039,48 @@
             overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; font-size:12px; }
         .al-remark { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--c-text); }
         .al-amt { flex:0 0 auto; margin-left:auto; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+        /* ===== 1010-D：分类汇总卡片 / 列表式选项 / 可点清单 / 不计日 ===== */
+        /* 分类汇总：与「日子」入口卡同一套卡片语言；一行一类，名称左、金额右，多了框内滑动 */
+        .cat-card { background:var(--c-card-1); border:1px solid var(--c-border); border-radius:12px;
+            padding:10px 12px 6px; margin-bottom:12px; }
+        .cat-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
+        .cat-card-title { font-size:14px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; }
+        #catSortSeg button { padding:4px 10px; font-size:12px; }
+        .cat-card .cat-stats { text-align:left; margin:0; max-height:212px; overflow-y:auto;
+            -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+        .cs-row { display:flex; justify-content:space-between; align-items:center; gap:10px;
+            padding:8px 2px; border-bottom:1px dashed var(--c-border); font-size:14px; }
+        .cs-row:last-child { border-bottom:none; }
+        .cs-name { color:var(--c-text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .cs-amt { flex-shrink:0; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .cs-empty { color:var(--c-text-soft); font-size:13px; padding:8px 2px; }
+
+        /* 列表式选项：一行一个、左对齐，多了框内滑动（批量菜单、选分类） */
+        #askChoices.choose-list { flex-direction:column; flex-wrap:nowrap; gap:0; max-height:52vh;
+            border:1px solid var(--c-border); border-radius:10px; background:var(--c-surface);
+            -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+        #askChoices.choose-list .cc { border:none; border-bottom:1px dashed var(--c-border); border-radius:0;
+            padding:13px 14px; text-align:left; background:transparent; white-space:normal; flex:0 0 auto; }
+        #askChoices.choose-list .cc:last-child { border-bottom:none; }
+        #askChoices.choose-list .cc.sel { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; }
+
+        /* 确认清单的行可点开看详情 */
+        .ask-list .al-row { cursor:pointer; transition:background .15s; }
+        .ask-list .al-row:active { background:var(--c-chip); }
+        .al-go { flex:0 0 auto; color:var(--c-text-soft); font-size:15px; line-height:1; margin-left:-2px; }
+
+        /* 统计日历：当天只有「不计入 / 只算结余」的记录——有账，但不进收支 */
+        .stat-cal .day.has.excl { background:#eef0f3; border:1px dashed #c6cdd5; }
+        .stat-cal .day.excl.sel { background:var(--c-sel-bg); border:1px solid transparent; }
+        .stat-cal .day .da-ex { font-size:9px; line-height:1.1; color:#8a96a3; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-C</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-D</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1069,7 +1104,17 @@
 
                 <div class="summary-overall" id="summaryOverall"></div>
                 <div class="summary-filter" id="summaryFilter" style="display:none"></div>
-                <div class="cat-stats" id="catStats"></div>
+                <!-- 分类汇总：各分类计入收支的净额。一行一类，可按金额或分类顺序排列 -->
+                <div class="cat-card" id="catStatsCard">
+                    <div class="cat-card-head">
+                        <span class="cat-card-title">分类汇总</span>
+                        <div class="seg" id="catSortSeg">
+                            <button data-v="amount">按金额</button>
+                            <button data-v="cat">按分类</button>
+                        </div>
+                    </div>
+                    <div class="cat-stats" id="catStats"></div>
+                </div>
 
                 <!-- 「日子」入口卡：显示最近的几个倒数日，点「管理 ›」进管理页。
                      放在汇总下方、账单上方——用户每次进记账页顺带就瞥到了，
@@ -1881,12 +1926,24 @@
                 const isExp=r.type==='expense';
                 const a=document.createElement('span'); a.className='al-amt '+(isExp?'neg':'pos');
                 a.textContent=(isExp?'−':'+')+safeNum(r.money).toFixed(2);
-                row.appendChild(t); row.appendChild(c); row.appendChild(rk); row.appendChild(a);
+                const go=document.createElement('span'); go.className='al-go'; go.textContent='›';
+                row.dataset.id=r.id;
+                row.appendChild(t); row.appendChild(c); row.appendChild(rk); row.appendChild(a); row.appendChild(go);
                 box.appendChild(row);
             });
             box.style.display='';
             box.scrollTop=0;
+            // 清单行可点开详情 → 详情弹窗(1020)要盖在这个确认框上面。askMask 默认是最顶的 1040，
+            // 这里按「内容页」降到 1010（同消费明细的做法）；closeAsk 会复位。
+            askMask.classList.add('as-page');
         }
+
+        // 清单行 → 只读详情。批量确认还没执行，此时允许改记录会让清单和即将执行的范围对不上，
+        // 所以从这里进的详情隐藏「修改」按钮，只看不改。
+        $('askList').addEventListener('click', e=>{
+            const row=e.target.closest('.al-row');
+            if(row && row.dataset.id) openDetail(row.dataset.id, { readonly:true });
+        });
 
         // 输入框：回调式。validate(value) 返回错误文案则在弹窗内提示且不关闭，返回空则通过
         function customPrompt(msg, defVal, onOk, title, validate, opts){
@@ -1915,13 +1972,15 @@
         // 选项弹窗：在弹窗里就地渲染一组可点选标签，选中点确定回调所选值。
         //   options: [{ value, label, cls }]  cls 用于收支的红/绿选中态（sel-out/sel-in）
         //   普通选项（如分类）选中走通用 .sel 态。点取消回调 null。
-        function customChoose(msg, options, onOk, title, onCancel){
+        //   opts.layout==='list'：选项一行一个、左对齐，多了在框内滑动（批量菜单、选分类用）
+        function customChoose(msg, options, onOk, title, onCancel, opts){
+            const asList = !!(opts && opts.layout==='list');
             askMode='choose';
             askChosen=null;
             askOnCancel=onCancel||null;   // 取消回调：取消时若设置则调用（用于 AI 导出回上一级）
             askValidate=null;   // 防御性复位：本模式不用校验，避免残留上一个 prompt 的校验函数
             askTitle.textContent=title||'请选择';
-            if(msg){ askMsg.textContent=msg; askMsg.style.display=''; askMsg.style.textAlign=''; }
+            if(msg){ askMsg.textContent=msg; askMsg.style.display=''; askMsg.style.textAlign=asList?'left':''; }
             else { askMsg.style.display='none'; }
             askInput.style.display='none';
             askCancel.style.display='';
@@ -1929,6 +1988,7 @@
             const box=$('askChoices');
             box.innerHTML='';
             box.style.display='flex';
+            box.classList.toggle('choose-list', asList);
             // 收支两项且带语义色时撑满一行更协调；分类等正常自适应换行
             box.classList.toggle('io-chips', options.length===2 && options.some(o=>o.cls));
             options.forEach(o=>{
@@ -3987,13 +4047,13 @@ ${detail}
                 // 无记录时连同容器一起隐藏，避免留下带底色/内边距的空白色块
                 $('summaryOverall').innerHTML=''; $('summaryOverall').style.display='none';
                 $('summaryFilter').style.display='none';
-                $('catStats').innerHTML=''; $('catStats').style.display='none';
+                $('catStats').innerHTML=''; $('catStatsCard').style.display='none';
                 $('pager').innerHTML='';
                 return;
             }
             // 有记录：确保汇总/分类统计容器恢复显示（上次可能被空数据分支隐藏过）
             $('summaryOverall').style.display='';
-            $('catStats').style.display='';
+            $('catStatsCard').style.display='';
 
             // 汇总：收入/支出/结余。结余始终为全账户净额，不随筛选变化
             let totalIn=0, totalOut=0;
@@ -4048,8 +4108,7 @@ ${detail}
                 const c=statContrib(r);
                 byCat[r.cat]=(byCat[r.cat]||0)+(c.inc-c.exp);
             });
-            $('catStats').innerHTML = Object.keys(byCat)
-                .map(c=>`<span class="chip">${escapeHtml(c)}：${round2(byCat[c]).toFixed(2)} 元</span>`).join('');
+            renderCatStats(byCat);
 
             if(asc.length===0){
                 billList.innerHTML=`<tr><td colspan="7" class="empty-tip">没有符合条件的记录</td></tr>`;
@@ -4126,7 +4185,7 @@ ${detail}
                         customConfirm(`将以下 ${targets.length} 条记录的分类改为「${cat}」：`,
                             ()=>applyBatch(targets.map(r=>r.id), { cat }), '批量改分类',
                             { okText:'确认修改', list:targets });
-                    }, '选择分类', openBatchMenu);
+                    }, '选择分类', openBatchMenu, { layout:'list' });
                 } else {
                     const NAME={ normal:'计入', flow:'只算结余', skip:'不计入' };
                     const targets=list.filter(r=>recMode(r)!==act);   // 已经是目标口径的不重复改
@@ -4135,7 +4194,7 @@ ${detail}
                         ()=>applyBatch(targets.map(r=>r.id), { mode:act }), '批量修改统计口径',
                         { okText:'确认修改', list:targets });
                 }
-            }, '批量操作');
+            }, '批量操作', null, { layout:'list' });
         }
         function applyBatch(ids, change){
             const idSet=new Set(ids);
@@ -4178,6 +4237,44 @@ ${detail}
             refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
             customAlert(`已撤销，${map.size} 条记录恢复原样。`);
         }
+
+        // ===== 分类汇总卡片 =====
+        // 排序：按金额（绝对值从大到小，收支混排时大头在上）/ 按分类（「管理分类」里拖出来的顺序）。
+        // 偏好是全局的，存 localStorage；读写都包 try/catch，取不到就用默认（按金额）。
+        let lastCatStats=null;
+        function getCatSort(){
+            try{ return localStorage.getItem('app_catstats_sort')==='cat' ? 'cat' : 'amount'; }catch(_){ return 'amount'; }
+        }
+        function renderCatStats(byCat){
+            if(byCat) lastCatStats=byCat;          // 切排序时传 null，复用上次结果，不重算整本账
+            byCat=lastCatStats||{};
+            const sort=getCatSort();
+            $('catSortSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===sort));
+            const keys=Object.keys(byCat);
+            if(sort==='amount'){
+                keys.sort((a,b)=>Math.abs(byCat[b])-Math.abs(byCat[a]));
+            } else {
+                const order=getCats();
+                const idx=c=>{ const i=order.indexOf(c); return i<0 ? 1e9 : i; };
+                keys.sort((a,b)=>idx(a)-idx(b));
+            }
+            if(!keys.length){
+                $('catStats').innerHTML='<div class="cs-empty">暂无计入收支的记录</div>';
+                return;
+            }
+            $('catStats').innerHTML=keys.map(c=>{
+                const v=round2(byCat[c]);
+                const pos=v>=0;
+                return `<div class="cs-row"><span class="cs-name">${escapeHtml(c)}</span>`
+                    + `<span class="cs-amt ${pos?'pos':'neg'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</span></div>`;
+            }).join('');
+        }
+        $('catSortSeg').addEventListener('click', e=>{
+            const b=e.target.closest('button[data-v]'); if(!b) return;
+            try{ localStorage.setItem('app_catstats_sort', b.dataset.v); }catch(_){}
+            renderCatStats(null);
+            $('catStats').scrollTop=0;
+        });
 
         // 渲染分页控件（≤1 页时不显示）
         function renderPager(totalPages){
@@ -5223,6 +5320,9 @@ ${detail}
                 cell.className='day';
                 const has=!!dayHas[day];
                 if(has) cell.classList.add('has');
+                // 当天有账、但全是不计入 / 只算结余：换一种底色，一眼和「花了钱的日子」分开
+                const excl = has && dayNet[day]===undefined;
+                if(excl) cell.classList.add('excl');
                 if(isThisMonth && today.getDate()===day) cell.classList.add('today');
                 if(statSelDay===day && has) cell.classList.add('sel');
 
@@ -5232,6 +5332,8 @@ ${detail}
                     const n=round2(dayNet[day]);   // 收支浮点相消可能剩 -5e-17，不归整会渲染成「-0」
                     const col = n>=0 ? 'var(--c-pos,#2f7d57)' : 'var(--c-neg,#d05a52)';
                     inner+=`<div class="da" style="color:${col}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
+                } else if(excl){
+                    inner+=`<div class="da-ex">不计</div>`;
                 }
                 cell.innerHTML=inner;
                 if(has){
@@ -5597,8 +5699,9 @@ ${detail}
         });
 
         // 打开只读详情弹窗（明细弹窗留在底下，不关）。
-        function openDetail(id){
+        function openDetail(id, opts){
             const rec=getUserData().find(r=>r.id===id);
+            $('detailEdit').style.display = (opts && opts.readonly) ? 'none' : '';
             if(!rec){ customAlert('这条记录不存在了'); refreshHourDetail(); return; }
             $('detailTime').textContent = rec.time.replace('T',' ');
             const isExp = rec.type==='expense';
