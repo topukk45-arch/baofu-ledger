@@ -1277,7 +1277,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K2</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -6749,12 +6749,23 @@ ${detail}
         });
 
         // 「回到本月」浮钮：在统计页、且看的不是本月时显示
+        // 【1010-K2】常驻会挡住下面的金额：改成「有动作才出现，停下 1.5 秒淡出」。
+        //   出现：翻月 / 统计页任何重绘（点日期、切页签）/ 滑动页面；隐藏后 pointer-events:none，不挡点击。
+        //   0.5 秒太短，手指挪到右下角时按钮已经没了，所以取 1.5 秒；要调就改 STAT_FAB_IDLE。
+        const STAT_FAB_IDLE=1500;
+        let statFabTimer=null;
+        function statAway(){
+            const now=new Date();
+            return statYear!==undefined && (statYear!==now.getFullYear() || statMonth!==now.getMonth());
+        }
         function syncStatTodayFab(){
             const f=$('statTodayFab'); if(!f) return;
-            const now=new Date();
-            const away = statYear!==undefined && (statYear!==now.getFullYear() || statMonth!==now.getMonth());
-            f.classList.toggle('show', currentTab==='stats' && away);
+            clearTimeout(statFabTimer);
+            const on = currentTab==='stats' && statAway();
+            f.classList.toggle('show', on);
+            if(on) statFabTimer=setTimeout(()=>f.classList.remove('show'), STAT_FAB_IDLE);
         }
+        window.addEventListener('scroll', ()=>{ if(currentTab==='stats' && statAway()) syncStatTodayFab(); }, { passive:true });
         $('statTodayFab').addEventListener('click', ()=>{
             const now=new Date();
             statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null; bgExpanded=null;
