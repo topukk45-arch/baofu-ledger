@@ -21,3 +21,18 @@
 - 数据存在手机本地（应用内），卸载 app 会清空；app 里有「导出存档」可备份。
 - 应用包名：`com.baofu.ledger`，应用名：记问。
 - 包名沿用 `com.baofu.ledger` 未改，是为了让新版能直接覆盖旧版安装、不丢数据。
+
+## 许可证 / License
+
+© 2026 Yake（[topukk45-arch](https://github.com/topukk45-arch)）。
+
+本项目以 [PolyForm Noncommercial 1.0.0](LICENSE) 授权：可以自由学习、个人使用和修改，**禁止任何商业用途**。如需商用，请先联系作者。
+
+项目中引用的第三方字体、图标、库及其他素材，仍按其各自的许可证授权。
+
+This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use is not permitted.
+
+### 致谢
+
+- 底栏文字字体：[霞鹜文楷 LXGW WenKai](https://github.com/lxgw/LxgwWenKai)（SIL OFL 1.1）
+- 图标：[Lucide](https://lucide.dev)（ISC）、[Tabler Icons](https://tabler.io/icons)（MIT）
