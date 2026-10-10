@@ -1220,14 +1220,29 @@
         .bgo-v .over { color:var(--c-neg); }
         .bgo-v .warn { color:#b07a1c; }
         .bgo-sub { grid-column:1 / -1; font-size:11.5px; color:var(--c-text-soft); padding-top:3px; }
-        .bgo-row.bgo-click .bgo-sub::after { content:' ›'; }
+        .bgo-row.bgo-click:not(.bgy-head) .bgo-sub::after { content:' ›'; }
+        .bgo-sub .over { color:var(--c-neg); }
+        /* 1010-I3：年度预算展开的月度进度 */
+        .bgy-head.open .bg-chev { transform:rotate(90deg); }
+        .bgy-list { padding:4px 0 6px; }
+        .bgy-row { display:grid; grid-template-columns:36px 1fr auto; align-items:center; column-gap:10px;
+            padding:7px 4px; border-radius:8px; cursor:pointer; }
+        .bgy-row:active { background:var(--c-chip); }
+        .bgy-row.cur { background:var(--c-chip); }
+        .bgy-m { font-size:13px; color:var(--c-text); }
+        .bgy-row.cur .bgy-m { font-weight:bold; }
+        .bgy-v { font-size:12px; color:var(--c-text-soft); text-align:right; min-width:84px; font-variant-numeric:tabular-nums; }
+        .bgy-v.over { color:var(--c-neg); }
+        .bgy-row.empty .bg-bar { background:repeating-linear-gradient(45deg, var(--c-chip) 0 4px, transparent 4px 8px); }
+        .bgy-row.empty .bgy-v { color:var(--c-text-soft); font-style:italic; }
+        .bgy-note { font-size:11.5px; color:var(--c-text-soft); padding:4px 4px 0; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-I2</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-I3</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1503,6 +1518,8 @@
     </div>
     <button class="to-top" id="toTopBtn" title="回到顶部" aria-label="回到顶部">↑</button>
     <button class="clear-filter-fab" id="clearFilterFab" title="清除筛选" aria-label="清除筛选">✕</button>
+    <!-- 1010-I3：统计页不在本月时出现，点了回到本月。与账单页的清除筛选同款外观、同一位置 -->
+    <button class="clear-filter-fab" id="statTodayFab" title="回到本月" aria-label="回到本月">✕</button>
 
     <!-- 筛选浮层（bottom sheet）：关键词 / 金额区间 / 日期范围 / 分类，全部筛选条件集中于此 -->
     <div class="mask sheet-mask" id="filterSheetMask">
@@ -4797,8 +4814,7 @@ ${detail}
         }
         // 【1010-I】总览下方两行：
         //   预算外 —— 本月没设预算的分类花了多少（计入口径），点一下展开下面的「未设预算」并滚过去；
-        //   今年至今 —— 1 月到当前查看月：已花（只算设了预算的分类）对比「当前月预算合计 × 月数」。
-        //     预算只存一份、没有历史，中途改过预算会按现在的值往回算，所以写明「估算」。
+        //   年度预算 —— 见 budgetYearHtml（1010-I3）。
         function budgetExtraRowsHtml(dec, B){
             let h='';
             if(B.unsetList.length){
@@ -4809,22 +4825,73 @@ ${detail}
                     + `<span class="bgo-v neg">−${sum.toFixed(2)}</span>`
                     + `<span class="bgo-sub">${escapeHtml(shown)} 没设预算</span></div>`;
             }
-            const months=statMonth+1;
-            if(months>1){
-                const perMonth=round2(B.rows.reduce((s,r)=>s+r.limit,0));
-                const lim=round2(perMonth*months);
-                let used=0;
-                for(let mo=0; mo<=statMonth; mo++){
-                    used+=computeBudget(dec, statYear, mo).rows.reduce((s,r)=>s+r.used,0);
-                }
-                used=round2(used);
-                const pct = lim>0 ? used/lim*100 : 0;
-                const st = pct>100 ? 'over' : (pct>=80 ? 'warn' : '');
-                h+=`<div class="bgo-row"><span class="bgo-k">${statYear}年 1–${months}月</span>`
-                    + `<span class="bgo-v"><b>${used.toFixed(2)}</b> / ${lim.toFixed(2)} · <span class="${st}">${pct.toFixed(0)}%</span></span>`
-                    + `<span class="bgo-sub">按当前预算 × ${months} 个月估算</span></div>`;
-            }
+            h+=budgetYearHtml(dec, B);
             return h ? `<div class="bgo-rows">${h}</div>` : '';
+        }
+        // 【1010-I3】年度预算
+        //   起算月 = 这一年里第一次有记录的月份（6 月才开始记账，就从 6 月算），之后连续算，
+        //     中间哪个月一条都没有也照算——那多半是漏记，跳过它等于漏记反而让预算变宽松；
+        //     展开的月度列表里会把这种月标成「没有记录」，提醒去补。
+        //   全年预算 = 每月预算合计 × 起算月到 12 月的月数。
+        //   「至今」按真实的今天算，不按页面上正在看的月份：年度进度不该因为翻到 7 月就变了。
+        //   预算只存一份、没有历史，中途改过预算会按现在的值往回算，所以写明「估算」。
+        let bgYearOpen=false;
+        function budgetYearInfo(dec, B, y){
+            const perMonth=round2(B.rows.reduce((s,r)=>s+r.limit,0));
+            const now=new Date(), ny=now.getFullYear(), nm=now.getMonth();
+            const has=new Set();
+            dec.forEach(x=>{ if(x.y===y) has.add(x.mo); });
+            const endMo = y<ny ? 11 : (y===ny ? nm : -1);        // 「至今」最后一个月；未来年份为 -1
+            let start = has.size ? Math.min(...has) : (endMo>=0 ? endMo : 0);
+            if(endMo>=0 && start>endMo) start=endMo;              // 今年还没开始记：从本月起算
+            const months=[];
+            for(let mo=start; mo<=endMo; mo++){
+                const used=round2(computeBudget(dec, y, mo).rows.reduce((s,r)=>s+r.used,0));
+                months.push({ mo, used, has:has.has(mo) });
+            }
+            const used=round2(months.reduce((s,m)=>s+m.used,0));
+            const yearLim=round2(perMonth*(12-start));
+            const shouldLim=round2(perMonth*months.length);
+            const remMonths = y===ny ? 12-nm : 0;                 // 含本月
+            return { perMonth, start, endMo, months, used, yearLim, shouldLim, remMonths };
+        }
+        function budgetStateOf(pct){ return pct>100 ? 'over' : (pct>=80 ? 'warn' : ''); }
+        function budgetYearHtml(dec, B){
+            const Y=budgetYearInfo(dec, B, statYear);
+            const pct = Y.yearLim>0 ? Y.used/Y.yearLim*100 : 0;
+            const st=budgetStateOf(pct);
+            const subs=[];
+            if(Y.months.length){
+                const d=round2(Y.used-Y.shouldLim);
+                subs.push(`至今应花 ${Y.shouldLim.toFixed(2)}（${Y.months.length} 个月）`
+                    + (d>0 ? `，已超 <span class="over">${d.toFixed(2)}</span>` : `，结余 ${(-d).toFixed(2)}`));
+            }
+            if(Y.remMonths>0){
+                const left=round2(Y.yearLim-Y.used);
+                subs.push(left>0 ? `剩下 ${Y.remMonths} 个月每月可花 ${(left/Y.remMonths).toFixed(2)}`
+                                 : `全年预算已用完`);
+            }
+            let h=`<div class="bgo-row bgo-click bgy-head${bgYearOpen?' open':''}" data-act="bgYearToggle">`
+                + `<span class="bgo-k">年度预算（${Y.start+1}–12月）<i class="bg-chev">›</i></span>`
+                + `<span class="bgo-v"><b>${Y.used.toFixed(2)}</b> / ${Y.yearLim.toFixed(2)} · <span class="${st}">${pct.toFixed(0)}%</span></span>`
+                + `<span class="bgo-sub">${subs.join(' · ')}</span></div>`;
+            if(bgYearOpen && Y.months.length){
+                h+=`<div class="bgy-list">` + Y.months.map(m=>{
+                    const cur = m.mo===statMonth;
+                    if(!m.has){
+                        return `<div class="bgy-row empty${cur?' cur':''}" data-act="bgYearMonth" data-mo="${m.mo}">`
+                            + `<span class="bgy-m">${m.mo+1}月</span><div class="bg-bar"></div>`
+                            + `<span class="bgy-v">没有记录</span></div>`;
+                    }
+                    const mp = Y.perMonth>0 ? m.used/Y.perMonth*100 : 0;
+                    return `<div class="bgy-row${cur?' cur':''}" data-act="bgYearMonth" data-mo="${m.mo}">`
+                        + `<span class="bgy-m">${m.mo+1}月</span>`
+                        + `<div class="bg-bar"><div class="bg-fill ${budgetStateOf(mp)}" style="width:${Math.min(100,mp).toFixed(1)}%"></div></div>`
+                        + `<span class="bgy-v ${budgetStateOf(mp)}">${m.used.toFixed(0)} / ${Y.perMonth.toFixed(0)}</span></div>`;
+                }).join('')
+                + `<div class="bgy-note">点月份查看那个月的预算 · 按当前预算估算</div></div>`;
+            }
+            return h;
         }
         // 展开的明细：这个月、这个分类里计入预算的每一笔（时间倒序）
         function budgetDetailHtml(dec, r){
@@ -4853,6 +4920,12 @@ ${detail}
                 openDetail(el.dataset.id);
             } else if(act==='bgUnsetToggle'){
                 bgUnsetOpen=!bgUnsetOpen; renderStats();
+            } else if(act==='bgYearToggle'){
+                bgYearOpen=!bgYearOpen; renderStats();
+            } else if(act==='bgYearMonth'){
+                statMonth=Number(el.dataset.mo); statSelDay=null; bgExpanded=null;
+                renderStatCalendar();
+                window.scrollTo(0,0);
             } else if(act==='bgOutside'){
                 bgUnsetOpen=true; renderStats();
                 const uc=$('bgUnsetCard');
@@ -5883,6 +5956,7 @@ ${detail}
                 const tt=$('toTopBtn'); if(tt) tt.classList.remove('show');
                 const cf=$('clearFilterFab'); if(cf) cf.classList.remove('show');
             }
+            if(tab!=='stats'){ const sf=$('statTodayFab'); if(sf) sf.classList.remove('show'); }
             document.body.classList.toggle('tab-ledger', tab==='ledger');
             document.body.classList.toggle('tab-stats', tab==='stats');
             document.querySelectorAll('.tab-btn').forEach(b=>{
@@ -6109,6 +6183,7 @@ ${detail}
             }
 
             if(statTab==='budget') renderBudgetPane(dec);
+            syncStatTodayFab();
 
             // 若已选中某天且该天仍在本月有数据，刷新当日分析；否则隐藏
             if(statSelDay && dayHas[statSelDay]){
@@ -6342,6 +6417,20 @@ ${detail}
             $('detailMask').style.display='none';
             detailCurId=null;
             if(id) window.openEdit(id, { fromDetail:true });
+        });
+
+        // 「回到本月」浮钮：在统计页、且看的不是本月时显示
+        function syncStatTodayFab(){
+            const f=$('statTodayFab'); if(!f) return;
+            const now=new Date();
+            const away = statYear!==undefined && (statYear!==now.getFullYear() || statMonth!==now.getMonth());
+            f.classList.toggle('show', currentTab==='stats' && away);
+        }
+        $('statTodayFab').addEventListener('click', ()=>{
+            const now=new Date();
+            statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null; bgExpanded=null;
+            renderStatCalendar();
+            window.scrollTo(0,0);
         });
 
         // 统计页月份切换
