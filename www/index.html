@@ -1191,13 +1191,39 @@
         .sc-delta { font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
         .sc-delta.bad { color:var(--c-neg); }
         .sc-delta.good { color:var(--c-pos); }
+
+        /* ===== 1010-I：常用模板 ===== */
+        .tpl-chips .cc { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .tpl-chips .cc .tpl-amt { margin-left:5px; font-size:12px; color:var(--c-text-soft); }
+        .tpl-chips .cc.sel .tpl-amt { color:inherit; }
+        .tpl-save-btn { display:block; margin:6px auto 0; padding:6px 10px; background:none; border:none;
+            color:var(--c-primary-dark); font-size:13px; text-decoration:underline; cursor:pointer; }
+        .tpl-item .tpl-sub { display:block; font-size:11.5px; color:var(--c-text-soft); margin-top:2px;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .tpl-item .cat-left { flex-direction:column; align-items:flex-start; gap:0; flex:1; }
+        .tpl-item .cat-name { max-width:100%; }
+        .tpl-item button:disabled { opacity:0.35; }
+        .tpl-empty { padding:18px 6px; text-align:center; color:var(--c-text-soft); font-size:13px; line-height:1.7; }
+
+        /* ===== 1010-I：预算总览的「预算外 / 今年至今」 ===== */
+        .bgo-rows { margin-top:12px; border-top:1px dashed var(--c-border); }
+        .bgo-row { display:grid; grid-template-columns:auto 1fr; column-gap:10px; padding:9px 0 2px; }
+        .bgo-row + .bgo-row { border-top:1px dashed var(--c-border); }
+        .bgo-row.bgo-click { cursor:pointer; }
+        .bgo-k { font-size:13.5px; color:var(--c-text); }
+        .bgo-v { text-align:right; font-size:13.5px; font-variant-numeric:tabular-nums; }
+        .bgo-v.neg { color:var(--c-neg); }
+        .bgo-v .over { color:var(--c-neg); }
+        .bgo-v .warn { color:#b07a1c; }
+        .bgo-sub { grid-column:1 / -1; font-size:11.5px; color:var(--c-text-soft); padding-top:3px; }
+        .bgo-row.bgo-click .bgo-sub::after { content:' ›'; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-H</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-I</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1365,6 +1391,7 @@
                     <button class="set-item" id="importBtn"><span>导入存档</span><span class="set-arrow">›</span></button>
                     <input type="file" id="importFile" accept=".json" style="display:none">
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
                 </div>
 
                 <!-- 云备份：不走任何官方登录，借助手机上已装好的网盘 App（Google Drive/OneDrive 等，
@@ -1526,6 +1553,11 @@
         <div class="edit-dialog">
             <h3>记一笔</h3>
             <div class="form-box">
+                <!-- 常用模板（1010-I）：没有模板时整行隐藏 -->
+                <div class="field" id="billTplField" style="display:none">
+                    <label class="field-label">常用</label>
+                    <div class="cat-chips tpl-chips" id="billTplChips"></div>
+                </div>
                 <div class="field">
                     <label class="field-label">记账时间</label>
                     <div id="billTime" class="dt-input" data-placeholder="选择记账时间"></div>
@@ -1561,6 +1593,7 @@
                     <textarea id="billRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
                 </div>
                 <button class="add-btn" id="addBill">添加记录</button>
+                <button class="tpl-save-btn" id="billSaveTpl">存为常用</button>
             </div>
             <div class="dialog-btn">
                 <button class="cancel" id="closeAdd">关闭</button>
@@ -1607,6 +1640,7 @@
                 <button class="save" id="saveEdit">保存</button>
                 <button class="cancel" id="cancelEdit">取消</button>
             </div>
+            <button class="tpl-save-btn" id="editSaveTpl">存为常用</button>
             <button class="edit-del-btn" id="deleteInEdit">删除这条记录</button>
         </div>
     </div>
@@ -1641,6 +1675,18 @@
             <div class="dialog-btn">
                 <button class="save" id="detailEdit">修改</button>
                 <button class="cancel" id="detailClose">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 常用模板管理（1010-I） -->
+    <div class="mask" id="tplMask">
+        <div class="edit-dialog">
+            <h3>常用模板</h3>
+            <div class="cat-reorder-tip">在「记一笔」或「修改账单」底部点「存为常用」添加；点 ↑ 往前挪。</div>
+            <div class="cat-list" id="tplList"></div>
+            <div class="dialog-btn">
+                <button class="cancel" id="closeTpl">关闭</button>
             </div>
         </div>
     </div>
@@ -2736,7 +2782,7 @@
             // 各带一份相同副本。这是可接受的冗余：真把它挪进 archives[x] 才是错的
             // （切到「旅行」存档，「入职纪念日」难道就不存在了）。
             const payload={ app:'记问', user:currentUser, archive:currentArchive,
-                cats:a.cats, budgets:a.budgets||{}, data:a.records, days:loadDays(),
+                cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], data:a.records, days:loadDays(),
                 exportedAt:new Date().toLocaleString() };
             const json=JSON.stringify(payload,null,2);
             const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;
@@ -2804,7 +2850,7 @@
         function odBuildPayload(){
             const store=loadStore(); const a=curArchive(store);
             return { app:'记问', user:currentUser, archive:currentArchive,
-                cats:a.cats, budgets:a.budgets||{}, data:a.records, days:loadDays(),
+                cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], data:a.records, days:loadDays(),
                 exportedAt:new Date().toLocaleString() };
         }
         function odPlugin(){
@@ -3275,7 +3321,9 @@ ${detail}
                     if(c && cats.includes(c) && v.ok) budgets[c]=v.val;
                 });
             }
-            store.archives[finalName]={ records, cats, budgets };
+            // 常用模板：逐条清洗，分类不在分类表里的丢掉；旧备份没有 tpls 字段 → 空数组
+            const tpls=sanitizeTpls(parsed && parsed.tpls, cats);
+            store.archives[finalName]={ records, cats, budgets, tpls };
             store.last=finalName;
             saveStore(store, targetUser);   // 抛错（配额满等）由调用方 catch 处理
 
@@ -3630,6 +3678,8 @@ ${detail}
                     a.budgets=Object.assign({}, a.budgets);
                     a.budgets[name]=a.budgets[oldName]; delete a.budgets[oldName];
                 }
+                // 常用模板也跟着改名
+                if(Array.isArray(a.tpls)) a.tpls.forEach(t=>{ if(t.cat===oldName) t.cat=name; });
                 saveStoreSafe(store);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '重命名分类', (name)=>{
@@ -3653,6 +3703,8 @@ ${detail}
                 if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
                 ar.records.forEach(r=>{ if(r.cat===name) r.cat='未分类'; });
                 if(ar.budgets && ar.budgets[name]!=null){ ar.budgets=Object.assign({}, ar.budgets); delete ar.budgets[name]; }
+                // 常用模板与记录一致：归入「未分类」
+                if(Array.isArray(ar.tpls)) ar.tpls.forEach(t=>{ if(t.cat===name) t.cat='未分类'; });
                 saveStoreSafe(s);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '删除分类');
@@ -4706,7 +4758,8 @@ ${detail}
                     + `<div class="bgo-chips">`
                     + `<span class="bgc over">超支 ${n.over}</span><span class="bgc warn">接近上限 ${n.warn}</span><span class="bgc ok">正常 ${n.ok}</span>`
                     + `</div>`
-                    + (B.timePct!=null ? `<div class="bgo-legend">竖线 = 今天（${B.day}/${B.dim} 天）。花销条跑到竖线前面，就是花得比时间快。</div>` : '');
+                    + (B.timePct!=null ? `<div class="bgo-legend">竖线 = 今天（${B.day}/${B.dim} 天）。花销条跑到竖线前面，就是花得比时间快。</div>` : '')
+                    + budgetExtraRowsHtml(dec, B);
 
                 // —— 分组：超支 → 接近 → 正常，组内按已用比例从高到低 ——
                 const GROUPS=[ ['over','已超支'], ['warn','接近上限（80% 以上）'], ['ok','正常'] ];
@@ -4734,6 +4787,37 @@ ${detail}
                         + `<button class="bgu-set" data-act="bgSet" data-cat="${escapeHtml(u.cat)}">设预算</button></div>`).join('')
                         + `</div>` : '');
             }
+        }
+        // 【1010-I】总览下方两行：
+        //   预算外 —— 本月没设预算的分类花了多少（计入口径），点一下展开下面的「未设预算」并滚过去；
+        //   今年至今 —— 1 月到当前查看月：已花（只算设了预算的分类）对比「当前月预算合计 × 月数」。
+        //     预算只存一份、没有历史，中途改过预算会按现在的值往回算，所以写明「估算」。
+        function budgetExtraRowsHtml(dec, B){
+            let h='';
+            if(B.unsetList.length){
+                const sum=round2(B.unsetList.reduce((s,u)=>s+u.used,0));
+                const names=B.unsetList.map(u=>u.cat);
+                const shown=names.slice(0,3).join('、') + (names.length>3 ? ` 等 ${names.length} 类` : '');
+                h+=`<div class="bgo-row bgo-click" data-act="bgOutside"><span class="bgo-k">预算外</span>`
+                    + `<span class="bgo-v neg">−${sum.toFixed(2)}</span>`
+                    + `<span class="bgo-sub">${escapeHtml(shown)} 没设预算</span></div>`;
+            }
+            const months=statMonth+1;
+            if(months>1){
+                const perMonth=round2(B.rows.reduce((s,r)=>s+r.limit,0));
+                const lim=round2(perMonth*months);
+                let used=0;
+                for(let mo=0; mo<=statMonth; mo++){
+                    used+=computeBudget(dec, statYear, mo).rows.reduce((s,r)=>s+r.used,0);
+                }
+                used=round2(used);
+                const pct = lim>0 ? used/lim*100 : 0;
+                const st = pct>100 ? 'over' : (pct>=80 ? 'warn' : '');
+                h+=`<div class="bgo-row"><span class="bgo-k">${statYear}年 1–${months}月</span>`
+                    + `<span class="bgo-v"><b>${used.toFixed(2)}</b> / ${lim.toFixed(2)} · <span class="${st}">${pct.toFixed(0)}%</span></span>`
+                    + `<span class="bgo-sub">按当前预算 × ${months} 个月估算</span></div>`;
+            }
+            return h ? `<div class="bgo-rows">${h}</div>` : '';
         }
         // 展开的明细：这个月、这个分类里计入预算的每一笔（时间倒序）
         function budgetDetailHtml(dec, r){
@@ -4765,6 +4849,10 @@ ${detail}
                 jumpToLedgerFilter(el.dataset.cat, statYear, statMonth);
             } else if(act==='bgUnsetToggle'){
                 bgUnsetOpen=!bgUnsetOpen; renderStats();
+            } else if(act==='bgOutside'){
+                bgUnsetOpen=true; renderStats();
+                const uc=$('bgUnsetCard');
+                if(uc && uc.scrollIntoView) uc.scrollIntoView({ behavior:'smooth', block:'start' });
             } else if(act==='bgSet'){
                 editBudget(el.dataset.cat, { fromStats:true });
             } else if(act==='bgSetup'){
@@ -4858,6 +4946,7 @@ ${detail}
         // 尽量保留用户当前已选的分类（若它还存在）。
         function refreshBillCatChipsIfOpen(){
             if($('addMask').style.display!=='flex') return;
+            renderTplChips();
             const keep=billCatSel;
             renderBillCatChips();
             if(keep && getCats().includes(keep)){
@@ -4949,8 +5038,156 @@ ${detail}
             setModeChips($('billMode'), 'normal');
             renderBillTypeChips();
             renderBillCatChips();
+            renderTplChips();
             setDtInput(billTime, nowDtValue());
         }
+
+        // ===== 常用模板（1010-I）=====
+        // 存在存档里：archive.tpls = [{ id, type, cat, remark, money|null, mode }]，跟着存档走（导出/云备份/导入）。
+        // 顺序完全由用户决定（不按使用次数自动排），点一下只「填表」，不直接入账。
+        // money 为 null 表示「不带金额」：适合每次金额不同的，比如吃饭；固定价的（订阅、房贷）就带上。
+        const TPL_MAX=12;
+        function getTpls(){
+            const a=curArchive(loadStore());
+            return (a && Array.isArray(a.tpls)) ? a.tpls : [];
+        }
+        function tplName(t){ return (t.remark||'').trim().split('\n')[0] || t.cat; }
+        function tplSame(a, b){
+            return a.type===b.type && a.cat===b.cat && (a.remark||'')===(b.remark||'')
+                && (a.mode||'normal')===(b.mode||'normal') && (a.money==null ? null : round2(a.money))===(b.money==null ? null : round2(b.money));
+        }
+        function sanitizeTpls(raw, cats){
+            if(!Array.isArray(raw)) return [];
+            const out=[];
+            raw.forEach(t=>{
+                if(out.length>=TPL_MAX || !t || typeof t!=='object') return;
+                const type = t.type==='expense' ? 'expense' : (t.type==='income' ? 'income' : null);
+                if(!type) return;
+                const cat=charSlice(String(t.cat==null?'':t.cat).trim(), 8);
+                if(!cats.includes(cat)) return;
+                let money=null;
+                if(t.money!=null && t.money!==''){ const m=normMoney(t.money); if(!m.ok) return; money=m.val; }
+                const n={ id:genId(), type, cat, remark:String(t.remark==null?'':t.remark).trim().slice(0,5000), money,
+                          mode:(t.mode==='flow'||t.mode==='skip') ? t.mode : 'normal' };
+                if(!out.some(o=>tplSame(o,n))) out.push(n);
+            });
+            return out;
+        }
+        function renderTplChips(){
+            const field=$('billTplField'), box=$('billTplChips');
+            if(!field || !box) return;
+            const cats=getCats();
+            const list=getTpls();
+            box.innerHTML='';
+            field.style.display = list.length ? '' : 'none';
+            list.forEach(t=>{
+                const b=document.createElement('div');
+                b.className='cc';
+                b.dataset.tpl=t.id;
+                const nm=document.createElement('span'); nm.textContent=tplName(t);
+                b.appendChild(nm);
+                if(t.money!=null){
+                    const am=document.createElement('span'); am.className='tpl-amt'; am.textContent=safeNum(t.money).toFixed(2).replace(/\.00$/,'');
+                    b.appendChild(am);
+                }
+                b.onclick=()=>{
+                    applyTpl(t, cats);
+                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                };
+                box.appendChild(b);
+            });
+        }
+        // 把模板填进「记一笔」表单。时间不动（仍是此刻 / 用户已选的时间）。
+        function applyTpl(t, cats){
+            const ioTxt = t.type==='expense' ? '支出' : '收入';
+            const io=[...$('billTypeChips').querySelectorAll('.cc')].find(el=>el.textContent===ioTxt);
+            if(io) io.click();
+            if((cats||getCats()).includes(t.cat)){
+                const c=[...$('billCatChips').querySelectorAll('.cc')].find(el=>el.textContent===t.cat);
+                if(c) c.click();
+            }
+            // 分类点击可能触发「转账 → 自动不计入」，模板里存的口径优先，放在分类之后设
+            setModeChips($('billMode'), t.mode||'normal');
+            billRemark.value=t.remark||'';
+            billMoney.value = t.money!=null ? String(round2(t.money)) : '';
+            try{ billMoney.focus(); if(t.money!=null) billMoney.select(); }catch(_){}
+        }
+        // 把表单当前内容存成模板。src: { type, cat, remark, money(字符串), mode }；after: 存完后的回调
+        function saveTplFrom(src, after){
+            if(!src.type || !src.cat){ customAlert('先选好分类和收支，再存为常用。'); return; }
+            if(getTpls().length>=TPL_MAX){ customAlert(`常用模板最多 ${TPL_MAX} 个，先去「设置 → 管理常用模板」删掉几个吧。`); return; }
+            const base={ type:src.type, cat:src.cat, remark:(src.remark||'').trim().slice(0,5000),
+                         mode:(src.mode==='flow'||src.mode==='skip') ? src.mode : 'normal' };
+            const m=normMoney(src.money);
+            const doSave=(withMoney)=>{
+                const t=Object.assign({ id:genId(), money: withMoney ? m.val : null }, base);
+                if(getTpls().some(o=>tplSame(o,t))){ customAlert('这个已经在常用里了。'); return; }
+                const store=loadStore(); const a=curArchive(store);
+                a.tpls=(Array.isArray(a.tpls) ? a.tpls.slice() : []).concat([t]);
+                if(!saveStoreSafe(store)) return;
+                if(after) after();
+                customAlert(`已存为常用：${tplName(t)}${withMoney?' '+m.val.toFixed(2):''}`);
+            };
+            if(String(src.money||'').trim()==='' || !m.ok){ doSave(false); return; }
+            customChoose('金额要一起存吗？', [
+                { value:'with',    label:`带上金额 ${m.val.toFixed(2)}`, desc:'固定价的：订阅、房贷、话费' },
+                { value:'without', label:'不带金额', desc:'每次金额不一样的：吃饭、打车' },
+            ], (v)=>doSave(v==='with'), '存为常用', null, { layout:'list' });
+        }
+        $('billSaveTpl').addEventListener('click', ()=>{
+            saveTplFrom({ type:billTypeSel, cat:billCatSel, remark:billRemark.value, money:billMoney.value,
+                          mode:getModeChips($('billMode')) }, ()=>{
+                // 只刷新胶囊，不动用户已填的表单
+                renderTplChips();
+            });
+        });
+        $('editSaveTpl').addEventListener('click', ()=>{
+            saveTplFrom({ type:editTypeSel, cat:editCatSel, remark:$('editRemark').value, money:$('editMoney').value,
+                          mode:getModeChips($('editMode')) });
+        });
+        // —— 管理：只有「往前挪」和「删除」，不做拖动（模板最多 12 个，够用且不容易误操作）——
+        function openTplManager(){
+            const list=$('tplList'); list.innerHTML='';
+            const tpls=getTpls();
+            if(!tpls.length){
+                list.innerHTML='<div class="tpl-empty">还没有常用模板。<br>记一笔或修改账单时，点底部的「存为常用」就能加进来。</div>';
+            }
+            const MODE_TXT={ flow:' · 只算结余', skip:' · 不计入' };
+            tpls.forEach((t,i)=>{
+                const div=document.createElement('div'); div.className='cat-item tpl-item';
+                const left=document.createElement('div'); left.className='cat-left';
+                const nm=document.createElement('span'); nm.className='cat-name'; nm.textContent=tplName(t);
+                const sub=document.createElement('span'); sub.className='tpl-sub';
+                sub.textContent=`${t.type==='expense'?'支出':'收入'} · ${t.cat} · ${t.money!=null ? safeNum(t.money).toFixed(2) : '不带金额'}${MODE_TXT[t.mode]||''}`;
+                left.appendChild(nm); left.appendChild(sub);
+                const wrap=document.createElement('div'); wrap.style.flexShrink='0';
+                const up=document.createElement('button'); up.textContent='↑'; up.style.marginRight='6px';
+                up.disabled = i===0;
+                up.onclick=()=>moveTpl(t.id, -1);
+                const del=document.createElement('button'); del.textContent='删除';
+                del.onclick=()=>removeTpl(t.id);
+                wrap.appendChild(up); wrap.appendChild(del);
+                div.appendChild(left); div.appendChild(wrap);
+                list.appendChild(div);
+            });
+            $('tplMask').style.display='flex';
+        }
+        function moveTpl(id, dir){
+            const store=loadStore(); const a=curArchive(store);
+            const arr=Array.isArray(a.tpls) ? a.tpls.slice() : [];
+            const i=arr.findIndex(t=>t.id===id), j=i+dir;
+            if(i<0 || j<0 || j>=arr.length) return;
+            [arr[i], arr[j]]=[arr[j], arr[i]];
+            a.tpls=arr;
+            if(saveStoreSafe(store)) openTplManager();
+        }
+        function removeTpl(id){
+            const store=loadStore(); const a=curArchive(store);
+            a.tpls=(Array.isArray(a.tpls) ? a.tpls : []).filter(t=>t.id!==id);
+            if(saveStoreSafe(store)) openTplManager();
+        }
+        $('manageTplSetting').addEventListener('click', openTplManager);
+        $('closeTpl').addEventListener('click', ()=>{ $('tplMask').style.display='none'; });
         function openAddModal(){
             resetBillForm();
             if(window.__openModalAfterKeyboard){
@@ -6610,6 +6847,7 @@ ${detail}
                 { can:()=>isOpen('dayMask'),    close:()=>closeDayDialog() },
                 { can:()=>isOpen('dayMgrMask'), close:()=>closeDayMgr() },
                 { can:()=>isOpen('catMask'),    close:()=>hide('catMask') },
+                { can:()=>isOpen('tplMask'),    close:()=>hide('tplMask') },
                 { can:()=>isOpen('themeMask'),  close:()=>hide('themeMask') },
                 // 统计页的年月选择器。它和 dtMask 是两套独立实现，别忘了这一个
                 // —— 漏掉的后果不是"关不掉"，而是 handleBack 返回 false、
