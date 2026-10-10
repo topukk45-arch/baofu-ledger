@@ -1009,7 +1009,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 0820-B</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-A</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -2260,6 +2260,22 @@
                     }
                     localStorage.removeItem(`app_time_repaired_${oldName}`);
                 }catch(_){}
+                // 迁移「日子入口卡显示条数」（days_card_n_*），否则改名后回到默认 3 条
+                try{
+                    const cardN=localStorage.getItem(`days_card_n_${oldName}`);
+                    if(cardN!==null){
+                        localStorage.setItem(`days_card_n_${newName}`, cardN);
+                        localStorage.removeItem(`days_card_n_${oldName}`);
+                    }
+                }catch(_){}
+                // 迁移每个存档的云备份连接。按存档名逐个精确迁移，不用前缀扫描：
+                // 若别的用户名恰好以「旧名__」开头，前缀匹配会把别人的连接一起搬走。
+                try{
+                    const migrated=loadStore(newName);
+                    Object.keys(migrated.archives).forEach(arc=>{
+                        odMoveLink(oldName, arc, newName, arc);
+                    });
+                }catch(_){}
                 // 更新账号索引：移除旧名、加入新名（保持在最前）
                 let list=getUsers().filter(u=>u!==oldName && u!==newName);
                 list.unshift(newName);
@@ -2321,9 +2337,13 @@
             customPrompt('', currentArchive, (name)=>{
                 name=name.trim();
                 if(name===currentArchive) return;
+                const oldArchive=currentArchive;
                 const store=loadStore();
-                store.archives[name]=store.archives[currentArchive];
-                delete store.archives[currentArchive];
+                store.archives[name]=store.archives[oldArchive];
+                delete store.archives[oldArchive];
+                // 云备份连接按「用户名__存档名」存，存档改名必须跟着搬，否则改名后显示「未连接」、
+                // 备份静默停掉。先搬连接、再存档：saveStoreSafe 会触发同步，那时要能找到新名下的连接。
+                odMoveLink(currentUser, oldArchive, currentUser, name);
                 currentArchive=name; store.last=name; saveStoreSafe(store);
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '重命名存档', (name)=>{
@@ -2340,7 +2360,13 @@
             if(Object.keys(store.archives).length<=1){ customAlert('至少保留一个存档！'); return; }
             customConfirm(`确定删除存档「${currentArchive}」吗？此操作不可恢复。`, ()=>{
                 const s=loadStore();
-                delete s.archives[currentArchive];
+                const delName=currentArchive;
+                delete s.archives[delName];
+                // 顺带清掉这个存档的云备份连接，并释放系统授权（云盘上的文件不删）
+                const delLink=odGetLink(currentUser, delName);
+                const odp=odPlugin();
+                if(odp && delLink && delLink.uri){ odp.forget({ uri: delLink.uri }).catch(()=>{}); }
+                odClearLink(currentUser, delName);
                 currentArchive=Object.keys(s.archives)[0];
                 s.last=currentArchive; saveStoreSafe(s);
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
@@ -2444,6 +2470,20 @@
         }
         function odClearLink(user, archive){
             try{ localStorage.removeItem(odKey(user, archive)); }catch(_){}
+        }
+        // 把一条连接从 (旧用户, 旧存档) 搬到 (新用户, 新存档)。
+        // 必须「写新 → 读回确认 → 删旧」：odSetLink 写失败是静默的，
+        // 若先删旧再写新，配额满时连接就彻底丢了。返回是否搬成功（没有连接也算成功）。
+        function odMoveLink(fromUser, fromArchive, toUser, toArchive){
+            let raw=null;
+            try{ raw=localStorage.getItem(odKey(fromUser, fromArchive)); }catch(_){ return false; }
+            if(raw===null) return true;
+            try{ localStorage.setItem(odKey(toUser, toArchive), raw); }catch(_){ return false; }
+            let back=null;
+            try{ back=localStorage.getItem(odKey(toUser, toArchive)); }catch(_){}
+            if(back!==raw) return false;
+            odClearLink(fromUser, fromArchive);
+            return true;
         }
 
         let odTimer=null;
@@ -3805,11 +3845,11 @@ ${detail}
             );
 
             billList.innerHTML='';
-            if(asc.length===0){
-                // 区分「真的没记录」与「有记录但筛选/搜索没命中」，提示更贴切
-                const emptyTip = (hasActiveSearch() || filterVal!=='__all')
-                    ? '没有符合条件的记录' : '暂无记账记录';
-                billList.innerHTML=`<tr><td colspan="7" class="empty-tip">${emptyTip}</td></tr>`;
+            // 只有存档里**一条记录都没有**时才隐藏汇总区。
+            // 此前是「筛选结果为空」也一并隐藏，导致筛选没命中时顶部总览、分类汇总全没了——
+            // 全局总览本不该受筛选影响。现在筛选没命中走下面的正常流程，小计条显示「命中 0 条」。
+            if(allAsc.length===0){
+                billList.innerHTML=`<tr><td colspan="7" class="empty-tip">暂无记账记录</td></tr>`;
                 // 无记录时连同容器一起隐藏，避免留下带底色/内边距的空白色块
                 $('summaryOverall').innerHTML=''; $('summaryOverall').style.display='none';
                 $('summaryFilter').style.display='none';
@@ -3865,6 +3905,12 @@ ${detail}
             });
             $('catStats').innerHTML = Object.keys(byCat)
                 .map(c=>`<span class="chip">${escapeHtml(c)}：${round2(byCat[c]).toFixed(2)} 元</span>`).join('');
+
+            if(asc.length===0){
+                billList.innerHTML=`<tr><td colspan="7" class="empty-tip">没有符合条件的记录</td></tr>`;
+                $('pager').innerHTML='';
+                return;
+            }
 
             // 显示按时间倒序（最新在上）；结余取自全账户累计
             const desc = asc.slice().reverse();
@@ -5279,7 +5325,7 @@ ${detail}
             if(!rec){ customAlert('这条记录不存在了'); refreshHourDetail(); return; }
             $('detailTime').textContent = rec.time.replace('T',' ');
             const isExp = rec.type==='expense';
-            const amt=Number(rec.money||0);
+            const amt=safeNum(rec.money);
             $('detailMoney').innerHTML = `<span class="${isExp?'neg':'pos'}">${isExp?'−':'+'}${amt.toFixed(2)} 元</span>`;
             $('detailCat').innerHTML = `<span class="cat-tag">${escapeHtml(rec.cat||'未分类')}</span>`;
             $('detailType').innerHTML = isExp
