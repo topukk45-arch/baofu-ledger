@@ -1167,8 +1167,9 @@
         .bg-detail-empty { padding:10px 2px; font-size:13px; color:var(--c-text-soft); }
         .bg-detail-foot { display:flex; justify-content:space-between; align-items:center; gap:10px;
             padding-top:8px; margin-top:2px; border-top:1px solid var(--c-border); font-size:12px; color:var(--c-text-soft); }
-        .bg-jump { flex-shrink:0; border:1px solid var(--c-border-mid); background:var(--c-card-1);
-            color:var(--c-primary-dark); border-radius:8px; padding:6px 10px; font-size:12.5px; cursor:pointer; }
+        .bgu-row.bg-click { cursor:pointer; }
+        .bgu-row.bg-click:active { background:var(--c-chip); }
+        .bgu-row + .bg-detail { margin-top:6px; }
         /* 预算页签：未设预算的分类 */
         .bgu-head { width:100%; display:flex; justify-content:space-between; align-items:center; border:none;
             background:none; padding:0; cursor:pointer; font-family:inherit; }
@@ -1196,8 +1197,11 @@
         .tpl-chips .cc { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .tpl-chips .cc .tpl-amt { margin-left:5px; font-size:12px; color:var(--c-text-soft); }
         .tpl-chips .cc.sel .tpl-amt { color:inherit; }
-        .tpl-save-btn { display:block; margin:6px auto 0; padding:6px 10px; background:none; border:none;
-            color:var(--c-primary-dark); font-size:13px; text-decoration:underline; cursor:pointer; }
+        .tpl-save-btn { display:block; width:100%; margin-top:10px; padding:11px; border-radius:8px;
+            border:1px solid var(--c-border-mid); background:var(--c-surface); color:var(--c-primary-dark);
+            font-size:15px; cursor:pointer; font-family:inherit; }
+        .tpl-save-btn:active { background:var(--c-chip); }
+        #editMask .tpl-save-btn { margin-top:12px; }
         .tpl-item .tpl-sub { display:block; font-size:11.5px; color:var(--c-text-soft); margin-top:2px;
             overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .tpl-item .cat-left { flex-direction:column; align-items:flex-start; gap:0; flex:1; }
@@ -1223,7 +1227,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-I</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-I2</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1553,11 +1557,6 @@
         <div class="edit-dialog">
             <h3>记一笔</h3>
             <div class="form-box">
-                <!-- 常用模板（1010-I）：没有模板时整行隐藏 -->
-                <div class="field" id="billTplField" style="display:none">
-                    <label class="field-label">常用</label>
-                    <div class="cat-chips tpl-chips" id="billTplChips"></div>
-                </div>
                 <div class="field">
                     <label class="field-label">记账时间</label>
                     <div id="billTime" class="dt-input" data-placeholder="选择记账时间"></div>
@@ -1565,6 +1564,12 @@
                 <div class="field">
                     <label class="field-label">金额</label>
                     <input type="text" inputmode="decimal" id="billMoney" class="money-input" placeholder="">
+                </div>
+                <!-- 常用模板（1010-I）：放在金额下面——打开弹窗时键盘已弹起，这个位置仍在可视区内。
+                     没有模板时整行隐藏 -->
+                <div class="field" id="billTplField" style="display:none">
+                    <label class="field-label">常用</label>
+                    <div class="cat-chips tpl-chips" id="billTplChips"></div>
                 </div>
                 <div class="field">
                     <label class="field-label">分类</label>
@@ -4679,7 +4684,7 @@ ${detail}
             dec.forEach(x=>{
                 if(x.y!==y || x.mo!==mo || x.r.type!=='expense') return;
                 const c=x.r.cat||'未分类';
-                if(recMode(x.r)!=='normal'){ if(budgets[c]>0) excl[c]=(excl[c]||0)+1; return; }
+                if(recMode(x.r)!=='normal'){ excl[c]=(excl[c]||0)+1; return; }
                 if(budgets[c]>0) spent[c]=(spent[c]||0)+safeNum(x.r.money);
                 else unset[c]=(unset[c]||0)+safeNum(x.r.money);
             });
@@ -4691,7 +4696,7 @@ ${detail}
                 const fast = timePct!=null && pct<=100 && pct>timePct+5;   // 比时间进度快 5 个百分点以上才提醒
                 return { cat:c, limit, used, pct, left:round2(limit-used), state, fast, excl:excl[c]||0 };
             });
-            const unsetList=Object.keys(unset).map(c=>({ cat:c, used:round2(unset[c]) })).sort((a,b)=>b.used-a.used);
+            const unsetList=Object.keys(unset).map(c=>({ cat:c, used:round2(unset[c]), excl:excl[c]||0 })).sort((a,b)=>b.used-a.used);
             return { rows, unsetList, isCur, dim, timePct, day:now.getDate() };
         }
         // 单行预算（名称 / 已花 / 进度条 / 剩余或超出）。clickable=true 时可展开明细
@@ -4782,9 +4787,11 @@ ${detail}
                 uc.innerHTML=`<button class="bgu-head" data-act="bgUnsetToggle">`
                     + `<span class="stat-day-title">未设预算的分类 · ${B.unsetList.length}</span><span class="bgu-arrow">▾</span></button>`
                     + (bgUnsetOpen ? `<div class="bgu-list">` + B.unsetList.map(u=>
-                        `<div class="bgu-row"><span class="bgu-name">${escapeHtml(u.cat)}</span>`
+                        `<div class="bgu-row bg-click${bgExpanded===u.cat?' open':''}" data-act="bgRow" data-cat="${escapeHtml(u.cat)}">`
+                        + `<span class="bgu-name">${escapeHtml(u.cat)}<i class="bg-chev">›</i></span>`
                         + `<span class="bgu-amt">−${u.used.toFixed(2)}</span>`
-                        + `<button class="bgu-set" data-act="bgSet" data-cat="${escapeHtml(u.cat)}">设预算</button></div>`).join('')
+                        + `<button class="bgu-set" data-act="bgSet" data-cat="${escapeHtml(u.cat)}">设预算</button></div>`
+                        + (bgExpanded===u.cat ? budgetDetailHtml(dec, { cat:u.cat, excl:u.excl||0 }) : '')).join('')
                         + `</div>` : '');
             }
         }
@@ -4830,11 +4837,10 @@ ${detail}
                     + `<div class="sf-top"><span class="sf-time">${pad(x.mo+1)}-${pad(x.d)} ${pad(x.hh)}:${pad(x.mi)}</span>`
                     + (rm ? `<span class="sf-remark">${escapeHtml(rm)}</span>` : `<span class="sf-cat">${escapeHtml(r.cat)}</span>`)
                     + `</div><span class="sf-amt neg">−${safeNum(x.r.money).toFixed(2)}</span></div>`;
-            }).join('') + `</div>` : `<div class="bg-detail-empty">这个月还没有计入预算的支出</div>`;
-            const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计入 / 只算结余，未占预算`:''}`;
+            }).join('') + `</div>` : `<div class="bg-detail-empty">这个月还没有计入的支出</div>`;
+            const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计入 / 只算结余，未算在内`:''}`;
             return `<div class="bg-detail">${items}`
-                + `<div class="bg-detail-foot"><span>${note}</span>`
-                + `<button class="bg-jump" data-act="bgJump" data-cat="${escapeHtml(r.cat)}">在账单里查看 ›</button></div></div>`;
+                + `<div class="bg-detail-foot"><span>${note}</span></div></div>`;
         }
         // 预算页签的所有点击（事件委托，一次绑定）
         $('statPaneBudget').addEventListener('click', e=>{
@@ -4845,8 +4851,6 @@ ${detail}
                 renderStats();
             } else if(act==='bgRec'){
                 openDetail(el.dataset.id);
-            } else if(act==='bgJump'){
-                jumpToLedgerFilter(el.dataset.cat, statYear, statMonth);
             } else if(act==='bgUnsetToggle'){
                 bgUnsetOpen=!bgUnsetOpen; renderStats();
             } else if(act==='bgOutside'){
@@ -4859,19 +4863,6 @@ ${detail}
                 openCatManager();
             }
         });
-        // 跳到记账页并带上筛选：分类 + 整月 + 口径「计入」——列表正好是算进「已花」的那几笔
-        // （同分类里的收入记录也会列出，但小计里的「支出」= 已花）
-        function jumpToLedgerFilter(cat, y, mo){
-            resetSearch();
-            searchState.from=`${y}-${pad(mo+1)}-01`;
-            searchState.to=`${y}-${pad(mo+1)}-${pad(new Date(y, mo+1, 0).getDate())}`;
-            searchState.mode='normal';
-            filterCat.value=cat;
-            curPage=1;
-            switchTab('ledger');
-            renderBill(); renderFilterChips();
-            if(window.syncFilterFab) window.syncFilterFab();
-        }
         // 页签切换
         function setStatTab(tab){
             statTab = (tab==='budget') ? 'budget' : 'flow';
@@ -5110,7 +5101,12 @@ ${detail}
             setModeChips($('billMode'), t.mode||'normal');
             billRemark.value=t.remark||'';
             billMoney.value = t.money!=null ? String(round2(t.money)) : '';
-            try{ billMoney.focus(); if(t.money!=null) billMoney.select(); }catch(_){}
+            // 带金额：表单已填全，收起键盘露出「添加记录」；要改金额再点输入框。
+            // 不带金额：金额还得填，直接聚焦弹键盘。
+            try{
+                if(t.money!=null){ billMoney.blur(); if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
+                else billMoney.focus();
+            }catch(_){}
         }
         // 把表单当前内容存成模板。src: { type, cat, remark, money(字符串), mode }；after: 存完后的回调
         function saveTplFrom(src, after){
