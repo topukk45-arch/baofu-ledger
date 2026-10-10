@@ -1003,13 +1003,26 @@
             font-size:13.5px; cursor:pointer; transition:0.2s; }
         .ask-extra-btn:hover { border-color:var(--c-accent);
             box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.3); }
+
+        /* ===== 不计入收支 / 批量操作（1010-B）=====
+           「不计入」一律用中性灰：它既不是收入也不是支出，不该沾语义色的红/绿。 */
+        .io-skip { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
+            background:#efefef; border:1px solid #d6d6d6; color:#888; }
+        .amt-skip, .pos.amt-skip, .neg.amt-skip { color:#9a9a9a !important; }
+        .sf-io.skip { color:#888; background:#efefef; border-color:#d6d6d6; }
+        .skip-hint { font-size:11.5px; color:var(--c-text-soft); line-height:1.5; }
+        .summary-filter { flex-wrap:wrap; }
+        .summary-filter .filter-nums { min-width:0; flex:1 1 auto; }
+        .filter-batch { flex-shrink:0; padding:5px 12px; border:1px solid var(--c-border-mid);
+            border-radius:9px; background:var(--c-surface); color:var(--c-primary-dark);
+            font-size:13px; cursor:pointer; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-A</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-B</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1323,6 +1336,13 @@
                     </select>
                 </div>
                 <div class="field">
+                    <div class="day-pin-row">
+                        <label class="field-label" style="margin:0;">不计入收支</label>
+                        <div class="day-switch" id="billSkip"></div>
+                    </div>
+                    <div class="skip-hint">信用卡还款、内部转账等：记录照常保留，但不算进结余和各项统计</div>
+                </div>
+                <div class="field">
                     <label class="field-label">备注</label>
                     <textarea id="billRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
                 </div>
@@ -1358,6 +1378,13 @@
                         <option value="expense">支出（花销）</option>
                         <option value="income">收入（存入）</option>
                     </select>
+                </div>
+                <div class="field">
+                    <div class="day-pin-row">
+                        <label class="field-label" style="margin:0;">不计入收支</label>
+                        <div class="day-switch" id="editSkip"></div>
+                    </div>
+                    <div class="skip-hint">信用卡还款、内部转账等：记录照常保留，但不算进结余和各项统计</div>
                 </div>
                 <div class="field">
                     <label class="field-label">备注</label>
@@ -1924,6 +1951,19 @@
         function safeNum(x){ const n=Number(x); return isFinite(n) ? n : 0; }
         // 对齐到「分」：消除多笔浮点累加的尾差（如 2.9999999 → 3.00）。
         function round2(n){ return Math.round(n*100)/100; }
+
+        // ===== 统计口径（1010-B）=====
+        // 一条记录对「收入 / 支出」各贡献多少。所有求和——账单结余、总览、筛选小计、分类汇总、
+        // 统计页日历/当月/饼图、AI 导出——一律走这里，不再各处自己写 type==='expense' 判断。
+        // 此前这类判断散在 6 处，只要漏改一处，账单页和统计页的数字就会对不上，而且不报错。
+        // 标记了 skip（不计入收支：信用卡还款、内部转账等）的记录贡献为 0：照常显示，不进任何统计。
+        // skip 只认严格的 true，旧数据没有这个字段，行为与之前完全一致。
+        function isSkip(r){ return !!(r && r.skip===true); }
+        function statContrib(r){
+            if(isSkip(r)) return { inc:0, exp:0 };
+            const a=safeNum(r.money);
+            return r.type==='expense' ? { inc:0, exp:a } : { inc:a, exp:0 };
+        }
 
         // 字符数：按 Unicode 码点计（一个汉字算 1）
         function charLen(s){ return Array.from(s).length; }
@@ -2558,17 +2598,20 @@
             } else {
                 if(disBtn) disBtn.style.display='';
                 connBtn.textContent = '重新选择备份文件';
+                // 存档改名后连接仍指向原文件（系统授权只认那一个文件），文件名对不上时说一句，免得误以为断了
+                const nameNote = (link.name && link.name!==`记问存档_${currentArchive}.json`)
+                    ? '（云盘文件名不随存档改名）' : '';
                 if(link.blocked){
                     // 守卫拦下：这不是「会自动重试」的失败，是刻意停住。文案必须说清，
                     // 否则用户以为过会儿就好了，实际永远不会好。
                     statusEl.textContent = `⚠ 自动同步已暂停：${link.lastError}。云端文件保持原样未被改动；`
                         + `确认本地数据无误后，点「重新选择备份文件」恢复同步。`;
                 } else if(link.lastError){
-                    statusEl.textContent = `已连接「${link.name||'备份文件'}」，最近一次同步失败（${link.lastError}），下次记账会自动重试`;
+                    statusEl.textContent = `已连接「${link.name||'备份文件'}」${nameNote}，最近一次同步失败（${link.lastError}），下次记账会自动重试`;
                 } else if(link.lastSyncAt){
-                    statusEl.textContent = `已连接「${link.name||'备份文件'}」，最近同步于 ${new Date(link.lastSyncAt).toLocaleString()}`;
+                    statusEl.textContent = `已连接「${link.name||'备份文件'}」${nameNote}，最近同步于 ${new Date(link.lastSyncAt).toLocaleString()}`;
                 } else {
-                    statusEl.textContent = `已连接「${link.name||'备份文件'}」，等待下一次记账/修改后首次同步`;
+                    statusEl.textContent = `已连接「${link.name||'备份文件'}」${nameNote}，等待下一次记账/修改后首次同步`;
                 }
             }
         }
@@ -2616,18 +2659,19 @@
             const amt=safeNum(r.money).toFixed(2);
             const cat=(r.cat||'未分类');
             const remark=(r.remark||'').trim();
-            return `${md} ${io} ${cat} ${amt} 元${remark?`（备注：${remark}）`:''}`;
+            return `${md} ${io} ${cat} ${amt} 元${remark?`（备注：${remark}）`:''}${isSkip(r)?'【不计入收支】':''}`;
         }
 
         // 给定一批记录 + 范围标签，拼出完整的「prompt + 结构化账单」纯文本
         function buildAiText(records, rangeLabel, dimLabel){
-            const inc=records.filter(r=>r.type==='income').reduce((s,r)=>s+safeNum(r.money),0);
-            const exp=records.filter(r=>r.type==='expense').reduce((s,r)=>s+safeNum(r.money),0);
+            const inc=records.reduce((s,r)=>s+statContrib(r).inc,0);
+            const exp=records.reduce((s,r)=>s+statContrib(r).exp,0);
+            const skipN=records.filter(isSkip).length;
             const bal=inc-exp;
 
             // 分类占比（按支出）
             const byCat={};
-            records.forEach(r=>{ if(r.type==='expense'){ const c=r.cat||'未分类'; byCat[c]=(byCat[c]||0)+safeNum(r.money); } });
+            records.forEach(r=>{ if(r.type==='expense' && !isSkip(r)){ const c=r.cat||'未分类'; byCat[c]=(byCat[c]||0)+safeNum(r.money); } });
             const catLines=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]).map(c=>{
                 const pct=exp>0?Math.round(byCat[c]/exp*100):0;
                 return `  · ${c}：${byCat[c].toFixed(2)} 元（${pct}%）`;
@@ -2643,12 +2687,12 @@
 1. 概括这段时间的整体消费情况（钱主要花在哪、收支是否健康）；
 2. 指出其中值得注意的地方（异常大额、占比过高的分类、可优化的开销）；
 3. 给出 3~5 条具体、可执行的省钱或预算建议，别讲空泛的大道理。
-如果数据太少不足以分析，直接说明即可。
+如果数据太少不足以分析，直接说明即可。${skipN?'\n标注【不计入收支】的记录（如信用卡还款、内部转账）已从总览和分类占比中排除，分析消费时不要再把它们算进去。':''}
 
 ────────────────
 ■ 统计维度：${dimLabel}
 ■ 时间范围：${rangeLabel}
-■ 总览：收入 ${inc.toFixed(2)} 元，支出 ${exp.toFixed(2)} 元，结余 ${bal.toFixed(2)} 元，共 ${records.length} 笔
+■ 总览：收入 ${inc.toFixed(2)} 元，支出 ${exp.toFixed(2)} 元，结余 ${bal.toFixed(2)} 元，共 ${records.length} 笔${skipN?`（其中 ${skipN} 笔不计入收支）`:''}
 ■ 支出分类占比：
 ${catLines}
 ■ 收支明细（按时间正序）：
@@ -2818,7 +2862,9 @@ ${detail}
                 // 分类名限长，与手动输入的 8 字校验对齐，防止超长名污染分类表/下拉
                 let cat = (typeof r.cat==='string' && r.cat.trim()) ? charSlice(r.cat.trim(), 8) : '未分类';
                 let remark = (typeof r.remark==='string') ? r.remark.slice(0,5000) : '';
-                out.push({ id:genId(), time, money:m.val, cat, remark, type });
+                const rec={ id:genId(), time, money:m.val, cat, remark, type };
+                if(r.skip===true) rec.skip=true;   // 不重建会丢：从备份还原后「不计入」标记必须还在
+                out.push(rec);
             }
             return { records:out, stats };
         }
@@ -3806,6 +3852,13 @@ ${detail}
             return true;
         }
 
+        // 「当前筛选命中」的唯一判定。列表渲染和批量操作都调它——两边各写一套，
+        // 早晚会出现「列表显示 12 条，实际改了 13 条」。filterVal 不传则读已提交的 filterCat。
+        function filterMatch(r, filterVal){
+            const fv = (filterVal===undefined) ? filterCat.value : filterVal;
+            return (fv==='__all' ? true : r.cat===fv) && searchMatch(r);
+        }
+
         function renderBill(){
             const filterVal=filterCat.value;
             // 结余必须基于「全部记录」累计，否则筛选时结余列会误导（这正是账对不上的根源）
@@ -3833,16 +3886,14 @@ ${detail}
             // 后续筛选/反转/分页都带着同一对象走，渲染时按对象取值，不经过 id 查表，
             // 因此旧数据里即便存在偶发重复 id 也绝不会互相覆盖、算错结余。
             allAsc.forEach(item=>{
-                const amt=safeNum(item.money);
-                running += (item.type==='expense' ? -amt : amt);
+                const c=statContrib(item);       // 不计入的记录贡献为 0：这一行结余与上一笔相同
+                running += c.inc - c.exp;
                 running = Math.round(running*100)/100;   // 每步对齐到分，避免浮点误差累积（如 19.99 显示成 20.00）
                 item.__bal=running;
             });
 
             // 再按筛选条件取出要显示的子集（仍保持时间正序）：分类标签 + 搜索条件叠加
-            const asc=allAsc.filter(r=>
-                (filterVal==='__all' ? true : r.cat===filterVal) && searchMatch(r)
-            );
+            const asc=allAsc.filter(r=>filterMatch(r, filterVal));
 
             billList.innerHTML='';
             // 只有存档里**一条记录都没有**时才隐藏汇总区。
@@ -3864,8 +3915,8 @@ ${detail}
             // 汇总：收入/支出/结余。结余始终为全账户净额，不随筛选变化
             let totalIn=0, totalOut=0;
             allAsc.forEach(item=>{
-                const amt=safeNum(item.money);
-                if(item.type==='expense') totalOut+=amt; else totalIn+=amt;
+                const c=statContrib(item);
+                totalIn+=c.inc; totalOut+=c.exp;
             });
             totalIn=round2(totalIn); totalOut=round2(totalOut);
             const net=round2(totalIn-totalOut);
@@ -3881,8 +3932,8 @@ ${detail}
 
             const fBar=$('summaryFilter');
             if(filtering){
-                let fIn=0, fOut=0;
-                asc.forEach(item=>{ const amt=safeNum(item.money); if(item.type==='expense') fOut+=amt; else fIn+=amt; });
+                let fIn=0, fOut=0, fSkip=0;
+                asc.forEach(item=>{ const c=statContrib(item); fIn+=c.inc; fOut+=c.exp; if(isSkip(item)) fSkip++; });
                 fIn=round2(fIn); fOut=round2(fOut);
                 // 徽标文案：有分类显示分类名，否则显示「搜索」；都为真则合并
                 let badge;
@@ -3891,7 +3942,10 @@ ${detail}
                 else badge='搜索';
                 fBar.innerHTML=
                     `<span class="filter-badge">${escapeHtml(badge)}</span>`+
-                    `<span class="filter-nums">命中 <b>${asc.length}</b> 条　收入 <b class="pos">${fIn.toFixed(2)}</b>　支出 <b class="neg">${fOut.toFixed(2)}</b></span>`;
+                    // 「其中 N 条不计入」：否则会出现「命中 4 条、支出 0.00」这种看着像 bug 的组合
+                    `<span class="filter-nums">命中 <b>${asc.length}</b> 条${fSkip?`（其中 ${fSkip} 条不计入）`:''}　收入 <b class="pos">${fIn.toFixed(2)}</b>　支出 <b class="neg">${fOut.toFixed(2)}</b></span>`+
+                    // 批量操作只在筛选生效时出现：没有筛选就等于「全部记录」，一不小心就改了整本账
+                    (asc.length ? `<button class="filter-batch" data-act="batch">批量</button>` : '');
                 fBar.style.display='flex';
             } else {
                 fBar.style.display='none';
@@ -3900,8 +3954,9 @@ ${detail}
             // 分类统计：始终基于全部记录，按收支净额（收入加、支出减）
             const byCat={};
             allAsc.forEach(r=>{
-                const amt=safeNum(r.money)*(r.type==='expense'?-1:1);
-                byCat[r.cat]=(byCat[r.cat]||0)+amt;
+                if(isSkip(r)) return;   // 全部不计入的分类不出现，避免一条「转账：0.00」
+                const c=statContrib(r);
+                byCat[r.cat]=(byCat[r.cat]||0)+(c.inc-c.exp);
             });
             $('catStats').innerHTML = Object.keys(byCat)
                 .map(c=>`<span class="chip">${escapeHtml(c)}：${round2(byCat[c]).toFixed(2)} 元</span>`).join('');
@@ -3926,10 +3981,11 @@ ${detail}
                 const balance=item.__bal;
                 const isExp = item.type==='expense';
                 const amt=safeNum(item.money);
-                const typeTag = isExp
+                const skip = isSkip(item);
+                const typeTag = (isExp
                     ? '<span class="io-tag io-out">支出</span>'
-                    : '<span class="io-tag io-in">收入</span>';
-                const amtCell = `<span class="${isExp?'neg':'pos'}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
+                    : '<span class="io-tag io-in">收入</span>') + (skip ? '<span class="io-skip">不计入</span>' : '');
+                const amtCell = `<span class="${isExp?'neg':'pos'}${skip?' amt-skip':''}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
 
                 const remarkFull = item.remark || '';
                 let remarkCell;
@@ -3955,6 +4011,90 @@ ${detail}
             });
 
             renderPager(totalPages);
+        }
+
+        // ===== 批量操作（基于当前筛选结果）=====
+        // 范围 = 当前筛选命中的**全部**记录（不只是当前页），判定与列表共用 filterMatch。
+        // 不可逆操作的保护：确认框写明条数并列出样例；完成后给一次「撤销」。
+        // 撤销只记被改记录的旧 cat/skip（体积很小），只在完成弹窗里提供一次。
+        let batchUndo=null;
+        $('summaryFilter').addEventListener('click', e=>{
+            if(e.target.closest('[data-act="batch"]')) openBatchMenu();
+        });
+        function batchSampleLines(list){
+            const sorted=list.slice().sort((a,b)=>parseRecTime(b.time)-parseRecTime(a.time));
+            const lines=sorted.slice(0,3).map(r=>
+                `· ${String(r.time||'').slice(5,16).replace('T',' ')}　${(r.remark||'').trim()||r.cat||'未分类'}　${safeNum(r.money).toFixed(2)}`);
+            if(list.length>3) lines.push(`……等共 ${list.length} 条`);
+            return lines.join('\n');
+        }
+        function openBatchMenu(){
+            const list=getUserData().filter(r=>filterMatch(r));
+            if(!list.length){ customAlert('当前筛选没有命中任何记录。'); return; }
+            customChoose(`对当前筛选命中的 ${list.length} 条记录（不只是这一页）：`, [
+                { value:'cat',    label:'改分类' },
+                { value:'skip',   label:'标记为不计入' },
+                { value:'unskip', label:'取消不计入' }
+            ], (act)=>{
+                if(act==='cat'){
+                    customChoose('改成哪个分类？', getCats().map(c=>({ value:c, label:c })), (cat)=>{
+                        const targets=list.filter(r=>r.cat!==cat);
+                        if(!targets.length){ customAlert(`这 ${list.length} 条已经都是「${cat}」了。`); return; }
+                        customConfirm(`将以下 ${targets.length} 条记录的分类改为「${cat}」：\n\n${batchSampleLines(targets)}`,
+                            ()=>applyBatch(targets.map(r=>r.id), { cat }), '批量改分类', { okText:'确认修改' });
+                    }, '选择分类', openBatchMenu);
+                } else {
+                    const on = act==='skip';
+                    const targets=list.filter(r=>isSkip(r)!==on);
+                    if(!targets.length){
+                        customAlert(on ? `这 ${list.length} 条已经都是不计入了。` : `这 ${list.length} 条都没有标记不计入。`);
+                        return;
+                    }
+                    customConfirm(`将以下 ${targets.length} 条记录${on?'标记为「不计入收支」':'恢复计入收支'}：\n\n${batchSampleLines(targets)}`,
+                        ()=>applyBatch(targets.map(r=>r.id), { skip:on }), on?'批量标记不计入':'批量取消不计入', { okText:'确认修改' });
+                }
+            }, '批量操作');
+        }
+        function applyBatch(ids, change){
+            const idSet=new Set(ids);
+            const data=getUserData();
+            const prev=[];
+            data.forEach(r=>{
+                if(!idSet.has(r.id)) return;
+                prev.push({ id:r.id, cat:r.cat, skip:isSkip(r) });
+                if(change.cat!==undefined) r.cat=change.cat;
+                if(change.skip!==undefined){ if(change.skip) r.skip=true; else delete r.skip; }
+            });
+            if(!prev.length) return;
+            if(!saveUserData(data)) return;      // 一次写盘、一次同步；失败已有提示
+            // 按分类筛选时改了分类：命中的记录全部离开当前分类，列表会瞬间变空，看着像数据没了。
+            // 把筛选分类切到新分类，让刚改的这批仍在眼前。
+            const prevFilter=filterCat.value;
+            if(change.cat!==undefined && prevFilter!=='__all' && prevFilter!==change.cat){
+                filterCat.value=change.cat;
+            }
+            curPage=1;
+            refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
+            batchUndo={ prev, prevFilter, archive:currentArchive };
+            customConfirm(`已处理 ${prev.length} 条记录。`, null, '批量操作完成',
+                { okText:'好的', extra:{ text:'撤销这次操作', onClick:undoBatch } });
+            askCancel.style.display='none';      // 「好的」「取消」意思一样，只留一个
+        }
+        function undoBatch(){
+            const u=batchUndo; batchUndo=null;
+            if(!u || u.archive!==currentArchive) return;
+            const map=new Map(u.prev.map(p=>[p.id, p]));
+            const data=getUserData();
+            data.forEach(r=>{
+                const p=map.get(r.id); if(!p) return;
+                r.cat=p.cat;
+                if(p.skip) r.skip=true; else delete r.skip;
+            });
+            if(!saveUserData(data)) return;
+            filterCat.value=u.prevFilter;         // 分类表没变，原筛选值一定还在
+            curPage=1;
+            refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
+            customAlert(`已撤销，${map.size} 条记录恢复原样。`);
         }
 
         // 渲染分页控件（≤1 页时不显示）
@@ -3995,8 +4135,10 @@ ${detail}
                 b.className='cc';
                 b.textContent=c;
                 b.onclick=()=>{
+                    const prevCat=billCatSel;
                     billCatSel=c; billCat.value=c;
                     box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                    autoSkipOnCat($('billSkip'), prevCat, c);
                 };
                 box.appendChild(b);
             });
@@ -4048,10 +4190,32 @@ ${detail}
             });
         }
 
+        // ===== 「不计入收支」开关 =====
+        // 选「转账」分类时自动打开——只在**切换到**转账的那一下触发；用户手动关掉后
+        // 再点一次转账（prev 已是转账）不会被强制打开。
+        // 自动打开的会打 data-auto 标记：切走到别的分类时顺手关掉，免得一笔餐饮被悄悄带成不计入。
+        // 用户手动拨过开关就清掉标记，之后完全听用户的。
+        const SKIP_DEFAULT_CATS=['转账'];
+        function setSkipSwitch(sw, on){ if(!sw) return; sw.classList.toggle('on', !!on); delete sw.dataset.auto; }
+        function skipSwitchOn(sw){ return !!(sw && sw.classList.contains('on')); }
+        function autoSkipOnCat(sw, prev, next){
+            if(!sw || prev===next) return;
+            if(SKIP_DEFAULT_CATS.includes(next)){
+                if(!sw.classList.contains('on')){ sw.classList.add('on'); sw.dataset.auto='1'; }
+            } else if(sw.dataset.auto==='1'){
+                sw.classList.remove('on'); delete sw.dataset.auto;
+            }
+        }
+        ['billSkip','editSkip'].forEach(id=>{
+            const sw=$(id);
+            if(sw) sw.addEventListener('click', ()=>{ sw.classList.toggle('on'); delete sw.dataset.auto; });
+        });
+
         // 把记账表单恢复到「空白初始态」：空金额/空备注、不选收支、不选分类、时间为此刻
         function resetBillForm(){
             billMoney.value='';
             billRemark.value='';
+            setSkipSwitch($('billSkip'), false);
             renderBillTypeChips();
             renderBillCatChips();
             setDtInput(billTime, nowDtValue());
@@ -4127,7 +4291,9 @@ ${detail}
             }
             const data=getUserData();
             const newId=genId();
-            data.push({ id:newId, time, money:m.val, cat, remark, type });
+            const newRec={ id:newId, time, money:m.val, cat, remark, type };
+            if(skipSwitchOn($('billSkip'))) newRec.skip=true;
+            data.push(newRec);
             // 保存失败（如存储配额满）时 saveUserData 已弹出失败提示，这里必须提前返回：
             // 否则会继续弹「记账成功」，造成「提示成功但实际没存上」的丢账假象。
             if(!saveUserData(data)) return;
@@ -4183,8 +4349,10 @@ ${detail}
                 b.className='cc'+(c===editCatSel?' sel':'');
                 b.textContent=c;
                 b.onclick=()=>{
+                    const prevCat=editCatSel;
                     editCatSel=c; editCat.value=c;
                     box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                    autoSkipOnCat($('editSkip'), prevCat, c);
                 };
                 box.appendChild(b);
             });
@@ -4225,6 +4393,7 @@ ${detail}
             // 预选记录原有的分类与收支（标签式）
             renderEditCatChips(item.cat||'未分类');
             renderEditTypeChips(item.type||'income');
+            setSkipSwitch($('editSkip'), isSkip(item));
             editMask.style.display='flex';
         };
         // 修改弹窗的唯一退出口。所有关闭路径（保存 / 取消 / 删除 / 记录已不存在）都走这里，
@@ -4286,7 +4455,10 @@ ${detail}
             const data=getUserData();
             const idx=data.findIndex(r=>r.id===editId);
             if(idx>=0){
-                data[idx]={ id:editId, time, money:m.val, cat, remark, type };
+                // 在原记录上合并，而不是整条重建：重建会把表单里没有的字段（skip，以及以后的新字段）悄悄丢掉
+                const next=Object.assign({}, data[idx], { id:editId, time, money:m.val, cat, remark, type });
+                if(skipSwitchOn($('editSkip'))) next.skip=true; else delete next.skip;
+                data[idx]=next;
                 // 保存失败时 saveUserData 已弹失败提示；提前返回，保持弹窗打开、不刷新，
                 // 避免「提示失败但弹窗已关、看似已保存」的不一致。
                 if(!saveUserData(data)) return;
@@ -4921,10 +5093,11 @@ ${detail}
             let mIn=0, mOut=0;
             dec.forEach(x=>{
                 if(x.y!==statYear || x.mo!==statMonth) return;
-                const amt=safeNum(x.r.money);
-                dayNet[x.d]=(dayNet[x.d]||0)+amt*(x.r.type==='expense'?-1:1);
-                dayHas[x.d]=true;
-                if(x.r.type==='expense') mOut+=amt; else mIn+=amt;
+                dayHas[x.d]=true;               // 不计入的记录也算「这天有账」：格子照样能点开看明细
+                if(isSkip(x.r)) return;         // ……但不计金额
+                const c=statContrib(x.r);
+                dayNet[x.d]=(dayNet[x.d]||0)+(c.inc-c.exp);
+                mIn+=c.inc; mOut+=c.exp;
             });
             $('statMonthIn').textContent='+'+round2(mIn).toFixed(2);
             $('statMonthOut').textContent='−'+round2(mOut).toFixed(2);
@@ -4951,7 +5124,8 @@ ${detail}
                 if(statSelDay===day && has) cell.classList.add('sel');
 
                 let inner=`<div class="dn">${day}</div>`;
-                if(has){
+                // 当天只有不计入的记录时 dayNet 没有这一天：只显示日期、不显示金额（否则会是 NaN）
+                if(has && dayNet[day]!==undefined){
                     const n=round2(dayNet[day]);   // 收支浮点相消可能剩 -5e-17，不归整会渲染成「-0」
                     const col = n>=0 ? 'var(--c-pos,#2f7d57)' : 'var(--c-neg,#d05a52)';
                     inner+=`<div class="da" style="color:${col}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
@@ -5002,11 +5176,11 @@ ${detail}
                     return `<div class="sf-item" data-act="sfItem" data-id="${escapeHtml(r.id)}">
                         <div class="sf-top">
                             <span class="sf-time">${hm}</span>
-                            <span class="sf-io ${isOut?'out':'in'}">${io}</span>
+                            <span class="sf-io ${isOut?'out':'in'}">${io}</span>${isSkip(r)?'<span class="sf-io skip">不计入</span>':''}
                             <span class="sf-cat">${escapeHtml(cat)}</span>
                             ${remark?`<span class="sf-remark">${escapeHtml(remark)}</span>`:''}
                         </div>
-                        <span class="sf-amt ${isOut?'neg':'pos'}">${isOut?'−':'+'}${amt}</span>
+                        <span class="sf-amt ${isOut?'neg':'pos'}${isSkip(r)?' amt-skip':''}">${isOut?'−':'+'}${amt}</span>
                     </div>`;
                 }).join('');
             } else {
@@ -5048,7 +5222,7 @@ ${detail}
             const byCat={};
             dec.forEach(x=>{
                 // 关键：只统计当前查看月份、且符合当前口径（支出/收入）的记录
-                if(x.y===statYear && x.mo===statMonth && x.r.type===wantType){
+                if(x.y===statYear && x.mo===statMonth && x.r.type===wantType && !isSkip(x.r)){
                     const amt=safeNum(x.r.money);
                     const c=x.r.cat||'未分类';
                     byCat[c]=(byCat[c]||0)+amt;
@@ -5326,11 +5500,12 @@ ${detail}
             $('detailTime').textContent = rec.time.replace('T',' ');
             const isExp = rec.type==='expense';
             const amt=safeNum(rec.money);
-            $('detailMoney').innerHTML = `<span class="${isExp?'neg':'pos'}">${isExp?'−':'+'}${amt.toFixed(2)} 元</span>`;
+            const skip=isSkip(rec);
+            $('detailMoney').innerHTML = `<span class="${isExp?'neg':'pos'}${skip?' amt-skip':''}">${isExp?'−':'+'}${amt.toFixed(2)} 元</span>`;
             $('detailCat').innerHTML = `<span class="cat-tag">${escapeHtml(rec.cat||'未分类')}</span>`;
-            $('detailType').innerHTML = isExp
+            $('detailType').innerHTML = (isExp
                 ? '<span class="io-tag io-out">支出</span>'
-                : '<span class="io-tag io-in">收入</span>';
+                : '<span class="io-tag io-in">收入</span>') + (skip ? '<span class="io-skip">不计入收支</span>' : '');
             const rk=(rec.remark||'').trim();
             $('detailRemark').textContent = rk || '（无备注）';
             detailCurId=id;
