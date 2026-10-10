@@ -683,7 +683,7 @@
             box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4);
             padding:8px 18px calc(20px + env(safe-area-inset-bottom));
             max-height:85dvh; overflow-y:auto;
-            transform:translateY(100%); transition:transform .26s ease; }
+            transform:translateY(100%); transition:transform .32s ease; }
         .sheet-mask.open .sheet { transform:translateY(0); }   /* 打开时滑入 */
         .sheet-handle { width:40px; height:4px; border-radius:2px; background:var(--c-border-mid);
             margin:6px auto 12px; }
@@ -1116,13 +1116,21 @@
         .dtag.skip { background:#e9e9e9; color:#767676; }
         .stat-cal .day.sel .dtag.flow { background:#d2deec; }
         .stat-cal .day.sel .dtag.skip { background:#dcdcdc; }
+
+        /* ===== 1010-F：选项说明 / 筛选口径 ===== */
+        /* 列表式选项下方的灰色说明（与记一笔里的口径说明同一口吻） */
+        #askChoices .cc .cc-label { display:block; }
+        #askChoices .cc .cc-desc { display:block; margin-top:3px; font-size:12px; line-height:1.45;
+            font-weight:normal; color:var(--c-text-soft); }
+        #askChoices.choose-list .cc.sel .cc-desc { color:var(--c-sel-text); opacity:.8; }
+        .filter-mode-chips .cc { font-size:13.5px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-E</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-F</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1403,6 +1411,10 @@
                         <span class="search-sep">—</span>
                         <div id="searchTo" class="search-input dt-input" data-placeholder="结束日期"></div>
                     </div>
+                </div>
+                <div class="search-field">
+                    <span class="search-label">统计口径</span>
+                    <div class="cat-chips mode-chips filter-mode-chips" id="filterModeChips"></div>
                 </div>
                 <div class="search-field">
                     <div class="field-label-row">
@@ -2039,7 +2051,14 @@
             options.forEach(o=>{
                 const b=document.createElement('div');
                 b.className='cc';
-                b.textContent=o.label;
+                if(o.desc){
+                    // 带说明的选项：标题 + 一行灰字。全部 textContent，不拼 HTML
+                    const l=document.createElement('span'); l.className='cc-label'; l.textContent=o.label;
+                    const ds=document.createElement('span'); ds.className='cc-desc'; ds.textContent=o.desc;
+                    b.appendChild(l); b.appendChild(ds);
+                } else {
+                    b.textContent=o.label;
+                }
                 b.onclick=()=>{
                     askChosen=o.value;
                     box.querySelectorAll('.cc').forEach(el=>el.classList.remove('sel','sel-out','sel-in'));
@@ -3823,6 +3842,22 @@ ${detail}
         //   清除全部 → 只清草稿，要点完成才生效。
         // draftCat 暂存分类选择，避免直接改 filterCat（filterCat 是已提交状态，renderBill 读它）。
         let draftCat='__all';
+        // 统计口径筛选的草稿值：'' 全部 / 'normal' / 'flow' / 'skip'。与 draftCat 同一套草稿规则：
+        // 面板里点只改草稿，点「完成」才提交进 searchState.mode。
+        let draftMode='';
+        const FILTER_MODE_OPTS=[ {v:'', t:'全部'}, {v:'normal', t:'计入'}, {v:'flow', t:'只算结余'}, {v:'skip', t:'不计入'} ];
+        function renderFilterModeChips(){
+            const box=$('filterModeChips'); if(!box) return;
+            if(!box.children.length){
+                FILTER_MODE_OPTS.forEach(o=>{
+                    const b=document.createElement('div');
+                    b.className='cc'; b.textContent=o.t; b.dataset.v=o.v;
+                    b.onclick=()=>{ draftMode=o.v; renderFilterModeChips(); };
+                    box.appendChild(b);
+                });
+            }
+            box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===draftMode));
+        }
         (function(){
             const kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax'),
                   from=$('searchFrom'), to=$('searchTo'),
@@ -3838,6 +3873,8 @@ ${detail}
                 from.value = searchState.from || ''; from.dataset.day = searchState.from || '';
                 to.value   = searchState.to   || ''; to.dataset.day   = searchState.to   || '';
                 draftCat = filterCat.value || '__all';
+                draftMode = searchState.mode || '';
+                renderFilterModeChips();
             }
             // 完成：把控件草稿提交为正式筛选条件，刷新列表
             function commitDraft(){
@@ -3847,6 +3884,7 @@ ${detail}
                 searchState.max = (max.value!=='' && isFinite(mx)) ? mx : null;
                 searchState.from = from.dataset.day || null;
                 searchState.to   = to.dataset.day || null;
+                searchState.mode = draftMode || null;
                 filterCat.value = draftCat;
                 curPage=1;
                 renderBill();
@@ -3878,7 +3916,7 @@ ${detail}
             function closeSheetDiscard(){
                 sheetMask.classList.remove('open');
                 resetSheetDrag();
-                setTimeout(()=>{ sheetMask.style.display='none'; loadCommittedIntoControls(); }, 260);
+                setTimeout(()=>{ sheetMask.style.display='none'; loadCommittedIntoControls(); }, 320);
             }
             // 暴露给系统返回键处理器：它在这个 IIFE 之外，但必须走这个正规出口
             // ——只 remove('open') 会漏掉 display 复位和拖拽 transform 复位，
@@ -3889,7 +3927,7 @@ ${detail}
                 commitDraft();
                 sheetMask.classList.remove('open');
                 resetSheetDrag();
-                setTimeout(()=>{ sheetMask.style.display='none'; }, 260);
+                setTimeout(()=>{ sheetMask.style.display='none'; }, 320);
             }
             fab.addEventListener('click', openSheet);
             applyBtn.addEventListener('click', closeSheetApply);
@@ -3916,25 +3954,75 @@ ${detail}
                 kw.value=''; min.value=''; max.value='';
                 from.value=''; from.dataset.day=''; to.value=''; to.dataset.day='';
                 draftCat='__all';
+                draftMode=''; renderFilterModeChips();
                 renderFilterChips();   // 重渲染让分类高亮回到「全部」
             });
 
             // ===== 下滑手势关闭 =====
-            // 只在顶部「抓手区」(把手+标题)上接管手势，不碰下面的输入/滚动。
-            // 关键：抓手区 CSS 设了 touch-action:none，move 监听非 passive，可 preventDefault，
-            // 这样在可滚动的 sheet 上手势也不会被滚动抢走（之前 passive+整片 sheet 导致拖不动）。
+            // 【1010-F】触屏上整片面板都能下拉关闭（此前只有顶部抓手区能拉）。
+            //   规则：手指向下、偏竖直、且面板内容已滚到顶 → 接管为「下拉关闭」；
+            //         否则交还给原生滚动（面板内容没到顶时往下拉就是往回滚）。
+            //   点按不受影响：位移不超过 DRAG_SLOP 不算拖。
+            //   刻意不做「点面板外关闭」：误触一下就丢掉填好的条件，代价太大。
+            // 灵敏度比之前调低一档：
+            //   · 关闭距离：至少 140px，且不少于面板高度的 28%
+            //   · 快速甩动：要拉过 80px 且末段速度 > 0.8px/ms 才算
+            //   · 跟手有 0.8 的阻尼，拉起来略「沉」，不容易一碰就飞
+            const DRAG_SLOP=10, DISMISS_MIN=140, DISMISS_RATIO=0.28, FLING_MIN_PX=80, FLING_V=0.8, DRAG_RESIST=0.8;
+            function dismissDistance(){ return Math.max(DISMISS_MIN, (sheet.offsetHeight||0)*DISMISS_RATIO); }
+            let tCand=false, tDrag=false, tY0=0, tX0=0, tDY=0, tLastY=0, tLastT=0, tVel=0;
+            function touchReset(){ tCand=false; tDrag=false; tDY=0; tVel=0; }
+            sheet.addEventListener('touchstart', e=>{
+                if(!sheetMask.classList.contains('open') || e.touches.length!==1){ touchReset(); return; }
+                const p=e.touches[0];
+                tCand=true; tDrag=false; tY0=p.clientY; tX0=p.clientX; tDY=0;
+                tLastY=p.clientY; tLastT=Date.now(); tVel=0;
+            }, {passive:true});
+            sheet.addEventListener('touchmove', e=>{
+                if(!tCand) return;
+                const p=e.touches[0];
+                const dy=p.clientY-tY0, dx=p.clientX-tX0;
+                if(!tDrag){
+                    const atTop = sheet.scrollTop<=0;
+                    // 已在顶部还往下拉：原生这时也滚不动，先拦住，免得浏览器把这次手势「认领」成滚动
+                    if(dy>0 && atTop && e.cancelable) e.preventDefault();
+                    if(Math.abs(dy)<DRAG_SLOP && Math.abs(dx)<DRAG_SLOP) return;
+                    if(dy>0 && atTop && Math.abs(dy)>Math.abs(dx)*1.2){
+                        tDrag=true; sheet.style.transition='none';
+                    } else { tCand=false; return; }   // 横向 / 向上 / 内容没到顶：交给原生
+                }
+                if(e.cancelable) e.preventDefault();
+                tDY=Math.max(0, dy-DRAG_SLOP)*DRAG_RESIST;
+                sheet.style.transform=`translateY(${tDY}px)`;
+                const now=Date.now();
+                if(now>tLastT){ tVel=(p.clientY-tLastY)/(now-tLastT); tLastY=p.clientY; tLastT=now; }
+            }, {passive:false});
+            sheet.addEventListener('touchend', ()=>{
+                if(!tDrag){ touchReset(); return; }
+                const close = tDY>dismissDistance() || (tDY>FLING_MIN_PX && tVel>FLING_V);
+                sheet.style.transition=''; sheet.style.transform='';
+                touchReset();
+                if(close) closeSheetDiscard();
+            }, {passive:true});
+            sheet.addEventListener('touchcancel', ()=>{
+                sheet.style.transition=''; sheet.style.transform=''; touchReset();
+            }, {passive:true});
+
+            // 鼠标（桌面调试）仍走抓手区拖拽；触屏的 pointer 事件交给上面的 touch 逻辑，避免双触发。
             const grip=$('filterSheetGrip');
-            const DRAG_DISMISS_PX = 80;     // 位移阈值：超过即关闭
-            const DRAG_FLING_PX   = 36;     // 快速下滑的最小位移
+            const DRAG_DISMISS_PX = DISMISS_MIN;   // 与触屏同一档
+            const DRAG_FLING_PX   = FLING_MIN_PX;
             let dragStartY=0, dragDY=0, dragging=false, dragStartT=0, dragId=null;
 
             function resetSheetDrag(){
                 dragging=false; dragDY=0; dragId=null;
+                touchReset();
                 sheet.style.transition='';
                 sheet.style.transform='';
             }
             function onDragStart(e){
                 if(!sheetMask.classList.contains('open')) return;
+                if(e.pointerType && e.pointerType!=='mouse') return;   // 触屏走 touch 那套
                 const pt=e.touches?e.touches[0]:e;
                 dragging=true; dragStartY=pt.clientY; dragDY=0; dragStartT=Date.now();
                 dragId = (e.pointerId!=null)?e.pointerId:null;
@@ -3947,7 +4035,7 @@ ${detail}
             function onDragMove(e){
                 if(!dragging) return;
                 const pt=e.touches?e.touches[0]:e;
-                dragDY=pt.clientY-dragStartY;
+                dragDY=(pt.clientY-dragStartY)*DRAG_RESIST;
                 if(dragDY<0) dragDY=0;             // 只允许下拉
                 // 非 passive：阻止默认滚动/回弹，手势完全归我们
                 if(e.cancelable) e.preventDefault();
@@ -3956,7 +4044,7 @@ ${detail}
             function onDragEnd(){
                 if(!dragging) return;
                 const dt=Date.now()-dragStartT;
-                const fling = dragDY>DRAG_FLING_PX && dt<260;   // 快速下滑也算关闭
+                const fling = dragDY>DRAG_FLING_PX && dt<200;   // 快速下滑也算关闭（门槛与触屏同档）
                 sheet.style.transition='';
                 sheet.style.transform='';
                 if(dragId!=null && grip.releasePointerCapture){
@@ -3973,20 +4061,22 @@ ${detail}
                 grip.addEventListener('pointermove', onDragMove, {passive:false});
                 grip.addEventListener('pointerup', onDragEnd, {passive:true});
                 grip.addEventListener('pointercancel', onDragEnd, {passive:true});
-            } else {
-                grip.addEventListener('touchstart', onDragStart, {passive:true});
-                grip.addEventListener('touchmove', onDragMove, {passive:false});
-                grip.addEventListener('touchend', onDragEnd, {passive:true});
-                grip.addEventListener('touchcancel', onDragEnd, {passive:true});
             }
+            // 没有 PointerEvent 的老 WebView：触屏已由上面整片面板的 touch 逻辑覆盖，这里不再重复绑。
         })();
 
         // ===== 搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加 =====
         // 金额存数字（null 表示不限）；日期存 'YYYY-MM-DD'（null 表示不限）；关键词存小写串。
-        const searchState={ keyword:'', min:null, max:null, from:null, to:null };
+        // mode：统计口径筛选，null 表示不限，否则为 'normal' / 'flow' / 'skip'
+        const searchState={ keyword:'', min:null, max:null, from:null, to:null, mode:null };
+        const MODE_NAME={ normal:'计入', flow:'只算结余', skip:'不计入' };
 
         // 是否有任意搜索条件生效（用于显示「清除」入口、高亮筛选按钮、空结果提示文案）
         function hasActiveSearch(){
+            return !!(hasTextSearch() || searchState.mode);
+        }
+        // 只看关键词 / 金额 / 日期（不含口径），用来决定徽标里写不写「搜索」
+        function hasTextSearch(){
             return !!(searchState.keyword || searchState.min!=null || searchState.max!=null
                       || searchState.from || searchState.to);
         }
@@ -3994,7 +4084,8 @@ ${detail}
         // 重置搜索状态与界面控件（切换存档/登录时调用，避免筛选条件跨存档残留）
         function resetSearch(){
             searchState.keyword=''; searchState.min=null; searchState.max=null;
-            searchState.from=null; searchState.to=null;
+            searchState.from=null; searchState.to=null; searchState.mode=null;
+            draftMode=''; renderFilterModeChips();
             const kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax'),
                   from=$('searchFrom'), to=$('searchTo');
             if(kw) kw.value='';
@@ -4037,6 +4128,8 @@ ${detail}
                 if(searchState.from && day < searchState.from) return false;
                 if(searchState.to && day > searchState.to) return false;
             }
+            // 统计口径
+            if(searchState.mode && recMode(r)!==searchState.mode) return false;
             return true;
         }
 
@@ -4135,10 +4228,12 @@ ${detail}
                 if(fFlow) fEx.push(`${fFlow} 条只算结余`);
                 fIn=round2(fIn); fOut=round2(fOut);
                 // 徽标文案：有分类显示分类名，否则显示「搜索」；都为真则合并
-                let badge;
-                if(filterVal!=='__all' && hasActiveSearch()) badge=`${filterVal}·搜索`;
-                else if(filterVal!=='__all') badge=filterVal;
-                else badge='搜索';
+                // 徽标按「分类 · 搜索 · 口径」拼，有几样写几样
+                const bp=[];
+                if(filterVal!=='__all') bp.push(filterVal);
+                if(hasTextSearch()) bp.push('搜索');
+                if(searchState.mode) bp.push(MODE_NAME[searchState.mode]);
+                const badge=bp.join('·')||'搜索';
                 fBar.innerHTML=
                     `<span class="filter-badge">${escapeHtml(badge)}</span>`+
                     // 「其中 N 条不计入」：否则会出现「命中 4 条、支出 0.00」这种看着像 bug 的组合
@@ -4234,10 +4329,11 @@ ${detail}
             const list=getUserData().filter(r=>filterMatch(r));
             if(!list.length){ customAlert('当前筛选没有命中任何记录。'); return; }
             customChoose(`对当前筛选命中的 ${list.length} 条记录（不只是这一页）：`, [
-                { value:'cat',    label:'改分类' },
-                { value:'flow',   label:'标为只算结余' },
-                { value:'skip',   label:'标为不计入' },
-                { value:'normal', label:'恢复计入' }
+                // 说明文字与记一笔里的口径说明（MODE_HINT）同源，两处永远一致
+                { value:'cat',    label:'改分类',       desc:'把这些记录统一改到同一个分类，比如把「永劫无间」归到「游戏」' },
+                { value:'flow',   label:'标为只算结余', desc:MODE_HINT.flow },
+                { value:'skip',   label:'标为不计入',   desc:MODE_HINT.skip },
+                { value:'normal', label:'恢复计入',     desc:'取消上面两种标记：'+MODE_HINT.normal }
             ], (act)=>{
                 if(act==='cat'){
                     customChoose('改成哪个分类？', getCats().map(c=>({ value:c, label:c })), (cat)=>{
