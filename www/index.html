@@ -634,6 +634,7 @@
         #detailMask         { z-index:1020; }   /* 账单详情：从清单/当日明细点进来的下一层 */
         #editMask.over-detail { z-index:1030; } /* 详情里点「修改」：再上一层 */
         #aiExpMask          { z-index:1010; }
+        #refundMask         { z-index:1032; }   /* 退款：从修改账单打开，盖过它；日期选择器还要盖过它 */
         #dtMask             { z-index:1035; }   /* 日期选择器：盖过所有表单弹窗，但低于提示 */
         .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
             border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
@@ -1193,6 +1194,27 @@
         .sc-delta.bad { color:var(--c-neg); }
         .sc-delta.good { color:var(--c-pos); }
 
+        /* ===== 1010-J：退款 ===== */
+        .io-refund { background:#e3f1ee; border:1px solid #b5dcd3; color:#2f7a6a; }
+        .sf-io.refund { color:#2f7a6a; background:rgba(47,122,106,0.10); }
+        .io-refunded { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
+            color:#2f7a6a; background:#eef7f4; border:1px dashed #b5dcd3; white-space:nowrap; }
+        .refund-link { margin-top:6px; font-size:12.5px; color:var(--c-text-soft); line-height:1.6; }
+        .refund-note { font-size:13px; line-height:1.65; color:var(--c-text); background:var(--c-chip);
+            border:1px solid var(--c-border); border-radius:10px; padding:9px 12px; margin-bottom:6px; }
+        .refund-note .refund-link { margin-top:0; }
+        #editMask.is-refund .lock-on-refund { display:none; }
+        .refund-btn { color:#2f7a6a; }
+        .refund-btn:disabled { opacity:0.5; cursor:default; }
+        .refund-sum { background:var(--c-chip); border:1px solid var(--c-border); border-radius:10px;
+            padding:10px 12px; margin:4px 0 6px; font-size:13.5px; }
+        .refund-sum .rs-when { color:var(--c-text-soft); font-size:12px; margin-left:4px; }
+        .refund-sum .rs-nums { display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:12.5px;
+            color:var(--c-text-soft); flex-wrap:wrap; }
+        .refund-sum .rs-nums b { color:var(--c-text); font-variant-numeric:tabular-nums; }
+        .refund-sum .rs-nums b.pos { color:#3a7a2e; }
+        #refundMoney.ro { background:var(--c-chip); color:var(--c-text-soft); }
+
         /* ===== 1010-I：常用模板 ===== */
         .tpl-chips .cc { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .tpl-chips .cc .tpl-amt { margin-left:5px; font-size:12px; color:var(--c-text-soft); }
@@ -1242,7 +1264,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-I3</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-J</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1627,6 +1649,8 @@
         <div class="edit-dialog">
             <h3>修改账单</h3>
             <div class="form-box">
+                <!-- 1010-J：退款记录 / 有退款的原账单，在这里说明关联关系 -->
+                <div class="refund-note" id="editRefundNote" style="display:none"></div>
                 <div class="field">
                     <label class="field-label">记账时间</label>
                     <div id="editTime" class="dt-input" data-placeholder="选择记账时间"></div>
@@ -1635,12 +1659,12 @@
                     <label class="field-label">金额</label>
                     <input type="text" inputmode="decimal" id="editMoney" class="money-input" placeholder="">
                 </div>
-                <div class="field">
+                <div class="field lock-on-refund">
                     <label class="field-label">分类</label>
                     <div class="cat-chips" id="editCatChips"></div>
                     <select id="editCat" style="display:none"></select>
                 </div>
-                <div class="field">
+                <div class="field lock-on-refund">
                     <label class="field-label">收支</label>
                     <div class="cat-chips io-chips" id="editTypeChips"></div>
                     <select id="editType" style="display:none">
@@ -1648,7 +1672,7 @@
                         <option value="income">收入（存入）</option>
                     </select>
                 </div>
-                <div class="field">
+                <div class="field lock-on-refund">
                     <label class="field-label">统计口径</label>
                     <div class="cat-chips mode-chips" id="editMode"></div>
                     <div class="skip-hint" id="editModeHint"></div>
@@ -1662,6 +1686,7 @@
                 <button class="save" id="saveEdit">保存</button>
                 <button class="cancel" id="cancelEdit">取消</button>
             </div>
+            <button class="tpl-save-btn refund-btn" id="editRefundBtn">退款</button>
             <button class="tpl-save-btn" id="editSaveTpl">存为常用</button>
             <button class="edit-del-btn" id="deleteInEdit">删除这条记录</button>
         </div>
@@ -1697,6 +1722,39 @@
             <div class="dialog-btn">
                 <button class="save" id="detailEdit">修改</button>
                 <button class="cancel" id="detailClose">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 退款（1010-J）：从修改账单进入 -->
+    <div class="mask" id="refundMask">
+        <div class="edit-dialog">
+            <h3>退款</h3>
+            <div class="refund-sum" id="refundSum"></div>
+            <div class="form-box">
+                <div class="field">
+                    <label class="field-label">退款方式</label>
+                    <div class="cat-chips mode-chips" id="refundKind">
+                        <div class="cc" data-v="all">全额退款</div>
+                        <div class="cc" data-v="part">部分退款</div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="field-label">退款金额</label>
+                    <input type="text" inputmode="decimal" id="refundMoney" class="money-input" placeholder="">
+                </div>
+                <div class="field">
+                    <label class="field-label">退款时间</label>
+                    <div id="refundTime" class="dt-input" data-placeholder="钱退回来的时间"></div>
+                </div>
+                <div class="field">
+                    <label class="field-label">备注（选填）</label>
+                    <textarea id="refundRemark" class="remark-area" placeholder="比如：七天无理由退货" maxlength="5000" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="dialog-btn">
+                <button class="save" id="refundOk">确认退款</button>
+                <button class="cancel" id="refundCancel">取消</button>
             </div>
         </div>
     </div>
@@ -2305,10 +2363,45 @@
             delete r.skip; delete r.flow;
             if(mode==='skip') r.skip=true; else if(mode==='flow') r.flow=true;
         }
+        // ===== 退款（1010-J）=====
+        // 退款记录 = type:'income' + refundOf:原账单 id。分类、口径永远跟原账单一致（写入时同步）。
+        // 统计上它是「同分类的负支出」：买 100 退 30，这个分类就是花了 70；不算收入，结余照常 +30。
+        // 存成 income 是为了向下兼容：旧版本不认识 refundOf，会把它当普通收入——
+        //   正好等于以前手动「退款记成收入」的效果，结余也对；存成 expense 则旧版本会把退款再算一遍支出。
+        function isRefund(r){ return !!(r && r.type==='income' && typeof r.refundOf==='string' && r.refundOf); }
+        // 「支出」口径下的带符号金额：支出 +a，退款 −a，其他 0。只算金额，口径由调用方判断。
+        function expSigned(r){
+            if(!r) return 0;
+            if(r.type==='expense') return safeNum(r.money);
+            if(isRefund(r)) return -safeNum(r.money);
+            return 0;
+        }
+        // 分类金额（饼图、环比、AI 分类占比）：支出口径用 expSigned；收入口径不含退款
+        function catSigned(r, wantType){
+            if(wantType==='expense') return expSigned(r);
+            return (r.type==='income' && !isRefund(r)) ? safeNum(r.money) : 0;
+        }
+        function refundsOf(data, id){ return data.filter(r=>isRefund(r) && r.refundOf===id); }
+        // 某原账单已退的总额；exceptId：改某一笔退款时，把它自己排除在外再算「还能退多少」
+        function refundedTotal(data, id, exceptId){
+            return round2(refundsOf(data, id).filter(r=>r.id!==exceptId).reduce((s,r)=>s+safeNum(r.money),0));
+        }
+        function refundedMap(data){
+            const m={};
+            data.forEach(r=>{ if(isRefund(r)) m[r.refundOf]=round2((m[r.refundOf]||0)+safeNum(r.money)); });
+            return m;
+        }
+        // 原账单的分类 / 口径变了，挂在它上面的退款跟着改
+        function syncRefunds(data, orig){
+            data.forEach(r=>{
+                if(isRefund(r) && r.refundOf===orig.id){ r.cat=orig.cat; setRecMode(r, recMode(orig)); }
+            });
+        }
         // 收支统计口径：只有「计入」算
         function statContrib(r){
             if(recMode(r)!=='normal') return { inc:0, exp:0 };
             const a=safeNum(r.money);
+            if(isRefund(r)) return { inc:0, exp:-a };      // 退款：冲抵支出，不算收入
             return r.type==='expense' ? { inc:0, exp:a } : { inc:a, exp:0 };
         }
         // 结余口径：「计入」「只算结余」都算，只有「不计入」不算
@@ -2335,9 +2428,10 @@
         function budgetSpentIn(records, cat, y, mo){
             let s=0;
             records.forEach(r=>{
-                if(r.cat!==cat || r.type!=='expense' || recMode(r)!=='normal') return;
+                if(r.cat!==cat || recMode(r)!=='normal') return;
+                const e=expSigned(r); if(!e) return;      // 支出 +，退款 −
                 const t=parseRecTime(r.time);
-                if(t.getFullYear()===y && t.getMonth()===mo) s+=safeNum(r.money);
+                if(t.getFullYear()===y && t.getMonth()===mo) s+=e;
             });
             return round2(s);
         }
@@ -2347,6 +2441,14 @@
             return `已花 ${spent.toFixed(2)} / ${limit.toFixed(2)}，${d>=0?`还剩 ${d.toFixed(2)}`:`超出 ${(-d).toFixed(2)}`}`;
         }
 
+        // 原账单上的「已退 x / 已全退」小标签
+        function refundedTag(r, rMap){
+            if(!r || r.type!=='expense') return '';
+            const done=rMap[r.id]; if(!(done>0)) return '';
+            return round2(safeNum(r.money)-done)<=0
+                ? '<span class="io-refunded">已全退</span>'
+                : `<span class="io-refunded">已退 ${done.toFixed(2)}</span>`;
+        }
         function modeAmtCls(r){ const m=recMode(r); return m==='skip' ? ' amt-skip' : (m==='flow' ? ' amt-flow' : ''); }
 
         // 字符数：按 Unicode 码点计（一个汉字算 1）
@@ -3039,11 +3141,12 @@
         function aiFmtRecord(r){
             const d=parseRecTime(r.time);
             const md=`${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-            const io=r.type==='expense'?'支出':'收入';
+            const rf=isRefund(r);
+            const io=r.type==='expense'?'支出':(rf?'退款':'收入');
             const amt=safeNum(r.money).toFixed(2);
             const cat=(r.cat||'未分类');
             const remark=(r.remark||'').trim();
-            return `${md} ${io} ${cat} ${amt} 元${remark?`（备注：${remark}）`:''}${isSkip(r)?'【不计入收支】':(isFlow(r)?'【只算结余】':'')}`;
+            return `${md} ${io} ${cat} ${amt} 元${remark?`（备注：${remark}）`:''}${rf?'【退款】':''}${isSkip(r)?'【不计入收支】':(isFlow(r)?'【只算结余】':'')}`;
         }
 
         // 给定一批记录 + 范围标签，拼出完整的「prompt + 结构化账单」纯文本
@@ -3053,6 +3156,9 @@
             const exp=records.reduce((s,r)=>s+statContrib(r).exp,0);
             const skipN=records.filter(isSkip).length;
             const flowN=records.filter(isFlow).length;
+            const refundRecs=records.filter(r=>isRefund(r) && recMode(r)==='normal');
+            const refundN=refundRecs.length;
+            const refundSum=round2(refundRecs.reduce((s,r)=>s+safeNum(r.money),0));
             const exclParts=[];
             if(skipN) exclParts.push(`${skipN} 笔不计入收支`);
             if(flowN) exclParts.push(`${flowN} 笔只算结余`);
@@ -3060,8 +3166,8 @@
 
             // 分类占比（按支出）
             const byCat={};
-            records.forEach(r=>{ if(r.type==='expense' && recMode(r)==='normal'){ const c=r.cat||'未分类'; byCat[c]=(byCat[c]||0)+safeNum(r.money); } });
-            const catLines=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]).map(c=>{
+            records.forEach(r=>{ if(recMode(r)==='normal'){ const e=expSigned(r); if(e){ const c=r.cat||'未分类'; byCat[c]=(byCat[c]||0)+e; } } });
+            const catLines=Object.keys(byCat).filter(c=>round2(byCat[c])>0).sort((a,b)=>byCat[b]-byCat[a]).map(c=>{
                 const pct=exp>0?Math.round(byCat[c]/exp*100):0;
                 return `  · ${c}：${byCat[c].toFixed(2)} 元（${pct}%）`;
             }).join('\n') || '  （本期无支出）';
@@ -3076,12 +3182,12 @@
 1. 概括这段时间的整体消费情况（钱主要花在哪、收支是否健康）；
 2. 指出其中值得注意的地方（异常大额、占比过高的分类、可优化的开销）；
 3. 给出 3~5 条具体、可执行的省钱或预算建议，别讲空泛的大道理。
-如果数据太少不足以分析，直接说明即可。${exclParts.length?'\n标注【不计入收支】（重复记录，如信用卡还款）或【只算结余】（资金往来，如期初存款、垫付报销、借出借入）的记录，已从总览和分类占比中排除，分析消费时不要再把它们算进去。':''}
+如果数据太少不足以分析，直接说明即可。${refundN?'\n标注【退款】的记录是之前某笔支出退回的钱，已从对应分类的支出里扣掉（支出、分类占比都是扣完后的净额），不是收入。':''}${exclParts.length?'\n标注【不计入收支】（重复记录，如信用卡还款）或【只算结余】（资金往来，如期初存款、垫付报销、借出借入）的记录，已从总览和分类占比中排除，分析消费时不要再把它们算进去。':''}
 
 ────────────────
 ■ 统计维度：${dimLabel}
 ■ 时间范围：${rangeLabel}
-■ 总览：收入 ${inc.toFixed(2)} 元，支出 ${exp.toFixed(2)} 元，结余 ${bal.toFixed(2)} 元，共 ${records.length} 笔${exclParts.length?`（其中 ${exclParts.join('、')}）`:''}
+■ 总览：收入 ${inc.toFixed(2)} 元，支出 ${exp.toFixed(2)} 元，结余 ${bal.toFixed(2)} 元，共 ${records.length} 笔${exclParts.length?`（其中 ${exclParts.join('、')}）`:''}${refundN?`；含退款 ${refundN} 笔共 ${refundSum.toFixed(2)} 元，已冲抵支出`:''}
 ${budgetLines?`■ 分类月预算：\n${budgetLines}\n`:''}■ 支出分类占比：
 ${catLines}
 ■ 收支明细（按时间正序）：
@@ -3226,6 +3332,7 @@ ${detail}
             if(records.length > MAX_IMPORT_RECORDS){ throw new Error('toomany'); }
             const out=[];
             const stats={ dropped:0, timeFixed:0, typeFilled:0 };
+            const idMap=new Map(), pend=[];     // 1010-J：旧 id → 新记录；待挂回的退款
             for(const r of records){
                 if(!r || typeof r!=='object'){ stats.dropped++; continue; }
                 const m=normMoney(r.money);
@@ -3258,8 +3365,20 @@ ${detail}
                 const rec={ id:genId(), time, money:m.val, cat, remark, type };
                 // 不重建会丢：从备份还原后口径标记必须还在
                 if(r.skip===true) rec.skip=true; else if(r.flow===true) rec.flow=true;
+                if(r.id!=null) idMap.set(String(r.id), rec);
+                if(type==='income' && r.refundOf!=null && r.refundOf!=='') pend.push([rec, String(r.refundOf)]);
                 out.push(rec);
             }
+            // 退款挂回原账单：原账单不在文件里 / 不是支出 / 累计超过原金额的，退化成普通收入（不丢、结余也对）
+            const used=new Map();
+            pend.forEach(([rec, oldId])=>{
+                const o=idMap.get(oldId);
+                if(!o || o===rec || o.type!=='expense') return;
+                const tot=round2((used.get(o)||0)+rec.money);
+                if(tot>o.money) return;
+                used.set(o, tot);
+                rec.refundOf=o.id; rec.cat=o.cat; setRecMode(rec, recMode(o));
+            });
             return { records:out, stats };
         }
 
@@ -4519,13 +4638,15 @@ ${detail}
             const start = (curPage - 1) * PAGE_SIZE;
             const pageItems = desc.slice(start, start + PAGE_SIZE);
 
+            const rMap=refundedMap(raw);        // 原账单 id → 已退总额（1010-J）
             pageItems.forEach(item=>{
                 const balance=item.__bal;
                 const isExp = item.type==='expense';
                 const amt=safeNum(item.money);
                 const typeTag = (isExp
                     ? '<span class="io-tag io-out">支出</span>'
-                    : '<span class="io-tag io-in">收入</span>') + modeTag(item);
+                    : (isRefund(item) ? '<span class="io-tag io-refund">退款</span>' : '<span class="io-tag io-in">收入</span>'))
+                    + modeTag(item) + refundedTag(item, rMap);
                 const amtCell = `<span class="${isExp?'neg':'pos'}${modeAmtCls(item)}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
 
                 const remarkFull = item.remark || '';
@@ -4563,9 +4684,13 @@ ${detail}
             if(e.target.closest('[data-act="batch"]')) openBatchMenu();
         });
         function openBatchMenu(){
-            const list=getUserData().filter(r=>filterMatch(r));
-            if(!list.length){ customAlert('当前筛选没有命中任何记录。'); return; }
-            customChoose(`对当前筛选命中的 ${list.length} 条记录（不只是这一页）：`, [
+            const hit=getUserData().filter(r=>filterMatch(r));
+            if(!hit.length){ customAlert('当前筛选没有命中任何记录。'); return; }
+            // 退款记录的分类 / 口径永远跟原账单走，不单独改（1010-J）
+            const list=hit.filter(r=>!isRefund(r));
+            const rfN=hit.length-list.length;
+            if(!list.length){ customAlert(`命中的 ${rfN} 条都是退款记录。退款的分类和口径跟着原账单走，请改原账单。`); return; }
+            customChoose(`对当前筛选命中的 ${list.length} 条记录（不只是这一页）：${rfN?`\n另有 ${rfN} 条退款记录不参与，会跟着各自的原账单一起变。`:''}`, [
                 // 说明文字与记一笔里的口径说明（MODE_HINT）同源，两处永远一致
                 { value:'cat',    label:'改分类',       desc:'把这些记录统一改到同一个分类，比如把「永劫无间」归到「游戏」' },
                 { value:'flow',   label:'标为只算结余', desc:MODE_HINT.flow },
@@ -4594,13 +4719,23 @@ ${detail}
             const idSet=new Set(ids);
             const data=getUserData();
             const prev=[];
+            const byId=new Map();
             data.forEach(r=>{
-                if(!idSet.has(r.id)) return;
+                if(!idSet.has(r.id) || isRefund(r)) return;
                 prev.push({ id:r.id, cat:r.cat, mode:recMode(r) });
                 if(change.cat!==undefined) r.cat=change.cat;
                 if(change.mode!==undefined) setRecMode(r, change.mode);
+                byId.set(r.id, r);
             });
             if(!prev.length) return;
+            const mainN=prev.length;
+            // 挂在这些原账单上的退款跟着改；旧值一并记下，撤销时一起还原
+            data.forEach(r=>{
+                if(!isRefund(r) || !byId.has(r.refundOf)) return;
+                const o=byId.get(r.refundOf);
+                prev.push({ id:r.id, cat:r.cat, mode:recMode(r), follow:true });
+                r.cat=o.cat; setRecMode(r, recMode(o));
+            });
             if(!saveUserData(data)) return;      // 一次写盘、一次同步；失败已有提示
             // 按分类筛选时改了分类：命中的记录全部离开当前分类，列表会瞬间变空，看着像数据没了。
             // 把筛选分类切到新分类，让刚改的这批仍在眼前。
@@ -4611,7 +4746,7 @@ ${detail}
             curPage=1;
             refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
             batchUndo={ prev, prevFilter, archive:currentArchive };
-            customConfirm(`已处理 ${prev.length} 条记录。`, null, '批量操作完成',
+            customConfirm(`已处理 ${mainN} 条记录。`, null, '批量操作完成',
                 { okText:'好的', extra:{ text:'撤销这次操作', onClick:undoBatch } });
             askCancel.style.display='none';      // 「好的」「取消」意思一样，只留一个
         }
@@ -4629,7 +4764,7 @@ ${detail}
             filterCat.value=u.prevFilter;         // 分类表没变，原筛选值一定还在
             curPage=1;
             refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
-            customAlert(`已撤销，${map.size} 条记录恢复原样。`);
+            customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
         }
 
         // ===== 数字自适应字号 =====
@@ -4699,11 +4834,12 @@ ${detail}
             const timePct = isCur ? now.getDate()/dim*100 : null;
             const spent={}, unset={}, excl={};
             dec.forEach(x=>{
-                if(x.y!==y || x.mo!==mo || x.r.type!=='expense') return;
+                if(x.y!==y || x.mo!==mo) return;
+                const e=expSigned(x.r); if(!e) return;    // 支出 +，退款 −（1010-J）
                 const c=x.r.cat||'未分类';
-                if(recMode(x.r)!=='normal'){ excl[c]=(excl[c]||0)+1; return; }
-                if(budgets[c]>0) spent[c]=(spent[c]||0)+safeNum(x.r.money);
-                else unset[c]=(unset[c]||0)+safeNum(x.r.money);
+                if(recMode(x.r)!=='normal'){ if(x.r.type==='expense') excl[c]=(excl[c]||0)+1; return; }
+                if(budgets[c]>0) spent[c]=(spent[c]||0)+e;
+                else unset[c]=(unset[c]||0)+e;
             });
             const rows=keys.map(c=>{
                 const limit=safeNum(budgets[c]);
@@ -4713,7 +4849,8 @@ ${detail}
                 const fast = timePct!=null && pct<=100 && pct>timePct+5;   // 比时间进度快 5 个百分点以上才提醒
                 return { cat:c, limit, used, pct, left:round2(limit-used), state, fast, excl:excl[c]||0 };
             });
-            const unsetList=Object.keys(unset).map(c=>({ cat:c, used:round2(unset[c]), excl:excl[c]||0 })).sort((a,b)=>b.used-a.used);
+            const unsetList=Object.keys(unset).map(c=>({ cat:c, used:round2(unset[c]), excl:excl[c]||0 }))
+                .filter(u=>u.used>0).sort((a,b)=>b.used-a.used);
             return { rows, unsetList, isCur, dim, timePct, day:now.getDate() };
         }
         // 单行预算（名称 / 已花 / 进度条 / 剩余或超出）。clickable=true 时可展开明细
@@ -4725,7 +4862,7 @@ ${detail}
             return `<div class="bg-row${clickable?' bg-click':''}${open?' open':''}"${clickable?` data-act="bgRow" data-cat="${escapeHtml(r.cat)}"`:''}>`
                 + `<div class="bg-top"><span class="bg-name">${escapeHtml(r.cat)}${clickable?'<i class="bg-chev">›</i>':''}</span>`
                 + `<span class="bg-num"><b>${r.used.toFixed(2)}</b> / ${r.limit.toFixed(2)}</span></div>`
-                + `<div class="bg-bar"><div class="bg-fill ${cls}" style="width:${Math.min(100,r.pct).toFixed(1)}%"></div>`
+                + `<div class="bg-bar"><div class="bg-fill ${cls}" style="width:${Math.max(0,Math.min(100,r.pct)).toFixed(1)}%"></div>`
                 + (timePct!=null ? `<div class="bg-mark" style="left:${timePct.toFixed(1)}%"></div>` : '')
                 + `</div>`
                 + `<div class="bg-foot"><span>已用 ${r.pct.toFixed(0)}%</span>${right}</div>`
@@ -4774,7 +4911,7 @@ ${detail}
                     `<div class="bgo-main"><div><div class="ov-label">已花 / 预算合计</div>`
                     + `<div class="bgo-num"><b>${used.toFixed(2)}</b> / ${lim.toFixed(2)}</div></div>`
                     + `<div class="bgo-pct ${st}">${pct.toFixed(0)}%</div></div>`
-                    + `<div class="bg-bar"><div class="bg-fill ${st}" style="width:${Math.min(100,pct).toFixed(1)}%"></div>`
+                    + `<div class="bg-bar"><div class="bg-fill ${st}" style="width:${Math.max(0,Math.min(100,pct)).toFixed(1)}%"></div>`
                     + (B.timePct!=null ? `<div class="bg-mark" style="left:${B.timePct.toFixed(1)}%"></div>` : '')
                     + `</div>`
                     + `<div class="bgo-chips">`
@@ -4886,7 +5023,7 @@ ${detail}
                     const mp = Y.perMonth>0 ? m.used/Y.perMonth*100 : 0;
                     return `<div class="bgy-row${cur?' cur':''}" data-act="bgYearMonth" data-mo="${m.mo}">`
                         + `<span class="bgy-m">${m.mo+1}月</span>`
-                        + `<div class="bg-bar"><div class="bg-fill ${budgetStateOf(mp)}" style="width:${Math.min(100,mp).toFixed(1)}%"></div></div>`
+                        + `<div class="bg-bar"><div class="bg-fill ${budgetStateOf(mp)}" style="width:${Math.max(0,Math.min(100,mp)).toFixed(1)}%"></div></div>`
                         + `<span class="bgy-v ${budgetStateOf(mp)}">${m.used.toFixed(0)} / ${Y.perMonth.toFixed(0)}</span></div>`;
                 }).join('')
                 + `<div class="bgy-note">点月份查看那个月的预算 · 按当前预算估算</div></div>`;
@@ -4896,14 +5033,16 @@ ${detail}
         // 展开的明细：这个月、这个分类里计入预算的每一笔（时间倒序）
         function budgetDetailHtml(dec, r){
             const list=dec.filter(x=>x.y===statYear && x.mo===statMonth && x.r.cat===r.cat
-                    && x.r.type==='expense' && recMode(x.r)==='normal')
+                    && expSigned(x.r)!==0 && recMode(x.r)==='normal')
                 .sort((a,b)=>b.ts-a.ts);
             const items = list.length ? `<div class="stat-flow">` + list.map(x=>{
                 const rm=(x.r.remark||'').trim();
+                const rf=isRefund(x.r);
                 return `<div class="sf-item" data-act="bgRec" data-id="${escapeHtml(x.r.id)}">`
                     + `<div class="sf-top"><span class="sf-time">${pad(x.mo+1)}-${pad(x.d)} ${pad(x.hh)}:${pad(x.mi)}</span>`
+                    + (rf ? `<span class="sf-io refund">退款</span>` : '')
                     + (rm ? `<span class="sf-remark">${escapeHtml(rm)}</span>` : `<span class="sf-cat">${escapeHtml(r.cat)}</span>`)
-                    + `</div><span class="sf-amt neg">−${safeNum(x.r.money).toFixed(2)}</span></div>`;
+                    + `</div><span class="sf-amt ${rf?'pos':'neg'}">${rf?'+':'−'}${safeNum(x.r.money).toFixed(2)}</span></div>`;
             }).join('') + `</div>` : `<div class="bg-detail-empty">这个月还没有计入的支出</div>`;
             const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计入 / 只算结余，未算在内`:''}`;
             return `<div class="bg-detail">${items}`
@@ -5210,6 +5349,85 @@ ${detail}
                 renderTplChips();
             });
         });
+        // ===== 退款弹窗（1010-J）=====
+        let refundOrigId=null, refundKindSel='all';
+        function refundRemain(data, o){ return round2(safeNum(o.money)-refundedTotal(data, o.id)); }
+        function setRefundKind(kind, rem){
+            refundKindSel=kind;
+            $('refundKind').querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===kind));
+            const inp=$('refundMoney');
+            if(kind==='all'){
+                inp.value=rem.toFixed(2); inp.readOnly=true; inp.classList.add('ro');
+                try{ inp.blur(); }catch(_){}
+            } else {
+                inp.value=''; inp.readOnly=false; inp.classList.remove('ro');
+                inp.placeholder=`最多 ${rem.toFixed(2)}`;
+                try{ inp.focus(); }catch(_){}
+            }
+        }
+        function openRefund(id){
+            const data=getUserData();
+            const o=data.find(r=>r.id===id);
+            if(!o || o.type!=='expense'){ customAlert('只有支出能退款。'); return; }
+            const done=refundedTotal(data, id), rem=refundRemain(data, o);
+            if(rem<=0){ customAlert('这笔已经全额退款了。'); return; }
+            refundOrigId=id;
+            $('refundSum').innerHTML=
+                `<div class="rs-what">${escapeHtml(o.cat||'未分类')}${(o.remark||'').trim()?` · ${escapeHtml(o.remark.trim())}`:''}`
+                + ` <span class="rs-when">${String(o.time).replace('T',' ')}</span></div>`
+                + `<div class="rs-nums"><span>原金额 <b>${safeNum(o.money).toFixed(2)}</b></span>`
+                + `<span>已退 <b>${done.toFixed(2)}</b></span><span>还能退 <b class="pos">${rem.toFixed(2)}</b></span></div>`;
+            $('refundRemark').value='';
+            const now=nowDtValue();
+            setDtInput($('refundTime'), now<o.time ? o.time : now);
+            $('refundMask').style.display='flex';
+            setRefundKind('all', rem);
+        }
+        function closeRefund(){ $('refundMask').style.display='none'; refundOrigId=null; }
+        $('refundKind').addEventListener('click', e=>{
+            const el=e.target.closest('.cc[data-v]'); if(!el || !refundOrigId) return;
+            const data=getUserData(); const o=data.find(r=>r.id===refundOrigId); if(!o) return;
+            setRefundKind(el.dataset.v, refundRemain(data, o));
+        });
+        $('refundTime').addEventListener('click', ()=>openDtPicker($('refundTime')));
+        $('refundCancel').addEventListener('click', closeRefund);
+        $('refundOk').addEventListener('click', ()=>{
+            const data=getUserData();
+            const o=data.find(r=>r.id===refundOrigId);
+            if(!o){ closeRefund(); customAlert('原账单已不存在。'); return; }
+            const rem=refundRemain(data, o);
+            let amt;
+            if(refundKindSel==='all') amt=rem;
+            else {
+                const m=normMoney($('refundMoney').value.trim());
+                if(!m.ok){ customAlert(m.why); return; }
+                amt=m.val;
+            }
+            if(amt>rem){ customAlert(`最多能退 ${rem.toFixed(2)}。\n如果拿回来的比付出去的多（比如赔付、补偿），多出的部分请另记一笔收入。`); return; }
+            const time=getDtInput($('refundTime'));
+            if(!time){ customAlert('选一下退款时间吧～'); return; }
+            if(time<o.time){ customAlert(`退款时间不能早于原账单（${o.time.replace('T',' ')}）。`); return; }
+            const rec={ id:genId(), time, money:amt, type:'income', cat:o.cat,
+                        remark:$('refundRemark').value.trim().slice(0,5000), refundOf:o.id };
+            setRecMode(rec, recMode(o));
+            data.push(rec);
+            if(!saveUserData(data)) return;
+            closeRefund();
+            refreshAllViews();
+            const left=round2(rem-amt);
+            customAlert(left>0 ? `已退款 ${amt.toFixed(2)}，这笔还能再退 ${left.toFixed(2)}。` : `已退款 ${amt.toFixed(2)}，这笔已全额退款。`, '退款完成');
+        });
+        // 修改弹窗里点「退款」：有没保存的改动先问一句，避免悄悄丢掉
+        $('editRefundBtn').addEventListener('click', ()=>{
+            const id=editId; if(id==null) return;
+            const item=getUserData().find(r=>r.id===id); if(!item) return;
+            const dirty = getDtInput(editTime)!==item.time || normMoney(editMoney.value).val!==round2(safeNum(item.money))
+                || editRemark.value.trim()!==(item.remark||'') || editCatSel!==(item.cat||'未分类')
+                || editTypeSel!==item.type || getModeChips($('editMode'))!==recMode(item);
+            const go=()=>{ closeEditModal(); openRefund(id); };
+            if(dirty) customConfirm('这笔账单的修改还没保存。先放弃这些修改，去退款吗？', go, '去退款', { okText:'放弃修改去退款' });
+            else go();
+        });
         $('editSaveTpl').addEventListener('click', ()=>{
             saveTplFrom({ type:editTypeSel, cat:editCatSel, remark:$('editRemark').value, money:$('editMoney').value,
                           mode:getModeChips($('editMode')) });
@@ -5436,8 +5654,38 @@ ${detail}
             renderEditCatChips(item.cat||'未分类');
             renderEditTypeChips(item.type||'income');
             setModeChips($('editMode'), recMode(item));
+            paintEditRefund(item);
             editMask.style.display='flex';
         };
+        // 修改弹窗里与退款相关的显示（1010-J）
+        //   退款记录：分类 / 收支 / 口径三栏隐藏（跟着原账单走），顶部写明原账单；不能退款、不能存为常用
+        //   支出：显示「退款」按钮（已退完则置灰）；有退款时顶部列出
+        //   普通收入：没有退款按钮
+        function paintEditRefund(item){
+            const data=getUserData();
+            const rf=isRefund(item);
+            editMask.classList.toggle('is-refund', rf);
+            const note=$('editRefundNote');
+            if(rf){
+                const o=data.find(r=>r.id===item.refundOf);
+                note.innerHTML=`<b>这是一笔退款</b>，分类「${escapeHtml(item.cat||'未分类')}」和统计口径跟着原账单走。`
+                    + (o ? `<br>原账单：${String(o.time).replace('T',' ')} · ${escapeHtml((o.remark||'').trim()||o.cat)} · −${safeNum(o.money).toFixed(2)}`
+                         + `，还能退 ${round2(safeNum(o.money)-refundedTotal(data,o.id,item.id)).toFixed(2)}（含这笔）` : '');
+                note.style.display='';
+            } else if(item.type==='expense' && refundsOf(data,item.id).length){
+                const dn=refundedTotal(data,item.id), rm=round2(safeNum(item.money)-dn);
+                note.innerHTML=`<b>${rm<=0?'已全额退款':`已退 ${dn.toFixed(2)}，还能退 ${rm.toFixed(2)}`}</b>` + refundLinkHtml(item, data);
+                note.style.display='';
+            } else { note.innerHTML=''; note.style.display='none'; }
+            const btn=$('editRefundBtn');
+            $('editSaveTpl').style.display = rf ? 'none' : '';
+            if(item.type!=='expense'){ btn.style.display='none'; return; }
+            btn.style.display='';
+            const done=refundedTotal(data, item.id);
+            const rem=round2(safeNum(item.money)-done);
+            btn.disabled = rem<=0;
+            btn.textContent = rem<=0 ? '已全额退款' : (done>0 ? `退款（已退 ${done.toFixed(2)}，还能退 ${rem.toFixed(2)}）` : '退款');
+        }
         // 修改弹窗的唯一退出口。所有关闭路径（保存 / 取消 / 删除 / 记录已不存在）都走这里，
         // 保证复位动作只写一遍、不会漏。
         //
@@ -5460,8 +5708,14 @@ ${detail}
         $('deleteInEdit').addEventListener('click', ()=>{
             const id=editId;
             if(id==null) return;
-            customConfirm('确定要删除这条记录吗？', ()=>{
-                const data=getUserData().filter(r=>r.id!==id);
+            const cur=getUserData();
+            const me=cur.find(r=>r.id===id);
+            const rs=me && me.type==='expense' ? refundsOf(cur, id) : [];
+            // 删原账单：挂在上面的退款一起删，确认框里列出来（1010-J）
+            const msg = (me && isRefund(me)) ? '确定删除这笔退款吗？删除后原账单的「还能退」金额会恢复。'
+                : (rs.length ? `这笔账单有 ${rs.length} 笔退款（共 ${refundedTotal(cur,id).toFixed(2)}），会跟它一起删除。确定删除吗？` : '确定要删除这条记录吗？');
+            customConfirm(msg, ()=>{
+                const data=getUserData().filter(r=>r.id!==id && !(isRefund(r) && r.refundOf===id));
                 // 删除写盘失败时记录其实仍在。这里用 silent 保存：抑制通用提示，只弹一条
                 // 对症的、保持弹窗打开不刷新，避免同一次失败连弹两个弹窗、也避免用户误以为已删除。
                 if(!saveUserData(data, true)){
@@ -5486,10 +5740,34 @@ ${detail}
             const data=getUserData();
             const idx=data.findIndex(r=>r.id===editId);
             if(idx>=0){
+                const old=data[idx];
+                let next;
+                if(isRefund(old)){
+                    // 退款记录：只改时间、金额、备注；分类 / 收支 / 口径保持跟原账单一致
+                    const o=data.find(r=>r.id===old.refundOf);
+                    if(o){
+                        const max=round2(safeNum(o.money)-refundedTotal(data, o.id, old.id));
+                        if(m.val>max){ customAlert(`这笔退款最多 ${max.toFixed(2)}（原账单 ${safeNum(o.money).toFixed(2)}，其他退款已退 ${refundedTotal(data,o.id,old.id).toFixed(2)}）。`); return; }
+                        if(time<o.time){ customAlert(`退款时间不能早于原账单（${o.time.replace('T',' ')}）。`); return; }
+                    }
+                    next=Object.assign({}, old, { time, money:m.val, remark });
+                    data[idx]=next;
+                    if(!saveUserData(data)) return;
+                    closeEditModal({ refresh:true });
+                    return;
+                }
+                const done=refundedTotal(data, editId);
+                if(done>0 && type!=='expense'){ customAlert(`这笔已经有 ${done.toFixed(2)} 的退款，不能改成收入。\n要改的话，先把它的退款记录删掉。`); return; }
+                if(done>0 && m.val<done){ customAlert(`这笔已经退了 ${done.toFixed(2)}，金额不能改得比这还少。`); return; }
+                if(done>0){
+                    const late=refundsOf(data, editId).find(r=>r.time<time);
+                    if(late){ customAlert(`有一笔退款在 ${late.time.replace('T',' ')}，原账单的时间不能晚于它。`); return; }
+                }
                 // 在原记录上合并，而不是整条重建：重建会把表单里没有的字段（skip，以及以后的新字段）悄悄丢掉
-                const next=Object.assign({}, data[idx], { id:editId, time, money:m.val, cat, remark, type });
+                next=Object.assign({}, old, { id:editId, time, money:m.val, cat, remark, type });
                 setRecMode(next, getModeChips($('editMode')));
                 data[idx]=next;
+                syncRefunds(data, next);           // 分类 / 口径变了，退款跟着改
                 // 保存失败时 saveUserData 已弹失败提示；提前返回，保持弹窗打开、不刷新，
                 // 避免「提示失败但弹窗已关、看似已保存」的不一致。
                 if(!saveUserData(data)) return;
@@ -6215,14 +6493,15 @@ ${detail}
                     const r=x.r;
                     const hm=`${pad(x.hh)}:${pad(x.mi)}`;
                     const isOut=r.type==='expense';
-                    const io=isOut?'支出':'收入';
+                    const rf=isRefund(r);
+                    const io=isOut?'支出':(rf?'退款':'收入');
                     const cat=r.cat||'未分类';
                     const remark=(r.remark||'').trim();
                     const amt=safeNum(r.money).toFixed(2);
                     return `<div class="sf-item" data-act="sfItem" data-id="${escapeHtml(r.id)}">
                         <div class="sf-top">
                             <span class="sf-time">${hm}</span>
-                            <span class="sf-io ${isOut?'out':'in'}">${io}</span>${isSkip(r)?'<span class="sf-io skip">不计入</span>':(isFlow(r)?'<span class="sf-io flow">只算结余</span>':'')}
+                            <span class="sf-io ${isOut?'out':(rf?'refund':'in')}">${io}</span>${isSkip(r)?'<span class="sf-io skip">不计入</span>':(isFlow(r)?'<span class="sf-io flow">只算结余</span>':'')}
                             <span class="sf-cat">${escapeHtml(cat)}</span>
                             ${remark?`<span class="sf-remark">${escapeHtml(remark)}</span>`:''}
                         </div>
@@ -6268,8 +6547,9 @@ ${detail}
             const byCat={};
             dec.forEach(x=>{
                 // 关键：只统计当前查看月份、且符合当前口径（支出/收入）的记录
-                if(x.y===statYear && x.mo===statMonth && x.r.type===wantType && recMode(x.r)==='normal'){
-                    const amt=safeNum(x.r.money);
+                if(x.y===statYear && x.mo===statMonth && recMode(x.r)==='normal'){
+                    const amt=catSigned(x.r, wantType);    // 支出口径：退款为负（1010-J）
+                    if(!amt) return;
                     const c=x.r.cat||'未分类';
                     byCat[c]=(byCat[c]||0)+amt;
                 }
@@ -6279,13 +6559,15 @@ ${detail}
             const pY = statMonth===0 ? statYear-1 : statYear, pM = statMonth===0 ? 11 : statMonth-1;
             const prevByCat={};
             dec.forEach(x=>{
-                if(x.y===pY && x.mo===pM && x.r.type===wantType && recMode(x.r)==='normal'){
+                if(x.y===pY && x.mo===pM && recMode(x.r)==='normal'){
+                    const amt=catSigned(x.r, wantType); if(!amt) return;
                     const c=x.r.cat||'未分类';
-                    prevByCat[c]=(prevByCat[c]||0)+safeNum(x.r.money);
+                    prevByCat[c]=(prevByCat[c]||0)+amt;
                 }
             });
 
-            let cats=Object.keys(byCat).sort((a,b)=>byCat[b]-byCat[a]);
+            // 退完了（净额 ≤ 0）的分类画不进饼图，不列
+            let cats=Object.keys(byCat).filter(c=>round2(byCat[c])>0).sort((a,b)=>byCat[b]-byCat[a]);
 
             // 当月该口径无记录：卡片保持可见（胶囊常在），只把内容区替换成一句提示。
             if(!cats.length){
@@ -6394,15 +6676,30 @@ ${detail}
             const amt=safeNum(rec.money);
             $('detailMoney').innerHTML = `<span class="${isExp?'neg':'pos'}${modeAmtCls(rec)}">${isExp?'−':'+'}${amt.toFixed(2)} 元</span>`;
             $('detailCat').innerHTML = `<span class="cat-tag">${escapeHtml(rec.cat||'未分类')}</span>`;
+            const all=getUserData();
             $('detailType').innerHTML = (isExp
                 ? '<span class="io-tag io-out">支出</span>'
-                : '<span class="io-tag io-in">收入</span>') + modeTag(rec, true);
+                : (isRefund(rec) ? '<span class="io-tag io-refund">退款</span>' : '<span class="io-tag io-in">收入</span>'))
+                + modeTag(rec, true) + refundedTag(rec, refundedMap(all)) + refundLinkHtml(rec, all);
             const rk=(rec.remark||'').trim();
             $('detailRemark').textContent = rk || '（无备注）';
             detailCurId=id;
             $('detailMask').style.display='flex';
         }
 
+        // 详情 / 修改弹窗里的一行关联说明：退款 → 原账单是哪笔；原账单 → 退了哪几笔
+        function refundLinkHtml(rec, data){
+            const fmt=r=>`${String(r.time).slice(5,16).replace('T',' ')} · ${escapeHtml((r.remark||'').trim()||r.cat||'未分类')}`;
+            if(isRefund(rec)){
+                const o=data.find(r=>r.id===rec.refundOf);
+                return o ? `<div class="refund-link">原账单：${fmt(o)} · −${safeNum(o.money).toFixed(2)}</div>`
+                         : `<div class="refund-link">原账单已不存在</div>`;
+            }
+            if(rec.type!=='expense') return '';
+            const rs=refundsOf(data, rec.id);
+            if(!rs.length) return '';
+            return `<div class="refund-link">` + rs.map(r=>`退款：${fmt(r)} · +${safeNum(r.money).toFixed(2)}`).join('<br>') + `</div>`;
+        }
         let detailCurId=null;
         // 详情「关闭」。抽成具名函数：返回键也要走这个正规出口，不能只 display='none'
         // —— 那样 detailCurId 不会复位。
@@ -6920,6 +7217,8 @@ ${detail}
                 { can:askIsPrompt,              close:()=>closeAsk(null) },
                 // 1035 日期时间选择器
                 { can:()=>isOpen('dtMask'),     close:()=>closeDtPicker() },
+                // 1032 退款弹窗（从修改账单里打开）
+                { can:()=>isOpen('refundMask'), close:()=>closeRefund() },
                 // 1030 详情里点进来的「修改」：必须走唯一出口，
                 //      否则 editId / over-detail 等状态复位不掉
                 { can:()=>isOpen('editMask'),   close:()=>closeEditModal() },
