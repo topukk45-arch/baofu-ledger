@@ -22,6 +22,7 @@
         /* ===== 主题色变量：换肤只需改这几个，全站跟着变 =====
            语义色（收入绿/支出红/错误红）不在此处，保持固定不随主题变化 */
         :root {
+            --c-tab-accent:#b4942d;     /* 1010-K3：底栏选中图标的重点笔画，随主题算出 */
             --c-primary:#d4af37;      /* 主金色：按钮、强调 */
             --c-primary-dark:#b8860b; /* 深主色：渐变深端、标题 */
             --c-primary-deep:#8b6914; /* 更深：正文强调字 */
@@ -367,9 +368,21 @@
         .tab-btn { flex:1; border:none; background:transparent; cursor:pointer;
             padding:9px 0 8px; display:flex; flex-direction:column; align-items:center; gap:2px;
             color:var(--c-text-soft); transition:0.15s; }
-        .tab-btn .tab-ico { font-size:21px; line-height:1; }
-        .tab-btn .tab-txt { font-size:12px; }
+        /* 1010-K3：底栏文字用霞鹜文楷（LXGW WenKai，SIL OFL 1.1，可商用），
+           只裁出「统计记账设置」6 个字内嵌，不随系统字体变；其他字照常用系统字体。 */
+        @font-face { font-family:'JiwenTab'; font-weight:400; font-display:block;
+            src:url(data:font/woff2;base64,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) format('woff2'); }
+        @font-face { font-family:'JiwenTab'; font-weight:700; font-display:block;
+            src:url(data:font/woff2;base64,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) format('woff2'); }
+        /* 图标：统计 = Lucide chart-spline（ISC 授权）；记账 = Tabler list-check、设置 = Tabler adjustments-horizontal（MIT 授权）。
+           选中时每个图标只有一笔（.acc）变 --c-tab-accent：统计=曲线，记账=中间的勾，设置=中间的圆钮。 */
+        .tab-btn .tab-ico { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.8;
+            stroke-linecap:round; stroke-linejoin:round; }
+        .tab-btn .tab-txt { font-size:13px; font-family:'JiwenTab', serif; letter-spacing:1px; }
         .tab-btn.active { color:var(--c-primary-dark); }
+        .tab-btn:not(.active) .tab-ico, .tab-btn:not(.active) .tab-txt { opacity:.62; }   /* 未选中再淡一档，选中项更跳 */
+        .tab-btn.active .tab-ico { stroke-width:2; }
+        .tab-btn.active .tab-ico .acc { stroke:var(--c-tab-accent); }
         .tab-btn.active .tab-txt { font-weight:bold; }
         /* 键盘弹出时，隐藏会被顶起的常驻底栏与悬浮按钮 */
         body.kb-open .tab-bar,
@@ -1277,7 +1290,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K2</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K4</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1532,13 +1545,13 @@
         <!-- 底部标签栏 -->
         <nav class="tab-bar" id="tabBar" style="display:none">
             <button class="tab-btn" data-tab="stats">
-                <span class="tab-ico">▦</span><span class="tab-txt">统计</span>
+                <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path class="acc" d="M7 16c.5-2 1.5-7 4-7 2 0 2 3 4 3 2.5 0 4.5-5 5-7"/></svg><span class="tab-txt">统计</span>
             </button>
             <button class="tab-btn active" data-tab="ledger">
-                <span class="tab-ico">▤</span><span class="tab-txt">记账</span>
+                <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 5.5l1.5 1.5l2.5 -2.5"/><path class="acc" d="M3.5 11.5l1.5 1.5l2.5 -2.5"/><path d="M3.5 17.5l1.5 1.5l2.5 -2.5"/><path d="M11 6l9 0"/><path d="M11 12l9 0"/><path d="M11 18l9 0"/></svg><span class="tab-txt">记账</span>
             </button>
             <button class="tab-btn" data-tab="settings">
-                <span class="tab-ico">⚙</span><span class="tab-txt">设置</span>
+                <svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M4 6l8 0"/><path d="M16 6l4 0"/><path class="acc" d="M6 12a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M4 12l2 0"/><path d="M10 12l10 0"/><path d="M15 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M4 18l11 0"/><path d="M19 18l1 0"/></svg><span class="tab-txt">设置</span>
             </button>
         </nav>
 
@@ -6089,6 +6102,9 @@ ${detail}
                     '--c-primary-deep':  hslToHex(h,Math.min(s+10,92),Math.max(pL-26,20)),
                     '--c-accent':        hslToHex(h,Math.min(s+20,100),Math.min(pL+10,68)),
                     '--c-accent-soft':   hslToHex(h,Math.min(s+8,80),88),
+                    // 底栏重点笔画：同色相、提高饱和度。宣纸灰这类低饱和主题，主色和选中深色几乎一样，
+                    // 直接用主色这一笔会看不出来；提饱和后变成赭金 / 亮青这类「同族但跳得出来」的颜色。
+                    '--c-tab-accent':    hslToHex(h,Math.min(Math.max(s+28,42),60),44),
                     '--c-text':          hslToHex(h,Math.min(s+8,85),28),
                     '--c-text-soft':     hslToHex(h,Math.min(s+4,70),38),
                     '--c-border':        hslToHex(h,Math.min(s,55),78),
