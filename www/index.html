@@ -1124,13 +1124,105 @@
             font-weight:normal; color:var(--c-text-soft); }
         #askChoices.choose-list .cc.sel .cc-desc { color:var(--c-sel-text); opacity:.8; }
         .filter-mode-chips .cc { font-size:13.5px; }
+
+        /* ===== 1010-G：收支标签靠右 / 分类预算 ===== */
+        /* 手机卡片里「收支」一行：多一个口径标签时，两枚标签一起靠右，不再被两端对齐挤到中间 */
+        @media (max-width: 600px) {
+            tbody td[data-label="收支"] { gap:6px; }
+            tbody td[data-label="收支"]::before { margin-right:auto; }
+        }
+
+        /* 统计页：本月预算 */
+        .bg-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:4px; }
+        .bg-legend { font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; }
+        .bg-row { padding:9px 0; border-bottom:1px dashed var(--c-border); }
+        .bg-row:last-child { border-bottom:none; padding-bottom:2px; }
+        .bg-top { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:6px; }
+        .bg-name { font-size:14px; font-weight:600; color:var(--c-text); min-width:0;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .bg-num { font-size:12.5px; color:var(--c-text-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .bg-num b { font-size:15px; color:var(--c-text); }
+        .bg-bar { position:relative; height:8px; border-radius:4px; background:var(--c-chip); }
+        .bg-fill { height:100%; border-radius:4px; background:var(--c-primary); transition:width .3s; }
+        .bg-fill.warn { background:#c9973a; }
+        .bg-fill.over { background:var(--c-neg); }
+        /* 竖线：本月时间进度。花销条超过竖线 = 花得比时间快 */
+        .bg-mark { position:absolute; top:-3px; bottom:-3px; width:2px; margin-left:-1px;
+            border-radius:1px; background:var(--c-text); opacity:.45; }
+        .bg-foot { display:flex; justify-content:space-between; gap:10px; margin-top:5px;
+            font-size:12px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .bg-foot .over { color:var(--c-neg); font-weight:600; }
+        .bg-foot .fast { color:#b07a1c; }
+
+        /* 分类管理：每行显示当前预算 */
+        .cat-item .cat-budget { flex:0 0 auto; font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; }
+
+        /* ===== 1010-G：统计页「收支 | 预算」页签 ===== */
+        .stat-tabs { margin:-10px 0 14px; }
+        .stat-tabs button { flex:1 1 0; padding:9px 0; font-size:14.5px; }
+        /* 收支页签里的一行预算入口 */
+        .bg-entry { display:flex; align-items:center; gap:10px; cursor:pointer; }
+        .bg-entry-title { font-size:15px; font-weight:bold; color:var(--c-text); flex-shrink:0; }
+        .bg-entry-sum { flex:1 1 auto; min-width:0; text-align:right; font-size:13px; color:var(--c-text-soft);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .bg-entry-sum b { font-size:14px; }
+        .bg-entry-sum .over { color:var(--c-neg); }
+        .bg-entry-sum .warn { color:#b07a1c; }
+        .bg-go { flex-shrink:0; color:var(--c-text-soft); font-size:18px; line-height:1; }
+        /* 预算页签：总览 */
+        .bgo-main { display:flex; justify-content:space-between; align-items:flex-end; gap:10px; margin:6px 0 8px; }
+        .bgo-num { font-size:13px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .bgo-num b { font-size:24px; color:var(--c-primary-deep); }
+        .bgo-pct { font-size:22px; font-weight:bold; font-variant-numeric:tabular-nums; color:var(--c-text); }
+        .bgo-pct.over { color:var(--c-neg); }
+        .bgo-pct.warn { color:#b07a1c; }
+        .bgo-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+        .bgc { font-size:12px; padding:3px 9px; border-radius:10px; border:1px solid var(--c-border); color:var(--c-text-soft); background:var(--c-surface); }
+        .bgc.over { color:var(--c-neg); border-color:#f0c2b4; background:#fbe6e0; }
+        .bgc.warn { color:#9a6a12; border-color:#ecd5a6; background:#fbf1dc; }
+        .bgc.ok { color:var(--c-pos); border-color:#b9e0b0; background:#e3f3e0; }
+        .bgo-legend { margin-top:8px; font-size:11.5px; color:var(--c-text-soft); }
+        /* 预算页签：分组 */
+        .bg-gtitle { display:flex; align-items:center; gap:8px; }
+        .bg-gtitle .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+        .bg-gtitle.over .dot { background:var(--c-neg); }
+        .bg-gtitle.warn .dot { background:#c9973a; }
+        .bg-gtitle.ok .dot { background:var(--c-pos); }
+        .bg-row.bg-click { cursor:pointer; }
+        .bg-row.bg-click:active { background:var(--c-chip); }
+        .bg-chev { display:inline-block; margin-left:4px; font-style:normal; color:var(--c-text-soft);
+            font-size:15px; transition:transform .2s; }
+        .bg-row.open .bg-chev { transform:rotate(90deg); }
+        .bg-detail { margin:2px 0 8px; padding:4px 10px 8px; border:1px solid var(--c-border);
+            border-radius:10px; background:var(--c-surface); }
+        .bg-detail .stat-flow .sf-item { padding:8px 6px; }
+        .bg-detail-empty { padding:10px 2px; font-size:13px; color:var(--c-text-soft); }
+        .bg-detail-foot { display:flex; justify-content:space-between; align-items:center; gap:10px;
+            padding-top:8px; margin-top:2px; border-top:1px solid var(--c-border); font-size:12px; color:var(--c-text-soft); }
+        .bg-jump { flex-shrink:0; border:1px solid var(--c-border-mid); background:var(--c-card-1);
+            color:var(--c-primary-dark); border-radius:8px; padding:6px 10px; font-size:12.5px; cursor:pointer; }
+        /* 预算页签：未设预算的分类 */
+        .bgu-head { width:100%; display:flex; justify-content:space-between; align-items:center; border:none;
+            background:none; padding:0; cursor:pointer; font-family:inherit; }
+        .bgu-head .stat-day-title { margin-bottom:0; }
+        .bgu-arrow { color:var(--c-text-soft); font-size:13px; transition:transform .2s; }
+        .bgu-open .bgu-arrow { transform:rotate(180deg); }
+        .bgu-list { margin-top:8px; }
+        .bgu-row { display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px dashed var(--c-border); font-size:14px; }
+        .bgu-row:last-child { border-bottom:none; }
+        .bgu-name { flex:1 1 auto; min-width:0; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .bgu-amt { flex-shrink:0; font-weight:bold; color:var(--c-neg); font-variant-numeric:tabular-nums; }
+        .bgu-set { flex-shrink:0; border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-primary-dark); border-radius:8px; padding:5px 10px; font-size:12.5px; cursor:pointer; }
+        .bg-empty { text-align:center; padding:10px 4px 4px; color:var(--c-text-soft); font-size:13.5px; line-height:1.8; }
+        .bg-empty button { margin-top:8px; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-F</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-G</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -1203,6 +1295,12 @@
             <!-- ========== 页面2：统计 ========== -->
             <div class="tab-page" id="pageStats" style="display:none">
                 <div class="user-info"><h3>统计分析</h3></div>
+                <!-- 页签：收支（日历/当月/分类）| 预算。两个页签共用 statYear/statMonth，切换时月份不变 -->
+                <div class="seg stat-tabs" id="statTabSeg">
+                    <button data-v="flow" class="on">收支</button>
+                    <button data-v="budget">预算</button>
+                </div>
+                <div id="statPaneFlow">
 
                 <!-- 日历 -->
                 <div class="stat-card">
@@ -1229,6 +1327,9 @@
                     </div>
                 </div>
 
+                <!-- 预算入口：一行摘要，点开切到「预算」页签。没设任何预算时隐藏 -->
+                <div class="stat-card" id="statBudgetCard" style="display:none"></div>
+
                 <!-- 当月支出/收入分类占比（整月维度，复用当日分析的饼图/列表样式；顶部胶囊切换口径） -->
                 <div class="stat-card" id="statMonthCatCard">
                     <div class="stat-month-cat-head">
@@ -1252,6 +1353,21 @@
                     </div>
                 </div>
                 <div class="stat-day-empty" id="statDayEmpty"></div>
+                </div><!-- /statPaneFlow -->
+
+                <!-- ===== 预算页签 ===== -->
+                <div id="statPaneBudget" style="display:none">
+                    <div class="stat-card">
+                        <div class="stat-cal-head">
+                            <button class="dt-nav" id="bgPrevM">‹</button>
+                            <span id="bgMonthLabel" style="cursor:pointer; padding:4px 12px; border-radius:9px; border:1px solid var(--c-border);">2026年01月</span>
+                            <button class="dt-nav" id="bgNextM">›</button>
+                        </div>
+                        <div id="bgOverview"></div>
+                    </div>
+                    <div id="bgGroups"></div>
+                    <div class="stat-card" id="bgUnsetCard" style="display:none"></div>
+                </div>
             </div>
 
             <!-- ========== 页面3：设置 ========== -->
@@ -2165,6 +2281,29 @@
             if(m==='flow') return '<span class="io-flow">只算结余</span>';
             return '';
         }
+        // ===== 分类月预算（1010-G）=====
+        // 存在存档里：archive.budgets = { 分类名: 每月上限 }，跟着存档走（导出 / 云备份 / 导入都带上）。
+        // 已花 = 该月、该分类、支出、且口径为「计入」的金额之和——与统计页、AI 导出同一口径；
+        // 不计入 / 只算结余的记录不占预算。月份按记录时间算，不按录入时间。
+        function getBudgets(){
+            const a=curArchive(loadStore());
+            return (a && a.budgets && typeof a.budgets==='object') ? a.budgets : {};
+        }
+        function budgetSpentIn(records, cat, y, mo){
+            let s=0;
+            records.forEach(r=>{
+                if(r.cat!==cat || r.type!=='expense' || recMode(r)!=='normal') return;
+                const t=parseRecTime(r.time);
+                if(t.getFullYear()===y && t.getMonth()===mo) s+=safeNum(r.money);
+            });
+            return round2(s);
+        }
+        // 「已花 x / 上限 y，还剩 / 超出 z」——记账成功提示与 AI 导出共用的一句话
+        function budgetPhrase(spent, limit){
+            const d=round2(limit-spent);
+            return `已花 ${spent.toFixed(2)} / ${limit.toFixed(2)}，${d>=0?`还剩 ${d.toFixed(2)}`:`超出 ${(-d).toFixed(2)}`}`;
+        }
+
         function modeAmtCls(r){ const m=recMode(r); return m==='skip' ? ' amt-skip' : (m==='flow' ? ' amt-flow' : ''); }
 
         // 字符数：按 Unicode 码点计（一个汉字算 1）
@@ -2622,7 +2761,7 @@
             // 各带一份相同副本。这是可接受的冗余：真把它挪进 archives[x] 才是错的
             // （切到「旅行」存档，「入职纪念日」难道就不存在了）。
             const payload={ app:'记问', user:currentUser, archive:currentArchive,
-                cats:a.cats, data:a.records, days:loadDays(),
+                cats:a.cats, budgets:a.budgets||{}, data:a.records, days:loadDays(),
                 exportedAt:new Date().toLocaleString() };
             const json=JSON.stringify(payload,null,2);
             const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;
@@ -2690,7 +2829,7 @@
         function odBuildPayload(){
             const store=loadStore(); const a=curArchive(store);
             return { app:'记问', user:currentUser, archive:currentArchive,
-                cats:a.cats, data:a.records, days:loadDays(),
+                cats:a.cats, budgets:a.budgets||{}, data:a.records, days:loadDays(),
                 exportedAt:new Date().toLocaleString() };
         }
         function odPlugin(){
@@ -2865,7 +3004,8 @@
         }
 
         // 给定一批记录 + 范围标签，拼出完整的「prompt + 结构化账单」纯文本
-        function buildAiText(records, rangeLabel, dimLabel){
+        // budgetLines（可选）：按月导出时传入的预算执行情况，多行文本；不传则不出现这一节
+        function buildAiText(records, rangeLabel, dimLabel, budgetLines){
             const inc=records.reduce((s,r)=>s+statContrib(r).inc,0);
             const exp=records.reduce((s,r)=>s+statContrib(r).exp,0);
             const skipN=records.filter(isSkip).length;
@@ -2899,7 +3039,7 @@
 ■ 统计维度：${dimLabel}
 ■ 时间范围：${rangeLabel}
 ■ 总览：收入 ${inc.toFixed(2)} 元，支出 ${exp.toFixed(2)} 元，结余 ${bal.toFixed(2)} 元，共 ${records.length} 笔${exclParts.length?`（其中 ${exclParts.join('、')}）`:''}
-■ 支出分类占比：
+${budgetLines?`■ 分类月预算：\n${budgetLines}\n`:''}■ 支出分类占比：
 ${catLines}
 ■ 收支明细（按时间正序）：
 ${detail}
@@ -3018,7 +3158,11 @@ ${detail}
                     const [y,m]=k.split('-').map(Number);
                     const recs=all.filter(r=>{ const t=parseRecTime(r.time); return t.getFullYear()===y && t.getMonth()===m-1; });
                     const label=`${y}年${m}月`;
-                    openAiExport(buildAiText(recs, label, '按月'), label);
+                    const bud=getBudgets();
+                    const bLines=getCats().filter(c=>bud[c]>0)
+                        .map(c=>`  · ${c}：预算 ${safeNum(bud[c]).toFixed(2)} 元，${budgetPhrase(budgetSpentIn(recs, c, y, m-1), safeNum(bud[c]))}`)
+                        .join('\n');
+                    openAiExport(buildAiText(recs, label, '按月', bLines), label);
                 }, '选择月份', aiChooseDim);
             }
         }
@@ -3147,7 +3291,16 @@ ${detail}
             const store=loadStore(targetUser);
             let n=1;
             while(store.archives[finalName]) finalName=`${name}(${n++})`;
-            store.archives[finalName]={ records, cats };
+            // 预算：只收「分类表里存在、金额合法」的项，旧备份没有 budgets 字段 → 空对象
+            const budgets={};
+            if(parsed && parsed.budgets && typeof parsed.budgets==='object' && !Array.isArray(parsed.budgets)){
+                Object.keys(parsed.budgets).forEach(k=>{
+                    const c=charSlice(String(k).trim(), 8);
+                    const v=normMoney(parsed.budgets[k]);
+                    if(c && cats.includes(c) && v.ok) budgets[c]=v.val;
+                });
+            }
+            store.archives[finalName]={ records, cats, budgets };
             store.last=finalName;
             saveStore(store, targetUser);   // 抛错（配额满等）由调用方 catch 处理
 
@@ -3318,13 +3471,22 @@ ${detail}
                 handle.textContent='⠿'; handle.title='长按拖动排序';
                 const span=document.createElement('span'); span.className='cat-name'; span.textContent=c;
                 left.appendChild(handle); left.appendChild(span);
+                const bv=(a.budgets && a.budgets[c]>0) ? a.budgets[c] : null;
+                if(bv!=null){
+                    const bs=document.createElement('span'); bs.className='cat-budget';
+                    bs.textContent=`每月 ${safeNum(bv).toFixed(0)}`;
+                    left.appendChild(bs);
+                }
 
                 const wrap=document.createElement('div');
+                wrap.style.flexShrink='0';
+                const bg=document.createElement('button'); bg.textContent='预算'; bg.style.marginRight='6px';
+                bg.onclick=()=>editBudget(c);
                 const rn=document.createElement('button'); rn.textContent='改名'; rn.style.marginRight='6px';
                 rn.onclick=()=>renameCat(c);
                 const del=document.createElement('button'); del.textContent='删除';
                 del.onclick=()=>deleteCat(c);
-                wrap.appendChild(rn); wrap.appendChild(del);
+                wrap.appendChild(bg); wrap.appendChild(rn); wrap.appendChild(del);
 
                 div.appendChild(left); div.appendChild(wrap);
                 attachCatDrag(div, handle);
@@ -3461,6 +3623,26 @@ ${detail}
             saveStoreSafe(store);
             refreshCatSelectors(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
         }
+        // 设置 / 修改 / 取消某分类的每月预算。填 0 = 取消（customPrompt 不接受空串，用 0 表示「不要了」）。
+        // opts.fromStats：从统计页「未设预算」里点的，存完只刷新统计页，不弹出分类管理
+        function editBudget(cat, opts){
+            const cur=getBudgets()[cat];
+            customPrompt(`给「${cat}」设一个每月预算（元）。填 0 表示取消预算。`, cur>0 ? String(cur) : '', (v)=>{
+                const n=round2(Number(v));
+                const store=loadStore(); const a=curArchive(store);
+                a.budgets=Object.assign({}, a.budgets||{});
+                if(n>0) a.budgets[cat]=n; else delete a.budgets[cat];
+                if(!saveStoreSafe(store)) return;
+                if(!(opts && opts.fromStats)) openCatManager();
+                if(currentTab==='stats') renderStats();
+            }, '分类预算', (v)=>{
+                const n=Number(v);
+                if(!isFinite(n) || n<0) return '请输入 0 或正数金额';
+                if(n>99999999) return '金额太大啦，确认一下没多打几个 0？';
+                return '';
+            }, { inputmode:'decimal', placeholder:'例如 200' });
+        }
+
         function renameCat(oldName){
             customPrompt('', oldName, (name)=>{
                 name=name.trim();
@@ -3468,6 +3650,11 @@ ${detail}
                 const store=loadStore(); const a=curArchive(store);
                 a.cats=a.cats.map(c=>c===oldName?name:c);
                 a.records.forEach(r=>{ if(r.cat===oldName) r.cat=name; });
+                // 预算跟着分类改名，否则改名后预算悄悄失效
+                if(a.budgets && a.budgets[oldName]!=null){
+                    a.budgets=Object.assign({}, a.budgets);
+                    a.budgets[name]=a.budgets[oldName]; delete a.budgets[oldName];
+                }
                 saveStoreSafe(store);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '重命名分类', (name)=>{
@@ -3490,6 +3677,7 @@ ${detail}
                 ar.cats=ar.cats.filter(c=>c!==name);
                 if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
                 ar.records.forEach(r=>{ if(r.cat===name) r.cat='未分类'; });
+                if(ar.budgets && ar.budgets[name]!=null){ ar.budgets=Object.assign({}, ar.budgets); delete ar.budgets[name]; }
                 saveStoreSafe(s);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '删除分类');
@@ -4446,6 +4634,204 @@ ${detail}
             $('catStats').scrollTop=0;
         });
 
+        // ===== 统计页：预算 =====
+        // 一处算、两处用：computeBudget 给「收支」页签的一行入口和「预算」页签共用，口径永远一致。
+        // 已花 = 该月、该分类、支出、口径「计入」；状态：> 100% 超支 / ≥ 80% 接近 / 其余正常。
+        let statTab='flow';        // 'flow' | 'budget'
+        let bgExpanded=null;       // 预算页签里展开的分类
+        let bgUnsetOpen=false;     // 「未设预算的分类」是否展开
+        function computeBudget(dec, y, mo){
+            const budgets=getBudgets();
+            const cats=getCats();
+            const keys=cats.filter(c=>budgets[c]>0);
+            const now=new Date();
+            const isCur = now.getFullYear()===y && now.getMonth()===mo;
+            const dim=new Date(y, mo+1, 0).getDate();
+            const timePct = isCur ? now.getDate()/dim*100 : null;
+            const spent={}, unset={}, excl={};
+            dec.forEach(x=>{
+                if(x.y!==y || x.mo!==mo || x.r.type!=='expense') return;
+                const c=x.r.cat||'未分类';
+                if(recMode(x.r)!=='normal'){ if(budgets[c]>0) excl[c]=(excl[c]||0)+1; return; }
+                if(budgets[c]>0) spent[c]=(spent[c]||0)+safeNum(x.r.money);
+                else unset[c]=(unset[c]||0)+safeNum(x.r.money);
+            });
+            const rows=keys.map(c=>{
+                const limit=safeNum(budgets[c]);
+                const used=round2(spent[c]||0);
+                const pct = limit>0 ? used/limit*100 : 0;
+                const state = pct>100 ? 'over' : (pct>=80 ? 'warn' : 'ok');
+                const fast = timePct!=null && pct<=100 && pct>timePct+5;   // 比时间进度快 5 个百分点以上才提醒
+                return { cat:c, limit, used, pct, left:round2(limit-used), state, fast, excl:excl[c]||0 };
+            });
+            const unsetList=Object.keys(unset).map(c=>({ cat:c, used:round2(unset[c]) })).sort((a,b)=>b.used-a.used);
+            return { rows, unsetList, isCur, dim, timePct, day:now.getDate() };
+        }
+        // 单行预算（名称 / 已花 / 进度条 / 剩余或超出）。clickable=true 时可展开明细
+        function budgetRowHtml(r, timePct, clickable, open){
+            const cls = r.state==='ok' ? '' : r.state;
+            const right = r.left>=0
+                ? `<span class="${r.fast?'fast':''}">还剩 ${r.left.toFixed(2)}${r.fast?'（花得偏快）':''}</span>`
+                : `<span class="over">超出 ${(-r.left).toFixed(2)}</span>`;
+            return `<div class="bg-row${clickable?' bg-click':''}${open?' open':''}"${clickable?` data-act="bgRow" data-cat="${escapeHtml(r.cat)}"`:''}>`
+                + `<div class="bg-top"><span class="bg-name">${escapeHtml(r.cat)}${clickable?'<i class="bg-chev">›</i>':''}</span>`
+                + `<span class="bg-num"><b>${r.used.toFixed(2)}</b> / ${r.limit.toFixed(2)}</span></div>`
+                + `<div class="bg-bar"><div class="bg-fill ${cls}" style="width:${Math.min(100,r.pct).toFixed(1)}%"></div>`
+                + (timePct!=null ? `<div class="bg-mark" style="left:${timePct.toFixed(1)}%"></div>` : '')
+                + `</div>`
+                + `<div class="bg-foot"><span>已用 ${r.pct.toFixed(0)}%</span>${right}</div>`
+                + `</div>`;
+        }
+
+        // 「收支」页签：一行入口
+        function renderStatBudget(dec){
+            const card=$('statBudgetCard'); if(!card) return;
+            const B=computeBudget(dec, statYear, statMonth);
+            if(!B.rows.length){ card.style.display='none'; card.innerHTML=''; return; }
+            card.style.display='';
+            const n={ over:0, warn:0, ok:0 };
+            B.rows.forEach(r=>n[r.state]++);
+            const parts=[];
+            if(n.over) parts.push(`超支 <b class="over">${n.over}</b>`);
+            if(n.warn) parts.push(`接近 <b class="warn">${n.warn}</b>`);
+            if(n.ok)   parts.push(`正常 <b>${n.ok}</b>`);
+            card.innerHTML=`<div class="bg-entry" data-act="toBudget">`
+                + `<span class="bg-entry-title">${B.isCur?'本月预算':`${statMonth+1}月预算`}</span>`
+                + `<span class="bg-entry-sum">${parts.join(' · ')}</span><span class="bg-go">›</span></div>`;
+        }
+        $('statBudgetCard').addEventListener('click', e=>{
+            if(e.target.closest('[data-act="toBudget"]')) setStatTab('budget');
+        });
+
+        // 「预算」页签
+        function renderBudgetPane(dec){
+            $('bgMonthLabel').textContent=`${statYear}年${pad(statMonth+1)}月`;
+            const B=computeBudget(dec, statYear, statMonth);
+
+            // —— 总览 ——
+            if(!B.rows.length){
+                $('bgOverview').innerHTML=`<div class="bg-empty">还没有给任何分类设预算。<br>`
+                    + `设好之后，这里会按月显示哪些分类超了、哪些还有余量。<br>`
+                    + `<button class="mini-btn gold" data-act="bgSetup">去设置预算</button></div>`;
+                $('bgGroups').innerHTML='';
+            } else {
+                const lim=round2(B.rows.reduce((s,r)=>s+r.limit,0));
+                const used=round2(B.rows.reduce((s,r)=>s+r.used,0));
+                const pct = lim>0 ? used/lim*100 : 0;
+                const st = pct>100 ? 'over' : (pct>=80 ? 'warn' : '');
+                const n={ over:0, warn:0, ok:0 };
+                B.rows.forEach(r=>n[r.state]++);
+                $('bgOverview').innerHTML=
+                    `<div class="bgo-main"><div><div class="ov-label">已花 / 预算合计</div>`
+                    + `<div class="bgo-num"><b>${used.toFixed(2)}</b> / ${lim.toFixed(2)}</div></div>`
+                    + `<div class="bgo-pct ${st}">${pct.toFixed(0)}%</div></div>`
+                    + `<div class="bg-bar"><div class="bg-fill ${st}" style="width:${Math.min(100,pct).toFixed(1)}%"></div>`
+                    + (B.timePct!=null ? `<div class="bg-mark" style="left:${B.timePct.toFixed(1)}%"></div>` : '')
+                    + `</div>`
+                    + `<div class="bgo-chips">`
+                    + `<span class="bgc over">超支 ${n.over}</span><span class="bgc warn">接近上限 ${n.warn}</span><span class="bgc ok">正常 ${n.ok}</span>`
+                    + `</div>`
+                    + (B.timePct!=null ? `<div class="bgo-legend">竖线 = 今天（${B.day}/${B.dim} 天）。花销条跑到竖线前面，就是花得比时间快。</div>` : '');
+
+                // —— 分组：超支 → 接近 → 正常，组内按已用比例从高到低 ——
+                const GROUPS=[ ['over','已超支'], ['warn','接近上限（80% 以上）'], ['ok','正常'] ];
+                $('bgGroups').innerHTML=GROUPS.map(([k,title])=>{
+                    const rs=B.rows.filter(r=>r.state===k).sort((a,b)=>b.pct-a.pct);
+                    if(!rs.length) return '';
+                    return `<div class="stat-card"><div class="stat-day-title bg-gtitle ${k}"><span class="dot"></span>${title} · ${rs.length}</div>`
+                        + rs.map(r=>budgetRowHtml(r, B.timePct, true, bgExpanded===r.cat)
+                            + (bgExpanded===r.cat ? budgetDetailHtml(dec, r) : '')).join('')
+                        + `</div>`;
+                }).join('');
+            }
+
+            // —— 未设预算的分类（本月有计入的支出）——
+            const uc=$('bgUnsetCard');
+            if(!B.unsetList.length){ uc.style.display='none'; uc.innerHTML=''; }
+            else {
+                uc.style.display='';
+                uc.classList.toggle('bgu-open', bgUnsetOpen);
+                uc.innerHTML=`<button class="bgu-head" data-act="bgUnsetToggle">`
+                    + `<span class="stat-day-title">未设预算的分类 · ${B.unsetList.length}</span><span class="bgu-arrow">▾</span></button>`
+                    + (bgUnsetOpen ? `<div class="bgu-list">` + B.unsetList.map(u=>
+                        `<div class="bgu-row"><span class="bgu-name">${escapeHtml(u.cat)}</span>`
+                        + `<span class="bgu-amt">−${u.used.toFixed(2)}</span>`
+                        + `<button class="bgu-set" data-act="bgSet" data-cat="${escapeHtml(u.cat)}">设预算</button></div>`).join('')
+                        + `</div>` : '');
+            }
+        }
+        // 展开的明细：这个月、这个分类里计入预算的每一笔（时间倒序）
+        function budgetDetailHtml(dec, r){
+            const list=dec.filter(x=>x.y===statYear && x.mo===statMonth && x.r.cat===r.cat
+                    && x.r.type==='expense' && recMode(x.r)==='normal')
+                .sort((a,b)=>b.ts-a.ts);
+            const items = list.length ? `<div class="stat-flow">` + list.map(x=>{
+                const rm=(x.r.remark||'').trim();
+                return `<div class="sf-item" data-act="bgRec" data-id="${escapeHtml(x.r.id)}">`
+                    + `<div class="sf-top"><span class="sf-time">${pad(x.mo+1)}-${pad(x.d)} ${pad(x.hh)}:${pad(x.mi)}</span>`
+                    + (rm ? `<span class="sf-remark">${escapeHtml(rm)}</span>` : `<span class="sf-cat">${escapeHtml(r.cat)}</span>`)
+                    + `</div><span class="sf-amt neg">−${safeNum(x.r.money).toFixed(2)}</span></div>`;
+            }).join('') + `</div>` : `<div class="bg-detail-empty">这个月还没有计入预算的支出</div>`;
+            const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计入 / 只算结余，未占预算`:''}`;
+            return `<div class="bg-detail">${items}`
+                + `<div class="bg-detail-foot"><span>${note}</span>`
+                + `<button class="bg-jump" data-act="bgJump" data-cat="${escapeHtml(r.cat)}">在账单里查看 ›</button></div></div>`;
+        }
+        // 预算页签的所有点击（事件委托，一次绑定）
+        $('statPaneBudget').addEventListener('click', e=>{
+            const el=e.target.closest('[data-act]'); if(!el) return;
+            const act=el.dataset.act;
+            if(act==='bgRow'){
+                bgExpanded = (bgExpanded===el.dataset.cat) ? null : el.dataset.cat;
+                renderStats();
+            } else if(act==='bgRec'){
+                openDetail(el.dataset.id);
+            } else if(act==='bgJump'){
+                jumpToLedgerFilter(el.dataset.cat, statYear, statMonth);
+            } else if(act==='bgUnsetToggle'){
+                bgUnsetOpen=!bgUnsetOpen; renderStats();
+            } else if(act==='bgSet'){
+                editBudget(el.dataset.cat, { fromStats:true });
+            } else if(act==='bgSetup'){
+                openCatManager();
+            }
+        });
+        // 跳到记账页并带上筛选：分类 + 整月 + 口径「计入」——列表正好是算进「已花」的那几笔
+        // （同分类里的收入记录也会列出，但小计里的「支出」= 已花）
+        function jumpToLedgerFilter(cat, y, mo){
+            resetSearch();
+            searchState.from=`${y}-${pad(mo+1)}-01`;
+            searchState.to=`${y}-${pad(mo+1)}-${pad(new Date(y, mo+1, 0).getDate())}`;
+            searchState.mode='normal';
+            filterCat.value=cat;
+            curPage=1;
+            switchTab('ledger');
+            renderBill(); renderFilterChips();
+            if(window.syncFilterFab) window.syncFilterFab();
+        }
+        // 页签切换
+        function setStatTab(tab){
+            statTab = (tab==='budget') ? 'budget' : 'flow';
+            $('statTabSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===statTab));
+            $('statPaneFlow').style.display   = statTab==='flow'   ? '' : 'none';
+            $('statPaneBudget').style.display = statTab==='budget' ? '' : 'none';
+            renderStats();
+            window.scrollTo(0,0);
+        }
+        $('statTabSeg').addEventListener('click', e=>{
+            const b=e.target.closest('button[data-v]'); if(b) setStatTab(b.dataset.v);
+        });
+        // 预算页签的月份切换：与收支页签共用 statYear/statMonth
+        $('bgPrevM').addEventListener('click', ()=>{
+            statMonth--; if(statMonth<0){ statMonth=11; statYear--; }
+            statSelDay=null; renderStatCalendar();
+        });
+        $('bgNextM').addEventListener('click', ()=>{
+            statMonth++; if(statMonth>11){ statMonth=0; statYear++; }
+            statSelDay=null; renderStatCalendar();
+        });
+        $('bgMonthLabel').addEventListener('click', ()=>$('statMonthLabel').click());   // 复用年月选择器
+
         // 渲染分页控件（≤1 页时不显示）
         function renderPager(totalPages){
             const box=$('pager');
@@ -4676,7 +5062,15 @@ ${detail}
             if(!remark){
                 confirmOpts.extra={ text:'添加备注', onClick:()=>addRemarkToRecord(newId) };
             }
-            customConfirm('已记下这一笔，要再记一笔吗？', ()=>{
+            // 这笔落在有预算的分类上（且是计入的支出）：成功提示里带一句当月预算情况
+            let bHint='';
+            const bLimit=getBudgets()[cat];
+            if(bLimit>0 && newRec.type==='expense' && recMode(newRec)==='normal'){
+                const tt=parseRecTime(time);
+                const spentNow=budgetSpentIn(data, cat, tt.getFullYear(), tt.getMonth());
+                bHint=`${tt.getMonth()+1}月「${cat}」预算：${budgetPhrase(spentNow, bLimit)}\n\n`;
+            }
+            customConfirm(bHint+'已记下这一笔，要再记一笔吗？', ()=>{
                 openAddModal();     // 重新打开，且为全新空白表单（不带上次数据）
             }, '记账成功', confirmOpts);
         });
@@ -5475,6 +5869,9 @@ ${detail}
             $('statMonthIn').textContent='+'+round2(mIn).toFixed(2);
             $('statMonthOut').textContent='−'+round2(mOut).toFixed(2);
 
+            // 本月预算（共用同一份预解析结果）
+            renderStatBudget(dec);
+
             // 当月支出分类占比（复用当日分析的甜甜圈 + 分类列表画法）
             renderStatMonthCats(dec);
 
@@ -5519,6 +5916,8 @@ ${detail}
                 }
                 grid.appendChild(cell);
             }
+
+            if(statTab==='budget') renderBudgetPane(dec);
 
             // 若已选中某天且该天仍在本月有数据，刷新当日分析；否则隐藏
             if(statSelDay && dayHas[statSelDay]){
