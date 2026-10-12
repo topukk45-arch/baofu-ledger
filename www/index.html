@@ -1290,7 +1290,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K4</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K5</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -2052,6 +2052,39 @@
                 // 稍等一拍再聚焦，让弹窗先完成绘制，键盘随后弹起，不抢在绘制前造成空帧
                 setTimeout(()=>{ try{ focusEl && focusEl.focus(); }catch(e){} }, 50);
             };
+        })();
+
+        // ===== 1010-K5：点「备注」后，把保存按钮也露出来 =====
+        // 键盘弹起时弹窗被压到半屏，WebView 只把备注框本身滚进视野，紧挨着的「添加记录 / 保存」
+        // 正好卡在下沿外，得手动再滑一下。这里在备注聚焦后，把弹窗内部再往上滚一点。
+        // 只滚弹窗自己（scrollTop），不用 scrollIntoView，免得连带滚动整个页面。
+        (function(){
+            const PAIRS = [['billRemark','addBill'], ['editRemark','saveEdit']];
+            function revealSave(ta, btn){
+                const dlg = ta && ta.closest('.edit-dialog');
+                if(!dlg || !btn) return;
+                const d = dlg.getBoundingClientRect(), b = btn.getBoundingClientRect(), t = ta.getBoundingClientRect();
+                let delta = b.bottom + 12 - d.bottom;          // 按钮底边离弹窗可视下沿还差多少
+                if(delta <= 0) return;                          // 已经看得见，不动
+                delta = Math.min(delta, t.top - d.top - 8);     // 屏幕再小也别把备注框本身滚出顶部
+                if(delta > 0) dlg.scrollTop += delta;
+            }
+            window.__revealSave = revealSave;   // 给测试用
+            PAIRS.forEach(([taId, btnId])=>{
+                const ta = document.getElementById(taId), btn = document.getElementById(btnId);
+                if(!ta || !btn) return;
+                // 等两拍：WebView 先自己滚一次；键盘若是刚弹起，还要等可视区收缩落定
+                ta.addEventListener('focus', ()=>{
+                    setTimeout(()=>revealSave(ta, btn), 120);
+                    setTimeout(()=>revealSave(ta, btn), 400);
+                });
+            });
+            if(window.visualViewport){
+                window.visualViewport.addEventListener('resize', ()=>{
+                    const a = document.activeElement;
+                    PAIRS.forEach(([taId, btnId])=>{ if(a && a.id===taId) revealSave(a, document.getElementById(btnId)); });
+                });
+            }
         })();
 
 

@@ -30,6 +30,7 @@ GitHub Actions 每次打包前都会先跑 `npm test`，不通过就不出包。
 | `i-templates-overview.test.js` | 常用模板、预算外 |
 | `i3-year-budget-today.test.js` | 年度预算与每月进度、统计页「回到本月」按钮 |
 | `j-refund.test.js` | 退款：部分 / 多次 / 全额 / 超额、修改与删除、批量、预算、AI 导出、导入清洗 |
+| `k-remark-reveal.test.js` | 键盘弹起时点备注，弹窗自动上滚露出「添加记录 / 保存」；屏幕太矮时不把备注框滚没 |
 
 ## 逐字节回归
 
