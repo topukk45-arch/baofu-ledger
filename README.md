@@ -4,6 +4,15 @@
 
 ## 怎么拿到 APK
 
+**最省事：**手机浏览器打开下面这个地址，直接下载 apk，不用登录、不用解压，签名不变可以覆盖升级：
+
+https://github.com/topukk45-arch/baofu-ledger/releases/download/latest-build/jiwen-latest.apk
+
+它永远指向最新一次打包（测试版）。正式版在仓库的 Releases 页面里，标着「Latest」的那个。
+
+下面是从零开始自己搭的步骤：
+
+
 1. 把本文件夹里的**所有文件和文件夹**上传到一个 GitHub 仓库（注意别漏掉 `.github` 文件夹，APK 就是靠它构建的）。
 2. 上传完成后，GitHub 会自动开始构建。点仓库顶部的 **Actions** 标签，能看到一个正在跑的任务「构建安卓 APK」。
 3. 等它跑完变成绿色对勾（约 3～5 分钟），点进这次运行，页面底部 **Artifacts** 区域有一个 `baofu-ledger-apk`，下载它。

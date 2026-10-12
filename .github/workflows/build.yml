@@ -5,6 +5,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 发布「最新测试版」要用
     steps:
       - name: 拉取代码
         uses: actions/checkout@v4
@@ -53,3 +55,29 @@ jobs:
           name: baofu-ledger-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # 每次 main 打包成功,就把 apk 放进固定的「最新测试版」发行页。
+      # 下载地址永远不变、不用登录、下到的直接是 apk(Actions 里的是要登录的 zip,而且 90 天过期)。
+      # 标成预发行,不会顶掉手动发的正式版。
+      - name: 发布到「最新测试版」
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          VER=$(grep -oE 'build [0-9]{4}-[A-Z0-9]+' www/index.html | head -1 | cut -d' ' -f2)
+          APK="$RUNNER_TEMP/jiwen-latest.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          WHEN=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')
+          NOTES="版本 $VER，打包于 $WHEN（北京时间），对应提交 ${GITHUB_SHA::7}：$(git log -1 --format=%s)
+
+          直接下载下面的 jiwen-latest.apk 安装即可，签名不变，可以覆盖升级。
+          这里永远是最新一次打包的结果；正式版请看标着「Latest」的那个发行版。"
+          # 标签跟着本次提交走
+          git push -f origin "$GITHUB_SHA:refs/tags/latest-build"
+          if gh release view latest-build >/dev/null 2>&1; then
+            gh release edit latest-build --title "最新测试版 $VER" --notes "$NOTES" --prerelease
+            gh release upload latest-build "$APK" --clobber
+          else
+            gh release create latest-build "$APK" --title "最新测试版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
+          fi
