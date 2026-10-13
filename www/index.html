@@ -1289,7 +1289,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-A</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-B</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2686,6 +2686,12 @@
                 const fileUser=(parsedHead && typeof parsedHead.user==='string') ? charSlice(parsedHead.user.trim(), 8) : '';
                 const fileId=(parsedHead && isAccountId(parsedHead.accountId)) ? parsedHead.accountId : null;
                 const doImport=(id)=>{
+                    // 【1013-B】还没整理完的账号不能导入：导入会先在新位置建出账本，挡住老数据搬过来
+                    const target=accountById(id);
+                    if(target && typeof target.legacy==='string'){
+                        customAlert(`账号「${target.name}」的数据还没整理完，暂时不能往里导入。请关掉 App 重新打开后再试。`, '请稍候');
+                        return;
+                    }
                     try{
                         const { finalName, stats, daysAdded, daysPending }=importArchiveFromText(text, id);
                         renderRecentUsers();
@@ -2707,7 +2713,8 @@
                     }
                 };
                 const newThenImport=()=>promptNewAccount(doImport, (fileUser && !nameTaken(fileUser)) ? fileUser : '', fileId);
-                const accts=getAccounts();
+                // 还没整理完的账号不出现在可选列表里（见 doImport）
+                const accts=getAccounts().filter(a=>typeof a.legacy!=='string');
                 if(!accts.length){ newThenImport(); }
                 else {
                     const opts=accts.map(a=>{
@@ -2840,7 +2847,14 @@
             if(v===null) return true;
             let cur=null;
             try{ cur=localStorage.getItem(to); }catch(_){}
-            if(cur!==null && cur!==v) return true;   // 新位置已有别的内容（上次搬到一半）：两份都留着，不冒险
+            // 【1013-B】新位置已经有别的内容（1013-A 里没搬完时能往这个账号导入，会先在新位置建出账本）：
+            //   以前这里「两份都留着」却报成功，迁移随即收尾，老数据就永远留在旧名字下、界面上再也看不到。
+            //   现在老数据才是这个账号真正的内容，放回新位置；新位置原来那份另存一份（不以 store_/billData_ 开头，
+            //   免得被当成老账号再搬一遍），一条都不删。另存失败就算这一项没搬完，下次接着来。
+            if(cur!==null && cur!==v){
+                try{ localStorage.setItem(`migrate_conflict_${to}_${Date.now()}`, cur); }catch(_){ return false; }
+                cur=null;
+            }
             if(cur===null){
                 try{ localStorage.setItem(to, v); }catch(_){ return false; }
                 if(localStorage.getItem(to)!==v) return false;
@@ -2903,17 +2917,25 @@
                 list.push(entry);
             });
             try{ saveAccounts(list); }catch(_){ return false; }
-            let ok=true;
-            list.forEach(a=>{ if(typeof a.legacy==='string') ok=migrateOneAccount(a.legacy, a.id) && ok; });
             // 自动登录记的是名字的话，换成编号
+            let ok=true;
             const remembered=localStorage.getItem('app_logged_in_user');
             const hit=list.find(a=>a.legacy===remembered);
             if(hit){ try{ localStorage.setItem('app_logged_in_user', hit.id); }catch(_){ ok=false; } }
+            // 【1013-B】逐个账号收尾：哪个账号的数据全搬完了，就马上去掉它的老名字记号，它就能进了。
+            //   以前要等所有账号都搬完才统一去掉，一个账号卡住（比如存储满），所有账号都进不去。
+            list.forEach(a=>{
+                if(typeof a.legacy!=='string') return;
+                if(!migrateOneAccount(a.legacy, a.id)){ ok=false; return; }
+                const cur=getAccounts().map(x=>{
+                    if(x.id!==a.id) return x;
+                    const b=Object.assign({}, x); delete b.legacy; return b;
+                });
+                try{ saveAccounts(cur); }catch(_){ ok=false; return; }
+                stampAccountName(a.id, a.name);
+            });
             if(!ok) return false;
-            const clean=list.map(a=>{ const b=Object.assign({}, a); delete b.legacy; return b; });
             try{
-                saveAccounts(clean);
-                clean.forEach(a=>stampAccountName(a.id, a.name));
                 localStorage.removeItem('users_index');
                 localStorage.setItem('accounts_v', ACCOUNTS_VERSION);
             }catch(_){ return false; }
@@ -7830,15 +7852,24 @@ ${detail}
             // 1010-K7：先把老的「按名字存」的数据搬到账号编号下（只跑一次；没搬完下次接着搬）
             let migrated=true;
             try{ migrated=migrateAccounts(); }catch(_){ migrated=false; }
-            if(!migrated) customAlert('升级时整理账号数据没有全部完成（可能是手机存储空间不足）。已经整理好的部分可以正常使用，下次打开 App 会接着整理。', '提示');
             const remembered=localStorage.getItem('app_logged_in_user');
-            if(migrated && remembered && accountById(remembered) && localStorage.getItem(`store_${remembered}`)!==null){
+            const rememberedAcc=remembered ? accountById(remembered) : null;
+            // 记住的账号自己已经整理好了，就照常自动进入（别的账号没整理完不影响它）
+            if(rememberedAcc && typeof rememberedAcc.legacy!=='string' && localStorage.getItem(`store_${remembered}`)!==null){
                 login(remembered);   // 自动登录，按设置进入默认页
             } else {
                 // 没整理完时先留着，下次整理完还能自动进入
                 if(remembered && migrated) localStorage.removeItem('app_logged_in_user');
                 document.body.classList.add('login-mode');
                 renderRecentUsers();
+            }
+            // 【1013-B】如实说是哪几个账号没整理完：只有它们暂时进不去，其它账号照常用。
+            //   放在自动登录之后，免得进入账号时弹出的别的提示把它盖掉。
+            if(!migrated){
+                const pendingNames=getAccounts().filter(a=>typeof a.legacy==='string').map(a=>`「${a.name}」`);
+                customAlert('升级时整理账号数据没有全部完成（可能是手机存储空间不足）。'
+                    + (pendingNames.length ? `${pendingNames.join('、')}暂时进不去，其它账号可以正常使用。` : '')
+                    + '下次打开 App 会接着整理。', '提示');
             }
         })();
 
