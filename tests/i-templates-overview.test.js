@@ -224,5 +224,38 @@ function bootSync(arc, extraArchives){
   ok(t.errs.length+t3.errs.length===0, '无脚本错误');
 }
 
+// ===== 【1013-E】点常用：带金额的直接滚到「添加记录」；不带金额的留在金额框 =====
+{
+  const t=await boot({ tpls:[{id:'m',type:'expense',cat:'餐饮',remark:'早餐',money:8,mode:'normal'},
+                              {id:'n',type:'expense',cat:'餐饮',remark:'午饭',money:null,mode:'normal'}] });
+  t.openAdd();
+  const dlg=t.$('addBill').closest('.edit-dialog');
+  // jsdom 不排版：手动给弹窗和按钮一个位置——弹窗可视区 0~600，按钮在 900，得往下滚 300 多
+  const rect=(top,bottom)=>({top,bottom,left:0,right:300,width:300,height:bottom-top,x:0,y:top});
+  dlg.getBoundingClientRect=()=>rect(0,600);
+  t.$('addBill').getBoundingClientRect=()=>rect(860-dlg.scrollTop, 900-dlg.scrollTop);
+  dlg.scrollTop=0;
+  t.clickChip('billTplChips','早餐8');
+  ok(dlg.scrollTop===316, '带金额的模板：弹窗滚到「添加记录」露出来（滚了 '+dlg.scrollTop+'）');
+  ok(t.$('billMoney').value==='8', '金额照常填好');
+  await new Promise(r=>setTimeout(r,400));
+  ok(dlg.scrollTop===316, '键盘收起后再滚一次也不会多滚');
+  dlg.scrollTop=0;
+  t.clickChip('billTplChips','午饭');
+  ok(dlg.scrollTop===0 && t.d.activeElement===t.$('billMoney'), '不带金额的模板：不滚，光标在金额框');
+  await new Promise(r=>setTimeout(r,400));
+  ok(dlg.scrollTop===0, '不带金额的过一会儿也不滚');
+  ok(t.errs.length===0, '1013-E 无脚本错误 '+t.errs.join(';'));
+}
+// ===== 【1013-E】标签选中前后大小不变：选中不再改字重，行高固定 =====
+{
+  const t=await boot();
+  const css=[...t.d.styleSheets].flatMap(sh=>[...sh.cssRules]).filter(r=>r.selectorText);
+  const rule=sel=>css.filter(r=>r.selectorText.split(',').map(x=>x.trim()).includes(sel));
+  const selRules=[...rule('.cat-chips .cc.sel'), ...rule('.filter-chips .cc.sel')];
+  ok(selRules.length>=2 && selRules.every(r=>!r.style.fontWeight), '分类 / 常用 / 口径 / 筛选标签选中时不改字重');
+  ok(rule('.cat-chips .cc').some(r=>r.style.lineHeight==='20px') && rule('.filter-chips .cc').some(r=>r.style.lineHeight==='20px'), '标签行高固定，不随字体变化');
+}
+
 console.log(`\n1010-I 专项：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);
 })();

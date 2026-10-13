@@ -89,9 +89,11 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   // 再点收起
   t.rowOf('游戏').click();
   ok(!t.$('bgGroups').querySelector('.bg-detail'), '再点收起');
-  // 一次只展开一个
+  // 【1013-E】可以同时展开多个
   t.rowOf('餐饮').click(); t.rowOf('订阅').click();
-  ok(t.$('bgGroups').querySelectorAll('.bg-detail').length===1 && t.rowOf('订阅').classList.contains('open'), '一次只展开一个');
+  ok(t.$('bgGroups').querySelectorAll('.bg-detail').length===2 && t.rowOf('订阅').classList.contains('open') && t.rowOf('餐饮').classList.contains('open'), '同时展开两个，互不收起');
+  t.rowOf('餐饮').click();
+  ok(t.$('bgGroups').querySelectorAll('.bg-detail').length===1 && t.rowOf('订阅').classList.contains('open') && !t.rowOf('餐饮').classList.contains('open'), '收起一个，另一个还开着');
 }
 
 // ===== 4. 【1010-I2】去掉「在账单里查看」；未设预算的分类也能点开明细 =====
@@ -99,14 +101,15 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   const t=await boot(B); t.tab('budget');
   t.rowOf('游戏').click();
   ok(!t.$('statPaneBudget').querySelector('[data-act="bgJump"]') && !t.$('statPaneBudget').textContent.includes('在账单里查看'), '明细里不再有「在账单里查看」');
-  ok(t.$('bgGroups').querySelector('.bg-detail-foot').textContent==='4 笔；另有 1 笔不计入 / 只算结余，未算在内', '明细底部说明：'+t.$('bgGroups').querySelector('.bg-detail-foot').textContent);
+  ok(t.$('bgGroups').querySelector('.bg-detail-foot span').textContent==='4 笔；另有 1 笔不计入 / 只算结余，未算在内', '明细底部说明：'+t.$('bgGroups').querySelector('.bg-detail-foot span').textContent);
   // 未设预算：展开列表 → 点「出行」行
   t.$('bgUnsetCard').querySelector('[data-act="bgUnsetToggle"]').click();
   const urow=c=>[...t.$('bgUnsetCard').querySelectorAll('.bgu-row')].find(r=>r.dataset.cat===c);
   urow('出行').click();
   const det=t.$('bgUnsetCard').querySelector('.bg-detail');
   ok(det && det.querySelectorAll('.sf-item').length===1 && det.textContent.includes('火车站') && det.textContent.includes('−483.00'), '未设预算的出行可展开看明细');
-  ok(urow('出行').classList.contains('open') && !t.$('bgGroups').querySelector('.bg-detail'), '与上面的已设预算共用「一次只展开一个」');
+  ok(urow('出行').classList.contains('open') && t.rowOf('游戏').classList.contains('open') && t.$('bgGroups').querySelector('.bg-detail'), '【1013-E】上面已设预算的游戏照样开着');
+  ok(!det.querySelector('[data-act="bgSet"]'), '未设预算的明细里不放「改预算」（行上已有「设预算」）');
   det.querySelector('.sf-item').click();
   ok(t.$('detailMask').style.display==='flex' && t.$('detailRemark').textContent==='火车站', '明细条目点开详情');
   t.$('detailClose').click();
@@ -143,5 +146,27 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   ok(t.$('bgUnsetCard').style.display==='', '仍列出未设预算的分类，方便挑着设');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
+// ===== 6. 【1013-E】展开后就地改预算上限 =====
+{
+  const t=await boot(B); t.tab('budget');
+  t.rowOf('游戏').click(); t.rowOf('订阅').click();
+  const btn=t.rowOf('游戏').nextElementSibling.querySelector('.bg-detail-foot [data-act="bgSet"]');
+  ok(btn && btn.textContent==='改预算' && btn.dataset.cat==='游戏', '展开的明细底部有「改预算」');
+  btn.click();
+  ok(t.$('askTitle').textContent==='分类预算' && t.$('askInput').value==='300', '弹出改预算，带着现在的上限 300');
+  ok(t.rowOf('游戏').classList.contains('open'), '点「改预算」不会把这一行收起');
+  t.$('askInput').value='500'; t.$('askOk').click();
+  const r=t.rowOf('游戏');
+  ok(r.querySelector('.bg-num').textContent==='306.87 / 500.00', '改完立即按新上限重算：'+r.querySelector('.bg-num').textContent);
+  ok(r.classList.contains('open') && t.rowOf('订阅').classList.contains('open'), '改完两个展开的都还开着');
+  ok(t.$('catMask').style.display!=='flex', '没有跳去分类管理');
+  ok(JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['默认存档'].budgets['游戏']===500, '新上限存进了账本');
+  // 填 0 = 取消预算：游戏回到「未设预算」
+  t.rowOf('游戏').nextElementSibling.querySelector('[data-act="bgSet"]').click();
+  t.$('askInput').value='0'; t.$('askOk').click();
+  ok(!t.rowOf('游戏'), '填 0 取消预算，游戏不在已设预算的分组里了');
+  ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
+}
+
 console.log(`\n1010-G 预算页签：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);
 })();

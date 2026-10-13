@@ -278,9 +278,13 @@
             background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer;
             white-space:nowrap; transition:0.15s; -webkit-user-select:none; user-select:none; }
         .cat-chips .cc:hover { border-color:var(--c-accent); }
+        /* 【1013-E】选中时不再改字重：有的手机没有这个字重，会换一种字体来画粗体，行高、字宽都跟着变，
+           选中的那颗变高变宽，同一行别的标签被拉高、字贴到顶上（看着像跳了一下）。
+           改成固定行高 + 描一圈细边来加粗，选中前后大小一点都不变。 */
         .cat-chips .cc.sel {
             background:var(--c-sel-bg);
-            border-color:var(--c-sel-border); font-weight:600; }
+            border-color:var(--c-sel-border); -webkit-text-stroke:0.45px currentColor; }
+        .cat-chips .cc, .filter-chips .cc { line-height:20px; }
         .cat-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
 
         /* 收支标签：复用 cat-chips 布局，但选中态用语义色（支出红 / 收入绿）便于一眼区分 */
@@ -548,7 +552,7 @@
         .filter-chips .cc:hover { border-color:var(--c-accent); }
         .filter-chips .cc.sel {
             background:var(--c-sel-bg);
-            border-color:var(--c-sel-border); font-weight:600; }
+            border-color:var(--c-sel-border); -webkit-text-stroke:0.45px currentColor; }
         .filter-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
 
         /* 上栏：全局总览（中性卡片底，始终显示） */
@@ -1048,7 +1052,7 @@
         #askChoices.choose-list .cc { border:none; border-bottom:1px dashed var(--c-border); border-radius:0;
             padding:13px 14px; text-align:left; background:transparent; white-space:normal; flex:0 0 auto; }
         #askChoices.choose-list .cc:last-child { border-bottom:none; }
-        #askChoices.choose-list .cc.sel { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; }
+        #askChoices.choose-list .cc.sel { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; -webkit-text-stroke:0; }
 
         /* 确认清单的行可点开看详情 */
         .ask-list .al-row { cursor:pointer; transition:background .15s; }
@@ -1186,6 +1190,9 @@
         .bg-detail-empty { padding:10px 2px; font-size:13px; color:var(--c-text-soft); }
         .bg-detail-foot { display:flex; justify-content:space-between; align-items:center; gap:10px;
             padding-top:8px; margin-top:2px; border-top:1px solid var(--c-border); font-size:12px; color:var(--c-text-soft); }
+        /* 【1013-E】展开明细底部的「改预算」：小一号，和「设预算」一个样子 */
+        .bg-detail-foot .bg-edit { flex-shrink:0; padding:5px 12px; font-size:12.5px; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-primary-dark); border-radius:8px; }
         .bgu-row.bg-click { cursor:pointer; }
         .bgu-row.bg-click:active { background:var(--c-chip); }
         .bgu-row + .bg-detail { margin-top:6px; }
@@ -1241,7 +1248,7 @@
 
         /* ===== 1010-I：常用模板 ===== */
         .tpl-chips .cc { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .tpl-chips .cc .tpl-amt { margin-left:5px; font-size:12px; color:var(--c-text-soft); }
+        .tpl-chips .cc .tpl-amt { margin-left:5px; font-size:12px; line-height:1; color:var(--c-text-soft); }
         .tpl-chips .cc.sel .tpl-amt { color:inherit; }
         .tpl-save-btn { display:block; width:100%; margin-top:10px; padding:11px; border-radius:8px;
             border:1px solid var(--c-border-mid); background:var(--c-surface); color:var(--c-primary-dark);
@@ -1289,7 +1296,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-D</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-E</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -5381,7 +5388,8 @@ ${detail}
         // 一处算、两处用：computeBudget 给「收支」页签的一行入口和「预算」页签共用，口径永远一致。
         // 已花 = 该月、该分类、支出、口径「计入」；状态：> 100% 超支 / ≥ 80% 接近 / 其余正常。
         let statTab='flow';        // 'flow' | 'budget'
-        let bgExpanded=null;       // 预算页签里展开的分类
+        // 【1013-E】预算页签里展开的分类：可以同时展开多个（以前只能开一个，点别的会把上一个收起）
+        const bgExpanded=new Set();
         let bgUnsetOpen=false;     // 「未设预算的分类」是否展开
         function computeBudget(dec, y, mo){
             const budgets=getBudgets();
@@ -5485,8 +5493,8 @@ ${detail}
                     const rs=B.rows.filter(r=>r.state===k).sort((a,b)=>b.pct-a.pct);
                     if(!rs.length) return '';
                     return `<div class="stat-card"><div class="stat-day-title bg-gtitle ${k}"><span class="dot"></span>${title} · ${rs.length}</div>`
-                        + rs.map(r=>budgetRowHtml(r, B.timePct, true, bgExpanded===r.cat)
-                            + (bgExpanded===r.cat ? budgetDetailHtml(dec, r) : '')).join('')
+                        + rs.map(r=>budgetRowHtml(r, B.timePct, true, bgExpanded.has(r.cat))
+                            + (bgExpanded.has(r.cat) ? budgetDetailHtml(dec, r) : '')).join('')
                         + `</div>`;
                 }).join('');
             }
@@ -5500,11 +5508,11 @@ ${detail}
                 uc.innerHTML=`<button class="bgu-head" data-act="bgUnsetToggle">`
                     + `<span class="stat-day-title">未设预算的分类 · ${B.unsetList.length}</span><span class="bgu-arrow">▾</span></button>`
                     + (bgUnsetOpen ? `<div class="bgu-list">` + B.unsetList.map(u=>
-                        `<div class="bgu-row bg-click${bgExpanded===u.cat?' open':''}" data-act="bgRow" data-cat="${escapeHtml(u.cat)}">`
+                        `<div class="bgu-row bg-click${bgExpanded.has(u.cat)?' open':''}" data-act="bgRow" data-cat="${escapeHtml(u.cat)}">`
                         + `<span class="bgu-name">${escapeHtml(u.cat)}<i class="bg-chev">›</i></span>`
                         + `<span class="bgu-amt">−${u.used.toFixed(2)}</span>`
                         + `<button class="bgu-set" data-act="bgSet" data-cat="${escapeHtml(u.cat)}">设预算</button></div>`
-                        + (bgExpanded===u.cat ? budgetDetailHtml(dec, { cat:u.cat, excl:u.excl||0 }) : '')).join('')
+                        + (bgExpanded.has(u.cat) ? budgetDetailHtml(dec, { cat:u.cat, excl:u.excl||0 }) : '')).join('')
                         + `</div>` : '');
             }
         }
@@ -5604,15 +5612,18 @@ ${detail}
                     + `</div><span class="sf-amt ${rf?'pos':'neg'}">${rf?'+':'−'}${safeNum(x.r.money).toFixed(2)}</span></div>`;
             }).join('') + `</div>` : `<div class="bg-detail-empty">这个月还没有计入的支出</div>`;
             const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计入 / 只算结余，未算在内`:''}`;
+            // 【1013-E】设了预算的分类，展开后就地改上限，不用再跑去设置里的分类管理
+            const edit = r.limit>0 ? `<button class="mini-btn bg-edit" data-act="bgSet" data-cat="${escapeHtml(r.cat)}">改预算</button>` : '';
             return `<div class="bg-detail">${items}`
-                + `<div class="bg-detail-foot"><span>${note}</span></div></div>`;
+                + `<div class="bg-detail-foot"><span>${note}</span>${edit}</div></div>`;
         }
         // 预算页签的所有点击（事件委托，一次绑定）
         $('statPaneBudget').addEventListener('click', e=>{
             const el=e.target.closest('[data-act]'); if(!el) return;
             const act=el.dataset.act;
             if(act==='bgRow'){
-                bgExpanded = (bgExpanded===el.dataset.cat) ? null : el.dataset.cat;
+                const c=el.dataset.cat;
+                if(bgExpanded.has(c)) bgExpanded.delete(c); else bgExpanded.add(c);
                 renderStats();
             } else if(act==='bgRec'){
                 openDetail(el.dataset.id);
@@ -5621,7 +5632,7 @@ ${detail}
             } else if(act==='bgYearToggle'){
                 bgYearOpen=!bgYearOpen; renderStats();
             } else if(act==='bgYearMonth'){
-                statMonth=Number(el.dataset.mo); statSelDay=null; bgExpanded=null;
+                statMonth=Number(el.dataset.mo); statSelDay=null; bgExpanded.clear();
                 renderStatCalendar();
                 window.scrollTo(0,0);
             } else if(act==='bgOutside'){
@@ -5855,9 +5866,27 @@ ${detail}
                 b.onclick=()=>{
                     applyTpl(t, cats);
                     box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                    // 【1013-E】带金额的模板点完表单就填全了，直接把弹窗滚到「添加记录」。
+                    //   不带金额的还得填金额，留在原处（applyTpl 已聚焦金额框）。
+                    if(t.money!=null) revealAddBtn();
                 };
                 box.appendChild(b);
             });
+        }
+        // 把「记一笔」弹窗自己往下滚，露出「添加记录」按钮（只滚弹窗，不动整个页面）。
+        //   键盘刚收起时弹窗会变高，过一会儿再滚一次。
+        function revealAddBtn(){
+            const go=()=>{
+                const dlg=$('addBill').closest('.edit-dialog'), btn=$('addBill');
+                if(!dlg || !btn || $('addMask').style.display==='none') return;
+                const d=dlg.getBoundingClientRect(), b=btn.getBoundingClientRect();
+                const delta=b.bottom + 16 - d.bottom;
+                if(delta<=0) return;
+                const top=dlg.scrollTop + delta;
+                try{ dlg.scrollTo({ top, behavior:'smooth' }); }catch(_){ dlg.scrollTop=top; }
+            };
+            go();
+            setTimeout(go, 350);
         }
         // 把模板填进「记一笔」表单。时间不动（仍是此刻 / 用户已选的时间）。
         function applyTpl(t, cats){
@@ -7312,7 +7341,7 @@ ${detail}
         window.addEventListener('scroll', ()=>{ if(currentTab==='stats' && statAway()) syncStatTodayFab(); }, { passive:true });
         $('statTodayFab').addEventListener('click', ()=>{
             const now=new Date();
-            statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null; bgExpanded=null;
+            statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null; bgExpanded.clear();
             renderStatCalendar();
             window.scrollTo(0,0);
         });
