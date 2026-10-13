@@ -1,5 +1,5 @@
 // 1010-G 预算页签专项：node test9.js <html>
-const fs=require('fs'); const {JSDOM}=require('jsdom');
+const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark},extra||{});
@@ -16,9 +16,11 @@ const recs=()=>[
   R('x1','2026-10-09T14:14',208.8,'expense','其他','日用品'),
   R('sep','2026-09-20T20:00',60,'expense','游戏','九月'),
 ];
-function boot(budgets, records){
+let __lastW=null, __phone=null, __lastPhone=null;
+async function boot(...a){ const t=bootSync(...a); const __w=__lastW, __p=__lastPhone; t.idle=()=>IDB.idle(__w); t.phone=__p; t.db=async()=>{ await IDB.idle(__w); return IDB.dumpDb(__p); }; await IDB.idle(__w); t.d.querySelector('.tab-btn[data-tab="stats"]').click(); return t; }
+function bootSync(budgets, records){
   const store={archives:{'默认存档':{cats:['未分类','餐饮','游戏','订阅','出行','其他'],records:records||recs(),budgets}},last:'默认存档'};
-  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
+  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){ __lastW=w; __lastPhone=IDB.install(w, __phone);
     const ls=w.localStorage; ls.setItem('app_logged_in_user','小明'); ls.setItem('store_小明',JSON.stringify(store)); ls.setItem('app_time_repaired_小明','1');
     w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=function(){};
     w.Date=class extends Date{constructor(...a){a.length?super(...a):super('2026-10-10T14:00:00');}static now(){return new Date('2026-10-10T14:00:00').getTime();}};}});
@@ -27,15 +29,15 @@ function boot(budgets, records){
   const tab=v=>$('statTabSeg').querySelector(`[data-v="${v}"]`).click();
   const groups=()=>[...$('bgGroups').querySelectorAll('.stat-card')].map(c=>({t:c.querySelector('.bg-gtitle').textContent, cats:[...c.querySelectorAll('.bg-row')].map(r=>r.dataset.cat)}));
   const rowOf=c=>[...$('bgGroups').querySelectorAll('.bg-row')].find(r=>r.dataset.cat===c);
-  d.querySelector('.tab-btn[data-tab="stats"]').click();
   return {w:dom.window,d,$,errs,tab,groups,rowOf};
 }
 // 游戏 306.87/300=102% 超；餐饮 29/35=83% 接近；订阅 157/300 正常；出行 483 未设；其他 208.8 未设
 const B={'游戏':300,'餐饮':35,'订阅':300};
 
+(async()=>{
 // ===== 1. 页签切换 =====
 {
-  const t=boot(B);
+  const t=await boot(B);
   ok([...t.$('statTabSeg').querySelectorAll('button')].map(b=>b.textContent).join()==='收支,预算', '页签：收支 | 预算');
   ok(t.$('statPaneFlow').style.display==='' && t.$('statPaneBudget').style.display==='none', '默认在收支');
   const entry=t.$('statBudgetCard');
@@ -55,7 +57,7 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
 
 // ===== 2. 总览与分组 =====
 {
-  const t=boot(B); t.tab('budget');
+  const t=await boot(B); t.tab('budget');
   const ov=t.$('bgOverview');
   ok(ov.querySelector('.bgo-num').textContent==='492.87 / 635.00' && ov.querySelector('.bgo-pct').textContent==='78%', '总览：已花 / 预算合计：'+ov.querySelector('.bgo-num').textContent);
   ok([...ov.querySelectorAll('.bgc')].map(e=>e.textContent).join()==='超支 1,接近上限 1,正常 1', '三类计数');
@@ -63,13 +65,13 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   const g=t.groups();
   ok(g.length===3 && g[0].t==='已超支 · 1' && g[0].cats.join()==='游戏' && g[1].cats.join()==='餐饮' && g[2].cats.join()==='订阅', '分组：超支 → 接近 → 正常：'+JSON.stringify(g));
   // 某组为空时不出现
-  const t2=boot({'订阅':300}); t2.tab('budget');
+  const t2=await boot({'订阅':300}); t2.tab('budget');
   ok(t2.groups().length===1 && t2.groups()[0].t==='正常 · 1', '空组不显示');
 }
 
 // ===== 3. 展开明细 =====
 {
-  const t=boot(B); t.tab('budget');
+  const t=await boot(B); t.tab('budget');
   t.rowOf('游戏').click();
   const det=t.$('bgGroups').querySelector('.bg-detail');
   const items=[...det.querySelectorAll('.sf-item')];
@@ -94,7 +96,7 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
 
 // ===== 4. 【1010-I2】去掉「在账单里查看」；未设预算的分类也能点开明细 =====
 {
-  const t=boot(B); t.tab('budget');
+  const t=await boot(B); t.tab('budget');
   t.rowOf('游戏').click();
   ok(!t.$('statPaneBudget').querySelector('[data-act="bgJump"]') && !t.$('statPaneBudget').textContent.includes('在账单里查看'), '明细里不再有「在账单里查看」');
   ok(t.$('bgGroups').querySelector('.bg-detail-foot').textContent==='4 笔；另有 1 笔不计入 / 只算结余，未算在内', '明细底部说明：'+t.$('bgGroups').querySelector('.bg-detail-foot').textContent);
@@ -119,7 +121,7 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
 
 // ===== 5. 未设预算的分类 =====
 {
-  const t=boot(B); t.tab('budget');
+  const t=await boot(B); t.tab('budget');
   const uc=t.$('bgUnsetCard');
   ok(uc.style.display==='' && uc.querySelector('.stat-day-title').textContent==='未设预算的分类 · 2' && !uc.querySelector('.bgu-list'), '默认折叠，写明个数');
   uc.querySelector('[data-act="bgUnsetToggle"]').click();
@@ -133,7 +135,7 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
 
 // ===== 6. 空状态 =====
 {
-  const t=boot(undefined); t.tab('budget');
+  const t=await boot(undefined); t.tab('budget');
   ok(t.$('bgOverview').textContent.includes('还没有给任何分类设预算') && t.$('bgGroups').innerHTML==='', '没设预算时给出说明');
   ok(t.$('statBudgetCard').style.display==='none', '收支页签不显示入口');
   t.$('bgOverview').querySelector('[data-act="bgSetup"]').click();
@@ -142,3 +144,4 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 console.log(`\n1010-G 预算页签：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);
+})();

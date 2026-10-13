@@ -1,6 +1,6 @@
 // 1010-C 回归（原 1010-B 用例）测试：node test2.js <html>
 const fs = require('fs');
-const { JSDOM } = require('jsdom');
+const { JSDOM } = require('jsdom'); const IDB=require('./helpers/idb');
 const html = fs.readFileSync(process.argv[2] || require('path').join(__dirname,'..','www','index.html'), 'utf8');
 let pass=0, fail=0;
 const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
@@ -18,10 +18,12 @@ function baseRecords(){
     for(let i=0;i<20;i++) rs.push(R('g'+i,`2026-09-${String(13+(i%10)).padStart(2,'0')}T2${i%10}:00`,10+i,'expense',['其他','购物','餐饮'][i%3],'游戏充值'));
     return rs;
 }
-function boot(records, extra){
+let __lastW=null, __phone=null, __lastPhone=null;
+async function boot(...a){ const t=bootSync(...a); const __w=__lastW, __p=__lastPhone; t.idle=()=>IDB.idle(__w); t.phone=__p; t.db=async()=>{ await IDB.idle(__w); return IDB.dumpDb(__p); }; await IDB.idle(__w); return t; }
+function bootSync(records, extra){
     const store={ archives:{ '默认存档':{ cats:['未分类','餐饮','购物','转账','其他','游戏'], records: records||baseRecords() } }, last:'默认存档' };
     const dom=new JSDOM(html,{ runScripts:'dangerously', pretendToBeVisual:true, url:'https://localhost/',
-        beforeParse(w){
+        beforeParse(w){ __lastW=w; __lastPhone=IDB.install(w, __phone);
             const ls=w.localStorage;
             ls.setItem('app_logged_in_user','小明'); ls.setItem('store_小明',JSON.stringify(store));
             ls.setItem('app_time_repaired_小明','1');
@@ -32,7 +34,7 @@ function boot(records, extra){
         }});
     const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
     const d=dom.window.document, $=id=>d.getElementById(id);
-    const recs=()=>JSON.parse(dom.window.localStorage.getItem(dom.window.storeKey())).archives['默认存档'].records;
+    const recs=()=>JSON.parse(dom.window.ledgerGet(dom.window.storeKey())).archives['默认存档'].records;
     const byId=id=>recs().find(r=>r.id===id);
     const chip=(boxId,text)=>[...$(boxId).querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===text);
     const choose=text=>{ chip('askChoices',text).click(); $('askOk').click(); };
@@ -40,9 +42,10 @@ function boot(records, extra){
     return { w:dom.window, d, $, recs, byId, chip, choose, filterKw, errs };
 }
 
+(async()=>{
 // ===== 1. 记一笔：三选一 + 转账自动切不计入 =====
 {
-    const t=boot(); const box=t.$('billMode'); const mode=()=>box.dataset.mode;
+    const t=await boot(); const box=t.$('billMode'); const mode=()=>box.dataset.mode;
     const pick=txt=>[...box.querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===txt).click();
     t.$('fabAdd').click();
     ok(mode()==='normal' && box.querySelector('.cc.sel').textContent==='计入', '新表单默认「计入」');
@@ -79,7 +82,7 @@ function boot(records, extra){
 // ===== 2. 修改：保留 skip 与未知字段，开关可关掉 =====
 {
     const recs=baseRecords(); recs[2].foo='keep';
-    const t=boot(recs);
+    const t=await boot(recs);
     t.w.openEdit('a5');
     ok(t.$('editMode').dataset.mode==='skip', '修改弹窗回显 skip');
     t.$('saveEdit').click();
@@ -95,11 +98,11 @@ function boot(records, extra){
 
 // ===== 3. 导入保留 skip =====
 {
-    const t=boot();
+    const t=await boot();
     const txt=JSON.stringify({ app:'记问', user:'小明', archive:'导入测试', cats:['转账'],
         data:[ R('x','2026-09-01T10:00',50,'expense','转账','还款',{skip:true}), R('y','2026-09-01T11:00',5,'expense','转账','',{skip:'yes'}) ] });
     t.w.importArchiveFromText(txt, t.w.localStorage.getItem('app_logged_in_user'));
-    const arc=JSON.parse(t.w.localStorage.getItem(t.w.storeKey())).archives['导入测试'].records;
+    const arc=JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['导入测试'].records;
     ok(arc[0].skip===true, '导入保留 skip:true');
     ok(!('skip' in arc[1]), '非严格 true 的 skip 不导入');
 }
@@ -107,7 +110,7 @@ function boot(records, extra){
 // ===== 4. 账单页口径 =====
 {
     const recs=baseRecords(); recs[0].skip=true; recs[1].skip=true;
-    const t=boot(recs);
+    const t=await boot(recs);
     const ov=t.$('summaryOverall').textContent;
     const out=14+100*0+[...Array(20).keys()].reduce((s,i)=>s+10+i,0); // 午饭 + 20 条游戏
     const q=c=>t.$('summaryOverall').querySelector(c).textContent;
@@ -122,7 +125,7 @@ function boot(records, extra){
     ok(sf.includes('命中 2 条（其中 2 条不计入）') && sf.includes('支出 0.00'), '筛选小计说明不计入条数：'+sf);
     ok(t.$('batchBar').querySelector('[data-act="batch"]'), '筛选生效时有批量按钮');
     // 结余：a5（100 不计入）那一行结余应等于它前一笔
-    const t2=boot(baseRecords());
+    const t2=await boot(baseRecords());
     const all=[...t2.$('billList').querySelectorAll('tr')].map(r=>({ t:r.querySelector('[data-label="记账时间"]').textContent, b:r.querySelector('[data-label="结余"]').textContent }));
     // 第一页是最新 15 条，a5 在 09-12，翻页找
     let found=null; const pages=[all];
@@ -138,7 +141,7 @@ function boot(records, extra){
 // ===== 5. 统计页 =====
 {
     const recs=baseRecords(); recs[1].skip=true;
-    const t=boot(recs);
+    const t=await boot(recs);
     t.d.querySelector('.tab-btn[data-tab="stats"]').click();
     const cells=[...t.$('statCal').querySelectorAll('.day')];
     const c12=cells.find(c=>c.querySelector('.dn') && c.querySelector('.dn').textContent==='12');
@@ -153,7 +156,7 @@ function boot(records, extra){
 // ===== 6. AI 导出 =====
 {
     const recs=baseRecords(); recs[0].skip=true; recs[1].skip=true;
-    const t=boot(recs);
+    const t=await boot(recs);
     const aug=recs.filter(r=>r.time.startsWith('2026-08'));
     const txt=t.w.buildAiText(aug,'2026年8月','按月');
     ok(txt.includes('支出 0.00 元') && txt.includes('共 2 笔（其中 2 笔不计入收支）'), 'AI 总览排除不计入');
@@ -163,7 +166,7 @@ function boot(records, extra){
 
 // ===== 7. 批量操作 =====
 {
-    const t=boot();
+    const t=await boot();
     t.filterKw('信用卡');
     t.$('batchBar').querySelector('[data-act="batch"]').click();
     t.choose('标为不计入');
@@ -175,7 +178,7 @@ function boot(records, extra){
     ok(!('skip' in t.byId('a1')) && !('skip' in t.byId('a2')), '撤销恢复原样');
 
     // 跨页：20 条游戏充值，每页 15 条
-    const t2=boot();
+    const t2=await boot();
     t2.filterKw('游戏充值');
     t2.$('batchBar').querySelector('[data-act="batch"]').click();
     t2.choose('改分类'); t2.choose('游戏');
@@ -185,7 +188,7 @@ function boot(records, extra){
     ok(t2.recs().filter(r=>r.cat==='游戏').length===20, '没有误改其他记录');
 
     // 按分类筛选时改分类：筛选跟到新分类
-    const t3=boot();
+    const t3=await boot();
     t3.$('filterFab').click(); t3.chip('filterChips','其他').click(); t3.$('searchKeyword').value='游戏充值'; t3.$('sheetApply').click();
     const n=t3.recs().filter(r=>r.cat==='其他' && r.remark==='游戏充值').length;
     t3.$('batchBar').querySelector('[data-act="batch"]').click();
@@ -196,20 +199,21 @@ function boot(records, extra){
     ok(t3.$('filterCat').value==='其他' && t3.recs().filter(r=>r.cat==='游戏').length===0, '撤销后分类与筛选都还原');
 
     // 没筛选时没有批量入口
-    const t4=boot();
+    const t4=await boot();
     ok(t4.$('summaryFilter').style.display==='none', '无筛选时不显示批量入口');
     ok(t.errs.length+t2.errs.length+t3.errs.length===0, '批量无脚本错误');
 }
 
 // ===== 8. 详情 + 云备份文件名说明 =====
 {
-    const t=boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_小明.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
+    const t=await boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_小明.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
     t.w.openDetail('a5');
     ok(t.$('detailType').textContent.includes('不计入收支') && t.$('detailMoney').querySelector('.amt-skip'), '详情显示不计入');
     ok(t.$('odStatus').textContent.includes('（云盘文件名不随存档改名）'), '文件名对不上时有说明');
-    const t2=boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_默认存档.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
+    const t2=await boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_默认存档.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
     ok(!t2.$('odStatus').textContent.includes('不随存档改名'), '文件名一致时不显示说明');
 }
 
 console.log(`\n1010-C 回归（原 1010-B 用例）：${pass} 通过，${fail} 失败`);
 process.exit(fail?1:0);
+})();

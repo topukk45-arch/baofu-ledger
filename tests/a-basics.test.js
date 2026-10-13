@@ -1,6 +1,6 @@
 // 1010-A 回归测试：node test.js <html>
 const fs = require('fs');
-const { JSDOM } = require('jsdom');
+const { JSDOM } = require('jsdom'); const IDB=require('./helpers/idb');
 const file = process.argv[2] || require('path').join(__dirname,'..','www','index.html');
 const html = fs.readFileSync(file, 'utf8');
 
@@ -20,12 +20,14 @@ function seedStore(){
     }, last: '默认存档' };
 }
 
-function boot(opts){
+let __lastW=null, __phone=null, __lastPhone=null;
+async function boot(...a){ const t=bootSync(...a); const __w=__lastW, __p=__lastPhone; t.idle=()=>IDB.idle(__w); t.phone=__p; t.db=async()=>{ await IDB.idle(__w); return IDB.dumpDb(__p); }; await IDB.idle(__w); return t; }
+function bootSync(opts){
     opts = opts || {};
     const forgotten = [];
     const dom = new JSDOM(html, {
         runScripts: 'dangerously', pretendToBeVisual: true, url: 'https://localhost/',
-        beforeParse(w){
+        beforeParse(w){ __lastW=w; __lastPhone=IDB.install(w, __phone);
             const ls = w.localStorage;
             ls.setItem('app_logged_in_user', '小明');
             ls.setItem('store_小明', JSON.stringify(opts.store || seedStore()));
@@ -52,11 +54,11 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
 
 (async ()=>{
     // ---------- 版本号 ----------
-    { const t = boot(); ok(/build \d{4}-[A-Z]\d*/.test(t.d.body.innerHTML), '页面带版本号'); }
+    { const t = await boot(); ok(/build \d{4}-[A-Z]\d*/.test(t.d.body.innerHTML), '页面带版本号'); }
 
     // ---------- 1. 重命名存档：连接跟着走 ----------
     {
-        const t = boot({ extra: [['onedrive_link_小明__默认存档', link('content://a')]] });
+        const t = await boot({ extra: [['onedrive_link_小明__默认存档', link('content://a')]] });
         $(t.d,'renameArchive').click(); prompt(t.d, '日常');
         const ls = t.w.localStorage;
         ok(ls.getItem(odk(t,'日常')) !== null, '改名后新存档名下有连接');
@@ -67,7 +69,7 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
     }
     // ---------- 1b. 写新连接失败：旧连接必须保留 ----------
     {
-        const t = boot({ extra: [['onedrive_link_小明__默认存档', link('content://a')]] });
+        const t = await boot({ extra: [['onedrive_link_小明__默认存档', link('content://a')]] });
         const S = t.w.Storage.prototype, orig = S.setItem, bad = odk(t,'日常');
         S.setItem = function(k, v){ if(String(k).startsWith(bad)) throw new Error('quota'); return orig.call(this, k, v); };
         $(t.d,'renameArchive').click(); prompt(t.d, '日常');
@@ -76,15 +78,15 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
     }
     // ---------- 1c. 没有连接时改名不出错、不凭空造连接 ----------
     {
-        const t = boot();
+        const t = await boot();
         $(t.d,'renameArchive').click(); prompt(t.d, '日常');
         ok(t.w.localStorage.getItem(odk(t,'日常')) === null, '无连接改名不产生连接');
-        ok(JSON.parse(t.w.localStorage.getItem(t.w.storeKey())).archives['日常'].records.length === 4, '改名后记录完整');
+        ok(JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['日常'].records.length === 4, '改名后记录完整');
     }
 
     // ---------- 2. 删除存档：清理连接 + 释放授权 ----------
     {
-        const t = boot({ extra: [['onedrive_link_小明__默认存档', link('content://a')],
+        const t = await boot({ extra: [['onedrive_link_小明__默认存档', link('content://a')],
                                   ['onedrive_link_小明__旅行', link('content://b')]] });
         $(t.d,'delArchive').click(); $(t.d,'askOk').click();
         const ls = t.w.localStorage;
@@ -96,7 +98,7 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
 
     // ---------- 3. 修改用户名：只改名字，数据原地不动 ----------
     {
-        const t = boot({ extra: [
+        const t = await boot({ extra: [
             ['onedrive_link_小明__默认存档', link('content://a')],
             ['onedrive_link_小明__旅行', link('content://b')],
             ['days_card_n_小明', '7'],
@@ -113,7 +115,7 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
         $(t.d,'editNameBtn').click(); prompt(t.d, '新名字');
         ok(uid(t) === id && t.w.storeKey() === `store_${id}`, '改名后编号不变');
         ok(JSON.parse(ls.getItem('accounts')).find(a=>a.id===id).name === '新名字', '账号列表里的名字已改');
-        ok(JSON.parse(ls.getItem(`store_${id}`)).accountName === '新名字', '名字也抄进了账本');
+        ok(JSON.parse((await t.db())[`store_${id}`]).accountName === '新名字', '名字也抄进了账本（IndexedDB 里的）');
         const after = [];
         for(let i=0;i<ls.length;i++) after.push(ls.key(i));
         ok(before.sort().join('|') === after.sort().join('|'), '改名没有新增或删除任何数据键');
@@ -124,7 +126,7 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
 
     // ---------- 4. 筛选无结果：总览保留 ----------
     {
-        const t = boot();
+        const t = await boot();
         $(t.d,'filterFab').click();
         $(t.d,'searchKeyword').value = '不存在的关键词';
         $(t.d,'sheetApply').click();
@@ -137,14 +139,14 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
     }
     // ---------- 4b. 存档完全为空：汇总区隐藏 ----------
     {
-        const t = boot({ store: { archives: { '默认存档': { cats:['未分类'], records: [] } }, last: '默认存档' } });
+        const t = await boot({ store: { archives: { '默认存档': { cats:['未分类'], records: [] } }, last: '默认存档' } });
         ok($(t.d,'summaryOverall').style.display === 'none', '空存档隐藏总览');
         ok($(t.d,'billList').textContent.includes('暂无记账记录'), '空存档提示暂无记录');
     }
 
     // ---------- 5. 详情金额 ----------
     {
-        const t = boot();
+        const t = await boot();
         t.w.openDetail('r4');
         const txt = $(t.d,'detailMoney').textContent;
         ok(!txt.includes('NaN') && txt.includes('0.00'), '脏金额详情显示 0.00 而非 NaN：' + txt);

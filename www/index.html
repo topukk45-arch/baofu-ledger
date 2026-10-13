@@ -1289,7 +1289,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-C</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-D</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2539,6 +2539,253 @@
         // 这样导入到其它账号时无需临时改写全局 currentUser（旧做法在异步/重入下会写错账号）。
         function storeKey(user){ return `store_${user!==undefined ? user : currentUser}`; }
 
+        // ===== 账本存储（1013-D 起放在 IndexedDB）=====
+        // 以前账本（store_<编号>）放在 localStorage：所有账号共用约 500 万字符，5 年的账就快装满了。
+        // 现在只有账本搬去 IndexedDB；账号列表、设置、日子这些小东西照旧留在 localStorage。
+        //
+        // 内存里留一份「账本原文」（JSON 字符串，不是对象）：
+        //   · 打开 App / 进入账号时从 IndexedDB 读一次；
+        //   · loadStore() 每次把原文解析成新对象再给出去——和以前从 localStorage 读完全一样，
+        //     拿到的永远是副本，改了不保存不会污染缓存，也不会影响下一次读；
+        //   · saveStore() 先改内存里的原文，再马上排队写 IndexedDB（同一个账本同一时间只写一份，
+        //     写的时候又改了，写完接着写最新的）；
+        //   · 切到后台时强制再写一遍当前账号。
+        // IndexedDB 一次写入要么整份成功要么整份不算，写到一半被杀，留下的是上一份完整的账本。
+        const LEDGER_DB='jiwen', LEDGER_OS='kv';
+        let __dbPromise=null;
+        const __ledger=new Map();       // key → { raw: 原文或 null（没有账本）, saved: 库里现在的原文, busy: 正在写的 Promise }
+        const __ledgerKeys=new Set();   // IndexedDB 里现有的键（启动时读一次，之后跟着增删）
+        const __ledgerPending=new Set();// 账本还没从 localStorage 搬完的账号编号：先不让进
+        const __busyOps=new Set();      // 进行中的异步存取（ledgerIdle 等它们，测试也靠它）
+        function trackBusy(p){
+            __busyOps.add(p);
+            const done=()=>__busyOps.delete(p);
+            p.then(done, done);
+            return p;
+        }
+        // 等所有进行中的读写、登录都结束（包括它们途中又排上的）
+        async function ledgerIdle(){
+            for(let i=0;i<100 && __busyOps.size;i++){
+                await Promise.all([...__busyOps].map(p=>p.catch(()=>{})));
+            }
+        }
+        function idbOpen(){
+            if(__dbPromise) return __dbPromise;
+            __dbPromise=new Promise((resolve, reject)=>{
+                let req;
+                try{ req=window.indexedDB.open(LEDGER_DB, 1); }catch(err){ reject(err); return; }
+                req.onupgradeneeded=()=>{
+                    const db=req.result;
+                    if(!db.objectStoreNames.contains(LEDGER_OS)) db.createObjectStore(LEDGER_OS);
+                };
+                req.onsuccess=()=>{
+                    const db=req.result;
+                    db.onversionchange=()=>{ try{ db.close(); }catch(_){} __dbPromise=null; };
+                    resolve(db);
+                };
+                req.onerror=()=>reject(req.error || new Error('idbopen'));
+                req.onblocked=()=>reject(new Error('idbblocked'));
+            });
+            __dbPromise.catch(()=>{ __dbPromise=null; });   // 打开失败，下次再试
+            return __dbPromise;
+        }
+        // 一次读或写一个事务；写要等事务真正提交（oncomplete）才算成功。strict：要求写到磁盘再回报（搬家时用）
+        async function idbTx(mode, fn, strict){
+            const db=await idbOpen();
+            return new Promise((resolve, reject)=>{
+                let tx, out;
+                try{
+                    tx = strict ? db.transaction(LEDGER_OS, mode, { durability:'strict' }) : db.transaction(LEDGER_OS, mode);
+                    const req=fn(tx.objectStore(LEDGER_OS));
+                    if(req) req.onsuccess=()=>{ out=req.result; };
+                }catch(err){ reject(err); return; }
+                tx.oncomplete=()=>resolve(out);
+                tx.onerror=()=>reject(tx.error || new Error('idbtx'));
+                tx.onabort=()=>reject(tx.error || new Error('idbabort'));
+            });
+        }
+        function idbGet(key){ return idbTx('readonly', os=>os.get(key)); }
+        function idbKeys(){ return idbTx('readonly', os=>os.getAllKeys()); }
+        async function idbPut(key, val, strict){ await idbTx('readwrite', os=>os.put(val, key), strict); __ledgerKeys.add(key); }
+        async function idbDel(key){ await idbTx('readwrite', os=>os.delete(key)); __ledgerKeys.delete(key); }
+        // 库里取出来的不是字符串（理论上不会有）：能转回 JSON 就转，免得被当成「没有账本」后被空账本覆盖
+        function asRaw(v){
+            if(v===undefined || v===null) return null;
+            if(typeof v==='string') return v;
+            try{ return JSON.stringify(v); }catch(_){ return '{}'; }
+        }
+        // 这个账号有没有账本（库里有，或者还在 localStorage 里等着搬）
+        function ledgerExists(id){
+            const k=`store_${id}`;
+            if(__ledger.has(k)) return __ledger.get(k).raw!==null;
+            if(__ledgerKeys.has(k)) return true;
+            try{ return localStorage.getItem(k)!==null; }catch(_){ return false; }
+        }
+        // 进入账号 / 往别的账号导入之前调用：内存里没有就从库里读一次。已经在内存里的不重读（内存是最新的）
+        function ledgerLoad(key){
+            if(__ledger.has(key)) return Promise.resolve();
+            return trackBusy((async()=>{
+                const raw=asRaw(await idbGet(key));
+                if(!__ledger.has(key)) __ledger.set(key, { raw, saved:raw, busy:null });
+            })());
+        }
+        // 只留当前账号在内存里；别的账号有没写进去的修改就先留着，等它写完
+        function ledgerEvictExcept(key){
+            [...__ledger.keys()].forEach(k=>{
+                const e=__ledger.get(k);
+                if(k!==key && !e.busy && e.raw===e.saved) __ledger.delete(k);
+            });
+        }
+        // 同步取原文：没读进内存就是代码走错了路，宁可报错也不能当成「没有账本」返回空的（会把真账本覆盖掉）
+        function ledgerGet(key){
+            const e=__ledger.get(key);
+            if(!e) throw new Error('notloaded:'+key);
+            return e.raw;
+        }
+        // 把内存里的最新原文写进库；返回的 Promise 在「写到最新」时完成，写失败时报错（内存里的修改还留着，下次再写）
+        function ledgerKick(key){
+            const e=__ledger.get(key);
+            if(!e) return Promise.resolve();
+            if(e.busy) return e.busy;
+            if(e.raw===e.saved) return Promise.resolve();
+            const p=(async()=>{
+                try{
+                    while(e.raw!==e.saved){
+                        const v=e.raw;
+                        if(v===null) await idbDel(key); else await idbPut(key, v);
+                        e.saved=v;
+                    }
+                }finally{ e.busy=null; }
+            })();
+            e.busy=p;
+            trackBusy(p);
+            return p;
+        }
+        function ledgerSetRaw(key, raw){
+            let e=__ledger.get(key);
+            if(!e){ e={ raw:null, saved:undefined, busy:null }; __ledger.set(key, e); }
+            e.raw=raw;
+            if(raw!==null) __ledgerKeys.add(key);
+            return e;
+        }
+        // 平时的写：失败了提示一次（连续失败不重复弹），下次保存或切后台时再试
+        let __ledgerFailShown=false;
+        function ledgerWriteSoon(key){
+            ledgerKick(key).then(()=>{ __ledgerFailShown=false; }, err=>{
+                if(__ledgerFailShown) return;
+                __ledgerFailShown=true;
+                customAlert(isQuotaErr(err)
+                    ? '存储空间已满，本次修改未能保存。请删除部分存档或记录后重试。'
+                    : '保存失败，请重试。', '保存失败');
+            });
+        }
+        function isQuotaErr(err){
+            return !!err && (err.name==='QuotaExceededError' || err.name==='NS_ERROR_DOM_QUOTA_REACHED'
+                || err.code===22 || err.code===1014);
+        }
+        // 要确认写进去了才往下走的地方（导入、新建账号、修复历史数据）：
+        // 写失败就把内存退回写之前的样子，并抛出和以前一样的 quota / savefail 错误
+        async function saveStoreDurable(store, user){
+            const key=storeKey(user);
+            const prev=__ledger.has(key) ? __ledger.get(key).raw : undefined;
+            const raw=JSON.stringify(store);
+            const e=ledgerSetRaw(key, raw);
+            try{ await ledgerKick(key); }
+            catch(err){
+                if(e.raw===raw){
+                    if(prev===undefined) __ledger.delete(key);
+                    else e.raw=prev;
+                }
+                const x=new Error(isQuotaErr(err) ? 'quota' : 'savefail');
+                x.cause=err;
+                throw x;
+            }
+        }
+        // 切到后台：强制把当前账号再写一遍（不管内存和库是否一致），别的账号有没写完的也写掉
+        let __forceFlushing=null;
+        function ledgerFlushOnHide(){
+            if(__forceFlushing) return __forceFlushing;
+            const cur=currentUser ? storeKey(currentUser) : null;
+            const jobs=[];
+            __ledger.forEach((e, k)=>{
+                if(k===cur && e.raw!==null && !e.busy) e.saved=undefined;   // 标成「没写过」，下面就会整份重写
+                jobs.push(ledgerKick(k).catch(()=>{}));
+            });
+            __forceFlushing=trackBusy(Promise.all(jobs).then(()=>{ __forceFlushing=null; }));
+            return __forceFlushing;
+        }
+        document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') ledgerFlushOnHide(); });
+        window.addEventListener('pagehide', ()=>ledgerFlushOnHide());
+        (function bindPause(){
+            function tryBind(){
+                const cap=window.Capacitor;
+                if(!cap || !cap.Plugins || !cap.Plugins.App || typeof cap.Plugins.App.addListener!=='function') return false;
+                try{ cap.Plugins.App.addListener('pause', ()=>ledgerFlushOnHide()); }catch(_){ return false; }
+                return true;
+            }
+            if(tryBind()) return;
+            let done=false;
+            const again=()=>{ if(!done) done=tryBind(); };
+            document.addEventListener('deviceready', again, { once:true });
+            setTimeout(again, 800);
+        })();
+        // 损坏的账本原文另存一份（存到库里，不再挤 localStorage），只留最近 1 份旧的，连同这次共 2 份
+        function ledgerBackupCorrupted(key, raw){
+            const prefix=`${key}__corrupted_`;
+            const olds=[...__ledgerKeys].filter(k=>k.indexOf(prefix)===0).sort();
+            trackBusy((async()=>{
+                for(const k of olds.slice(0, Math.max(0, olds.length-1))){ try{ await idbDel(k); }catch(_){} }
+                try{ await idbPut(`${prefix}${Date.now()}`, raw); }catch(_){}
+            })());
+        }
+
+        // ===== 账本搬家：localStorage → IndexedDB（只跑一次；没搬完下次打开接着搬）=====
+        // 做法和 1010-K7 一样：写新 → 读回确认 → 删旧。旧的删掉之前，账本在两边都有。
+        //   · 新位置已经有一份、而且和旧的不一样（比如装回过旧版本又用了几天）：旧位置那份才是最新的，
+        //     放进新位置；新位置原来那份另存为 migrate_conflict_store_<编号>_<时间>，一条都不删。
+        //   · 任何一步失败，这个账号就算没搬完：这次先不让进，下次打开 App 接着搬。
+        //   · 只搬 store_<编号>（账本本身）；旧的损坏备份、日子、设置都留在 localStorage。
+        async function moveLedgerToIdb(key){
+            let v;
+            try{ v=localStorage.getItem(key); }catch(_){ return false; }
+            if(v===null) return true;
+            let cur;
+            try{ cur=await idbGet(key); }catch(_){ return false; }
+            if(cur!==undefined && cur!==v){
+                try{ await idbPut(`migrate_conflict_${key}_${Date.now()}`, cur, true); }catch(_){ return false; }
+                cur=undefined;
+            }
+            if(cur===undefined){
+                try{ await idbPut(key, v, true); }catch(_){ return false; }
+                let back;
+                try{ back=await idbGet(key); }catch(_){ return false; }
+                if(back!==v) return false;
+            }
+            // 旧的必须真删掉才算搬完：留着的话，下次启动会把它当成「更新的那份」盖回来
+            try{ localStorage.removeItem(key); }catch(_){ return false; }
+            try{ if(localStorage.getItem(key)!==null) return false; }catch(_){ return false; }
+            __ledger.delete(key);
+            return true;
+        }
+        async function migrateLedgersToIdb(){
+            const ks=[];
+            for(let i=0;i<localStorage.length;i++){
+                const k=localStorage.key(i);
+                if(k && k.indexOf('store_')===0 && isAccountId(k.slice(6))) ks.push(k);
+            }
+            ks.sort();
+            let ok=true;
+            for(const k of ks){
+                const id=k.slice(6);
+                const acc=accountById(id);
+                // 名字→编号那一步还没搬完的账号（1010-K7）：账本还得留在原处给它用，等它整理完下次再搬
+                if(acc && typeof acc.legacy==='string'){ __ledgerPending.add(id); ok=false; continue; }
+                if(await moveLedgerToIdb(k)) __ledgerPending.delete(id);
+                else { __ledgerPending.add(id); ok=false; }
+            }
+            return ok;
+        }
+
         // 自增序列持久化：旧实现每次刷新归零，刷新前后同一毫秒生成 id 时，
         // 时间戳与 seq 都可能相同，仅靠 4 位随机区分（万分之一碰撞），
         // 而 editId/删除按 id 精确匹配，碰撞会误改/误删另一条。
@@ -2581,9 +2828,11 @@
         //   只存在于内存：重启 App 后若数据已正常，自然解除；仍损坏则会被重新登记。
         const __corruptedStores = new Set();
 
+        // 【1013-D】原文从内存缓存里取（进入账号时已从 IndexedDB 读好），之后的解析、校验、损坏处理与以前一模一样，
+        //   每次都解析出一个新对象，调用方随便改，不碰缓存。
         function loadStore(user){
             const u = (user!==undefined) ? user : currentUser;
-            const raw = localStorage.getItem(storeKey(u));
+            const raw = ledgerGet(storeKey(u));
             let store, corrupted=false;
             if (raw) {
                 try { store = JSON.parse(raw); } catch(e) { store = null; corrupted = true; }
@@ -2599,20 +2848,8 @@
                 // 仍回退到可用结构以保证界面不白屏，但不主动写回，给用户/后续逻辑留出恢复余地。
                 // 写新备份前清理该用户的旧备份，只保留最近 1 份（连同这次共 2 份），
                 // 避免反复损坏时备份无上限堆积、最终吃满 localStorage 配额。
-                try {
-                    const prefix=`${storeKey(u)}__corrupted_`;
-                    const olds=[];
-                    for(let i=0;i<localStorage.length;i++){
-                        const k=localStorage.key(i);
-                        if(k && k.indexOf(prefix)===0) olds.push(k);
-                    }
-                    // 按时间戳（key 末尾）升序，删掉除最新 1 份外的旧备份
-                    olds.sort();
-                    olds.slice(0, Math.max(0, olds.length-1)).forEach(k=>{
-                        try{ localStorage.removeItem(k); }catch(_){}
-                    });
-                    localStorage.setItem(`${prefix}${Date.now()}`, raw);
-                } catch(_){}
+                //   【1013-D】备份也放进 IndexedDB（账本多大，备份就多大，localStorage 放不下）。
+                ledgerBackupCorrupted(storeKey(u), raw);
             }
             if (!store) {
                 const old = localStorage.getItem(`billData_${u}`);
@@ -2626,18 +2863,13 @@
         }
         // 写存档：捕获配额溢出（QuotaExceededError）等写入失败，避免静默丢数据。
         // 失败时抛出带标记的错误，由调用方决定如何提示；返回 true/false 供需要的地方判断。
+        //   【1013-D】先改内存，马上排队写 IndexedDB。写库是异步的，失败时由 ledgerWriteSoon 提示，
+        //   内存里的修改留着，下次保存 / 切后台时再写。必须确认写进去才能往下走的地方用 saveStoreDurable。
         function saveStore(store, user){
-            try{
-                localStorage.setItem(storeKey(user), JSON.stringify(store));
-                return true;
-            }catch(err){
-                const quota = err && (err.name==='QuotaExceededError'
-                    || err.name==='NS_ERROR_DOM_QUOTA_REACHED'
-                    || err.code===22 || err.code===1014);
-                const e = new Error(quota ? 'quota' : 'savefail');
-                e.cause = err;
-                throw e;
-            }
+            const key=storeKey(user);
+            ledgerSetRaw(key, JSON.stringify(store));
+            ledgerWriteSoon(key);
+            return true;
         }
         // 安全写：吞掉异常并弹窗提示，用于「写失败也不该中断流程」的高频场景
         // 【P1】odBuildPayload 打包的是 records + cats + days 三样，但此前只有 saveUserData
@@ -2691,15 +2923,17 @@
                 try{ parsedHead=JSON.parse(text); }catch(_){}
                 const fileUser=(parsedHead && typeof parsedHead.user==='string') ? charSlice(parsedHead.user.trim(), 8) : '';
                 const fileId=(parsedHead && isAccountId(parsedHead.accountId)) ? parsedHead.accountId : null;
-                const doImport=(id)=>{
+                const doImport=(id)=>trackBusy((async()=>{
                     // 【1013-B】还没整理完的账号不能导入：导入会先在新位置建出账本，挡住老数据搬过来
+                    //   【1013-D】账本还没搬进 IndexedDB 的账号同样不能导入
                     const target=accountById(id);
-                    if(target && typeof target.legacy==='string'){
+                    if(target && (typeof target.legacy==='string' || __ledgerPending.has(id))){
                         customAlert(`账号「${target.name}」的数据还没整理完，暂时不能往里导入。请关掉 App 重新打开后再试。`, '请稍候');
                         return;
                     }
                     try{
-                        const { finalName, stats, daysAdded, daysPending }=importArchiveFromText(text, id);
+                        await ledgerLoad(storeKey(id));    // 导到哪个账号，先把它的账本读进内存
+                        const { finalName, stats, daysAdded, daysPending }=await importArchiveFromText(text, id);
                         renderRecentUsers();
                         // 同一个账号（编号一样；旧备份没编号就比名字）：日子已自动带进来。
                         // 不是同一个：先问要不要一起导入日子，再问进不进账号。
@@ -2717,10 +2951,10 @@
                         else                     tip='导入失败：文件格式不正确';
                         customAlert(tip);
                     }
-                };
+                })());
                 const newThenImport=()=>promptNewAccount(doImport, (fileUser && !nameTaken(fileUser)) ? fileUser : '', fileId);
                 // 还没整理完的账号不出现在可选列表里（见 doImport）
-                const accts=getAccounts().filter(a=>typeof a.legacy!=='string');
+                const accts=getAccounts().filter(a=>typeof a.legacy!=='string' && !__ledgerPending.has(a.id));
                 if(!accts.length){ newThenImport(); }
                 else {
                     const opts=accts.map(a=>{
@@ -2754,7 +2988,7 @@
         function newAccountId(list){
             let id;
             do{ id='u'+String(Date.now()).padStart(13,'0')+String(Math.floor(Math.random()*1e6)).padStart(6,'0'); }
-            while((list||[]).some(a=>a.id===id) || localStorage.getItem(`store_${id}`)!==null);
+            while((list||[]).some(a=>a.id===id) || ledgerExists(id));
             return id;
         }
         function readAccountsRaw(){
@@ -2782,8 +3016,22 @@
             if(clash) return '这台手机上已经有叫这个名字的账号了，换一个吧';
             return '';
         }
-        // 把名字抄进 store，供账号列表损坏时找回。失败不影响主流程
+        // 把名字抄进 store，供账号列表损坏时找回。失败不影响主流程。
+        //   【1013-D】账本在内存缓存里（当前账号）就改缓存再写库；1010-K7 迁移途中账本还在 localStorage，用 stampAccountNameLS
         function stampAccountName(id, name){
+            try{
+                const key=`store_${id}`;
+                if(!__ledger.has(key)) return;
+                const raw=ledgerGet(key);
+                if(raw===null) return;
+                const s=JSON.parse(raw);
+                if(!s || typeof s!=='object' || s.accountName===name) return;
+                s.accountName=name;
+                ledgerSetRaw(key, JSON.stringify(s));
+                ledgerWriteSoon(key);
+            }catch(_){}
+        }
+        function stampAccountNameLS(id, name){
             try{
                 const raw=localStorage.getItem(`store_${id}`);
                 if(raw===null) return;
@@ -2794,14 +3042,20 @@
             }catch(_){}
         }
         // 新建账号：写好空账本和名字，排到列表最前。preferId：导入别的手机的备份时沿用它原来的编号
-        function createAccount(name, preferId){
+        //   【1013-D】账本确认写进 IndexedDB 之后才登记进账号列表（和以前先写账本、再写列表的顺序一样）
+        async function createAccount(name, preferId){
             const list=getAccounts();
             const id=(isAccountId(preferId) && !list.some(a=>a.id===preferId)
-                      && localStorage.getItem(`store_${preferId}`)===null) ? preferId : newAccountId(list);
+                      && !ledgerExists(preferId)) ? preferId : newAccountId(list);
             const store={ archives:{ '默认存档':{ records:[], cats:DEFAULT_CATS.slice() } }, last:'默认存档', accountName:name };
-            localStorage.setItem(`store_${id}`, JSON.stringify(store));
+            await saveStoreDurable(store, id);
             try{ saveAccounts([{ id, name }].concat(list)); }
-            catch(err){ try{ localStorage.removeItem(`store_${id}`); }catch(_){} throw err; }
+            catch(err){
+                const key=`store_${id}`;
+                __ledger.delete(key);
+                try{ await idbDel(key); }catch(_){}
+                throw err;
+            }
             return id;
         }
         // 进入某账号时把它排到最前、并取消隐藏
@@ -2822,7 +3076,8 @@
 
         // 账号列表丢了或坏了：从数据里把账号找回来（名字取 store.accountName，没有就叫「账号1」…）。
         // 坏掉的原文先另存一份，不覆盖。
-        function recoverAccountsIfBroken(){
+        //   【1013-D】账本可能在 IndexedDB（搬过家的），也可能还在 localStorage（没搬完的），两边都要找
+        async function recoverAccountsIfBroken(){
             const raw=localStorage.getItem(ACCOUNTS_KEY);
             if(raw!==null && readAccountsRaw()!==null) return;
             const ids=[];
@@ -2830,16 +3085,23 @@
                 const k=localStorage.key(i);
                 if(k && k.indexOf('store_')===0 && isAccountId(k.slice(6))) ids.push(k.slice(6));
             }
+            __ledgerKeys.forEach(k=>{
+                if(k.indexOf('store_')===0 && isAccountId(k.slice(6)) && !ids.includes(k.slice(6))) ids.push(k.slice(6));
+            });
             if(raw===null && !ids.length) return;              // 新装的 App：本来就没有账号
             if(raw!==null){ try{ localStorage.setItem(`${ACCOUNTS_KEY}__corrupted_${Date.now()}`, raw); }catch(_){} }
             ids.sort();
             const list=[]; let n=1;
-            ids.forEach(id=>{
+            for(const id of ids){
                 let name='';
-                try{ const s=JSON.parse(localStorage.getItem(`store_${id}`)); name=(s && typeof s.accountName==='string') ? charSlice(s.accountName.trim(), 8) : ''; }catch(_){}
+                try{
+                    let r=localStorage.getItem(`store_${id}`);
+                    if(r===null) r=asRaw(await idbGet(`store_${id}`));
+                    const s=JSON.parse(r); name=(s && typeof s.accountName==='string') ? charSlice(s.accountName.trim(), 8) : '';
+                }catch(_){}
                 while(!name || list.some(a=>a.name===name)) name=`账号${n++}`;
                 list.push({ id, name });
-            });
+            }
             try{ saveAccounts(list); }catch(_){}
         }
 
@@ -2900,8 +3162,8 @@
             archives.forEach(arc=>{ ok=odMoveLink(name, arc, id, arc) && ok; });
             return ok;
         }
+        //   【1013-D】「账号列表坏了先找回」要读 IndexedDB，挪到 initApp 里在这之前调用
         function migrateAccounts(){
-            recoverAccountsIfBroken();     // 账号列表坏了先找回（迁移完以后也要查）
             if(localStorage.getItem('accounts_v')===ACCOUNTS_VERSION) return true;
             let indexNames=[];
             try{ const u=JSON.parse(localStorage.getItem('users_index')||'[]'); if(Array.isArray(u)) indexNames=u.filter(x=>typeof x==='string' && x); }catch(_){}
@@ -2941,7 +3203,7 @@
                     const b=Object.assign({}, x); delete b.legacy; return b;
                 });
                 try{ saveAccounts(cur); }catch(_){ ok=false; return; }
-                stampAccountName(a.id, a.name);
+                stampAccountNameLS(a.id, a.name);
             });
             if(!ok) return false;
             try{
@@ -3006,18 +3268,34 @@
         function promptNewAccount(onCreated, preset, preferId){
             customPrompt('给新账号起个名字（最多 8 字）。名字以后可以在「设置 → 修改用户名」里改。', preset||'', (name)=>{
                 name=name.trim();
-                let id;
-                try{ id=createAccount(name, preferId); }
-                catch(_){ customAlert('存储空间不足，没能新建账号。请删除部分存档或记录后重试。', '新建失败'); return; }
-                if(onCreated) onCreated(id); else login(id);
+                trackBusy((async()=>{
+                    let id;
+                    try{ id=await createAccount(name, preferId); }
+                    catch(_){ customAlert('存储空间不足，没能新建账号。请删除部分存档或记录后重试。', '新建失败'); return; }
+                    if(onCreated) onCreated(id); else login(id);
+                })());
             }, '新建账号', (name)=>accountNameError(name.trim()), { placeholder:'输入名字（最多 8 字）', maxchars:8 });
         }
 
+        // 【1013-D】进入账号先从 IndexedDB 把账本读进内存（读一次），读好了再往下走，后面和以前一样
+        let __loginSeq=0;
         function login(id){
             const acc=accountById(id);
             if(!acc){ renderRecentUsers(); return; }
             // 迁移还没搬完的账号先别进：进去会建一个空账本，反而挡住后面的数据搬过来
-            if(typeof acc.legacy==='string'){ customAlert('这个账号的数据还没整理完，请关掉 App 重新打开后再进。', '请稍候'); return; }
+            if(typeof acc.legacy==='string' || __ledgerPending.has(id)){ customAlert('这个账号的数据还没整理完，请关掉 App 重新打开后再进。', '请稍候'); return; }
+            const seq=++__loginSeq;
+            const key=storeKey(id);
+            return trackBusy(ledgerLoad(key).then(()=>{
+                if(seq!==__loginSeq) return;          // 读的过程中又点了别的账号：以最后一次为准
+                ledgerEvictExcept(key);
+                enterAccount(id);
+            }, ()=>{
+                if(seq!==__loginSeq) return;
+                customAlert('读取账本失败，请关掉 App 重新打开后再试。', '读取失败');
+            }));
+        }
+        function enterAccount(id){
             currentUser = id;
             touchAccount(id);
             localStorage.setItem('app_logged_in_user', id);   // 记住当前登录账号（编号），下次自动进入
@@ -3044,7 +3322,7 @@
             switchTab(getDefaultTab());   // 按用户设置进入默认页（默认记账）
             // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
             // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
-            runTimeRepairOnce(id);
+            trackBusy(runTimeRepairOnce(id));
         }
 
         logoutBtn.addEventListener('click', () => {
@@ -3068,7 +3346,7 @@
                 const list=getAccounts().map(a=>a.id===id ? Object.assign({}, a, { name:newName }) : a);
                 try{ saveAccounts(list); }
                 catch(_){ customAlert('存储空间不足，改名未能完成，原名字没有变。请删除部分存档或记录后重试。', '改名失败'); return; }
-                stampAccountName(id, newName);
+                stampAccountName(id, newName);   // 当前账号的账本就在内存里
                 nowUser.innerText=`当前用户：${newName}`;
                 customAlert(`用户名已改为「${newName}」`);
             }, '修改用户名', (newName)=>{
@@ -3677,7 +3955,8 @@ ${detail}
 
         // 核心导入逻辑：解析文本 → 清洗 → 存为目标用户名下的新存档。
         // 返回 { finalName, stats } 或抛错；stats 用于导入后提示静默修正情况。
-        function importArchiveFromText(text, targetUser){
+        //   【1013-D】要等账本确认写进 IndexedDB 才算导入成功（写失败照旧报 quota，什么都不改），所以是 async
+        async function importArchiveFromText(text, targetUser){
             const parsed=JSON.parse(text);   // 解析失败由调用方 catch
             const rawRecords=Array.isArray(parsed)?parsed:parsed.data;
             if(!Array.isArray(rawRecords)) throw new Error('bad');
@@ -3717,7 +3996,7 @@ ${detail}
             const tpls=sanitizeTpls(parsed && parsed.tpls, cats);
             store.archives[finalName]={ records, cats, budgets, tpls };
             store.last=finalName;
-            saveStore(store, targetUser);   // 抛错（配额满等）由调用方 catch 处理
+            await saveStoreDurable(store, targetUser);   // 抛错（配额满等）由调用方 catch 处理
 
             // 倒数日：「文件里的账号 === 要导进的账号」时自动合并。
             //   存档可以并存十份（重名自动加序号，从不覆盖），倒数日却是账号级的唯一一份，
@@ -3777,9 +4056,9 @@ ${detail}
                 $('importFile').value=''; return;
             }
             const reader=new FileReader();
-            reader.onload=ev=>{
+            reader.onload=ev=>trackBusy((async()=>{
                 try{
-                    const { finalName, stats, daysAdded, daysPending }=importArchiveFromText(ev.target.result, currentUser);
+                    const { finalName, stats, daysAdded, daysPending }=await importArchiveFromText(ev.target.result, currentUser);
                     // importArchiveFromText 内部已把新存档写盘并设好 store.last，无需再重读重写一遍
                     currentArchive=finalName;
                     // refreshAllViews 里已含 renderDaysCard，导进来的倒数日会一并刷新到入口卡
@@ -3799,7 +4078,7 @@ ${detail}
                     customAlert(tip);
                 }
                 $('importFile').value='';
-            };
+            })());
             reader.readAsText(file);
         });
 
@@ -4131,6 +4410,8 @@ ${detail}
 
         function getUserData(){ return curArchive(loadStore()).records; }
         // silent=true 时不弹通用失败提示，由调用方自行给出对症提示（避免同一次失败连弹两个弹窗）
+        //   【1013-D】saveStore 改成先改内存、再异步写库，这里不会再同步拿到失败；
+        //   写库失败由 ledgerWriteSoon 统一提示一次，修改留在内存里，下次保存 / 切后台时再写。
         function saveUserData(data, silent){
             const store=loadStore(); curArchive(store).records=data;
             store.last=currentArchive;
@@ -7251,7 +7532,8 @@ ${detail}
 
         // 登录后自检：只在该用户尚未修过时跑一次（用 localStorage 打标记，避免每次登录都全表扫描）。
         // 修复结果如实告知用户——静默改动用户的账目数据是不可接受的。
-        function runTimeRepairOnce(user){
+        //   【1013-D】修好的数据要确认写进 IndexedDB 才打「已修过」标记，所以是 async
+        async function runTimeRepairOnce(user){
             const flagKey=`app_time_repaired_${user}`;
             if(localStorage.getItem(flagKey)==='1') return;   // 已修过，跳过
             let store;
@@ -7266,11 +7548,12 @@ ${detail}
             }
             // 有修改：先写盘。写失败就不打标记，下次启动再试（不能只改内存不落盘）
             try{
-                saveStore(store, user);
+                await saveStoreDurable(store, user);
             }catch(_){
                 return;   // 配额满等，本次放弃，保持原样，下次再修
             }
             try{ localStorage.setItem(flagKey,'1'); }catch(_){}
+            if(user!==currentUser) return;   // 写库的工夫里切了账号：标记照打，界面不用刷、也不弹提示
 
             // 修完必须刷新视图，否则界面还停在修复前的旧数据上
             refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
@@ -7857,29 +8140,50 @@ ${detail}
         }
 
         // ===== 页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页 =====
+        // 【1013-D】账本在 IndexedDB 里，启动要先打开库、把老账本搬过去，所以是 async。
+        //   准备好之前把登录框藏起来，免得自动登录的人先闪一下登录页、或者在没准备好时点了按钮。
         (function initApp(){
-            // 1010-K7：先把老的「按名字存」的数据搬到账号编号下（只跑一次；没搬完下次接着搬）
-            let migrated=true;
-            try{ migrated=migrateAccounts(); }catch(_){ migrated=false; }
-            const remembered=localStorage.getItem('app_logged_in_user');
-            const rememberedAcc=remembered ? accountById(remembered) : null;
-            // 记住的账号自己已经整理好了，就照常自动进入（别的账号没整理完不影响它）
-            if(rememberedAcc && typeof rememberedAcc.legacy!=='string' && localStorage.getItem(`store_${remembered}`)!==null){
-                login(remembered);   // 自动登录，按设置进入默认页
-            } else {
-                // 没整理完时先留着，下次整理完还能自动进入
-                if(remembered && migrated) localStorage.removeItem('app_logged_in_user');
-                document.body.classList.add('login-mode');
-                renderRecentUsers();
-            }
-            // 【1013-B】如实说是哪几个账号没整理完：只有它们暂时进不去，其它账号照常用。
-            //   放在自动登录之后，免得进入账号时弹出的别的提示把它盖掉。
-            if(!migrated){
-                const pendingNames=getAccounts().filter(a=>typeof a.legacy==='string').map(a=>`「${a.name}」`);
-                customAlert('升级时整理账号数据没有全部完成（可能是手机存储空间不足）。'
-                    + (pendingNames.length ? `${pendingNames.join('、')}暂时进不去，其它账号可以正常使用。` : '')
-                    + '下次打开 App 会接着整理。', '提示');
-            }
+            loginBox.style.visibility='hidden';
+            trackBusy((async()=>{
+                let dbOk=true;
+                try{ (await idbKeys()).forEach(k=>__ledgerKeys.add(String(k))); }catch(_){ dbOk=false; }
+                // 账号列表坏了先找回（要看 IndexedDB 里有哪些账本）
+                try{ await recoverAccountsIfBroken(); }catch(_){}
+                // 1010-K7：先把老的「按名字存」的数据搬到账号编号下（只跑一次；没搬完下次接着搬）
+                let migrated=true;
+                try{ migrated=migrateAccounts(); }catch(_){ migrated=false; }
+                // 1013-D：再把账本从 localStorage 搬进 IndexedDB（只跑一次；没搬完下次接着搬）
+                let moved=true;
+                if(dbOk){ try{ moved=await migrateLedgersToIdb(); }catch(_){ moved=false; } }
+                else {
+                    moved=false;
+                    getAccounts().forEach(a=>__ledgerPending.add(a.id));   // 库打不开：哪个账号都读不了账本
+                }
+                loginBox.style.visibility='';
+                const remembered=localStorage.getItem('app_logged_in_user');
+                const rememberedAcc=remembered ? accountById(remembered) : null;
+                // 记住的账号自己已经整理好了，就照常自动进入（别的账号没整理完不影响它）
+                if(rememberedAcc && typeof rememberedAcc.legacy!=='string' && !__ledgerPending.has(remembered) && ledgerExists(remembered)){
+                    await login(remembered);   // 自动登录，按设置进入默认页
+                } else {
+                    // 没整理完时先留着，下次整理完还能自动进入
+                    if(remembered && migrated && moved) localStorage.removeItem('app_logged_in_user');
+                    document.body.classList.add('login-mode');
+                    renderRecentUsers();
+                }
+                // 【1013-B】如实说是哪几个账号没整理完：只有它们暂时进不去，其它账号照常用。
+                //   放在自动登录之后，免得进入账号时弹出的别的提示把它盖掉。
+                if(!dbOk){
+                    customAlert('打不开手机上的账本数据库，暂时进不了账号。请关掉 App 重新打开；还不行的话，先别清除 App 数据，联系开发者。', '提示');
+                } else if(!migrated || !moved){
+                    const pendingNames=getAccounts()
+                        .filter(a=>typeof a.legacy==='string' || __ledgerPending.has(a.id))
+                        .map(a=>`「${a.name}」`);
+                    customAlert('升级时整理账号数据没有全部完成（可能是手机存储空间不足）。'
+                        + (pendingNames.length ? `${pendingNames.join('、')}暂时进不去，其它账号可以正常使用。` : '')
+                        + '下次打开 App 会接着整理。', '提示');
+                }
+            })().finally(()=>{ loginBox.style.visibility=''; }));
         })();
 
     </script>

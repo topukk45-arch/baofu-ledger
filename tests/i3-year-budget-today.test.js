@@ -1,13 +1,15 @@
 // 1010-I3 专项：年度预算 + 月度进度 + 统计页「回到本月」。node test12.js <html>
-const fs=require('fs'); const {JSDOM}=require('jsdom');
+const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark:remark||''},extra||{});
-function boot(arc, now){
+let __lastW=null, __phone=null, __lastPhone=null;
+async function boot(...a){ const t=bootSync(...a); const __w=__lastW, __p=__lastPhone; t.idle=()=>IDB.idle(__w); t.phone=__p; t.db=async()=>{ await IDB.idle(__w); return IDB.dumpDb(__p); }; await IDB.idle(__w); return t; }
+function bootSync(arc, now){
   now=now||'2026-10-10T14:00:00';
   const a=Object.assign({ cats:['未分类','餐饮','游戏','出行','存款'], records:[] }, arc||{});
   const store={archives:{'默认存档':a},last:'默认存档'};
-  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
+  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){ __lastW=w; __lastPhone=IDB.install(w, __phone);
     const ls=w.localStorage; ls.setItem('app_logged_in_user','小明'); ls.setItem('store_小明',JSON.stringify(store)); ls.setItem('app_time_repaired_小明','1');
     w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=function(){};
     w.Date=class extends Date{constructor(...x){x.length?super(...x):super(now);}static now(){return new Date(now).getTime();}};}});
@@ -31,9 +33,10 @@ const recs=[
 ];
 const B={'游戏':200,'餐饮':1200};
 
+(async()=>{
 // ===== 1. 年度预算：从第一次有记录的月份起算 =====
 {
-  const t=boot({ records:recs, budgets:B });
+  const t=await boot({ records:recs, budgets:B });
   t.toBudget();
   const y=t.yrow();
   ok(y && y.querySelector('.bgo-k').textContent==='年度预算（6–12月）›', '标题从 6 月起：'+(y&&y.querySelector('.bgo-k').textContent));
@@ -47,7 +50,7 @@ const B={'游戏':200,'餐饮':1200};
 
 // ===== 2. 展开：每月一条进度条，空月标「没有记录」 =====
 {
-  const t=boot({ records:recs, budgets:B });
+  const t=await boot({ records:recs, budgets:B });
   t.toBudget(); t.yrow().click();
   const rs=t.mrows();
   ok(rs.map(r=>r.querySelector('.bgy-m').textContent).join()==='6月,7月,8月,9月,10月', '列出 6–10 月（未来月份不列）');
@@ -72,7 +75,7 @@ const B={'游戏':200,'餐饮':1200};
 // ===== 3. 超支时的副标题 / 全年用完 =====
 {
   const r2=[R('a','2026-06-01T10:00',5000,'expense','餐饮'), R('b','2026-10-01T10:00',6000,'expense','餐饮')];
-  const t=boot({ records:r2, budgets:{'餐饮':1000} });
+  const t=await boot({ records:r2, budgets:{'餐饮':1000} });
   t.toBudget();
   const sub=t.yrow().querySelector('.bgo-sub');
   // 全年 7000，已用 11000；至今应花 5000 → 已超 6000；全年已用完
@@ -82,7 +85,7 @@ const B={'游戏':200,'餐饮':1200};
 
 // ===== 4. 往年：不显示「每月可花」；今年还没开始记的空年 =====
 {
-  const t=boot({ records:[R('a','2025-03-01T10:00',100,'expense','餐饮'), R('b','2026-10-01T10:00',10,'expense','餐饮')], budgets:{'餐饮':1000} });
+  const t=await boot({ records:[R('a','2025-03-01T10:00',100,'expense','餐饮'), R('b','2026-10-01T10:00',10,'expense','餐饮')], budgets:{'餐饮':1000} });
   t.toBudget();
   t.w.eval('statYear=2025; statMonth=5; renderStats()');
   const y=t.yrow();
@@ -95,7 +98,7 @@ const B={'游戏':200,'餐饮':1200};
 
 // ===== 5. 回到本月浮钮 =====
 {
-  const t=boot({ records:recs, budgets:B });
+  const t=await boot({ records:recs, budgets:B });
   ok(!t.fab(), '记账页不显示');
   t.toStats();
   ok(!t.fab(), '统计页、本月：不显示');
@@ -127,7 +130,7 @@ const B={'游戏':200,'餐饮':1200};
 // ===== 6. 【1010-K2】停下 1.5 秒自动淡出，滑动再出现 =====
 (async()=>{
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-  const t=boot({ records:recs, budgets:B });
+  const t=await boot({ records:recs, budgets:B });
   t.toStats(); t.$('statPrevM').click();
   ok(t.fab(), '翻月后立即出现');
   await sleep(800);
@@ -145,4 +148,5 @@ const B={'游戏':200,'餐饮':1200};
   ok(!t.fab(), '记账页滑动不出现');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
   console.log(`\n1010-I3 专项：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);
+})();
 })();

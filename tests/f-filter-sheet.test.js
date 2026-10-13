@@ -1,5 +1,5 @@
 // 1010-F 专项：node test7.js <html>
-const fs=require('fs'); const {JSDOM}=require('jsdom');
+const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark},extra||{});
@@ -10,9 +10,11 @@ const recs=[
   R('a','2026-10-05T12:00',14,'expense','餐饮','午饭'),
   R('b','2026-10-06T12:00',20,'expense','购物','充电器'),
 ];
-function boot(){
+let __lastW=null, __phone=null, __lastPhone=null;
+async function boot(...a){ const t=bootSync(...a); const __w=__lastW, __p=__lastPhone; t.idle=()=>IDB.idle(__w); t.phone=__p; t.db=async()=>{ await IDB.idle(__w); return IDB.dumpDb(__p); }; await IDB.idle(__w); return t; }
+function bootSync(){
   const store={archives:{'默认存档':{cats:['未分类','餐饮','购物','其他','存款'],records:recs}},last:'默认存档'};
-  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
+  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){ __lastW=w; __lastPhone=IDB.install(w, __phone);
     const ls=w.localStorage; ls.setItem('app_logged_in_user','小明'); ls.setItem('store_小明',JSON.stringify(store)); ls.setItem('app_time_repaired_小明','1');
     w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=function(){};
     w.__clock=1e12;
@@ -27,9 +29,10 @@ function boot(){
 }
 const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b.dataset.id).sort().join();
 
+(async()=>{
 // ===== 1. 筛选：统计口径 =====
 {
-  const t=boot();
+  const t=await boot();
   t.$('filterFab').click();
   const opts=[...t.$('filterModeChips').querySelectorAll('.cc')].map(e=>e.textContent);
   ok(opts.join()==='全部,计入,只算结余,不计入', '口径选项四个：'+opts.join());
@@ -66,7 +69,7 @@ const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b
 
 // ===== 2. 批量菜单说明 =====
 {
-  const t=boot();
+  const t=await boot();
   t.$('filterFab').click(); t.$('searchKeyword').value='午饭'; t.$('sheetApply').click();
   t.$('batchBar').querySelector('[data-act="batch"]').click();
   const rows=[...t.$('askChoices').querySelectorAll('.cc')];
@@ -80,7 +83,7 @@ const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b
 
 // ===== 3. 整片面板下滑关闭 =====
 {
-  const t=boot(); const sheet=t.$('filterSheet'), mask=t.$('filterSheetMask');
+  const t=await boot(); const sheet=t.$('filterSheet'), mask=t.$('filterSheetMask');
   const open=()=>{ t.$('filterFab').click(); mask.classList.add('open'); };   // rAF 在 jsdom 里异步，直接补上 open
   const swipe=(x,y0,y1,steps,msPerStep)=>{
     t.touch(sheet,'touchstart',x,y0);
@@ -126,3 +129,4 @@ const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 console.log(`\n1010-F 专项：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);
+})();

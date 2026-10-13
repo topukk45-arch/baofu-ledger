@@ -1,19 +1,21 @@
 // 1010-I 专项：常用模板 + 预算总览「预算外 / 今年至今」。node test11.js <html>
-const fs=require('fs'); const {JSDOM}=require('jsdom');
+const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark:remark||''},extra||{});
 const NOW='2026-10-10T14:00:00';
-function boot(arc, extraArchives){
+let __lastW=null, __phone=null, __lastPhone=null;
+async function boot(...a){ const t=bootSync(...a); const __w=__lastW, __p=__lastPhone; t.idle=()=>IDB.idle(__w); t.phone=__p; t.db=async()=>{ await IDB.idle(__w); return IDB.dumpDb(__p); }; await IDB.idle(__w); return t; }
+function bootSync(arc, extraArchives){
   const a=Object.assign({ cats:['未分类','餐饮','游戏','订阅','出行','其他','转账'], records:[] }, arc||{});
   const store={archives:Object.assign({'默认存档':a}, extraArchives||{}),last:'默认存档'};
-  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
+  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){ __lastW=w; __lastPhone=IDB.install(w, __phone);
     const ls=w.localStorage; ls.setItem('app_logged_in_user','小明'); ls.setItem('store_小明',JSON.stringify(store)); ls.setItem('app_time_repaired_小明','1');
     w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=function(){};
     w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
   const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
   const d=dom.window.document,$=id=>d.getElementById(id);
-  const st=()=>JSON.parse(dom.window.localStorage.getItem(dom.window.storeKey()));
+  const st=()=>JSON.parse(dom.window.ledgerGet(dom.window.storeKey()));
   const arcOf=()=>st().archives['默认存档'];
   const chipTxt=box=>[...$(box).querySelectorAll('.cc')].map(e=>e.textContent);
   const clickChip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>e.textContent===txt).click();
@@ -22,16 +24,17 @@ function boot(arc, extraArchives){
   return {w:dom.window,d,$,errs,st,arcOf,chipTxt,clickChip,choose,openAdd};
 }
 
+(async()=>{
 // ===== 1. 没有模板：记一笔里「常用」整行隐藏 =====
 {
-  const t=boot();
+  const t=await boot();
   t.openAdd();
   ok(t.$('billTplField').style.display==='none', '无模板时隐藏常用行');
 }
 
 // ===== 2. 从记一笔存模板：带金额 / 不带金额 =====
 {
-  const t=boot();
+  const t=await boot();
   t.openAdd();
   t.$('billMoney').value='157'; t.clickChip('billCatChips','订阅'); t.clickChip('billTypeChips','支出'); t.$('billRemark').value='视频会员';
   t.$('billSaveTpl').click();
@@ -62,7 +65,7 @@ function boot(arc, extraArchives){
 
 // ===== 3. 没选分类 / 收支：拦下 =====
 {
-  const t=boot();
+  const t=await boot();
   t.openAdd(); t.$('billMoney').value='5';
   t.$('billSaveTpl').click();
   ok(t.$('askMsg').textContent.includes('先选好分类和收支') && !t.arcOf().tpls, '缺分类收支不存');
@@ -75,7 +78,7 @@ function boot(arc, extraArchives){
     {id:'b', type:'expense', cat:'转账', remark:'信用卡还款', money:null, mode:'normal'},   // 转账会自动切不计入，模板口径要优先
     {id:'c', type:'income', cat:'其他', remark:'借出还回', money:500, mode:'flow'},
   ];
-  const t=boot({ tpls });
+  const t=await boot({ tpls });
   t.openAdd();
   ok(t.chipTxt('billTplChips').join('|')==='视频会员157|信用卡还款|借出还回500', '顺序固定，带金额的显示金额');
   const before=t.arcOf().records.length;
@@ -105,7 +108,7 @@ function boot(arc, extraArchives){
 
 // ===== 5. 从修改弹窗存 =====
 {
-  const t=boot({ records:[ R('r1','2026-10-08T10:40',30,'expense','订阅','云盘会员') ] });
+  const t=await boot({ records:[ R('r1','2026-10-08T10:40',30,'expense','订阅','云盘会员') ] });
   t.w.openEdit('r1');
   t.$('editSaveTpl').click(); t.choose('带上金额'); t.$('askOk').click();
   const tp=t.arcOf().tpls;
@@ -118,7 +121,7 @@ function boot(arc, extraArchives){
   const tpls=[ {id:'a',type:'expense',cat:'餐饮',remark:'早饭',money:null,mode:'normal'},
                {id:'b',type:'expense',cat:'订阅',remark:'VPN',money:20,mode:'normal'},
                {id:'c',type:'expense',cat:'转账',remark:'',money:null,mode:'skip'} ];
-  const t=boot({ tpls });
+  const t=await boot({ tpls });
   t.$('manageTplSetting').click();
   const rows=()=>[...t.$('tplList').querySelectorAll('.tpl-item')];
   ok(t.$('tplMask').style.display==='flex' && rows().length===3, '管理弹窗列出 3 个');
@@ -134,14 +137,14 @@ function boot(arc, extraArchives){
   ok(/isOpen\('tplMask'\)/.test(html), '返回键层级里有 tplMask');
   // 空态
   t.$('closeTpl').click();
-  const t2=boot(); t2.$('manageTplSetting').click();
+  const t2=await boot(); t2.$('manageTplSetting').click();
   ok(t2.$('tplList').textContent.includes('还没有常用模板'), '空态提示');
 }
 
 // ===== 7. 分类改名 / 删除：模板跟着走 =====
 {
   const tpls=[ {id:'a',type:'expense',cat:'游戏',remark:'游戏充值',money:null,mode:'normal'} ];
-  const t=boot({ tpls });
+  const t=await boot({ tpls });
   t.w.eval("renameCat('游戏')"); t.$('askInput').value='娱乐'; t.$('askOk').click();
   ok(t.arcOf().tpls[0].cat==='娱乐', '分类改名，模板跟着改');
   t.w.eval("deleteCat('娱乐')"); t.$('askOk').click();
@@ -151,7 +154,7 @@ function boot(arc, extraArchives){
 // ===== 8. 导出 / 云备份 / 导入 =====
 {
   const tpls=[ {id:'a',type:'expense',cat:'订阅',remark:'视频会员',money:157,mode:'normal'} ];
-  const t=boot({ tpls, records:[R('r','2026-10-01T10:00',1,'expense','餐饮')] });
+  const t=await boot({ tpls, records:[R('r','2026-10-01T10:00',1,'expense','餐饮')] });
   ok(JSON.stringify(t.w.eval('odBuildPayload()').tpls)===JSON.stringify(tpls), '云备份带模板');
   t.w.importArchiveFromText(JSON.stringify({ archive:'导入', cats:['未分类','订阅','餐饮'], data:[R('x','2026-10-01T10:00',1,'expense','餐饮')],
     tpls:[ {type:'expense',cat:'订阅',remark:'视频会员',money:157,mode:'normal'},
@@ -162,17 +165,17 @@ function boot(arc, extraArchives){
            {type:'expense',cat:'餐饮',remark:'<b>午饭</b>',money:'',mode:'flow'} ] }), t.w.localStorage.getItem('app_logged_in_user'));
   const im=t.st().archives['导入'].tpls;
   ok(im.length===2 && im[0].money===157 && im[1].money===null && im[1].mode==='flow' && im[0].id && im[0].id!==im[1].id, '导入清洗：'+JSON.stringify(im));
-  const t2=boot(); t2.w.importArchiveFromText(JSON.stringify({ archive:'旧备份', cats:['未分类'], data:[R('x','2026-10-01T10:00',1,'expense','未分类')] }), t2.w.localStorage.getItem('app_logged_in_user'));
+  const t2=await boot(); t2.w.importArchiveFromText(JSON.stringify({ archive:'旧备份', cats:['未分类'], data:[R('x','2026-10-01T10:00',1,'expense','未分类')] }), t2.w.localStorage.getItem('app_logged_in_user'));
   ok(Array.isArray(t2.st().archives['旧备份'].tpls) && t2.st().archives['旧备份'].tpls.length===0, '旧备份没有 tpls → 空数组');
   // XSS：模板名只当文字
-  const t3=boot({ tpls:[{id:'x',type:'expense',cat:'餐饮',remark:'<img src=x onerror="window.__pwn=1">',money:null,mode:'normal'}] });
+  const t3=await boot({ tpls:[{id:'x',type:'expense',cat:'餐饮',remark:'<img src=x onerror="window.__pwn=1">',money:null,mode:'normal'}] });
   t3.openAdd(); t3.$('manageTplSetting').click();
   ok(!t3.$('billTplChips').querySelector('img') && !t3.$('tplList').querySelector('img') && !t3.w.__pwn, '模板名里的 HTML 不执行');
 }
 
 // ===== 9. 模板跟存档走：切存档后看到的是另一套 =====
 {
-  const t=boot({ tpls:[{id:'a',type:'expense',cat:'餐饮',remark:'早饭',money:null,mode:'normal'}] },
+  const t=await boot({ tpls:[{id:'a',type:'expense',cat:'餐饮',remark:'早饭',money:null,mode:'normal'}] },
                { '旅行':{ cats:['未分类','出行'], records:[] } });
   const sel=t.$('archiveSelect'); sel.value='旅行'; sel.dispatchEvent(new t.w.Event('change'));
   t.openAdd();
@@ -182,7 +185,7 @@ function boot(arc, extraArchives){
 // ===== 10. 上限 12 =====
 {
   const tpls=[]; for(let i=0;i<12;i++) tpls.push({id:'t'+i,type:'expense',cat:'餐饮',remark:'x'+i,money:null,mode:'normal'});
-  const t=boot({ tpls });
+  const t=await boot({ tpls });
   t.openAdd(); t.clickChip('billCatChips','餐饮'); t.clickChip('billTypeChips','支出'); t.$('billRemark').value='第13个';
   t.$('billSaveTpl').click();
   ok(t.$('askMsg').textContent.includes('最多 12 个') && t.arcOf().tpls.length===12, '满 12 个拦下');
@@ -198,7 +201,7 @@ function boot(arc, extraArchives){
     R('d01','2026-01-03T10:00',100,'expense','餐饮'),
     R('d25','2025-12-03T10:00',9999,'expense','餐饮'),                         // 去年：不算
   ];
-  const t=boot({ records:recs, budgets:{'游戏':200,'餐饮':1200} });
+  const t=await boot({ records:recs, budgets:{'游戏':200,'餐饮':1200} });
   t.d.querySelector('.tab-btn[data-tab="stats"]').click();
   t.$('statTabSeg').querySelector('[data-v="budget"]').click();
   const rows=[...t.$('bgOverview').querySelectorAll('.bgo-row')];
@@ -215,10 +218,11 @@ function boot(arc, extraArchives){
   out.click();
   ok(t.$('bgUnsetCard').querySelector('.bgu-list') && t.$('bgUnsetCard').querySelectorAll('.bgu-row').length===2, '点预算外 → 展开未设预算的分类');
   // 没设任何预算：保持原来的空态，不出这两行
-  const t3=boot({ records:recs });
+  const t3=await boot({ records:recs });
   t3.d.querySelector('.tab-btn[data-tab="stats"]').click(); t3.$('statTabSeg').querySelector('[data-v="budget"]').click();
   ok(t3.$('bgOverview').textContent.includes('还没有给任何分类设预算') && !t3.$('bgOverview').querySelector('.bgo-row'), '无预算时保持空态');
   ok(t.errs.length+t3.errs.length===0, '无脚本错误');
 }
 
 console.log(`\n1010-I 专项：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);
+})();

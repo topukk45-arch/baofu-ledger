@@ -1,0 +1,343 @@
+// 1013-D 专项：账本从 localStorage 搬到 IndexedDB。node p-idb-storage.test.js <html>
+// 覆盖：缓存给副本、先改内存再写库、切后台强制写、写到一半被杀、写失败的提示与重试、
+//      新建账号 / 导入要确认写进去、搬家（成功 / 中途失败续搬 / 读回对不上 / 旧的删不掉 / 两边不一致）、
+//      库里的账本坏了、打不开库、1.7 万条进入账号的耗时。
+const fs=require('fs'); const path=require('path'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
+const FIDB=require('fake-indexeddb');
+const file=process.argv[2]||path.join(__dirname,'..','www','index.html');
+const html=fs.readFileSync(file,'utf8');
+let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
+const NOW='2026-10-10T14:00:00';
+const ID_A='u1760000000000000011', ID_B='u1760000000000000022';
+const R=(id,time,money,type,cat,remark)=>({id,time,money,type,cat,remark:remark||''});
+const store=(recs, name)=>JSON.stringify(Object.assign({ archives:{'默认存档':{cats:['未分类','餐饮'],records:recs||[]}}, last:'默认存档' }, name?{accountName:name}:{}));
+const ACCTS=JSON.stringify([{id:ID_A,name:'小明'},{id:ID_B,name:'小红'}]);
+// 1013-C 时的样子：账号已经是编号，账本还在 localStorage
+const OLD={ accounts:ACCTS, accounts_v:'1', app_logged_in_user:ID_A,
+  ['store_'+ID_A]:store([R('a1','2026-10-01T12:00',20,'expense','餐饮','午饭')],'小明'),
+  ['store_'+ID_B]:store([R('b1','2026-10-02T12:00',5,'expense','餐饮','早饭')],'小红'),
+  ['app_time_repaired_'+ID_A]:'1', ['app_time_repaired_'+ID_B]:'1' };
+
+// ---- 让 IndexedDB 出故障：只影响满足条件的键，用完记得 restore() ----
+const OS=FIDB.IDBObjectStore.prototype, origPut=OS.put, origGet=OS.get;
+function breakPut(when, how){   // how: 'abort' 事务中途死掉 | 'quota' 存储满
+  OS.put=function(v,k){
+    if(when(String(k), v)){
+      if(how==='quota'){ const e=new Error('full'); e.name='QuotaExceededError'; throw e; }
+      const req=origPut.call(this,v,k); this.transaction.abort(); return req;
+    }
+    return origPut.call(this,v,k);
+  };
+}
+function breakGet(when, fake){ OS.get=function(k){ const req=origGet.call(this,k); if(when(String(k))){ const tx=this.transaction; req.addEventListener('success',()=>{ Object.defineProperty(req,'result',{value:fake,configurable:true}); }); } return req; }; }
+function restore(){ OS.put=origPut; OS.get=origGet; }
+function countPuts(){ const log=[]; OS.put=function(v,k){ log.push(String(k)); return origPut.call(this,v,k); }; return log; }
+
+async function boot(seed, opts){
+  opts=opts||{};
+  let win;
+  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
+    win=w;
+    if(opts.noIdb){ w.indexedDB={ open(){ throw new Error('no idb'); } }; }
+    else IDB.install(w, opts.phone);
+    const ls=w.localStorage;
+    Object.keys(seed||{}).forEach(k=>ls.setItem(k, seed[k]));
+    if(opts.lsFail){ const S=w.Storage.prototype, o=S.removeItem; S.removeItem=function(k){ if(opts.lsFail(String(k))) return; return o.call(this,k); }; }
+    w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=function(){};
+    w.Capacitor={ isNativePlatform:()=>true, Plugins:{ OneDriveLink:{ writeText:async()=>{}, pickFile:async()=>({}), forget:async()=>{} } } };
+    w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
+  const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
+  const w=dom.window, d=w.document, $=id=>d.getElementById(id), ls=w.localStorage;
+  const t={ w,d,$,ls,errs, phone:w.indexedDB,
+    idle:()=>IDB.idle(w),
+    db:async()=>{ await IDB.idle(w); return IDB.dumpDb(w.indexedDB); },
+    inMain:()=>$('mainBox').style.display==='block',
+    open:()=>w.getComputedStyle($('askMask')).display!=='none',
+    title:()=>$('askTitle').textContent, msg:()=>$('askMsg').textContent,
+    chip:n=>[...$('recentUsers').querySelectorAll('.user-chip')].find(c=>c.querySelector('span').textContent===n),
+    choices:()=>[...$('askChoices').querySelectorAll('.cc')].map(e=>e.textContent),
+    keys:()=>{ const a=[]; for(let i=0;i<ls.length;i++) a.push(ls.key(i)); return a.sort(); },
+    dump:()=>{ const o={}; for(let i=0;i<ls.length;i++){ const k=ls.key(i); o[k]=ls.getItem(k); } return o; },
+  };
+  t.pick=async(inputId, text)=>{
+    const input=$(inputId);
+    const f=new w.File([text],'备份.json',{type:'application/json'});
+    Object.defineProperty(input,'files',{value:[f],configurable:true});
+    input.dispatchEvent(new w.Event('change'));
+    for(let i=0;i<50 && !t.open();i++) await new Promise(r=>setTimeout(r,10));
+    await t.idle();
+  };
+  t.addBill=async(money, remark)=>{
+    // 直接走数据层记一笔（界面上的记一笔流程别的测试已覆盖）
+    const data=w.getUserData(); data.push(R(w.genId(), '2026-10-10T12:00', money, 'expense', '餐饮', remark)); w.saveUserData(data);
+  };
+  await t.idle();
+  return t;
+}
+const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone }));
+
+(async()=>{
+// ===== 1. 搬家：1013-C 的数据第一次打开 =====
+{
+  const t=await boot(OLD);
+  const db=await t.db();
+  ok(db['store_'+ID_A]===OLD['store_'+ID_A] && db['store_'+ID_B]===OLD['store_'+ID_B], '1 两个账号的账本原样进了 IndexedDB（逐字节一样）');
+  ok(t.ls.getItem('store_'+ID_A)===null && t.ls.getItem('store_'+ID_B)===null, '1 localStorage 里的账本删掉了');
+  ok(t.ls.getItem('accounts')===ACCTS && t.ls.getItem('app_time_repaired_'+ID_A)==='1', '1 账号列表、设置这些小数据留在 localStorage 不动');
+  ok(t.inMain() && t.$('billList').textContent.includes('午饭'), '1 自动进入小明，账单都在');
+  ok(!t.open(), '1 搬完不弹任何提示');
+  ok(!t.errs.length, '1 无报错 '+t.errs.join('|'));
+  // 再开一次：什么都不变
+  const snapLs=JSON.stringify(t.dump()), snapDb=JSON.stringify(db);
+  const t2=await reboot(t, t.dump());
+  ok(JSON.stringify(t2.dump())===snapLs && JSON.stringify(await t2.db())===snapDb, '1 第二次打开不再搬，两边都原样');
+  ok(t2.inMain() && t2.$('billList').textContent.includes('午饭'), '1 第二次打开照常进入');
+}
+
+// ===== 2. 缓存给副本 =====
+{
+  const t=await boot(OLD);
+  const a=t.w.loadStore(), b=t.w.loadStore();
+  ok(a!==b && a.archives!==b.archives && a.archives['默认存档'].records!==b.archives['默认存档'].records, '2 两次 loadStore 拿到的是两个不同的对象');
+  a.archives['默认存档'].records.push(R('x1','2026-10-09T12:00',1,'expense','餐饮','没保存的'));
+  a.last='改了没存';
+  ok(t.w.loadStore().archives['默认存档'].records.length===1 && t.w.loadStore().last==='默认存档', '2 改了副本不保存：再读还是原样');
+  const recs=t.w.getUserData(); recs.length=0;
+  ok(t.w.getUserData().length===1, '2 getUserData 拿到的数组被清空，也不影响缓存');
+  t.w.getBudgets().x=1; t.w.getCats().push('乱加的');
+  ok(!('x' in t.w.getBudgets()) && !t.w.getCats().includes('乱加的'), '2 getBudgets / getCats 给的也是副本');
+  ok(!(await t.db())['store_'+ID_A].includes('没保存的'), '2 没保存的东西也没写进库');
+}
+
+// ===== 3. 先改内存，马上写库 =====
+{
+  const t=await boot(OLD);
+  await t.addBill(12.5, '奶茶');
+  ok(t.w.getUserData().some(r=>r.remark==='奶茶'), '3 存完立刻能读到（内存先改好了）');
+  ok(t.$('billList').textContent.includes('午饭'), '3 界面照常');
+  const db=await t.db();
+  ok(JSON.parse(db['store_'+ID_A]).archives['默认存档'].records.some(r=>r.remark==='奶茶'), '3 等一下就写进了 IndexedDB');
+  // 连着存好几次：库里是最后一次的
+  for(let i=0;i<5;i++) await t.addBill(i+1, '连续'+i);
+  const last=JSON.parse((await t.db())['store_'+ID_A]).archives['默认存档'].records;
+  ok(last.filter(r=>r.remark.startsWith('连续')).length===5, '3 连续存 5 次，库里最后是完整的 5 条');
+  ok(JSON.stringify(last)===JSON.stringify(t.w.getUserData()), '3 库里和内存一致');
+  const t2=await reboot(t, t.dump());
+  ok(t2.w.getUserData().length===last.length, '3 重开 App 读回来的就是这份');
+}
+
+// ===== 4. 切后台：强制写一次 =====
+{
+  const t=await boot(OLD);
+  const log=countPuts();
+  Object.defineProperty(t.d,'visibilityState',{configurable:true,get:()=>'hidden'});
+  t.d.dispatchEvent(new t.w.Event('visibilitychange'));
+  await t.idle();
+  restore();
+  ok(log.filter(k=>k==='store_'+ID_A).length===1, '4 切后台：没改东西也把当前账号写了一遍（'+log.join(',')+'）');
+  ok(!log.includes('store_'+ID_B), '4 不碰没打开的账号');
+  // 写库失败、修改还在内存里：切后台时会再写
+  breakPut(k=>k==='store_'+ID_A, 'abort');
+  await t.addBill(8, '后台补写'); await t.idle();
+  ok(t.open() && t.title()==='保存失败', '4 写库失败弹「保存失败」');
+  t.$('askOk').click();
+  restore();
+  ok(!(await t.db())['store_'+ID_A].includes('后台补写'), '4 这时库里还没有');
+  t.w.dispatchEvent(new t.w.Event('pagehide'));
+  ok((await t.db())['store_'+ID_A].includes('后台补写'), '4 切后台（pagehide）时补写进去了');
+}
+
+// ===== 5. 写到一半被杀：库里留下的是上一份完整的账本 =====
+{
+  const t=await boot(OLD);
+  await t.addBill(30, '被杀前写好的'); await t.idle();
+  const before=(await t.db())['store_'+ID_A];
+  // 下一次写库的事务中途死掉（相当于写到一半 App 被杀）
+  breakPut(k=>k==='store_'+ID_A, 'abort');
+  await t.addBill(40, '写到一半'); await t.idle();
+  restore();
+  const after=(await t.db())['store_'+ID_A];
+  ok(after===before, '5 事务没提交：库里还是上一份，一个字节都没变');
+  let parsed=null; try{ parsed=JSON.parse(after); }catch(_){}
+  ok(parsed && parsed.archives['默认存档'].records.some(r=>r.remark==='被杀前写好的'), '5 上一份是完整、能解析的账本');
+  // 「被杀」：不再给它补写的机会，直接用这台手机重开
+  const t2=await reboot(t, t.dump());
+  ok(t2.inMain() && t2.$('billList').textContent.includes('被杀前写好的') && !t2.$('billList').textContent.includes('写到一半'), '5 重开：看到的是被杀前那份，没有半截数据');
+  ok(!t2.open() && !t2.errs.length, '5 重开不报损坏、无报错 '+t2.errs.join('|'));
+}
+
+// ===== 6. 写库失败：提示一次，修改留在内存，下次保存时一起写进去 =====
+{
+  const t=await boot(OLD);
+  breakPut(k=>k==='store_'+ID_A, 'quota');
+  await t.addBill(1, '第一笔'); await t.idle();
+  ok(t.open() && t.msg().includes('存储空间已满'), '6 存储满：提示和以前一样');
+  t.$('askOk').click();
+  await t.addBill(2, '第二笔'); await t.idle();
+  ok(!t.open(), '6 连续失败不重复弹');
+  restore();
+  await t.addBill(3, '第三笔'); await t.idle();
+  const r=JSON.parse((await t.db())['store_'+ID_A]).archives['默认存档'].records.map(x=>x.remark);
+  ok(['第一笔','第二笔','第三笔'].every(x=>r.includes(x)), '6 恢复后三笔一起写进去了');
+  breakPut(k=>k==='store_'+ID_A, 'quota');
+  await t.addBill(4, '第四笔'); await t.idle();
+  ok(t.open() && t.title()==='保存失败', '6 好过一次以后再失败，会再提示');
+  restore();
+}
+
+// ===== 7. 新建账号、导入：要确认写进去才算 =====
+{
+  const t=await boot(OLD);
+  t.$('logoutBtn').click();
+  breakPut(k=>/^store_u\d{19}$/.test(k), 'quota');
+  t.$('newAccountBtn').click(); t.$('askInput').value='小刚'; t.$('askOk').click(); await t.idle();
+  ok(t.title()==='新建失败' && !t.inMain(), '7 账本写不进去：新建失败，留在登录页');
+  ok(!JSON.parse(t.ls.getItem('accounts')).some(a=>a.name==='小刚'), '7 账号列表里没有半成品');
+  t.$('askOk').click();
+  restore();
+  t.$('newAccountBtn').click(); t.$('askInput').value='小刚'; t.$('askOk').click(); await t.idle();
+  const id=JSON.parse(t.ls.getItem('accounts')).find(a=>a.name==='小刚').id;
+  ok(t.inMain() && JSON.parse((await t.db())['store_'+id]).accountName==='小刚', '7 正常时新建好，账本在库里');
+  // 设置页导入：写库失败 → 导入失败，内存退回原样
+  const backup=JSON.stringify({ app:'记问', user:'小刚', archive:'备份', cats:['未分类'], data:[R('z1','2026-09-01T12:00',9,'expense','未分类','导入的')] });
+  breakPut(k=>k==='store_'+id, 'quota');
+  await t.pick('importFile', backup);
+  restore();
+  ok(t.msg().includes('存储空间不足') && t.msg().includes('导入失败'), '7 导入写不进去：如实说导入失败');
+  ok(!t.w.loadStore().archives['备份'], '7 内存里也没有留下导入了一半的存档');
+  t.$('askOk').click();
+  await t.pick('importFile', backup);
+  ok(t.title()==='导入成功' && JSON.parse((await t.db())['store_'+id]).archives['备份'], '7 正常时导入成功并写进库');
+  // 登录页导入到另一个没打开过的账号
+  t.$('askOk').click(); t.$('logoutBtn').click();
+  await t.pick('loginImportFile', backup);
+  const opt=[...t.$('askChoices').querySelectorAll('.cc')].find(e=>e.textContent.startsWith('小红'));
+  opt.click(); t.$('askOk').click(); await t.idle();
+  ok(t.title()==='导入成功' && JSON.parse((await t.db())['store_'+ID_B]).archives['备份'], '7 登录页导入到没打开过的账号：先读它的账本再导，写进了库');
+  ok(JSON.parse((await t.db())['store_'+ID_B]).archives['默认存档'].records[0].remark==='早饭', '7 那个账号原来的账单没丢');
+  ok(!t.errs.length, '7 无报错 '+t.errs.join('|'));
+}
+
+// ===== 8. 搬家中途失败：没搬完的账号先不让进，下次接着搬 =====
+{
+  breakPut(k=>k==='store_'+ID_B, 'quota');
+  const t=await boot(OLD);
+  restore();
+  ok(t.ls.getItem('store_'+ID_B)===OLD['store_'+ID_B], '8 没搬过去的账本留在原处，原样');
+  ok((await t.db())['store_'+ID_B]===undefined, '8 库里没有半份');
+  ok(t.ls.getItem('store_'+ID_A)===null && (await t.db())['store_'+ID_A], '8 别的账号照常搬完');
+  ok(t.inMain() && t.$('billList').textContent.includes('午饭'), '8 搬完的小明照常自动进入');
+  ok(t.title()==='提示' && t.msg().includes('「小红」暂时进不去') && !t.msg().includes('「小明」'), '8 提示点名小红');
+  t.$('askOk').click(); t.$('logoutBtn').click();
+  t.chip('小红').click(); await t.idle();
+  ok(!t.inMain() && t.msg().includes('还没整理完'), '8 点小红：先不让进');
+  t.$('askOk').click();
+  await t.pick('loginImportFile', JSON.stringify({ app:'记问', user:'x', archive:'备份', data:[R('z1','2026-09-01T12:00',9,'expense','餐饮','')] }));
+  ok(t.choices().some(x=>x.startsWith('小明')) && !t.choices().some(x=>x.startsWith('小红')), '8 登录页导入也选不到小红');
+  // 下次打开，存储正常了
+  const t2=await reboot(t, t.dump());
+  ok(t2.ls.getItem('store_'+ID_B)===null && (await t2.db())['store_'+ID_B]===OLD['store_'+ID_B], '8 下次打开接着搬完');
+  ok(!t2.open(), '8 搬完不再提示');
+  t2.$('logoutBtn').click(); t2.chip('小红').click(); await t2.idle();
+  ok(t2.inMain() && t2.$('billList').textContent.includes('早饭'), '8 小红能进了，账单都在');
+}
+
+// ===== 9. 读回来对不上 / 旧的删不掉：都算没搬完 =====
+{
+  breakGet(k=>k==='store_'+ID_B, '{"读回来不一样":1}');
+  const t=await boot(OLD);
+  restore();
+  ok(t.ls.getItem('store_'+ID_B)===OLD['store_'+ID_B], '9 读回对不上：旧的不删');
+  ok(t.msg().includes('「小红」暂时进不去'), '9 读回对不上：小红先不让进');
+  const t2=await reboot(t, t.dump());
+  ok(t2.ls.getItem('store_'+ID_B)===null && (await t2.db())['store_'+ID_B]===OLD['store_'+ID_B], '9 下次打开搬完');
+
+  const t3=await boot(OLD, { lsFail:k=>k==='store_'+ID_B });
+  ok(t3.ls.getItem('store_'+ID_B)!==null && t3.msg().includes('「小红」暂时进不去'), '9 旧的删不掉：也算没搬完（不然下次会被旧的盖回来）');
+  const t4=await reboot(t3, t3.dump());
+  ok(t4.ls.getItem('store_'+ID_B)===null && (await t4.db())['store_'+ID_B]===OLD['store_'+ID_B] && !t4.open(), '9 下次打开：库里已经是同一份，删掉旧的就算完');
+  ok(!Object.keys(await t4.db()).some(k=>k.startsWith('migrate_conflict_')), '9 两边一样时不另存冲突副本');
+}
+
+// ===== 10. 两边都有、内容不一样（装回过旧版本又用了几天）：旧位置那份是最新的 =====
+{
+  const t=await boot(OLD);
+  await t.addBill(66, '新版里记的'); await t.idle();
+  const newer=(await t.db())['store_'+ID_A];
+  // 装回旧版本：旧版本只认 localStorage，在那里接着记
+  const lsAfterDowngrade=Object.assign(t.dump(), { ['store_'+ID_A]:store([R('a1','2026-10-01T12:00',20,'expense','餐饮','午饭'), R('a9','2026-10-11T12:00',7,'expense','餐饮','旧版里记的')],'小明') });
+  const t2=await reboot(t, lsAfterDowngrade);
+  const db=await t2.db();
+  ok(db['store_'+ID_A].includes('旧版里记的') && t2.ls.getItem('store_'+ID_A)===null, '10 旧位置那份放进了库');
+  const ck=Object.keys(db).find(k=>k.startsWith('migrate_conflict_store_'+ID_A+'_'));
+  ok(ck && db[ck]===newer, '10 库里原来那份另存着，没删');
+  ok(t2.inMain() && t2.$('billList').textContent.includes('旧版里记的'), '10 进去看到的是最新的');
+}
+
+// ===== 11. 库里的账本坏了：照旧不白屏、另存原文、暂停云同步 =====
+{
+  const t0=await boot(OLD);
+  await new Promise((res,rej)=>{ const q=t0.phone.open('jiwen',1); q.onsuccess=()=>{ const tx=q.result.transaction('kv','readwrite'); tx.objectStore('kv').put('{坏了', 'store_'+ID_A); tx.oncomplete=()=>{ q.result.close(); res(); }; tx.onerror=rej; }; });
+  const t=await reboot(t0, t0.dump());
+  ok(t.inMain() && t.$('billList').textContent.includes('暂无记账记录'), '11 坏账本：界面照常打开（空的）');
+  const db=await t.db();
+  const bk=Object.keys(db).find(k=>k.startsWith('store_'+ID_A+'__corrupted_'));
+  ok(bk && db[bk]==='{坏了', '11 原文另存进了库');
+  t.ls.setItem(`onedrive_link_${ID_A}__默认存档`, JSON.stringify({ uri:'content://a', name:'a.json', lastCount:1 }));
+  await t.w.odSyncNow();
+  ok(JSON.parse(t.ls.getItem(`onedrive_link_${ID_A}__默认存档`)).blocked===true, '11 云同步照旧被拦住，不拿空账本覆盖云端');
+}
+
+// ===== 12. 打不开 IndexedDB：不动老数据，说明情况 =====
+{
+  const t=await boot(OLD, { noIdb:true });
+  ok(!t.inMain() && t.title()==='提示' && t.msg().includes('打不开'), '12 打不开库：停在登录页并说明');
+  ok(t.ls.getItem('store_'+ID_A)===OLD['store_'+ID_A], '12 localStorage 里的账本原样不动');
+  t.$('askOk').click();
+  t.chip('小明').click(); await t.idle();
+  ok(!t.inMain() && t.msg().includes('还没整理完'), '12 点账号也先不让进（不会建出空账本）');
+  ok(t.ls.getItem('app_logged_in_user')===ID_A, '12 记住的登录不清掉，好了以后还能自动进');
+}
+
+// ===== 13. 大数据量：1.7 万条，进入账号的耗时 =====
+{
+  const N=17000, recs=[];
+  const cats=['餐饮','购物','出行','其他'];
+  for(let i=0;i<N;i++){
+    const d=new Date(Date.UTC(2021,9,1)+Math.floor(i*5*365/N)*86400000);
+    const ds=d.toISOString().slice(0,10);
+    recs.push({ id:'r'+String(i).padStart(6,'0'), time:`${ds}T${String(8+i%12).padStart(2,'0')}:${String(i%60).padStart(2,'0')}`,
+      money:Math.round((5+(i*37)%300)*100)/100, type:i%40===0?'income':'expense', cat:cats[i%4], remark:['早饭','午饭','地铁','超市',''][i%5] });
+  }
+  const big=JSON.stringify({ archives:{'默认存档':{cats:['未分类'].concat(cats),records:recs}}, last:'默认存档', accountName:'小明' });
+  const seed=Object.assign({}, OLD, { ['store_'+ID_A]:big });
+  let t0=Date.now();
+  const t=await boot(seed);
+  const tBoot=Date.now()-t0;
+  ok(t.inMain() && (await t.db())['store_'+ID_A]===big, `13 ${N} 条（${(big.length/1e6).toFixed(1)}M 字符）搬进库并自动进入，用时 ${tBoot}ms`);
+  t.$('logoutBtn').click();
+  t0=Date.now(); t.chip('小明').click(); await t.idle();
+  const tEnter=Date.now()-t0;
+  ok(t.inMain() && t.$('summaryOverall').textContent.includes(`共 ${N} 条`), `13 从登录页进入账号（读库 + 显示）用时 ${tEnter}ms`);
+  t0=Date.now(); await t.addBill(1, '大账本里记一笔'); const tSave=Date.now()-t0; await t.idle();
+  const tSaveAll=Date.now()-t0;
+  ok((await t.db())['store_'+ID_A].includes('大账本里记一笔'), `13 记一笔：界面那头 ${tSave}ms，连写库 ${tSaveAll}ms`);
+  ok(tEnter<5000 && tSave<1000, '13 耗时在合理范围（测试机上进入 < 5 秒、记一笔 < 1 秒）');
+  // 和 1013-C（localStorage）对比一下
+  const oldFile=process.env.OLD_HTML;
+  if(oldFile && fs.existsSync(oldFile)){
+    const oh=fs.readFileSync(oldFile,'utf8');
+    const od=new JSDOM(oh,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
+      Object.keys(seed).forEach(k=>w.localStorage.setItem(k, seed[k])); w.localStorage.setItem('app_logged_in_user','');
+      w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=function(){};
+      w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
+    const chip=[...od.window.document.getElementById('recentUsers').querySelectorAll('.user-chip')].find(c=>c.textContent.includes('小明'));
+    t0=Date.now(); chip.click(); const oEnter=Date.now()-t0;
+    console.log(`  （对比 1013-C：同样 ${N} 条从登录页进入用时 ${oEnter}ms）`);
+  }
+  console.log(`  耗时：首次打开（含搬家）${tBoot}ms，进入账号 ${tEnter}ms，记一笔 ${tSave}ms / 连写库 ${tSaveAll}ms`);
+}
+
+console.log(`\n${pass} 通过，${fail} 失败`);
+process.exit(fail?1:0);
+})();

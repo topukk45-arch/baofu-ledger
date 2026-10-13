@@ -1,5 +1,5 @@
 // 1010-J 专项：退款。node test13.js <html>
-const fs=require('fs'); const {JSDOM}=require('jsdom');
+const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark:remark||''},extra||{});
@@ -10,16 +10,18 @@ function base(){ return [
   R('pay','2026-10-01T09:00',5000,'income','工资','工资'),
   R('cc','2026-10-05T09:00',800,'expense','转账','信用卡还款',{skip:true}),
 ];}
-function boot(records, arcExtra){
+let __lastW=null, __phone=null, __lastPhone=null;
+async function boot(...a){ const t=bootSync(...a); const __w=__lastW, __p=__lastPhone; t.idle=()=>IDB.idle(__w); t.phone=__p; t.db=async()=>{ await IDB.idle(__w); return IDB.dumpDb(__p); }; await IDB.idle(__w); return t; }
+function bootSync(records, arcExtra){
   const a=Object.assign({ cats:['未分类','餐饮','购物','工资','转账','游戏'], records:records||base() }, arcExtra||{});
   const store={archives:{'默认存档':a},last:'默认存档'};
-  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
+  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){ __lastW=w; __lastPhone=IDB.install(w, __phone);
     const ls=w.localStorage; ls.setItem('app_logged_in_user','小明'); ls.setItem('store_小明',JSON.stringify(store)); ls.setItem('app_time_repaired_小明','1');
     w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=function(){};
     w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
   const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
   const d=dom.window.document,$=id=>d.getElementById(id);
-  const recs=()=>JSON.parse(dom.window.localStorage.getItem(dom.window.storeKey())).archives['默认存档'].records;
+  const recs=()=>JSON.parse(dom.window.ledgerGet(dom.window.storeKey())).archives['默认存档'].records;
   const refunds=()=>recs().filter(r=>r.refundOf);
   const kind=v=>$('refundKind').querySelector(`[data-v="${v}"]`).click();
   // 从修改弹窗走一次退款
@@ -36,9 +38,10 @@ function boot(records, arcExtra){
   return {w:dom.window,d,$,errs,recs,refunds,kind,refund,q,toStats};
 }
 
+(async()=>{
 // ===== 1. 退款按钮：只有支出有；退款弹窗内容 =====
 {
-  const t=boot();
+  const t=await boot();
   t.w.openEdit('pay');
   ok(t.$('editRefundBtn').style.display==='none', '收入没有退款按钮');
   t.$('cancelEdit').click();
@@ -58,7 +61,7 @@ function boot(records, arcExtra){
 
 // ===== 2. 部分退款 → 统计 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('buy', { part:30, remark:'差价' });
   const rf=t.refunds();
   ok(rf.length===1 && rf[0].money===30 && rf[0].type==='income' && rf[0].cat==='购物' && rf[0].refundOf==='buy' && rf[0].remark==='差价' && rf[0].time==='2026-10-10T14:00', '生成退款记录：'+JSON.stringify(rf[0]));
@@ -92,7 +95,7 @@ function boot(records, arcExtra){
 
 // ===== 3. 多次退、全额、超额、时间早于原账单 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('buy', { part:30 }); t.$('askOk').click();
   t.refund('buy', { part:80 });
   ok(t.$('askMsg').textContent.startsWith('最多能退 70.00') && t.$('askMsg').textContent.includes('另记一笔收入') && t.refunds().length===1, '超额拦下并提示另记收入');
@@ -124,7 +127,7 @@ function boot(records, arcExtra){
 
 // ===== 4. 修改退款记录：只能改时间/金额/备注 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('buy', { part:30 }); t.$('askOk').click();
   t.refund('buy', { part:50 }); t.$('askOk').click();
   const rid=t.refunds()[0].id;
@@ -152,7 +155,7 @@ function boot(records, arcExtra){
 
 // ===== 5. 修改原账单的约束与联动 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('buy', { part:40 }); t.$('askOk').click();
   t.w.openEdit('buy');
   t.$('editMoney').value='30'; t.$('saveEdit').click();
@@ -180,7 +183,7 @@ function boot(records, arcExtra){
 
 // ===== 6. 删原账单：退款一起删 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('buy', { part:40 }); t.$('askOk').click();
   t.refund('buy', { part:10 }); t.$('askOk').click();
   t.w.openEdit('buy'); t.$('deleteInEdit').click();
@@ -192,7 +195,7 @@ function boot(records, arcExtra){
 
 // ===== 7. 没保存的修改：先问 =====
 {
-  const t=boot();
+  const t=await boot();
   t.w.openEdit('buy'); t.$('editRemark').value='改了没保存';
   t.$('editRefundBtn').click();
   ok(t.$('askMsg').textContent.includes('修改还没保存') && t.$('refundMask').style.display!=='flex', '有改动先确认');
@@ -202,7 +205,7 @@ function boot(records, arcExtra){
 
 // ===== 8. 原账单是「不计入」：退款也不计入 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('cc', { part:100 }); t.$('askOk').click();
   const rf=t.refunds()[0];
   ok(rf.skip===true && rf.cat==='转账', '退款跟着原账单不计入');
@@ -212,7 +215,7 @@ function boot(records, arcExtra){
 // ===== 9. 预算 / 年度 / 环比 / AI =====
 {
   const recs=base().concat([ R('sep','2026-09-02T10:00',100,'expense','购物','九月') ]);
-  const t=boot(recs, { budgets:{'购物':200} });
+  const t=await boot(recs, { budgets:{'购物':200} });
   t.refund('buy', { part:30, remark:'差价' }); t.$('askOk').click();
   t.toStats(); t.$('statTabSeg').querySelector('[data-v="budget"]').click();
   const row=[...t.$('bgGroups').querySelectorAll('.bg-row')].find(r=>r.dataset.cat==='购物');
@@ -235,7 +238,7 @@ function boot(records, arcExtra){
 
 // ===== 10. 批量：退款不参与，跟着原账单 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('buy', { part:30, remark:'鞋子退差价' }); t.$('askOk').click();
   t.$('filterFab').click(); t.$('searchKeyword').value='鞋子'; t.$('sheetApply').click();
   t.$('batchBar').querySelector('[data-act="batch"]').click();
@@ -249,7 +252,7 @@ function boot(records, arcExtra){
   t.$('askExtra').click();
   ok(t.recs().find(r=>r.id==='buy').cat==='购物' && t.refunds()[0].cat==='购物' && t.$('askMsg').textContent==='已撤销，1 条记录恢复原样。', '撤销一起还原');
   // 只命中退款
-  const t2=boot(); t2.refund('buy',{part:5, remark:'独有备注'}); t2.$('askOk').click();
+  const t2=await boot(); t2.refund('buy',{part:5, remark:'独有备注'}); t2.$('askOk').click();
   t2.$('filterFab').click(); t2.$('searchKeyword').value='独有备注'; t2.$('sheetApply').click();
   t2.$('batchBar').querySelector('[data-act="batch"]').click();
   ok(t2.$('askMsg').textContent.startsWith('命中的 1 条都是退款记录'), '只命中退款时提示');
@@ -259,7 +262,7 @@ function boot(records, arcExtra){
 
 // ===== 11. 详情 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('buy', { part:30, remark:'差价' }); t.$('askOk').click();
   const rid=t.refunds()[0].id;
   t.w.openDetail(rid);
@@ -282,7 +285,7 @@ function boot(records, arcExtra){
 
 // ===== 12. 导入 / 导出 / 旧数据兼容 =====
 {
-  const t=boot();
+  const t=await boot();
   t.refund('buy', { part:30 }); t.$('askOk').click();
   const payload=t.w.eval('odBuildPayload()');
   ok(payload.data.some(r=>r.refundOf==='buy'), '云备份带 refundOf');
@@ -295,13 +298,13 @@ function boot(records, arcExtra){
     R('r4','2026-10-03T10:00',5,'income','购物','挂在收入上',{refundOf:'o2'}),      // → 普通收入
     R('r5','2026-10-03T10:00',5,'expense','购物','支出带标记',{refundOf:'o1'}),     // 支出不认
   ]}), t.w.localStorage.getItem('app_logged_in_user'));
-  const im=JSON.parse(t.w.localStorage.getItem(t.w.storeKey())).archives['导入'].records;
+  const im=JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['导入'].records;
   const by=rk=>im.find(r=>r.remark===rk);
   const o1=by('原');
   ok(by('退1').refundOf===o1.id && o1.id!=='o1' && by('退1').cat==='购物', '退款挂回新 id，分类跟原账单');
   ok(!by('退2超额').refundOf && !by('找不到原账单').refundOf && !by('挂在收入上').refundOf && !by('支出带标记').refundOf, '不合法的退化为普通记录');
   // 旧数据（没有 refundOf）：所有数字与 1010-I3 一致由 regress.js 保证；这里补一条「普通收入」不受影响
-  const t2=boot(base().concat([R('x','2026-10-06T10:00',12,'income','购物','普通收入')]));
+  const t2=await boot(base().concat([R('x','2026-10-06T10:00',12,'income','购物','普通收入')]));
   ok(t2.q('.ov-in')==='+5012.00' && t2.q('.ov-out')==='−130.00', '普通收入照旧算收入');
   ok(t.errs.length+t2.errs.length===0, '无脚本错误');
 }
@@ -312,3 +315,4 @@ function boot(records, arcExtra){
 }
 
 console.log(`\n1010-J 退款专项：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);
+})();

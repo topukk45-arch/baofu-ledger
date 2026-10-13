@@ -2,6 +2,8 @@
 
 用 [jsdom](https://github.com/jsdom/jsdom) 在 Node 里加载完整的 `www/index.html`，像真人一样点按钮、填表单，再检查页面和存档数据。不需要浏览器，也不需要手机。
 
+1013-D 起账本存在 IndexedDB。jsdom 没有 IndexedDB，测试用 [fake-indexeddb](https://github.com/dumbmatter/fakeIndexedDB)（纯 JS 实现，只在测试里用，不进 App）。
+
 **所有测试数据都是虚构的**，不含任何真实账单。
 
 ## 运行
@@ -35,6 +37,7 @@ GitHub Actions 每次打包前都会先跑 `npm test`，不通过就不出包。
 | `m-accounts.test.js` | 账号改为内部编号：新建账号、老数据迁移（多账号、云备份连接、损坏备份、早期 billData）、迁移中途失败后续跑、账号列表损坏找回、移走与找回账号、改名不搬数据、重名拦截 |
 | `n-migrate-partial.test.js` | 迁移没一次搬完时：搬完的账号马上能进、不被卡住的账号拖累；提示点名没整理完的账号；没整理完的账号不能往里导入；1013-A 时已经导进去的那份另存起来，老账本照样搬回来 |
 | `o-name-input.test.js` | 名字输入：撞上「已移走」账号名字时提示可以找回；账号、存档、分类、日子名称的输入框按实际字数限长，8 个 emoji 也能打进去 |
+| `p-idb-storage.test.js` | 账本搬到 IndexedDB：缓存给副本、先改内存再写库、切后台强制写、写到一半被杀、写失败提示与重试、新建账号 / 导入要确认写进去、搬家（中途失败续搬、读回对不上、旧的删不掉、两边内容不一样）、库里账本坏了、打不开库、1.7 万条进入账号的耗时 |
 
 ## 逐字节回归
 
@@ -43,7 +46,9 @@ git show HEAD~1:www/index.html > /tmp/old.html
 node regress.js /tmp/old.html ../www/index.html
 ```
 
-用 `fixtures/sample-records.js` 生成的同一份假账单（约 130 条），对比两个版本的账单列表、分类汇总、筛选、统计页、当日明细和 AI 导出。
+用 `fixtures/sample-records.js` 生成的同一份假账单（约 130 条），对比两个版本的账单列表、分类汇总、筛选、统计页、当日明细和 AI 导出。新旧版本都能比（老版本同步启动，新版本等它准备好再取）。
+
+`p-idb-storage.test.js` 第 13 组会顺带和老版本比一下 1.7 万条进入账号的耗时：`OLD_HTML=/tmp/old.html node p-idb-storage.test.js`。
 
 - 纯重构（不该改变行为）：应当「全部一致」；
 - 有意的改动：只允许预期的那几项不一致。
@@ -52,5 +57,10 @@ node regress.js /tmp/old.html ../www/index.html
 
 - 测试数据一律虚构，**不要放真实金额、真实备注或真实姓名**（仓库是公开的）。
 - 用固定的「今天」（覆盖 `Date`），不要依赖运行测试时的真实日期。
-- 数据按账号编号存（1010-K7 起）。测试照旧可以用老格式（`store_小明`）预置数据，启动时会自动迁移；读回数据用 `w.storeKey()`，当前账号编号是 `localStorage.getItem('app_logged_in_user')`。
+- 数据按账号编号存（1010-K7 起）。测试照旧可以用老格式（`store_小明`）预置数据，启动时会自动迁移；当前账号编号是 `localStorage.getItem('app_logged_in_user')`。
+- 账本在 IndexedDB（1013-D 起），启动、进入账号、新建账号、导入都是异步的：
+  - `boot()` 是 async，用 `const t=await boot(...)`，返回时页面已经准备好；
+  - 点账号、新建账号、导入之后 `await t.idle()` 再检查（等页面里进行中的读写都结束，见 `helpers/idb.js`）；
+  - 读当前账号的账本：`JSON.parse(t.w.ledgerGet(t.w.storeKey()))`（内存里那份）；要确认真写进库了用 `(await t.db())['store_'+编号]`；
+  - 模拟「重开 App」要用同一台手机：`boot` 时传同一个 IndexedDB（各文件里的 `reboot(t, 快照)`）。
 - 每组结尾输出 `N 通过，M 失败`，并在有失败时 `process.exit(1)`，`run-all.js` 靠这个汇总。
