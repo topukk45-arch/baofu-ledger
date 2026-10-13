@@ -27,7 +27,7 @@ https://github.com/topukk45-arch/baofu-ledger/releases/download/latest-build/jiw
 
 ## 自动化测试
 
-`tests/` 里是用 jsdom 在 Node 中跑完整页面的测试，共 14 组、500 多条，覆盖存档与云备份、统计口径、批量操作、筛选、预算、环比、常用模板、年度预算、退款、导入倒数日、账号迁移（含中途没搬完）等。测试数据全部是虚构的。
+`tests/` 里是用 jsdom 在 Node 中跑完整页面的测试，共 15 组、500 多条，覆盖存档与云备份、统计口径、批量操作、筛选、预算、环比、常用模板、年度预算、退款、导入倒数日、账号迁移（含中途没搬完）等。测试数据全部是虚构的。
 
 ```bash
 cd tests

@@ -1289,7 +1289,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-B</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-C</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1806,7 +1806,7 @@
             <div class="cat-reorder-tip">长按左侧 ⠿ 拖动可调整顺序，顺序会用在记账页的标签排列</div>
             <div class="cat-list" id="catList"></div>
             <div class="cat-add-row">
-                <input type="text" id="newCatName" placeholder="新分类名称（最多 8 字）" maxlength="8">
+                <input type="text" id="newCatName" placeholder="新分类名称（最多 8 字）" maxlength="16"><!-- 1013-C：按字数校验在提交时做，emoji 占 2 个编码单位，这里放宽到 2 倍 -->
                 <button class="mini-btn gold" id="addCatBtn">添加</button>
             </div>
             <p id="catErr" class="ask-err" style="display:none"></p>
@@ -1942,7 +1942,7 @@
             <div class="form-box">
                 <div class="field">
                     <label class="field-label">名称（最多 8 字）</label>
-                    <input type="text" id="dayName" maxlength="8" placeholder="例如：入职">
+                    <input type="text" id="dayName" maxlength="16" placeholder="例如：入职"><!-- 1013-C：同上，字数在保存时按实际字数检查 -->
                 </div>
                 <div class="field">
                     <label class="field-label">目标日期</label>
@@ -2296,7 +2296,13 @@
             // 补金额等场景可指定数字键盘；不传则恢复默认文本键盘，避免影响改名等其它调用
             if(opts.inputmode){ askInput.setAttribute('inputmode', opts.inputmode); }
             else { askInput.removeAttribute('inputmode'); }
-            if(opts.maxlen){ askInput.setAttribute('maxlength', opts.maxlen); }
+            // 【1013-C】maxchars：按「字」限长的名字类输入（账号、存档、分类）。输入框自带的 maxlength 按编码单位数，
+            //   一个 emoji 占 2 个，「最多 8 个字」的框里只能打 4 个 emoji。所以输入框只放宽到 2 倍兜个底，
+            //   真正的字数由各自的校验按实际字数检查（charLen），超了点确定时提示。
+            //   不在打字时截断：中文输入法选字时框里是拼音，截了会把字打坏。
+            //   maxlen：按原样限长（备注这类长文本，不涉及字数提示）。
+            if(opts.maxchars){ askInput.setAttribute('maxlength', opts.maxchars*2); }
+            else if(opts.maxlen){ askInput.setAttribute('maxlength', opts.maxlen); }
             else { askInput.removeAttribute('maxlength'); }
             askCancel.style.display='';
             askErr.style.display='none';
@@ -2770,7 +2776,10 @@
         function accountNameError(name, exceptId){
             if(!name) return '名字不能为空';
             if(charLen(name) > 8) return '名字最多 8 个字～';
-            if(nameTaken(name, exceptId)) return '这台手机上已经有叫这个名字的账号了，换一个吧';
+            const clash=getAccounts().find(a=>a.name===name && a.id!==exceptId);
+            // 【1013-C】撞上的是「已移走」的账号：它不在列表里显示，直接说「已经有了」会让人找不着北
+            if(clash && clash.hidden) return '「已移走的账号」里有一个叫这个名字的，可以在登录页下方找回它，或者换个名字';
+            if(clash) return '这台手机上已经有叫这个名字的账号了，换一个吧';
             return '';
         }
         // 把名字抄进 store，供账号列表损坏时找回。失败不影响主流程
@@ -3001,7 +3010,7 @@
                 try{ id=createAccount(name, preferId); }
                 catch(_){ customAlert('存储空间不足，没能新建账号。请删除部分存档或记录后重试。', '新建失败'); return; }
                 if(onCreated) onCreated(id); else login(id);
-            }, '新建账号', (name)=>accountNameError(name.trim()), { placeholder:'输入名字（最多 8 字）', maxlen:8 });
+            }, '新建账号', (name)=>accountNameError(name.trim()), { placeholder:'输入名字（最多 8 字）', maxchars:8 });
         }
 
         function login(id){
@@ -3066,7 +3075,7 @@
                 newName=newName.trim();
                 if(newName===oldName) return '';
                 return accountNameError(newName, id);
-            }, { placeholder:'输入新用户名（最多 8 字）', maxlen:8 });
+            }, { placeholder:'输入新用户名（最多 8 字）', maxchars:8 });
         });
 
         function refreshArchiveSelect(){
@@ -3099,7 +3108,7 @@
                 if(charLen(name) > 16) return '存档名最多 16 个字～';
                 if(loadStore().archives[name]) return '该存档名已存在';
                 return '';
-            }, { placeholder:'输入存档名称（最多 16 字）', maxlen:16 });
+            }, { placeholder:'输入存档名称（最多 16 字）', maxchars:16 });
         });
         $('renameArchive').addEventListener('click', () => {
             customPrompt('', currentArchive, (name)=>{
@@ -3121,7 +3130,7 @@
                 if(charLen(name) > 16) return '存档名最多 16 个字～';
                 if(loadStore().archives[name]) return '该存档名已存在';
                 return '';
-            }, { placeholder:'输入新存档名（最多 16 字）', maxlen:16 });
+            }, { placeholder:'输入新存档名（最多 16 字）', maxchars:16 });
         });
         $('delArchive').addEventListener('click', () => {
             const store=loadStore();
@@ -4099,7 +4108,7 @@ ${detail}
                 if(charLen(name) > 8) return '分类名最多 8 个字～';
                 if(curArchive(loadStore()).cats.includes(name)) return '该分类已存在';
                 return '';
-            }, { placeholder:'输入新分类名（最多 8 字）', maxlen:8 });
+            }, { placeholder:'输入新分类名（最多 8 字）', maxchars:8 });
         }
         function deleteCat(name){
             if(name==='未分类'){ customAlert('「未分类」是保留分类，不能删除哦～'); return; }
