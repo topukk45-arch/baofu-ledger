@@ -19,7 +19,7 @@ function boot(records, arcExtra){
     w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
   const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
   const d=dom.window.document,$=id=>d.getElementById(id);
-  const recs=()=>JSON.parse(dom.window.localStorage.getItem('store_小明')).archives['默认存档'].records;
+  const recs=()=>JSON.parse(dom.window.localStorage.getItem(dom.window.storeKey())).archives['默认存档'].records;
   const refunds=()=>recs().filter(r=>r.refundOf);
   const kind=v=>$('refundKind').querySelector(`[data-v="${v}"]`).click();
   // 从修改弹窗走一次退款
@@ -294,8 +294,8 @@ function boot(records, arcExtra){
     R('o2','2026-10-01T10:00',20,'income','购物','收入不能被退'),
     R('r4','2026-10-03T10:00',5,'income','购物','挂在收入上',{refundOf:'o2'}),      // → 普通收入
     R('r5','2026-10-03T10:00',5,'expense','购物','支出带标记',{refundOf:'o1'}),     // 支出不认
-  ]}), '小明');
-  const im=JSON.parse(t.w.localStorage.getItem('store_小明')).archives['导入'].records;
+  ]}), t.w.localStorage.getItem('app_logged_in_user'));
+  const im=JSON.parse(t.w.localStorage.getItem(t.w.storeKey())).archives['导入'].records;
   const by=rk=>im.find(r=>r.remark===rk);
   const o1=by('原');
   ok(by('退1').refundOf===o1.id && o1.id!=='o1' && by('退1').cat==='购物', '退款挂回新 id，分类跟原账单');

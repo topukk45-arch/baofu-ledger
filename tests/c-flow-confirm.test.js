@@ -23,7 +23,7 @@ function boot(records){
             w.Date=class extends Date{constructor(...a){a.length?super(...a):super('2026-10-10T10:00:00');}static now(){return new Date('2026-10-10T10:00:00').getTime();}}; }});
     const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
     const d=dom.window.document, $=id=>d.getElementById(id);
-    const recs=()=>JSON.parse(dom.window.localStorage.getItem('store_小明')).archives['默认存档'].records;
+    const recs=()=>JSON.parse(dom.window.localStorage.getItem(dom.window.storeKey())).archives['默认存档'].records;
     const chip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===txt);
     const choose=txt=>{ chip('askChoices',txt).click(); $('askOk').click(); };
     const filterKw=kw=>{ $('filterFab').click(); $('searchKeyword').value=kw; $('sheetApply').click(); };
@@ -123,8 +123,8 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     const t=boot(oct());
     t.w.importArchiveFromText(JSON.stringify({ user:'小明', archive:'导入', cats:['存款'],
         data:[ R('a','2026-07-01T00:00',100,'income','存款','期初',{flow:true}),
-               R('b','2026-07-01T00:00',1,'income','存款','两个都有',{flow:true, skip:true}) ] }),'小明');
-    const arc=JSON.parse(t.w.localStorage.getItem('store_小明')).archives['导入'].records;
+               R('b','2026-07-01T00:00',1,'income','存款','两个都有',{flow:true, skip:true}) ] }), t.w.localStorage.getItem('app_logged_in_user'));
+    const arc=JSON.parse(t.w.localStorage.getItem(t.w.storeKey())).archives['导入'].records;
     ok(arc[0].flow===true && !('skip' in arc[0]), '导入保留 flow');
     ok(arc[1].skip===true && !('flow' in arc[1]), '两者都有时 skip 优先，只留一个');
 }

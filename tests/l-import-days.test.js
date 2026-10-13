@@ -37,7 +37,10 @@ function boot(loggedIn, existingDays){
   const open=()=>$('askMask').style.display==='flex';
   const msg=()=>$('askMsg').textContent;
   const title=()=>$('askTitle').textContent;
-  const days=u=>JSON.parse(w.localStorage.getItem('days_'+u)||'[]');
+  // 1010-K7：数据按账号编号存。按名字找到编号再读
+  const idOf=u=>{ const a=JSON.parse(w.localStorage.getItem('accounts')||'[]').find(x=>x.name===u); return a?a.id:null; };
+  const days=u=>JSON.parse(w.localStorage.getItem('days_'+idOf(u))||'[]');
+  const choose=label=>[...$('askChoices').querySelectorAll('.cc')].find(e=>e.textContent.startsWith(label)).click();
   // 模拟选文件：FileReader 是异步的，等它读完
   const pick=async(inputId, text)=>{
     const input=$(inputId);
@@ -46,7 +49,7 @@ function boot(loggedIn, existingDays){
     input.dispatchEvent(new w.Event('change'));
     for(let i=0;i<50 && !open();i++) await new Promise(r=>setTimeout(r,10));
   };
-  return {w,d,$,errs,open,msg,title,days,pick};
+  return {w,d,$,errs,open,msg,title,days,pick,idOf,choose};
 }
 
 (async()=>{
@@ -83,7 +86,7 @@ function boot(loggedIn, existingDays){
   ok(t.days('小明').length===0, '3 不用了：日子没导');
   ok(t.open() && t.title()==='导入成功', '3 仍然弹出导入成功');
   ok(!t.msg().includes('日子'), '3 提示里不提日子');
-  const st=JSON.parse(t.w.localStorage.getItem('store_小明'));
+  const st=JSON.parse(t.w.localStorage.getItem(t.w.storeKey()));
   ok(st.archives['旧手机'] && st.archives['旧手机'].records.length===2, '3 账单照常导入');
 }
 
@@ -115,13 +118,13 @@ function boot(loggedIn, existingDays){
   ok(t2.title()==='导入成功' && t2.days('小明').length===0, '6b 旧文件没有账号名：不问也不导');
 }
 
-// ===== 7. 登录页导入到别的账号：先问日子，再问进不进账号 =====
+// ===== 7. 登录页、手机上还没有账号：直接新建，名字默认用备份里的；起了别的名字 → 先问日子，再问进不进 =====
 {
   const t=boot();
   await t.pick('loginImportFile', fileText('测试', DAYS));
-  ok(t.title()==='导入到账号', '7 先问导到哪个账号');
+  ok(t.title()==='新建账号' && t.$('askInput').value==='测试', '7 没有账号时直接新建，名字默认是备份里的');
   t.$('askInput').value='小刚'; t.$('askOk').click();
-  ok(t.title()==='一起导入日子？' && t.msg().includes('「小刚」'), '7 再问日子');
+  ok(t.title()==='一起导入日子？' && t.msg().includes('「小刚」') && t.msg().includes('账号「测试」'), '7 再问日子');
   t.$('askOk').click();
   ok(t.days('小刚').length===3, '7 日子进了小刚');
   ok(t.title()==='导入成功' && t.msg().includes('同时导入了 3 个日子') && t.msg().includes('现在进入该账号吗'), '7 最后问进不进账号，带上日子');
@@ -141,12 +144,46 @@ function boot(loggedIn, existingDays){
   ok(!t.msg().includes('日子') && t.days('小刚').length===0, '8 日子没导，也不提');
 }
 
-// ===== 9. 登录页，账号名和文件里一样：自动带上，不问 =====
+// ===== 9. 旧备份（没有账号编号），新账号名字和备份里一样：当作自己的，日子自动带上 =====
 {
   const t=boot();
   await t.pick('loginImportFile', fileText('测试', DAYS));
-  t.$('askInput').value='测试'; t.$('askOk').click();
+  t.$('askOk').click();   // 默认名字「测试」
   ok(t.title()==='导入成功' && t.msg().includes('同时导入了 3 个日子'), '9 自导自：不问，自动带上');
+}
+
+// ===== 10. 新版备份带账号编号：新建账号沿用这个编号，就算起了别的名字也是同一个账号 =====
+{
+  const t=boot();
+  const f=JSON.parse(fileText('测试', DAYS)); f.accountId='u1790000000000123456';
+  await t.pick('loginImportFile', JSON.stringify(f));
+  t.$('askInput').value='新手机上的我'; t.$('askOk').click();
+  ok(t.idOf('新手机上的我')==='u1790000000000123456', '10 新账号沿用备份里的编号');
+  ok(t.title()==='导入成功' && t.msg().includes('同时导入了 3 个日子'), '10 编号一样：日子自动带上，不问');
+}
+
+// ===== 11. 已有账号：从列表里选导到哪个；编号一样的那个会标出来 =====
+{
+  const t=boot('小明');
+  t.$('logoutBtn').click();
+  const id=t.idOf('小明');
+  const f=JSON.parse(fileText('小明换过名', DAYS)); f.accountId=id;
+  await t.pick('loginImportFile', JSON.stringify(f));
+  ok(t.title()==='导入到账号', '11 先选导到哪个账号');
+  const items=[...t.$('askChoices').querySelectorAll('.cc')].map(e=>e.textContent);
+  ok(items.some(x=>x.startsWith('小明') && x.includes('原来就是这个账号')) && items.some(x=>x.includes('新建账号')), '11 列出已有账号，标出原账号，可新建');
+  t.choose('小明'); t.$('askOk').click();
+  ok(t.title()==='导入成功' && t.days('小明').length===3, '11 编号一样：名字不同也自动带上日子');
+}
+
+// ===== 12. 编号不一样、名字碰巧一样（两台手机各自建的「小明」）：要问 =====
+{
+  const t=boot('小明');
+  t.$('logoutBtn').click();
+  const f=JSON.parse(fileText('小明', DAYS)); f.accountId='u1790000000000999999';
+  await t.pick('loginImportFile', JSON.stringify(f));
+  t.choose('小明'); t.$('askOk').click();
+  ok(t.title()==='一起导入日子？', '12 编号不同就算重名也要问');
 }
 
 console.log(`\n${pass} 通过，${fail} 失败`);

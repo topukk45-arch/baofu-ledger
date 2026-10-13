@@ -153,10 +153,6 @@
              letter-spacing:3px; text-shadow:0 0 6px rgba(var(--c-shadow-rgb),0.5); }
 
         .login-box { text-align:center; padding:50px 0; }
-        .login-input { padding:12px 16px; width:240px; border:1px solid var(--c-primary);
-            border-radius:8px; font-size:16px; margin-bottom:20px; outline:none;
-            transition:0.3s; background:var(--c-surface); }
-        .login-input:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
         .login-btn { padding:12px 32px; border:none; border-radius:8px; font-size:16px;
             cursor:pointer; transition:0.3s; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
         .login-btn:hover { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.5); }
@@ -168,7 +164,10 @@
         .login-import-btn:hover { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.35); color:var(--c-primary-deep); }
 
         /* 最近账号 */
-        .recent-users { margin-top:28px; }
+        .recent-users { margin:6px 0 26px; }
+        .recent-users .hidden-toggle { margin-top:16px; border:none; background:transparent; color:var(--c-text-soft);
+            font-size:12.5px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; font-family:inherit; }
+        .recent-users .hidden-list { margin-top:12px; opacity:0.75; }
         .recent-users .recent-title { color:var(--c-text-soft); font-size:13px; margin-bottom:12px; letter-spacing:1px; }
         .recent-list { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
         .user-chip { display:flex; align-items:center; gap:8px; padding:8px 14px 8px 8px;
@@ -1290,15 +1289,14 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K6</div>
-            <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
-            <br>
-            <button class="login-btn" id="loginBtn">登录</button>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K7</div>
+            <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
+            <div class="recent-users" id="recentUsers"></div>
+            <button class="login-btn" id="newAccountBtn">新建账号</button>
             <div class="login-import-row">
                 <button class="login-import-btn" id="loginImportBtn">从文件导入存档</button>
                 <input type="file" id="loginImportFile" accept=".json" style="display:none">
             </div>
-            <div class="recent-users" id="recentUsers"></div>
         </div>
 
         <div class="main-box" id="mainBox">
@@ -2139,7 +2137,6 @@
             });
         });
         const saveEdit=$('saveEdit'), cancelEdit=$('cancelEdit');
-        const userNameInput=$('userNameInput'), loginBtn=$('loginBtn');
         const archiveSelect=$('archiveSelect'), filterCat=$('filterCat');
 
         // ===== .dt-input 的 value 垫片 =====
@@ -2657,8 +2654,7 @@
         }
         function curArchive(store){ return store.archives[currentArchive]; }
 
-        loginBtn.addEventListener('click', ()=>login());
-        userNameInput.addEventListener('keydown', e => { if(e.key==='Enter') login(); });
+        $('newAccountBtn').addEventListener('click', ()=>promptNewAccount());
 
         // ===== 登录页：从文件导入存档（先选文件，再指定要导入到哪个账号）=====
         $('loginImportBtn').addEventListener('click', ()=> $('loginImportFile').click());
@@ -2682,18 +2678,22 @@
                     $('loginImportFile').value=''; return;
                 }
 
-                const preset=userNameInput.value.trim();
-                customPrompt('把这份存档导入到哪个账号？（不存在会自动创建）', preset, (acct)=>{
-                    acct=acct.trim();
+                // 导到哪个账号：从已有账号里选，或新建一个。
+                // 新建时默认用备份里的名字；备份里带着账号编号且这台手机上没有的话，新账号沿用这个编号——
+                // 换手机恢复时，它就还是「同一个账号」，日子也会自动带上。
+                let parsedHead={};
+                try{ parsedHead=JSON.parse(text); }catch(_){}
+                const fileUser=(parsedHead && typeof parsedHead.user==='string') ? charSlice(parsedHead.user.trim(), 8) : '';
+                const fileId=(parsedHead && isAccountId(parsedHead.accountId)) ? parsedHead.accountId : null;
+                const doImport=(id)=>{
                     try{
-                        const { finalName, stats, daysAdded, daysPending }=importArchiveFromText(text, acct);
-                        recordUser(acct);            // 让该账号出现在最近账号里
+                        const { finalName, stats, daysAdded, daysPending }=importArchiveFromText(text, id);
                         renderRecentUsers();
-                        // 账号名和文件里的一样（换手机自导自）：日子已自动带进来。
-                        // 不一样：先问要不要一起导入日子，再问进不进账号。
-                        askImportOtherDays(daysPending, acct, (asked)=>{
-                            customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。${importFixSuffix(stats)}${importDaysSuffix(daysAdded+asked)}\n\n现在进入该账号吗？`, ()=>{
-                                login(acct);         // 进入后会自动定位到 last（即刚导入的存档）
+                        // 同一个账号（编号一样；旧备份没编号就比名字）：日子已自动带进来。
+                        // 不是同一个：先问要不要一起导入日子，再问进不进账号。
+                        askImportOtherDays(daysPending, id, (asked)=>{
+                            customConfirm(`已导入到账号「${nameOf(id)}」的存档「${finalName}」。${importFixSuffix(stats)}${importDaysSuffix(daysAdded+asked)}\n\n现在进入该账号吗？`, ()=>{
+                                login(id);           // 进入后会自动定位到 last（即刚导入的存档）
                             }, '导入成功', { okText:'立即进入', cancelText:'稍后' });
                         });
                     }catch(err){
@@ -2705,66 +2705,291 @@
                         else                     tip='导入失败：文件格式不正确';
                         customAlert(tip);
                     }
-                }, '导入到账号', (acct)=>{
-                    acct=acct.trim();
-                    if(!acct) return '请输入账号名';
-                    if(charLen(acct) > 8) return '账号名最多 8 个字～';
-                    return '';
-                }, { placeholder:'输入账号名（最多 8 字）', maxlen:8 });
+                };
+                const newThenImport=()=>promptNewAccount(doImport, (fileUser && !nameTaken(fileUser)) ? fileUser : '', fileId);
+                const accts=getAccounts();
+                if(!accts.length){ newThenImport(); }
+                else {
+                    const opts=accts.map(a=>{
+                        const o={ value:a.id, label:a.name };
+                        if(a.id===fileId) o.desc='这份备份原来就是这个账号的';
+                        else if(a.hidden) o.desc='已从登录页移走的账号';
+                        return o;
+                    });
+                    opts.push({ value:'__new', label:'＋ 新建账号', desc:'导到一个新账号里，和现有账号分开' });
+                    customChoose('把这份存档导入到哪个账号？', opts, (v)=>{
+                        if(v==='__new') newThenImport(); else doImport(v);
+                    }, '导入到账号', null, { layout:'list' });
+                }
 
                 $('loginImportFile').value='';
             };
             reader.readAsText(file);
         });
 
-        // ===== 账号索引（用于登录页最近账号）=====
-        function getUsers(){
-            try { return JSON.parse(localStorage.getItem('users_index')||'[]'); }
-            catch(e){ return []; }
+        // ===== 账号（1010-K7）=====
+        // 账号 = 一个永远不变的内部编号 + 一个给人看的名字。所有数据按编号存（store_<编号>、days_<编号>…），
+        // 名字只是标签：改名只改这里一个字段，什么数据都不用搬。
+        // 以前是拿名字直接当钥匙，改名要搬好几处数据，导入时也只能比名字判断「是不是同一个人」。
+        //
+        // 账号列表存在 accounts：[{ id, name, hidden? }]，最近用过的排最前。
+        //   hidden：从登录页列表里移走的账号。数据还在，登录页底部能找回（与以前「移出最近账号」同义）。
+        // 名字同时抄一份在该账号的 store.accountName 里：万一账号列表坏了，能从数据里把名字找回来。
+        const ACCOUNTS_KEY='accounts';
+        const ACCOUNT_ID_RE=/^u\d{19}$/;
+        function isAccountId(s){ return typeof s==='string' && ACCOUNT_ID_RE.test(s); }
+        function newAccountId(list){
+            let id;
+            do{ id='u'+String(Date.now()).padStart(13,'0')+String(Math.floor(Math.random()*1e6)).padStart(6,'0'); }
+            while((list||[]).some(a=>a.id===id) || localStorage.getItem(`store_${id}`)!==null);
+            return id;
         }
-        function recordUser(name){
-            let list=getUsers().filter(u=>u!==name);
-            list.unshift(name);              // 最近用的排最前
-            localStorage.setItem('users_index', JSON.stringify(list));
+        function readAccountsRaw(){
+            const raw=localStorage.getItem(ACCOUNTS_KEY);
+            if(raw===null) return null;
+            try{
+                const a=JSON.parse(raw);
+                if(!Array.isArray(a)) return null;
+                return a.filter(x=>x && isAccountId(x.id) && typeof x.name==='string');
+            }catch(_){ return null; }
         }
-        function removeUser(name){
-            const list=getUsers().filter(u=>u!==name);
-            localStorage.setItem('users_index', JSON.stringify(list));
+        function getAccounts(){ return readAccountsRaw() || []; }
+        // 写失败（配额满）会抛错，由调用方决定怎么提示
+        function saveAccounts(list){ localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list)); }
+        function accountById(id){ return getAccounts().find(a=>a.id===id) || null; }
+        function nameOf(id){ const a=accountById(id); return a ? a.name : String(id||''); }
+        function nameTaken(name, exceptId){ return getAccounts().some(a=>a.name===name && a.id!==exceptId); }
+        // 账号名校验：返回错误文案，合格返回空串（新建、改名、导入时新建共用）
+        function accountNameError(name, exceptId){
+            if(!name) return '名字不能为空';
+            if(charLen(name) > 8) return '名字最多 8 个字～';
+            if(nameTaken(name, exceptId)) return '这台手机上已经有叫这个名字的账号了，换一个吧';
+            return '';
+        }
+        // 把名字抄进 store，供账号列表损坏时找回。失败不影响主流程
+        function stampAccountName(id, name){
+            try{
+                const raw=localStorage.getItem(`store_${id}`);
+                if(raw===null) return;
+                const s=JSON.parse(raw);
+                if(!s || typeof s!=='object' || s.accountName===name) return;
+                s.accountName=name;
+                localStorage.setItem(`store_${id}`, JSON.stringify(s));
+            }catch(_){}
+        }
+        // 新建账号：写好空账本和名字，排到列表最前。preferId：导入别的手机的备份时沿用它原来的编号
+        function createAccount(name, preferId){
+            const list=getAccounts();
+            const id=(isAccountId(preferId) && !list.some(a=>a.id===preferId)
+                      && localStorage.getItem(`store_${preferId}`)===null) ? preferId : newAccountId(list);
+            const store={ archives:{ '默认存档':{ records:[], cats:DEFAULT_CATS.slice() } }, last:'默认存档', accountName:name };
+            localStorage.setItem(`store_${id}`, JSON.stringify(store));
+            try{ saveAccounts([{ id, name }].concat(list)); }
+            catch(err){ try{ localStorage.removeItem(`store_${id}`); }catch(_){} throw err; }
+            return id;
+        }
+        // 进入某账号时把它排到最前、并取消隐藏
+        function touchAccount(id){
+            const list=getAccounts();
+            const i=list.findIndex(a=>a.id===id); if(i<0) return;
+            const a=Object.assign({}, list[i]); delete a.hidden;
+            list.splice(i,1); list.unshift(a);
+            try{ saveAccounts(list); }catch(_){}
+        }
+        function setAccountHidden(id, hidden){
+            const list=getAccounts().map(a=>{
+                if(a.id!==id) return a;
+                const b=Object.assign({}, a); if(hidden) b.hidden=true; else delete b.hidden; return b;
+            });
+            saveAccounts(list);
+        }
+
+        // 账号列表丢了或坏了：从数据里把账号找回来（名字取 store.accountName，没有就叫「账号1」…）。
+        // 坏掉的原文先另存一份，不覆盖。
+        function recoverAccountsIfBroken(){
+            const raw=localStorage.getItem(ACCOUNTS_KEY);
+            if(raw!==null && readAccountsRaw()!==null) return;
+            const ids=[];
+            for(let i=0;i<localStorage.length;i++){
+                const k=localStorage.key(i);
+                if(k && k.indexOf('store_')===0 && isAccountId(k.slice(6))) ids.push(k.slice(6));
+            }
+            if(raw===null && !ids.length) return;              // 新装的 App：本来就没有账号
+            if(raw!==null){ try{ localStorage.setItem(`${ACCOUNTS_KEY}__corrupted_${Date.now()}`, raw); }catch(_){} }
+            ids.sort();
+            const list=[]; let n=1;
+            ids.forEach(id=>{
+                let name='';
+                try{ const s=JSON.parse(localStorage.getItem(`store_${id}`)); name=(s && typeof s.accountName==='string') ? charSlice(s.accountName.trim(), 8) : ''; }catch(_){}
+                while(!name || list.some(a=>a.name===name)) name=`账号${n++}`;
+                list.push({ id, name });
+            });
+            try{ saveAccounts(list); }catch(_){}
+        }
+
+        // ===== 老数据迁移：按名字存 → 按编号存（只跑一次，失败了下次启动接着跑）=====
+        // 每个老账号先在账号列表里登记一个编号（记下 legacy = 老名字），再把它名下的数据逐个
+        // 「写新 → 读回确认 → 删旧」地搬过去。账号列表先落盘，所以中途断了，下次能按同一个编号续上。
+        // 全部搬完才打 accounts_v=1 标记、去掉 legacy。
+        // 老账号从哪来：store_名字（每个登录过的账号都有）、更早期的 billData_名字。
+        // 以前登录页「移出最近账号」的账号不在 users_index 里，迁移后记为 hidden，登录页底部能找回。
+        const ACCOUNTS_VERSION='1';
+        function migrateMoveKey(from, to){
+            let v;
+            try{ v=localStorage.getItem(from); }catch(_){ return false; }
+            if(v===null) return true;
+            let cur=null;
+            try{ cur=localStorage.getItem(to); }catch(_){}
+            if(cur!==null && cur!==v) return true;   // 新位置已有别的内容（上次搬到一半）：两份都留着，不冒险
+            if(cur===null){
+                try{ localStorage.setItem(to, v); }catch(_){ return false; }
+                if(localStorage.getItem(to)!==v) return false;
+            }
+            try{ localStorage.removeItem(from); }catch(_){}
+            return true;
+        }
+        function migrateKeysWithPrefix(oldPrefix, newPrefix){
+            const ks=[];
+            for(let i=0;i<localStorage.length;i++){
+                const k=localStorage.key(i);
+                if(k && k.indexOf(oldPrefix)===0) ks.push(k);
+            }
+            let ok=true;
+            ks.forEach(k=>{ ok=migrateMoveKey(k, newPrefix+k.slice(oldPrefix.length)) && ok; });
+            return ok;
+        }
+        function migrateOneAccount(name, id){
+            let ok=true;
+            ok=migrateMoveKey(`store_${name}`, `store_${id}`) && ok;
+            ok=migrateMoveKey(`billData_${name}`, `billData_${id}`) && ok;
+            ok=migrateMoveKey(`days_${name}`, `days_${id}`) && ok;
+            ok=migrateMoveKey(`days_card_n_${name}`, `days_card_n_${id}`) && ok;
+            ok=migrateMoveKey(`app_time_repaired_${name}`, `app_time_repaired_${id}`) && ok;
+            ok=migrateKeysWithPrefix(`store_${name}__corrupted_`, `store_${id}__corrupted_`) && ok;
+            ok=migrateKeysWithPrefix(`days_${name}__corrupted_`, `days_${id}__corrupted_`) && ok;
+            // 云备份连接：按这个账号自己的存档名逐个搬，不用前缀扫描——
+            // 别的老账号名恰好是「名字__xxx」时，前缀匹配会把别人的连接一起搬走。
+            let archives=[];
+            try{
+                const s=JSON.parse(localStorage.getItem(`store_${id}`));
+                if(s && s.archives && typeof s.archives==='object') archives=Object.keys(s.archives);
+            }catch(_){}
+            archives.forEach(arc=>{ ok=odMoveLink(name, arc, id, arc) && ok; });
+            return ok;
+        }
+        function migrateAccounts(){
+            recoverAccountsIfBroken();     // 账号列表坏了先找回（迁移完以后也要查）
+            if(localStorage.getItem('accounts_v')===ACCOUNTS_VERSION) return true;
+            let indexNames=[];
+            try{ const u=JSON.parse(localStorage.getItem('users_index')||'[]'); if(Array.isArray(u)) indexNames=u.filter(x=>typeof x==='string' && x); }catch(_){}
+            const found=[];
+            for(let i=0;i<localStorage.length;i++){
+                const k=localStorage.key(i); if(!k) continue;
+                let n=null;
+                if(k.indexOf('store_')===0) n=k.slice(6);
+                else if(k.indexOf('billData_')===0) n=k.slice(9);
+                if(n===null || !n || n.indexOf('__corrupted_')>=0 || isAccountId(n)) continue;
+                if(!found.includes(n)) found.push(n);
+            }
+            const names=indexNames.filter(n=>found.includes(n)).concat(found.filter(n=>!indexNames.includes(n)).sort());
+            const list=getAccounts();
+            names.forEach(n=>{
+                if(list.some(a=>a.legacy===n)) return;
+                let name=charSlice(n.trim(), 8) || '账号';
+                const base=name; let k=2;
+                while(list.some(a=>a.name===name)) name=charSlice(base, 6)+k++;
+                const entry={ id:newAccountId(list), name, legacy:n };
+                if(!indexNames.includes(n)) entry.hidden=true;
+                list.push(entry);
+            });
+            try{ saveAccounts(list); }catch(_){ return false; }
+            let ok=true;
+            list.forEach(a=>{ if(typeof a.legacy==='string') ok=migrateOneAccount(a.legacy, a.id) && ok; });
+            // 自动登录记的是名字的话，换成编号
+            const remembered=localStorage.getItem('app_logged_in_user');
+            const hit=list.find(a=>a.legacy===remembered);
+            if(hit){ try{ localStorage.setItem('app_logged_in_user', hit.id); }catch(_){ ok=false; } }
+            if(!ok) return false;
+            const clean=list.map(a=>{ const b=Object.assign({}, a); delete b.legacy; return b; });
+            try{
+                saveAccounts(clean);
+                clean.forEach(a=>stampAccountName(a.id, a.name));
+                localStorage.removeItem('users_index');
+                localStorage.setItem('accounts_v', ACCOUNTS_VERSION);
+            }catch(_){ return false; }
+            return true;
+        }
+
+        // ===== 登录页：账号列表 =====
+        let showHiddenAccounts=false;
+        function accountChip(acc){
+            const chip=document.createElement('div'); chip.className='user-chip';
+            chip.title='点击进入';
+            const av=document.createElement('div'); av.className='avatar';
+            av.textContent=Array.from(acc.name)[0] || '?';
+            const label=document.createElement('span'); label.textContent=acc.name;
+            chip.appendChild(av); chip.appendChild(label);
+            if(!acc.hidden){
+                const del=document.createElement('button'); del.className='u-del'; del.textContent='×';
+                del.title='从列表移走（数据不会删除，可在下方找回）';
+                del.onclick=(e)=>{
+                    e.stopPropagation();
+                    customConfirm(`把「${acc.name}」从列表移走？\n\n账本数据不会删除，之后点下方「已移走的账号」就能找回。`, ()=>{
+                        try{ setAccountHidden(acc.id, true); }catch(_){ customAlert('保存失败，请重试。'); }
+                        renderRecentUsers();
+                    }, '移走账号');
+                };
+                chip.appendChild(del);
+            }
+            chip.onclick=()=>login(acc.id);
+            return chip;
         }
         function renderRecentUsers(){
             const box=$('recentUsers');
-            const list=getUsers();
-            if(!list.length){ box.innerHTML=''; return; }
-            box.innerHTML='<div class="recent-title">最近账号（点击直接进入）</div>';
-            const wrap=document.createElement('div'); wrap.className='recent-list';
-            list.forEach(name=>{
-                const chip=document.createElement('div'); chip.className='user-chip';
-                chip.title='点击进入';
-                const av=document.createElement('div'); av.className='avatar';
-                av.textContent=name.slice(0,1).toUpperCase();
-                const label=document.createElement('span'); label.textContent=name;
-                const del=document.createElement('button'); del.className='u-del'; del.textContent='×';
-                del.title='从列表移除（不会删除账本数据）';
-                del.onclick=(e)=>{
-                    e.stopPropagation();
-                    customConfirm(`将「${name}」从最近账号列表移除？（账本数据不会删除，重新输入名字仍可进入）`, ()=>{
-                        removeUser(name); renderRecentUsers();
-                    }, '移除账号');
-                };
-                chip.appendChild(av); chip.appendChild(label); chip.appendChild(del);
-                chip.onclick=()=>login(name);
-                wrap.appendChild(chip);
-            });
-            box.appendChild(wrap);
+            box.innerHTML='';
+            const all=getAccounts();
+            const shown=all.filter(a=>!a.hidden), hidden=all.filter(a=>a.hidden);
+            if(shown.length){
+                const t=document.createElement('div'); t.className='recent-title'; t.textContent='选择账号';
+                const wrap=document.createElement('div'); wrap.className='recent-list';
+                shown.forEach(a=>wrap.appendChild(accountChip(a)));
+                box.appendChild(t); box.appendChild(wrap);
+            } else {
+                const t=document.createElement('div'); t.className='recent-title';
+                t.textContent = all.length ? '账号都被移走了，点下方找回，或者新建一个' : '还没有账号，先新建一个吧';
+                box.appendChild(t);
+            }
+            if(hidden.length){
+                const tg=document.createElement('button'); tg.className='hidden-toggle'; tg.id='hiddenToggle';
+                tg.textContent = showHiddenAccounts ? '收起已移走的账号' : `已移走的账号（${hidden.length}）`;
+                tg.onclick=()=>{ showHiddenAccounts=!showHiddenAccounts; renderRecentUsers(); };
+                box.appendChild(tg);
+                if(showHiddenAccounts){
+                    const wrap=document.createElement('div'); wrap.className='recent-list hidden-list';
+                    hidden.forEach(a=>wrap.appendChild(accountChip(a)));
+                    box.appendChild(wrap);
+                }
+            }
+        }
+        // 新建账号：起个名字，建好直接进去
+        function promptNewAccount(onCreated, preset, preferId){
+            customPrompt('给新账号起个名字（最多 8 字）。名字以后可以在「设置 → 修改用户名」里改。', preset||'', (name)=>{
+                name=name.trim();
+                let id;
+                try{ id=createAccount(name, preferId); }
+                catch(_){ customAlert('存储空间不足，没能新建账号。请删除部分存档或记录后重试。', '新建失败'); return; }
+                if(onCreated) onCreated(id); else login(id);
+            }, '新建账号', (name)=>accountNameError(name.trim()), { placeholder:'输入名字（最多 8 字）', maxlen:8 });
         }
 
-        function login(presetName){
-            const name = (presetName!==undefined ? presetName : userNameInput.value).trim();
-            if(!name){ customAlert('请输入姓名！'); return; }
-            if(charLen(name) > 8){ customAlert('姓名最多 8 个字～'); return; }
-            currentUser = name;
-            recordUser(name);
-            localStorage.setItem('app_logged_in_user', name);   // 记住当前登录用户，下次自动进入
+        function login(id){
+            const acc=accountById(id);
+            if(!acc){ renderRecentUsers(); return; }
+            // 迁移还没搬完的账号先别进：进去会建一个空账本，反而挡住后面的数据搬过来
+            if(typeof acc.legacy==='string'){ customAlert('这个账号的数据还没整理完，请关掉 App 重新打开后再进。', '请稍候'); return; }
+            currentUser = id;
+            touchAccount(id);
+            localStorage.setItem('app_logged_in_user', id);   // 记住当前登录账号（编号），下次自动进入
             const store = loadStore();
             saveStoreSafe(store);
             currentArchive = store.last || Object.keys(store.archives)[0];
@@ -2778,7 +3003,7 @@
             mainBox.style.display='block';
             $('tabBar').style.display='flex';
             document.body.classList.remove('login-mode');
-            nowUser.innerText = `当前用户：${name}`;
+            nowUser.innerText = `当前用户：${nameOf(id)}`;
             resetSearch();
             refreshArchiveSelect();
             refreshCatSelectors();
@@ -2788,110 +3013,38 @@
             switchTab(getDefaultTab());   // 按用户设置进入默认页（默认记账）
             // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
             // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
-            runTimeRepairOnce(name);
+            runTimeRepairOnce(id);
         }
 
         logoutBtn.addEventListener('click', () => {
             currentUser=''; currentArchive='';
             localStorage.removeItem('app_logged_in_user');   // 退出后不再自动登录
-            userNameInput.value='';
             mainBox.style.display='none';
             $('tabBar').style.display='none';
             loginBox.style.display='block';
             document.body.classList.add('login-mode');
             $('actionBar').style.display='none';
+            showHiddenAccounts=false;
             renderRecentUsers();
         });
 
-        // 修改用户名：把当前账号连同其全部存档数据迁移到新名字下
+        // 修改用户名：数据按编号存，改名只改账号列表里的名字（再抄一份进 store），不搬任何数据
         $('editNameBtn').addEventListener('click', () => {
-            const oldName=currentUser;
+            const id=currentUser, oldName=nameOf(id);
             customPrompt('', oldName, (newName)=>{
                 newName=newName.trim();
                 if(newName===oldName) return;
-                // 迁移数据：store_old -> store_new
-                // 写入可能因配额满而抛错。必须先确认新键写成功，再删旧键——
-                // 否则异常会从这里逃出去，弹窗已关、提示也没有，用户看到的是「改名静默失败」。
-                const data=localStorage.getItem(`store_${oldName}`);
-                if(data!==null){
-                    try{
-                        localStorage.setItem(`store_${newName}`, data);
-                    }catch(err){
-                        customAlert('存储空间不足，改名未能完成。原用户名和数据都没有变动，请删除部分存档或记录后重试。', '改名失败');
-                        return;   // 旧键原封不动，数据安全
-                    }
-                }
-                localStorage.removeItem(`store_${oldName}`);
-                // 顺带迁移该用户的「损坏备份」键（store_旧名__corrupted_*），
-                // 否则它们会永远挂在旧名下，既取不回也清不掉，白占配额。
-                try{
-                    const oldPrefix=`store_${oldName}__corrupted_`;
-                    const moved=[];
-                    for(let i=0;i<localStorage.length;i++){
-                        const k=localStorage.key(i);
-                        if(k && k.indexOf(oldPrefix)===0) moved.push(k);
-                    }
-                    moved.forEach(k=>{
-                        const suffix=k.slice(oldPrefix.length);
-                        const v=localStorage.getItem(k);
-                        try{ localStorage.setItem(`store_${newName}__corrupted_${suffix}`, v); }catch(_){}
-                        localStorage.removeItem(k);
-                    });
-                }catch(_){}
-                // 迁移「日子」数据（独立 key，不在 store 里，必须单独搬）
-                try{
-                    const dayData=localStorage.getItem(`days_${oldName}`);
-                    if(dayData!==null){
-                        localStorage.setItem(`days_${newName}`, dayData);
-                        localStorage.removeItem(`days_${oldName}`);
-                    }
-                }catch(_){}
-                // 迁移「已修复历史时间」标记，否则改名后会对同一份数据重复扫描一次
-                try{
-                    if(localStorage.getItem(`app_time_repaired_${oldName}`)==='1'){
-                        localStorage.setItem(`app_time_repaired_${newName}`, '1');
-                    }
-                    localStorage.removeItem(`app_time_repaired_${oldName}`);
-                }catch(_){}
-                // 迁移「日子入口卡显示条数」（days_card_n_*），否则改名后回到默认 3 条
-                try{
-                    const cardN=localStorage.getItem(`days_card_n_${oldName}`);
-                    if(cardN!==null){
-                        localStorage.setItem(`days_card_n_${newName}`, cardN);
-                        localStorage.removeItem(`days_card_n_${oldName}`);
-                    }
-                }catch(_){}
-                // 迁移每个存档的云备份连接。按存档名逐个精确迁移，不用前缀扫描：
-                // 若别的用户名恰好以「旧名__」开头，前缀匹配会把别人的连接一起搬走。
-                try{
-                    const migrated=loadStore(newName);
-                    Object.keys(migrated.archives).forEach(arc=>{
-                        odMoveLink(oldName, arc, newName, arc);
-                    });
-                }catch(_){}
-                // 更新账号索引：移除旧名、加入新名（保持在最前）
-                let list=getUsers().filter(u=>u!==oldName && u!==newName);
-                list.unshift(newName);
-                localStorage.setItem('users_index', JSON.stringify(list));
-                // 更新当前状态与界面
-                currentUser=newName;
-                // 同步「自动登录」记住的用户名，否则改名后关 App，下次启动会因旧名 store 已删而无法自动进入
-                localStorage.setItem('app_logged_in_user', newName);
+                const list=getAccounts().map(a=>a.id===id ? Object.assign({}, a, { name:newName }) : a);
+                try{ saveAccounts(list); }
+                catch(_){ customAlert('存储空间不足，改名未能完成，原名字没有变。请删除部分存档或记录后重试。', '改名失败'); return; }
+                stampAccountName(id, newName);
                 nowUser.innerText=`当前用户：${newName}`;
-                // 数据迁移后必须重新加载界面，否则仍显示旧视图直到刷新
-                const store=loadStore();
-                currentArchive = store.last || Object.keys(store.archives)[0];
-                refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
                 customAlert(`用户名已改为「${newName}」`);
             }, '修改用户名', (newName)=>{
                 newName=newName.trim();
                 if(newName===oldName) return '';
-                if(!newName) return '用户名不能为空';
-                if(charLen(newName) > 8) return '用户名最多 8 个字～';
-                // 已存在同名且有数据的账号，不允许覆盖
-                if(localStorage.getItem(`store_${newName}`)!==null) return '该用户名已存在，换一个吧';
-                return '';
-            }, { placeholder:'输入新用户名（最多 8 字，数据会一并迁移）', maxlen:8 });
+                return accountNameError(newName, id);
+            }, { placeholder:'输入新用户名（最多 8 字）', maxlen:8 });
         });
 
         function refreshArchiveSelect(){
@@ -2972,7 +3125,7 @@
             // 注意它是账号级的（全局一份），不是存档级的——多存档时每份导出文件都会
             // 各带一份相同副本。这是可接受的冗余：真把它挪进 archives[x] 才是错的
             // （切到「旅行」存档，「入职纪念日」难道就不存在了）。
-            const payload={ app:'记问', user:currentUser, archive:currentArchive,
+            const payload={ app:'记问', user:nameOf(currentUser), accountId:currentUser, archive:currentArchive,
                 cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], data:a.records, days:loadDays(),
                 exportedAt:new Date().toLocaleString() };
             const json=JSON.stringify(payload,null,2);
@@ -3040,7 +3193,7 @@
         // 每个「账号+存档」独立连接一个文件（跟导出/导入的粒度保持一致）。
         function odBuildPayload(){
             const store=loadStore(); const a=curArchive(store);
-            return { app:'记问', user:currentUser, archive:currentArchive,
+            return { app:'记问', user:nameOf(currentUser), accountId:currentUser, archive:currentArchive,
                 cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], data:a.records, days:loadDays(),
                 exportedAt:new Date().toLocaleString() };
         }
@@ -3543,14 +3696,17 @@ ${detail}
             //   【1010-K6】账号不同时不再悄悄跳过：把「目标账号里还没有的」那几条交回调用方，
             //   由调用方问一句要不要一起导入（见 askImportOtherDays）。旧备份没有 user 字段的照旧不收。
             let daysAdded=0, daysPending=null;
-            if(parsed && typeof parsed.user==='string'){
+            //   【1010-K7】「同一个账号」先看账号编号；旧备份没有编号，退回去比名字。
+            const hasId=parsed && isAccountId(parsed.accountId);
+            if(parsed && (hasId || typeof parsed.user==='string')){
                 const list=sanitizeImportedDays(parsed.days);
-                if(parsed.user===targetUser){
+                const same = hasId ? parsed.accountId===targetUser : parsed.user===nameOf(targetUser);
+                if(same){
                     daysAdded=mergeImportedDays(list, targetUser);
                 } else if(list.length){
                     const seen=new Set(loadDays(targetUser).map(d=>`${d.name}|${d.date}`));
                     const fresh=list.filter(d=>!seen.has(`${d.name}|${d.date}`));
-                    if(fresh.length) daysPending={ list:fresh, fromUser:parsed.user };
+                    if(fresh.length) daysPending={ list:fresh, fromUser:(typeof parsed.user==='string' ? parsed.user : '') };
                 }
             }
             return { finalName, stats, daysAdded, daysPending };
@@ -3563,7 +3719,7 @@ ${detail}
             if(!pending || !pending.list.length){ done(0); return; }
             const from = pending.fromUser ? `账号「${pending.fromUser}」` : '另一个账号';
             customConfirm(`文件里还有 ${pending.list.length} 个日子（倒数日），原本属于${from}。\n\n`
-                + `日子是每个账号只有一份的，导入后会和「${targetUser}」现有的日子放在一起。要一起导入吗？`,
+                + `日子是每个账号只有一份的，导入后会和「${nameOf(targetUser)}」现有的日子放在一起。要一起导入吗？`,
                 ()=>done(mergeImportedDays(pending.list, targetUser)),
                 '一起导入日子？', { okText:'一起导入', cancelText:'不用了', onCancel:()=>done(0) });
         }
@@ -7671,11 +7827,16 @@ ${detail}
 
         // ===== 页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页 =====
         (function initApp(){
+            // 1010-K7：先把老的「按名字存」的数据搬到账号编号下（只跑一次；没搬完下次接着搬）
+            let migrated=true;
+            try{ migrated=migrateAccounts(); }catch(_){ migrated=false; }
+            if(!migrated) customAlert('升级时整理账号数据没有全部完成（可能是手机存储空间不足）。已经整理好的部分可以正常使用，下次打开 App 会接着整理。', '提示');
             const remembered=localStorage.getItem('app_logged_in_user');
-            if(remembered && localStorage.getItem(`store_${remembered}`)!==null){
+            if(migrated && remembered && accountById(remembered) && localStorage.getItem(`store_${remembered}`)!==null){
                 login(remembered);   // 自动登录，按设置进入默认页
             } else {
-                if(remembered) localStorage.removeItem('app_logged_in_user');
+                // 没整理完时先留着，下次整理完还能自动进入
+                if(remembered && migrated) localStorage.removeItem('app_logged_in_user');
                 document.body.classList.add('login-mode');
                 renderRecentUsers();
             }

@@ -45,6 +45,9 @@ function boot(opts){
 }
 const $ = (d,id)=>d.getElementById(id);
 function prompt(d, value){ $(d,'askInput').value = value; $(d,'askOk').click(); }
+// 1010-K7：数据按账号编号存，老的「按名字存」在启动时被迁移过去
+const uid = t => t.w.localStorage.getItem('app_logged_in_user');
+const odk = (t, arc) => `onedrive_link_${uid(t)}__${arc}`;
 const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError:null, blocked:false, lastCount:4 });
 
 (async ()=>{
@@ -56,27 +59,27 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
         const t = boot({ extra: [['onedrive_link_小明__默认存档', link('content://a')]] });
         $(t.d,'renameArchive').click(); prompt(t.d, '日常');
         const ls = t.w.localStorage;
-        ok(ls.getItem('onedrive_link_小明__日常') !== null, '改名后新存档名下有连接');
-        ok(ls.getItem('onedrive_link_小明__默认存档') === null, '改名后旧连接已删');
-        ok(JSON.parse(ls.getItem('onedrive_link_小明__日常')).uri === 'content://a', '连接内容原样保留');
+        ok(ls.getItem(odk(t,'日常')) !== null, '改名后新存档名下有连接');
+        ok(ls.getItem(odk(t,'默认存档')) === null, '改名后旧连接已删');
+        ok(JSON.parse(ls.getItem(odk(t,'日常'))).uri === 'content://a', '连接内容原样保留');
         ok($(t.d,'odStatus').textContent.includes('已连接'), '设置页显示「已连接」');
         ok(t.errors.length === 0, '改名无脚本错误 ' + t.errors.join(';'));
     }
     // ---------- 1b. 写新连接失败：旧连接必须保留 ----------
     {
         const t = boot({ extra: [['onedrive_link_小明__默认存档', link('content://a')]] });
-        const S = t.w.Storage.prototype, orig = S.setItem;
-        S.setItem = function(k, v){ if(String(k).startsWith('onedrive_link_小明__日常')) throw new Error('quota'); return orig.call(this, k, v); };
+        const S = t.w.Storage.prototype, orig = S.setItem, bad = odk(t,'日常');
+        S.setItem = function(k, v){ if(String(k).startsWith(bad)) throw new Error('quota'); return orig.call(this, k, v); };
         $(t.d,'renameArchive').click(); prompt(t.d, '日常');
         S.setItem = orig;
-        ok(t.w.localStorage.getItem('onedrive_link_小明__默认存档') !== null, '写新失败时旧连接未被删');
+        ok(t.w.localStorage.getItem(odk(t,'默认存档')) !== null, '写新失败时旧连接未被删');
     }
     // ---------- 1c. 没有连接时改名不出错、不凭空造连接 ----------
     {
         const t = boot();
         $(t.d,'renameArchive').click(); prompt(t.d, '日常');
-        ok(t.w.localStorage.getItem('onedrive_link_小明__日常') === null, '无连接改名不产生连接');
-        ok(JSON.parse(t.w.localStorage.getItem('store_小明')).archives['日常'].records.length === 4, '改名后记录完整');
+        ok(t.w.localStorage.getItem(odk(t,'日常')) === null, '无连接改名不产生连接');
+        ok(JSON.parse(t.w.localStorage.getItem(t.w.storeKey())).archives['日常'].records.length === 4, '改名后记录完整');
     }
 
     // ---------- 2. 删除存档：清理连接 + 释放授权 ----------
@@ -85,27 +88,36 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
                                   ['onedrive_link_小明__旅行', link('content://b')]] });
         $(t.d,'delArchive').click(); $(t.d,'askOk').click();
         const ls = t.w.localStorage;
-        ok(ls.getItem('onedrive_link_小明__默认存档') === null, '删存档后其连接被清');
-        ok(ls.getItem('onedrive_link_小明__旅行') !== null, '其他存档的连接不受影响');
+        ok(ls.getItem(odk(t,'默认存档')) === null, '删存档后其连接被清');
+        ok(ls.getItem(odk(t,'旅行')) !== null, '其他存档的连接不受影响');
         await new Promise(r=>setTimeout(r, 10));
         ok(t.forgotten.includes('content://a') && !t.forgotten.includes('content://b'), '只释放被删存档的授权');
     }
 
-    // ---------- 3. 修改用户名 ----------
+    // ---------- 3. 修改用户名：只改名字，数据原地不动 ----------
     {
         const t = boot({ extra: [
             ['onedrive_link_小明__默认存档', link('content://a')],
             ['onedrive_link_小明__旅行', link('content://b')],
             ['days_card_n_小明', '7'],
-            // 干扰项：另一个用户名恰好是「小明__x」开头
+            // 干扰项：另一个（不存在的）老用户名恰好是「小明__x」开头，迁移时不能被当成小明的
             ['onedrive_link_小明__x__某存档', link('content://other')],
         ]});
+        const id = uid(t), ls = t.w.localStorage;
+        ok(/^u\d{19}$/.test(id), '启动时已迁移到账号编号');
+        ok(ls.getItem(`days_card_n_${id}`) === '7' && ls.getItem('days_card_n_小明') === null, '入口卡条数已迁移');
+        ok(ls.getItem(odk(t,'默认存档')) !== null && ls.getItem(odk(t,'旅行')) !== null, '两个存档的连接都已迁移');
+        ok(ls.getItem('onedrive_link_小明__x__某存档') !== null && ls.getItem(odk(t,'x__某存档')) === null, '不误搬其他用户的连接');
+        const before = [];
+        for(let i=0;i<ls.length;i++) before.push(ls.key(i));
         $(t.d,'editNameBtn').click(); prompt(t.d, '新名字');
-        const ls = t.w.localStorage;
-        ok(ls.getItem('days_card_n_新名字') === '7' && ls.getItem('days_card_n_小明') === null, '入口卡条数已迁移');
-        ok(ls.getItem('onedrive_link_新名字__默认存档') !== null && ls.getItem('onedrive_link_新名字__旅行') !== null, '两个存档的连接都已迁移');
-        ok(ls.getItem('onedrive_link_小明__默认存档') === null && ls.getItem('onedrive_link_小明__旅行') === null, '旧连接已删');
-        ok(ls.getItem('onedrive_link_小明__x__某存档') !== null && ls.getItem('onedrive_link_新名字__x__某存档') === null, '不误搬其他用户的连接');
+        ok(uid(t) === id && t.w.storeKey() === `store_${id}`, '改名后编号不变');
+        ok(JSON.parse(ls.getItem('accounts')).find(a=>a.id===id).name === '新名字', '账号列表里的名字已改');
+        ok(JSON.parse(ls.getItem(`store_${id}`)).accountName === '新名字', '名字也抄进了账本');
+        const after = [];
+        for(let i=0;i<ls.length;i++) after.push(ls.key(i));
+        ok(before.sort().join('|') === after.sort().join('|'), '改名没有新增或删除任何数据键');
+        ok($(t.d,'askTitle').textContent && $(t.d,'askMsg').textContent.includes('新名字'), '提示已改名');
         ok($(t.d,'odStatus').textContent.includes('已连接'), '改名后当前存档仍显示已连接');
         ok(t.errors.length === 0, '改名用户无脚本错误 ' + t.errors.join(';'));
     }

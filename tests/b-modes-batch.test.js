@@ -32,7 +32,7 @@ function boot(records, extra){
         }});
     const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
     const d=dom.window.document, $=id=>d.getElementById(id);
-    const recs=()=>JSON.parse(dom.window.localStorage.getItem('store_小明')).archives['默认存档'].records;
+    const recs=()=>JSON.parse(dom.window.localStorage.getItem(dom.window.storeKey())).archives['默认存档'].records;
     const byId=id=>recs().find(r=>r.id===id);
     const chip=(boxId,text)=>[...$(boxId).querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===text);
     const choose=text=>{ chip('askChoices',text).click(); $('askOk').click(); };
@@ -98,8 +98,8 @@ function boot(records, extra){
     const t=boot();
     const txt=JSON.stringify({ app:'记问', user:'小明', archive:'导入测试', cats:['转账'],
         data:[ R('x','2026-09-01T10:00',50,'expense','转账','还款',{skip:true}), R('y','2026-09-01T11:00',5,'expense','转账','',{skip:'yes'}) ] });
-    t.w.importArchiveFromText(txt,'小明');
-    const arc=JSON.parse(t.w.localStorage.getItem('store_小明')).archives['导入测试'].records;
+    t.w.importArchiveFromText(txt, t.w.localStorage.getItem('app_logged_in_user'));
+    const arc=JSON.parse(t.w.localStorage.getItem(t.w.storeKey())).archives['导入测试'].records;
     ok(arc[0].skip===true, '导入保留 skip:true');
     ok(!('skip' in arc[1]), '非严格 true 的 skip 不导入');
 }

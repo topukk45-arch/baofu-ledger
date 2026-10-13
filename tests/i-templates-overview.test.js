@@ -13,7 +13,7 @@ function boot(arc, extraArchives){
     w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
   const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
   const d=dom.window.document,$=id=>d.getElementById(id);
-  const st=()=>JSON.parse(dom.window.localStorage.getItem('store_小明'));
+  const st=()=>JSON.parse(dom.window.localStorage.getItem(dom.window.storeKey()));
   const arcOf=()=>st().archives['默认存档'];
   const chipTxt=box=>[...$(box).querySelectorAll('.cc')].map(e=>e.textContent);
   const clickChip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>e.textContent===txt).click();
@@ -159,10 +159,10 @@ function boot(arc, extraArchives){
            {type:'expense',cat:'不存在',remark:'x',money:null},                    // 分类不在表里
            {type:'oops',cat:'订阅'},                                               // 类型非法
            {type:'income',cat:'餐饮',remark:'',money:-3},                          // 金额非法
-           {type:'expense',cat:'餐饮',remark:'<b>午饭</b>',money:'',mode:'flow'} ] }), '小明');
+           {type:'expense',cat:'餐饮',remark:'<b>午饭</b>',money:'',mode:'flow'} ] }), t.w.localStorage.getItem('app_logged_in_user'));
   const im=t.st().archives['导入'].tpls;
   ok(im.length===2 && im[0].money===157 && im[1].money===null && im[1].mode==='flow' && im[0].id && im[0].id!==im[1].id, '导入清洗：'+JSON.stringify(im));
-  const t2=boot(); t2.w.importArchiveFromText(JSON.stringify({ archive:'旧备份', cats:['未分类'], data:[R('x','2026-10-01T10:00',1,'expense','未分类')] }),'小明');
+  const t2=boot(); t2.w.importArchiveFromText(JSON.stringify({ archive:'旧备份', cats:['未分类'], data:[R('x','2026-10-01T10:00',1,'expense','未分类')] }), t2.w.localStorage.getItem('app_logged_in_user'));
   ok(Array.isArray(t2.st().archives['旧备份'].tpls) && t2.st().archives['旧备份'].tpls.length===0, '旧备份没有 tpls → 空数组');
   // XSS：模板名只当文字
   const t3=boot({ tpls:[{id:'x',type:'expense',cat:'餐饮',remark:'<img src=x onerror="window.__pwn=1">',money:null,mode:'normal'}] });
