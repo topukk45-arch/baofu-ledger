@@ -1290,7 +1290,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K5</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1010-K6</div>
             <input type="text" class="login-input" id="userNameInput" placeholder="请输入姓名（最多 8 字）" maxlength="8">
             <br>
             <button class="login-btn" id="loginBtn">登录</button>
@@ -2214,7 +2214,7 @@
         function customConfirm(msg, onOk, title, opts){
             opts = opts || {};
             askMode='confirm';
-            askOnCancel=null;
+            askOnCancel=opts.onCancel||null;   // 可选：点取消时要接着做的事（如导入时问完日子再问进不进账号）
             askValidate=null;   // 防御性复位：本模式不用校验，避免残留上一个 prompt 的校验函数
             askTitle.textContent=title||'确认操作';
             askMsg.textContent=msg;
@@ -2230,6 +2230,7 @@
                 extra.style.display='';
                 extra.onclick=()=>{
                     const fn=opts.extra.onClick;
+                    askOnCancel=null;         // 点的是附加按钮，不算取消
                     closeAsk(false);          // 先关闭成功弹窗（不触发 onOk，因为传 false）
                     if(fn) fn();              // 再执行（通常是弹出补备注输入框）
                 };
@@ -2685,14 +2686,16 @@
                 customPrompt('把这份存档导入到哪个账号？（不存在会自动创建）', preset, (acct)=>{
                     acct=acct.trim();
                     try{
-                        const { finalName, stats, daysAdded }=importArchiveFromText(text, acct);
+                        const { finalName, stats, daysAdded, daysPending }=importArchiveFromText(text, acct);
                         recordUser(acct);            // 让该账号出现在最近账号里
                         renderRecentUsers();
-                        // 这里 daysAdded 通常是 0：用户手输的目标账号多半与文件里的 user 不同，
-                        // 倒数日按规则跳过。只有原样填回自己的账号名（换手机自导自）才会带进来。
-                        customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。${importFixSuffix(stats)}${importDaysSuffix(daysAdded)}\n\n现在进入该账号吗？`, ()=>{
-                            login(acct);             // 进入后会自动定位到 last（即刚导入的存档）
-                        }, '导入成功', { okText:'立即进入', cancelText:'稍后' });
+                        // 账号名和文件里的一样（换手机自导自）：日子已自动带进来。
+                        // 不一样：先问要不要一起导入日子，再问进不进账号。
+                        askImportOtherDays(daysPending, acct, (asked)=>{
+                            customConfirm(`已导入到账号「${acct}」的存档「${finalName}」。${importFixSuffix(stats)}${importDaysSuffix(daysAdded+asked)}\n\n现在进入该账号吗？`, ()=>{
+                                login(acct);         // 进入后会自动定位到 last（即刚导入的存档）
+                            }, '导入成功', { okText:'立即进入', cancelText:'稍后' });
+                        });
                     }catch(err){
                         const msg = err && err.message;
                         let tip;
@@ -3532,17 +3535,37 @@ ${detail}
             store.last=finalName;
             saveStore(store, targetUser);   // 抛错（配额满等）由调用方 catch 处理
 
-            // 倒数日：只在「文件里的账号 === 要导进的账号」时才收。
+            // 倒数日：「文件里的账号 === 要导进的账号」时自动合并。
             //   存档可以并存十份（重名自动加序号，从不覆盖），倒数日却是账号级的唯一一份，
-            //   没有「新建一个」的退路——写进去就只能是合并或覆盖。所以别人的倒数日一律不收，
-            //   宁可少搬，不可污染。主流场景是换手机自导自，user 天然相等，无感还原。
-            //   登录页那条路让用户手输目标账号，走的正是「不相等」分支 → 跳过，符合预期。
+            //   没有「新建一个」的退路——写进去就只能是合并或覆盖。所以别的账号的倒数日不能默认收。
+            //   主流场景是换手机自导自，user 天然相等，无感还原。
             //   旧备份文件没有 days 字段 → sanitize 收到 undefined 返回 []，向后兼容。
-            let daysAdded=0;
-            if(parsed && typeof parsed.user==='string' && parsed.user===targetUser){
-                daysAdded=mergeImportedDays(sanitizeImportedDays(parsed.days), targetUser);
+            //   【1010-K6】账号不同时不再悄悄跳过：把「目标账号里还没有的」那几条交回调用方，
+            //   由调用方问一句要不要一起导入（见 askImportOtherDays）。旧备份没有 user 字段的照旧不收。
+            let daysAdded=0, daysPending=null;
+            if(parsed && typeof parsed.user==='string'){
+                const list=sanitizeImportedDays(parsed.days);
+                if(parsed.user===targetUser){
+                    daysAdded=mergeImportedDays(list, targetUser);
+                } else if(list.length){
+                    const seen=new Set(loadDays(targetUser).map(d=>`${d.name}|${d.date}`));
+                    const fresh=list.filter(d=>!seen.has(`${d.name}|${d.date}`));
+                    if(fresh.length) daysPending={ list:fresh, fromUser:parsed.user };
+                }
             }
-            return { finalName, stats, daysAdded };
+            return { finalName, stats, daysAdded, daysPending };
+        }
+
+        // 导入的文件来自别的账号、里面带着日子时，问一句要不要一起导入。
+        // 日子是账号级的唯一一份，导进来就是和现有的合并，所以必须让人点头，不能默认做。
+        // done(n)：n = 实际导入的条数（选「不用了」为 0），调用方据此拼最后的提示。
+        function askImportOtherDays(pending, targetUser, done){
+            if(!pending || !pending.list.length){ done(0); return; }
+            const from = pending.fromUser ? `账号「${pending.fromUser}」` : '另一个账号';
+            customConfirm(`文件里还有 ${pending.list.length} 个日子（倒数日），原本属于${from}。\n\n`
+                + `日子是每个账号只有一份的，导入后会和「${targetUser}」现有的日子放在一起。要一起导入吗？`,
+                ()=>done(mergeImportedDays(pending.list, targetUser)),
+                '一起导入日子？', { okText:'一起导入', cancelText:'不用了', onCancel:()=>done(0) });
         }
 
         // 把清洗统计拼成一句人类可读的提示尾巴（没有任何修正则返回空串）
@@ -3569,12 +3592,16 @@ ${detail}
             const reader=new FileReader();
             reader.onload=ev=>{
                 try{
-                    const { finalName, stats, daysAdded }=importArchiveFromText(ev.target.result, currentUser);
+                    const { finalName, stats, daysAdded, daysPending }=importArchiveFromText(ev.target.result, currentUser);
                     // importArchiveFromText 内部已把新存档写盘并设好 store.last，无需再重读重写一遍
                     currentArchive=finalName;
                     // refreshAllViews 里已含 renderDaysCard，导进来的倒数日会一并刷新到入口卡
                     refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
-                    customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}${importDaysSuffix(daysAdded)}`, '导入成功', 'left');
+                    const user=currentUser;
+                    askImportOtherDays(daysPending, user, (asked)=>{
+                        if(asked && user===currentUser) refreshAllViews();
+                        customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}${importDaysSuffix(daysAdded+asked)}`, '导入成功', 'left');
+                    });
                 }catch(err){
                     const msg = err && err.message;
                     let tip;
