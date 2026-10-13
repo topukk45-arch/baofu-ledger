@@ -31,15 +31,18 @@ function breakPut(when, how){   // how: 'abort' 事务中途死掉 | 'quota' 存
 }
 function breakGet(when, fake){ OS.get=function(k){ const req=origGet.call(this,k); if(when(String(k))){ const tx=this.transaction; req.addEventListener('success',()=>{ Object.defineProperty(req,'result',{value:fake,configurable:true}); }); } return req; }; }
 function restore(){ OS.put=origPut; OS.get=origGet; }
+// 1013-G 起账本按月分块：某个账号的账本键都以 led_<编号>_ 开头（损坏备份除外）
+const led=id=>k=>k.indexOf('led_'+id+'_')===0 && k.indexOf('__corrupted_')<0;
 function countPuts(){ const log=[]; OS.put=function(v,k){ log.push(String(k)); return origPut.call(this,v,k); }; return log; }
 
 async function boot(seed, opts){
   opts=opts||{};
   let win;
-  const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
+  const dom=new JSDOM(opts.html||html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){
     win=w;
     if(opts.noIdb){ w.indexedDB={ open(){ throw new Error('no idb'); } }; }
     else IDB.install(w, opts.phone);
+    if(opts.loose) w.__LEDGER_STRICT=false;   // 测耗时时关掉「一改就报错」（它让每次读记录都慢一点）
     const ls=w.localStorage;
     Object.keys(seed||{}).forEach(k=>ls.setItem(k, seed[k]));
     if(opts.lsFail){ const S=w.Storage.prototype, o=S.removeItem; S.removeItem=function(k){ if(opts.lsFail(String(k))) return; return o.call(this,k); }; }
@@ -134,10 +137,10 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   t.d.dispatchEvent(new t.w.Event('visibilitychange'));
   await t.idle();
   restore();
-  ok(log.filter(k=>k==='store_'+ID_A).length===1, '4 切后台：没改东西也把当前账号写了一遍（'+log.join(',')+'）');
-  ok(!log.includes('store_'+ID_B), '4 不碰没打开的账号');
+  ok(log.filter(k=>k==='led_'+ID_A+'_m').length===1 && log.every(led(ID_A)), '4 切后台：没改东西也把当前账号（meta）写了一遍（'+log.join(',')+'）');
+  ok(!log.some(led(ID_B)), '4 不碰没打开的账号');
   // 写库失败、修改还在内存里：切后台时会再写
-  breakPut(k=>k==='store_'+ID_A, 'abort');
+  breakPut(led(ID_A), 'abort');
   await t.addBill(8, '后台补写'); await t.idle();
   ok(t.open() && t.title()==='保存失败', '4 写库失败弹「保存失败」');
   t.$('askOk').click();
@@ -153,7 +156,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   await t.addBill(30, '被杀前写好的'); await t.idle();
   const before=(await t.db())['store_'+ID_A];
   // 下一次写库的事务中途死掉（相当于写到一半 App 被杀）
-  breakPut(k=>k==='store_'+ID_A, 'abort');
+  breakPut(led(ID_A), 'abort');
   await t.addBill(40, '写到一半'); await t.idle();
   restore();
   const after=(await t.db())['store_'+ID_A];
@@ -169,7 +172,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
 // ===== 6. 写库失败：提示一次，修改留在内存，下次保存时一起写进去 =====
 {
   const t=await boot(OLD);
-  breakPut(k=>k==='store_'+ID_A, 'quota');
+  breakPut(led(ID_A), 'quota');
   await t.addBill(1, '第一笔'); await t.idle();
   ok(t.open() && t.msg().includes('存储空间已满'), '6 存储满：提示和以前一样');
   t.$('askOk').click();
@@ -179,7 +182,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   await t.addBill(3, '第三笔'); await t.idle();
   const r=JSON.parse((await t.db())['store_'+ID_A]).archives['默认存档'].records.map(x=>x.remark);
   ok(['第一笔','第二笔','第三笔'].every(x=>r.includes(x)), '6 恢复后三笔一起写进去了');
-  breakPut(k=>k==='store_'+ID_A, 'quota');
+  breakPut(led(ID_A), 'quota');
   await t.addBill(4, '第四笔'); await t.idle();
   ok(t.open() && t.title()==='保存失败', '6 好过一次以后再失败，会再提示');
   restore();
@@ -189,7 +192,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
 {
   const t=await boot(OLD);
   t.$('logoutBtn').click();
-  breakPut(k=>/^store_u\d{19}$/.test(k), 'quota');
+  breakPut(k=>/^led_u\d{19}_/.test(k), 'quota');
   t.$('newAccountBtn').click(); t.$('askInput').value='小刚'; t.$('askOk').click(); await t.idle();
   ok(t.title()==='新建失败' && !t.inMain(), '7 账本写不进去：新建失败，留在登录页');
   ok(!JSON.parse(t.ls.getItem('accounts')).some(a=>a.name==='小刚'), '7 账号列表里没有半成品');
@@ -200,7 +203,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   ok(t.inMain() && JSON.parse((await t.db())['store_'+id]).accountName==='小刚', '7 正常时新建好，账本在库里');
   // 设置页导入：写库失败 → 导入失败，内存退回原样
   const backup=JSON.stringify({ app:'记问', user:'小刚', archive:'备份', cats:['未分类'], data:[R('z1','2026-09-01T12:00',9,'expense','未分类','导入的')] });
-  breakPut(k=>k==='store_'+id, 'quota');
+  breakPut(led(id), 'quota');
   await t.pick('importFile', backup);
   restore();
   ok(t.msg().includes('存储空间不足') && t.msg().includes('导入失败'), '7 导入写不进去：如实说导入失败');
@@ -332,14 +335,19 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
       w.scrollTo=()=>{}; w.HTMLElement.prototype.scrollIntoView=function(){};
       w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
     const chip=[...od.window.document.getElementById('recentUsers').querySelectorAll('.user-chip')].find(c=>c.textContent.includes('小明'));
-    t0=Date.now(); chip.click(); const oEnter=Date.now()-t0;
-    console.log(`  （对比 1013-C：同样 ${N} 条从登录页进入用时 ${oEnter}ms）`);
+    // 只有 1013-C（账本在 localStorage、同步启动）能这样比；1013-D 以后的老版本这里找不到账号，跳过（第 14 组会比）
+    if(chip){
+      t0=Date.now(); chip.click(); const oEnter=Date.now()-t0;
+      console.log(`  （对比 1013-C：同样 ${N} 条从登录页进入用时 ${oEnter}ms）`);
+    }
   }
   console.log(`  耗时：首次打开（含搬家）${tBoot}ms，进入账号 ${tEnter}ms，记一笔 ${tSave}ms / 连写库 ${tSaveAll}ms`);
 }
 
 // ===== 14. 一年导入量：12 万条（带 src / 交易对方编号），进入账号、记一笔、翻页、切到统计页 =====
-//   1013-F 的基线（服务器上）：见 README 测试表。结果写到 BENCH_OUT（如有），方便新旧版本对比。
+//   1013-F（整段存）的基线见 tests/README.md。主要断言数的是每个操作解析 / 序列化了多少字符的 JSON
+//   （和机器快慢无关）：1013-F 记一笔要整本解析 2 次 + 序列化 1 次，切统计页整本解析 3 次，进入账号整本解析 5 次。
+//   设了 OLD_HTML 时，同样的数据再用老版本跑一遍，直接对比。结果写到 BENCH_OUT（如有）。
 {
   const N=120000, recs=[];
   const cats=['餐饮','购物','出行','转账','其他'];
@@ -351,27 +359,65 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
       remark:['扫码付款','收款','便利店','虚构商户'+(i%97),''][i%5], src:i%2?'wx':'ali', peer:'p'+String(i%3000).padStart(5,'0') });
   }
   const big=JSON.stringify({ archives:{'默认存档':{cats:['未分类'].concat(cats),records:recs}}, last:'默认存档', accountName:'小明' });
-  // 1013-F 的样子：库里一个账号一整段。localStorage 装不下 20M，直接放进库
-  const phone=IDB.newPhone();
-  await new Promise((res,rej)=>{ const q=phone.open('jiwen',1); q.onupgradeneeded=()=>q.result.createObjectStore('kv');
-    q.onsuccess=()=>{ const tx=q.result.transaction('kv','readwrite'); tx.objectStore('kv').put(big, 'store_'+ID_A); tx.oncomplete=()=>{ q.result.close(); res(); }; tx.onerror=rej; }; });
-  const seed=Object.assign({}, OLD); delete seed['store_'+ID_A]; seed.app_logged_in_user='';
-  const t=await boot(seed, { phone });
-  const ms=()=>Number(process.hrtime.bigint()/1000000n);
-  let t0=ms(); t.chip('小明').click(); await t.idle(); const tEnter=ms()-t0;
-  ok(t.inMain() && t.$('summaryOverall').textContent.includes(`共 ${N} 条`), `14 进入账号（读库 + 显示）${tEnter}ms`);
-  t0=ms(); await t.addBill(1, '大账本里记一笔'); const tSave=ms()-t0; await t.idle(); const tSaveAll=ms()-t0;
-  const nextBtn=()=>[...t.$('pager').querySelectorAll('button')].find(b=>b.textContent.includes('下一页'));
-  t0=ms(); nextBtn().click(); const tPage=ms()-t0;
-  ok(t.$('pager').textContent.includes('第 2 /'), `14 翻页 ${tPage}ms`);
-  t0=ms(); t.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle(); const tStats=ms()-t0;
-  ok(t.d.querySelector('.tab-btn[data-tab="stats"]').classList.contains('active'), `14 切到统计页 ${tStats}ms`);
-  t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
-  const all=JSON.stringify(t.w.getUserData());
-  ok(all.includes('大账本里记一笔') && t.w.getUserData().length===N+1, '14 记的那笔在账本里');
-  const line=`进入账号 ${tEnter}ms，记一笔 ${tSave}ms / 连写库 ${tSaveAll}ms，翻页 ${tPage}ms，切到统计页 ${tStats}ms`;
-  console.log(`  12 万条（${(big.length/1e6).toFixed(1)}M 字符）耗时：${line}`);
-  if(process.env.BENCH_OUT) fs.writeFileSync(process.env.BENCH_OUT, JSON.stringify({ tEnter, tSave, tSaveAll, tPage, tStats }));
+  const ms=()=>Number(process.hrtime.bigint())/1e6;
+  // 同一台机器上整本解析一次要多久（取三次里最快的）
+  let T=Infinity; for(let i=0;i<3;i++){ const t0=ms(); JSON.parse(big); T=Math.min(T, ms()-t0); }
+  async function run(htmlStr){
+    // 1013-F 的样子：库里一个账号一整段。localStorage 装不下 15M，直接放进库
+    const phone=IDB.newPhone();
+    await new Promise((res,rej)=>{ const q=phone.open('jiwen',1); q.onupgradeneeded=()=>q.result.createObjectStore('kv');
+      q.onsuccess=()=>{ const tx=q.result.transaction('kv','readwrite'); tx.objectStore('kv').put(big, 'store_'+ID_A); tx.oncomplete=()=>{ q.result.close(); res(); }; tx.onerror=rej; }; });
+    const seed=Object.assign({}, OLD); delete seed['store_'+ID_A]; seed.app_logged_in_user='';
+    const t=await boot(seed, { phone, loose:true, html:htmlStr });
+    // 数页面里 JSON.parse / JSON.stringify 处理了多少字符
+    const J=t.w.JSON, op=J.parse, os=J.stringify; let chars=0;
+    J.parse=function(x){ if(typeof x==='string') chars+=x.length; return op.apply(this, arguments); };
+    J.stringify=function(){ const r=os.apply(this, arguments); if(typeof r==='string') chars+=r.length; return r; };
+    const take=()=>{ const c=chars; chars=0; return c; };
+    take();
+    let t0=ms(); t.chip('小明').click(); await t.idle(); const tEnter=ms()-t0; const cEnter=take();
+    const entered=t.inMain() && t.$('summaryOverall').textContent.includes(`共 ${N} 条`);
+    t0=ms(); await t.addBill(1, '大账本里记一笔'); const tSave=ms()-t0; await t.idle(); const tSaveAll=ms()-t0; const cSave=take();
+    const nextBtn=[...t.$('pager').querySelectorAll('button')].find(b=>b.textContent.includes('下一页'));
+    t0=ms(); nextBtn.click(); const tPage=ms()-t0; const cPage=take();
+    const paged=t.$('pager').textContent.includes('第 2 /');
+    t0=ms(); t.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle(); const tStats=ms()-t0; const cStats=take();
+    J.parse=op; J.stringify=os;
+    const stats=t.d.querySelector('.tab-btn[data-tab="stats"]').classList.contains('active');
+    t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
+    const data=t.w.getUserData();
+    const saved=data.length===N+1 && data[N].remark==='大账本里记一笔';
+    const db=await t.db();
+    return { t, db, entered, paged, stats, saved, tEnter, tSave, tSaveAll, tPage, tStats, cEnter, cSave, cPage, cStats };
+  }
+  const r=await run(html);
+  const f=x=>Math.round(x);
+  ok(r.entered, `14 进入账号（读库 + 显示）${f(r.tEnter)}ms`);
+  ok(r.paged, `14 翻页 ${f(r.tPage)}ms`);
+  ok(r.stats, `14 切到统计页 ${f(r.tStats)}ms`);
+  ok(r.saved, '14 记的那笔在账本里，排在最后');
+  const blocks=Object.keys(r.db).filter(k=>k.indexOf('led_'+ID_A+'_a')===0);
+  ok(r.db['store_'+ID_A]!==undefined && JSON.parse(r.db['store_'+ID_A]).archives['默认存档'].records.length===N+1 && blocks.length===13,
+     `14 搬成了按月分块（${blocks.length} 块），合起来是完整的一本`);
+  const L=big.length, x=c=>(c/L).toFixed(2)+' 本';
+  ok(r.cEnter < 1.2*L, `14 进入账号只解析一遍（处理了 ${x(r.cEnter)}；1013-F 是 5 本）`);
+  ok(r.cSave < 0.2*L, `14 记一笔只序列化这一个月（处理了 ${x(r.cSave)}；1013-F 是 3 本）`);
+  ok(r.cPage < 0.01*L && r.cStats < 0.01*L, `14 翻页、切统计页不再解析账本（${x(r.cPage)}、${x(r.cStats)}；1013-F 是 1 本、3 本）`);
+  ok(r.tSaveAll < T, `14 记一笔连写库 ${f(r.tSaveAll)}ms，比整本解析一次（${f(T)}ms）还快`);
+  const line=x=>`进入账号 ${f(x.tEnter)}ms，记一笔 ${f(x.tSave)}ms / 连写库 ${f(x.tSaveAll)}ms，翻页 ${f(x.tPage)}ms，切到统计页 ${f(x.tStats)}ms`;
+  console.log(`  12 万条（${(big.length/1e6).toFixed(1)}M 字符，整本解析一次 ${f(T)}ms）耗时：${line(r)}`);
+  console.log(`  处理的 JSON：进入账号 ${x(r.cEnter)}，记一笔 ${x(r.cSave)}，翻页 ${x(r.cPage)}，切到统计页 ${x(r.cStats)}`);
+  const out={ T, now:{ tEnter:r.tEnter, tSave:r.tSave, tSaveAll:r.tSaveAll, tPage:r.tPage, tStats:r.tStats } };
+  // 和老版本直接比
+  const oldFile=process.env.OLD_HTML;
+  if(oldFile && fs.existsSync(oldFile)){
+    const o=await run(fs.readFileSync(oldFile,'utf8'));
+    console.log(`  老版本（${path.basename(oldFile)}）同样数据：${line(o)}`);
+    ok(r.tSaveAll < o.tSaveAll/2 && r.tStats < o.tStats/2 && r.tEnter < o.tEnter*0.8,
+       '14 比老版本明显快：记一笔、切统计页不到一半，进入账号少两成以上');
+    out.old={ tEnter:o.tEnter, tSave:o.tSave, tSaveAll:o.tSaveAll, tPage:o.tPage, tStats:o.tStats };
+  }
+  if(process.env.BENCH_OUT) fs.writeFileSync(process.env.BENCH_OUT, JSON.stringify(out));
 }
 
 console.log(`\n${pass} 通过，${fail} 失败`);

@@ -1296,7 +1296,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-F</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-G</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2467,9 +2467,12 @@
             return m;
         }
         // 原账单的分类 / 口径变了，挂在它上面的退款跟着改
+        //   【1013-G】账本里的记录是冻结的：换成新对象，不在原记录上改
         function syncRefunds(data, orig){
-            data.forEach(r=>{
-                if(isRefund(r) && r.refundOf===orig.id){ r.cat=orig.cat; setRecMode(r, recMode(orig)); }
+            data.forEach((r,i)=>{
+                if(isRefund(r) && r.refundOf===orig.id){
+                    const n=Object.assign({}, r); n.cat=orig.cat; setRecMode(n, recMode(orig)); data[i]=n;
+                }
             });
         }
         // 收支统计口径：只有「计入」算
@@ -2546,24 +2549,31 @@
         // 这样导入到其它账号时无需临时改写全局 currentUser（旧做法在异步/重入下会写错账号）。
         function storeKey(user){ return `store_${user!==undefined ? user : currentUser}`; }
 
-        // ===== 账本存储（1013-D 起放在 IndexedDB）=====
-        // 以前账本（store_<编号>）放在 localStorage：所有账号共用约 500 万字符，5 年的账就快装满了。
-        // 现在只有账本搬去 IndexedDB；账号列表、设置、日子这些小东西照旧留在 localStorage。
+        // ===== 账本存储（1013-G 起按月分块存在 IndexedDB）=====
+        // 1013-D 把账本搬进了 IndexedDB，但还是一个账号一整段 JSON：记一笔就整本序列化、整本写库，
+        // 每次读数据又整本解析一遍。一年导入的流水（十几万条）在手机上会卡到秒级。现在拆开存：
+        //   · led_<账号>_m                    —— 存档级的东西：整个 store 对象，只是每个存档的 records
+        //                                       换成存档内部号（分类、预算、模板、last、accountName……原样、顺序不变）
+        //   · led_<账号>_<存档号>_<YYYY-MM>   —— 这个存档这个月的记录：{"s":[序号…], "r":[记录…]}
+        //   · led_<账号>_<存档号>_none        —— 时间缺失或不合法的记录
+        // 存档号是内部号（a + 时间 + 随机），不是存档名：名字里什么字符都不影响键，改名也不用搬记录。
+        // 序号用来保住记录在整本里的先后（导出是按这个顺序出的），读的时候按序号合回去。
         //
-        // 内存里留一份「账本原文」（JSON 字符串，不是对象）：
-        //   · 打开 App / 进入账号时从 IndexedDB 读一次；
-        //   · loadStore() 每次把原文解析成新对象再给出去——和以前从 localStorage 读完全一样，
-        //     拿到的永远是副本，改了不保存不会污染缓存，也不会影响下一次读；
-        //   · saveStore() 先改内存里的原文，再马上排队写 IndexedDB（同一个账本同一时间只写一份，
-        //     写的时候又改了，写完接着写最新的）；
-        //   · 切到后台时强制再写一遍当前账号。
-        // IndexedDB 一次写入要么整份成功要么整份不算，写到一半被杀，留下的是上一份完整的账本。
+        // 内存里每个账号一份解析好的账本：
+        //   · 进入账号时从库里读一次、解析一次；记录冻结（谁也改不了缓存）；
+        //   · getUserData() / loadStore() 给的是数组的浅拷贝：push、filter、删都行；
+        //     要改某条记录就换成一个新对象（{...r, cat:新}），直接改会被拦下；
+        //   · saveStore() 和缓存逐条比对（看是不是同一个对象），只把涉及的月份标成要写，
+        //     再排队把这些月份块 + meta 放进同一个事务写进库：跨月的改动要么全写进去，要么一块都不算。
+        // 切到后台时把 meta 和这次动过的月份块强制再写一遍。
         const LEDGER_DB='jiwen', LEDGER_OS='kv';
         let __dbPromise=null;
-        const __ledger=new Map();       // key → { raw: 原文或 null（没有账本）, saved: 库里现在的原文, busy: 正在写的 Promise }
+        const __ledger=new Map();       // storeKey → 账本缓存（见 ledgerNewEntry）
         const __ledgerKeys=new Set();   // IndexedDB 里现有的键（启动时读一次，之后跟着增删）
-        const __ledgerPending=new Set();// 账本还没从 localStorage 搬完的账号编号：先不让进
+        const __ledgerPending=new Set();// 账本还没搬完的账号编号：先不让进
         const __busyOps=new Set();      // 进行中的异步存取（ledgerIdle 等它们，测试也靠它）
+        // 测试里打开：缓存里的记录被直接改就报错（App 里改冻结对象是静默失败，漏改的地方在测试里要能抓出来）
+        const __LEDGER_STRICT = !!window.__LEDGER_STRICT;
         function trackBusy(p){
             __busyOps.add(p);
             const done=()=>__busyOps.delete(p);
@@ -2597,6 +2607,7 @@
             return __dbPromise;
         }
         // 一次读或写一个事务；写要等事务真正提交（oncomplete）才算成功。strict：要求写到磁盘再回报（搬家时用）
+        //   【1013-G】往事务里放请求的途中出错（比如存储满直接抛出），整个事务作废，不能留下半批
         async function idbTx(mode, fn, strict){
             const db=await idbOpen();
             return new Promise((resolve, reject)=>{
@@ -2605,7 +2616,10 @@
                     tx = strict ? db.transaction(LEDGER_OS, mode, { durability:'strict' }) : db.transaction(LEDGER_OS, mode);
                     const req=fn(tx.objectStore(LEDGER_OS));
                     if(req) req.onsuccess=()=>{ out=req.result; };
-                }catch(err){ reject(err); return; }
+                }catch(err){
+                    if(tx){ try{ tx.abort(); }catch(_){} }
+                    reject(err); return;
+                }
                 tx.oncomplete=()=>resolve(out);
                 tx.onerror=()=>reject(tx.error || new Error('idbtx'));
                 tx.onabort=()=>reject(tx.error || new Error('idbabort'));
@@ -2615,65 +2629,482 @@
         function idbKeys(){ return idbTx('readonly', os=>os.getAllKeys()); }
         async function idbPut(key, val, strict){ await idbTx('readwrite', os=>os.put(val, key), strict); __ledgerKeys.add(key); }
         async function idbDel(key){ await idbTx('readwrite', os=>os.delete(key)); __ledgerKeys.delete(key); }
+        // 读出某个前缀下的所有键值（一个账号的 meta 和全部月份块），一个事务
+        async function idbRange(prefix){
+            const range=window.IDBKeyRange.bound(prefix, prefix+'￿');
+            let keys=[], vals=[];
+            await idbTx('readonly', os=>{
+                const a=os.getAllKeys(range), b=os.getAll(range);
+                a.onsuccess=()=>{ keys=a.result; };
+                b.onsuccess=()=>{ vals=b.result; };
+            });
+            return keys.map((k,i)=>[String(k), vals[i]]);
+        }
+        // 一批写和删放进同一个事务：要么全成，要么全不算。ops: [['put', 键, 值] | ['del', 键]]
+        async function idbBatch(ops, strict){
+            if(!ops.length) return;
+            await idbTx('readwrite', os=>{
+                ops.forEach(o=>{ if(o[0]==='put') os.put(o[2], o[1]); else os.delete(o[1]); });
+            }, strict);
+            ops.forEach(o=>{ if(o[0]==='put') __ledgerKeys.add(o[1]); else __ledgerKeys.delete(o[1]); });
+        }
         // 库里取出来的不是字符串（理论上不会有）：能转回 JSON 就转，免得被当成「没有账本」后被空账本覆盖
         function asRaw(v){
             if(v===undefined || v===null) return null;
             if(typeof v==='string') return v;
             try{ return JSON.stringify(v); }catch(_){ return '{}'; }
         }
-        // 这个账号有没有账本（库里有，或者还在 localStorage 里等着搬）
+
+        // ---- 键 ----
+        function ledPrefix(id){ return `led_${id}_`; }
+        function ledMetaKey(id){ return `led_${id}_m`; }
+        function ledBlockKey(id, aid, mon){ return `led_${id}_${aid}_${mon}`; }
+        const LED_AID_RE=/^a[0-9a-z]+$/;
+        // led_<账号>_<存档号>_<月份> → { aid, mon }；meta → { meta:true }；损坏备份等别的键 → null
+        function ledParseKey(id, k){
+            const p=ledPrefix(id);
+            if(typeof k!=='string' || k.indexOf(p)!==0) return null;
+            const rest=k.slice(p.length);
+            if(rest==='m') return { meta:true };
+            const m=/^(a[0-9a-z]+)_(\d{4}-\d{2}|none)$/.exec(rest);
+            return m ? { aid:m[1], mon:m[2] } : null;
+        }
+        // 记录归哪个月：按 time 的「年-月」；时间缺失或不合法的归 none
+        //   （每次写库都要对整个存档算一遍，所以逐个字符判断，不用正则）
+        function recMonth(r){
+            const t=r && r.time;
+            if(typeof t!=='string' || t.length<7 || t.charCodeAt(4)!==45) return 'none';
+            for(let i=0;i<7;i++){ if(i===4) continue; const c=t.charCodeAt(i); if(c<48 || c>57) return 'none'; }
+            const mm=(t.charCodeAt(5)-48)*10+(t.charCodeAt(6)-48);
+            return (mm>=1 && mm<=12) ? t.slice(0,7) : 'none';
+        }
+        function newArchiveId(e){
+            let aid;
+            do{ aid='a'+Date.now().toString(36)+Math.floor(Math.random()*1679616).toString(36).padStart(4,'0'); }
+            while(e.archs.has(aid) || [...e.keys].some(k=>k.indexOf(ledBlockKey(e.id, aid, ''))===0));
+            return aid;
+        }
+
+        // ---- 记录：冻结后放进缓存 ----
+        const __sealed=new WeakSet();
+        const __strictHandler={
+            set(){ throw new TypeError('账本记录不能直接改，请换成新对象'); },
+            deleteProperty(){ throw new TypeError('账本记录不能直接改，请换成新对象'); },
+            defineProperty(){ throw new TypeError('账本记录不能直接改，请换成新对象'); },
+        };
+        function sealRec(r){
+            if(!__LEDGER_STRICT) return Object.isFrozen(r) ? r : Object.freeze(r);
+            if(__sealed.has(r)) return r;
+            const out=new Proxy(Object.freeze(r), __strictHandler);
+            __sealed.add(out);
+            return out;
+        }
+        // 和以前 normArchive 对每条记录做的一样：缺分类 / 编号 / 收支的补上（补的是新对象，不碰调用方的）
+        function normRec(r){
+            if(r.cat && r.id && r.type) return r;
+            const n=Object.assign({}, r);
+            if (!n.cat) n.cat = '未分类';
+            if (!n.id) n.id = genId();
+            if (!n.type) n.type = 'income';
+            return n;
+        }
+        // 存档对象规范化（不改调用方的对象）：旧格式（直接是数组）、缺 records / 分类
+        function normArchiveCopy(a){
+            if (Array.isArray(a)) return { records:a, cats:DEFAULT_CATS.slice() };
+            const o=Object.assign({}, a);
+            if (!o.records) o.records = [];
+            if (!o.cats || !o.cats.length) o.cats = DEFAULT_CATS.slice();
+            return o;
+        }
+
+        // ---- 一个账号的缓存 ----
+        //   has     有没有账本（没有时 loadStore 给空的默认结构，和以前一样）
+        //   meta    meta 原文（records 是存档号）；names 存档名 → 存档号
+        //   archs   存档号 → { recs: 记录数组（按序号排好）, seqs: 对应的序号, idx: 记录 → 序号（查「是不是原来那条」用）}
+        //   keys    库里这个账号现有的键
+        //   dirty   要写的月份块：键 → 第几次修改；metaGen 不为 0 表示 meta 要写
+        //   pend    读的时候发现坏掉 / 缺字段的块，下次保存时一起重写（和以前「第一次保存覆盖」一样）
+        //   touched 这次打开后写过的块（切后台时强制重写这些）
+        function ledgerNewEntry(id){
+            return { id, has:false, meta:null, names:new Map(), archs:new Map(), keys:new Set(),
+                     dirty:new Map(), metaGen:0, gen:0, pend:new Map(), pendMeta:false,
+                     touched:new Set(), busy:null, ver:0, broken:false };
+        }
+        function ledgerDirty(e){ return e.dirty.size>0 || e.metaGen>0; }
+        function validMeta(m){
+            if(!m || typeof m!=='object' || Array.isArray(m) || !m.archives || typeof m.archives!=='object' || Array.isArray(m.archives)) return false;
+            const seen=new Set();
+            return Object.keys(m.archives).every(n=>{
+                const a=m.archives[n];
+                if(!a || typeof a!=='object' || Array.isArray(a) || typeof a.records!=='string' || !LED_AID_RE.test(a.records) || seen.has(a.records)) return false;
+                seen.add(a.records); return true;
+            });
+        }
+        function validBlock(b){
+            if(!b || typeof b!=='object' || !Array.isArray(b.s) || !Array.isArray(b.r) || b.s.length!==b.r.length || !b.r.length) return false;
+            const s=b.s, r=b.r;
+            for(let i=0;i<r.length;i++){
+                if(typeof s[i]!=='number' || !isFinite(s[i]) || !r[i] || typeof r[i]!=='object' || Array.isArray(r[i])) return false;
+            }
+            return true;
+        }
+        // 从库里读出的键值建缓存。quiet：只是拿来比对（搬家核对用），坏了不登记、不另存
+        function ledgerBuild(id, rows, quiet){
+            const e=ledgerNewEntry(id);
+            const skey=`store_${id}`;
+            let metaRaw=null, metaSeen=false;
+            const blocks=[];
+            rows.forEach(([k,v])=>{
+                const p=ledParseKey(id, k); if(!p) return;
+                e.keys.add(k);
+                if(p.meta){ metaSeen=true; metaRaw=asRaw(v); }
+                else blocks.push({ k, aid:p.aid, mon:p.mon, raw:asRaw(v) });
+            });
+            if(!metaSeen && !blocks.length) return e;          // 这个账号还没有账本
+            const bad=(bk, raw)=>{
+                e.broken=true;
+                if(quiet) return;
+                // 登记到会话级损坏名单，供云同步据此拒绝写入（见 odSyncNow）
+                __corruptedStores.add(skey);
+                // 原文另存一份再说（meta 沿用以前整本账本的备份名 store_<编号>__corrupted_）
+                if(raw!==null) ledgerBackupCorrupted(bk, raw);
+            };
+            let meta=null;
+            if(metaSeen){
+                try{ meta=JSON.parse(metaRaw); }catch(_){ meta=null; }
+                if(!validMeta(meta)){ meta=null; bad(skey, metaRaw); }
+            } else bad(skey, null);                              // 有月份块却没有 meta：也算坏了
+            // 各月份块
+            const pairs=new Map();
+            blocks.forEach(b=>{
+                let arr=null;
+                try{ arr=JSON.parse(b.raw); }catch(_){ arr=null; }
+                if(!validBlock(arr)){
+                    bad(b.k, b.raw);
+                    e.pend.set(b.k, true);     // 坏块：下次保存时按内存里的样子重写（备份已经另存）
+                    return;
+                }
+                let list=pairs.get(b.aid);
+                if(!list) pairs.set(b.aid, list=[]);
+                list.push(arr);
+            });
+            if(!meta){
+                // meta 坏了：用还在的月份块把存档重建出来（名字叫「恢复的存档 N」，分类用默认的），记录不丢
+                const aids=[...pairs.keys()].sort();
+                if(!aids.length) return e;     // 一条也救不回来：当成没有账本（和以前坏了给空的一样，第一次保存时覆盖）
+                meta={ archives:{} };
+                aids.forEach((aid,i)=>{ meta.archives[`恢复的存档 ${i+1}`]={ records:aid, cats:DEFAULT_CATS.slice() }; });
+                meta.last=`恢复的存档 1`;
+                e.pendMeta=true;
+            }
+            // 分类为空的存档补默认分类（和以前 normArchive 一样）
+            Object.keys(meta.archives).forEach(n=>{
+                const a=meta.archives[n];
+                if(!a.cats || !a.cats.length){ a.cats=DEFAULT_CATS.slice(); e.pendMeta=true; }
+            });
+            e.has=true;
+            e.meta=JSON.stringify(meta);
+            Object.keys(meta.archives).forEach(n=>{
+                const aid=meta.archives[n].records;
+                e.names.set(n, aid);
+                // 各月份块按键（月份）顺序读出来，块内按序号排好；一般记录先后和月份一致，拼起来已经是顺的，
+                //   不顺（比如补记了很早以前的账）才整体排一次
+                const parts=pairs.get(aid) || [];
+                let sAll=[], rAll=[];
+                parts.forEach(b=>{ sAll=sAll.length ? sAll.concat(b.s) : b.s; rAll=rAll.length ? rAll.concat(b.r) : b.r; });
+                let ordered=true;
+                for(let i=1;i<sAll.length;i++){ if(sAll[i]<sAll[i-1]){ ordered=false; break; } }
+                if(!ordered){
+                    const ord=sAll.map((_,i)=>i).sort((x,y)=>sAll[x]-sAll[y]);
+                    sAll=ord.map(i=>sAll[i]); rAll=ord.map(i=>rAll[i]);
+                }
+                const recs=new Array(rAll.length), seqs=new Array(rAll.length), idx=new Map();
+                for(let i=0;i<rAll.length;i++){
+                    const s=sAll[i];
+                    let r=rAll[i];
+                    const n2=normRec(r);
+                    if(n2!==r){ r=n2; e.pend.set(ledBlockKey(id, aid, recMonth(r)), true); }
+                    r=sealRec(r);
+                    recs[i]=r; seqs[i]=s; idx.set(r, s);
+                }
+                e.archs.set(aid, { recs, seqs, idx });
+            });
+            return e;
+        }
+        // 合成一整本（和 1013-F 存的 store 一模一样的结构）
+        function ledgerAssemble(e){
+            const s=JSON.parse(e.meta);
+            Object.keys(s.archives).forEach(n=>{
+                const st=e.archs.get(s.archives[n].records);
+                s.archives[n].records=st ? st.recs : [];
+            });
+            return s;
+        }
+        // 搬家核对用：把读出来的键值合成一整本的 JSON；有坏的就返回 null
+        function ledgerAssembleRows(id, rows){
+            const e=ledgerBuild(id, rows, true);
+            if(e.broken || !e.has) return null;
+            return JSON.stringify(ledgerAssemble(e));
+        }
+
+        // ---- 把调用方给的 store 和缓存比对，记下要写的块 ----
+        function ledgerEmptyArch(){ return { recs:[], seqs:[], idx:new Map() }; }
+        // 返回这个存档新的状态；没变就返回 null。dirty：要写的块键
+        //   先按「是不是同一个对象」掐掉头尾一样的部分，只看中间变了的那一段（记一笔、改一笔、删一笔都只有几条）；
+        //   中间那段太长、或者有记录挪了位置，就整个存档比一遍。
+        function ledgerDiffArchive(e, aid, st, R, dirty){
+            const n=R.length;
+            if(!st) st=ledgerEmptyArch();
+            const old=st.recs, m=old.length;
+            let p=0;
+            while(p<n && p<m && R[p]===old[p]) p++;
+            if(p===n && p===m) return null;
+            let q=0;
+            while(q<n-p && q<m-p && R[n-1-q]===old[m-1-q]) q++;
+            if((n-p-q)+(m-p-q) <= 4000){
+                const r=ledgerDiffMiddle(e, aid, st, R, p, q, dirty);
+                if(r) return r;
+            }
+            return ledgerDiffFull(e, aid, st, R, dirty);
+        }
+        function ledgerDiffMiddle(e, aid, st, R, p, q, dirty){
+            const old=st.recs, m=old.length, n=R.length;
+            const oldMid=new Set();
+            for(let i=p;i<m-q;i++) oldMid.add(old[i]);
+            const newMid=R.slice(p, n-q);
+            const inNew=new Set(newMid);
+            for(const r of newMid){ if(st.idx.has(r) && !oldMid.has(r)) return null; }   // 有记录挪了位置：整个比
+            const reuse=new Map(), removed=[];
+            for(let i=p;i<m-q;i++){
+                const r=old[i];
+                if(inNew.has(r)) continue;
+                removed.push(r);
+                if(r.id!=null && !reuse.has(r.id)) reuse.set(r.id, st.seqs[i]);
+            }
+            const lo=p>0 ? st.seqs[p-1] : -1, hi=q>0 ? st.seqs[m-q] : Infinity;
+            const midRecs=[], midSeqs=[], added=[];
+            let last=lo;
+            for(let r of newMid){
+                let s;
+                if(oldMid.has(r)){ s=st.idx.get(r); }
+                else {
+                    if(!r || typeof r!=='object' || Array.isArray(r)) continue;
+                    r=sealRec(normRec(r));
+                    if(r.id!=null && reuse.has(r.id)){ s=reuse.get(r.id); reuse.delete(r.id); }
+                    added.push(r);
+                }
+                if(s===undefined) s=last+1;
+                if(s<=last || s>=hi) return null;               // 顺序对不上（插到中间等）：整个比、重新编号
+                midRecs.push(r); midSeqs.push(s); last=s;
+            }
+            if(new Set(midRecs).size!==midRecs.length) return null;   // 同一个对象放了两次
+            removed.forEach(r=>dirty.add(ledBlockKey(e.id, aid, recMonth(r))));
+            added.forEach(r=>dirty.add(ledBlockKey(e.id, aid, recMonth(r))));
+            // 查找表接着用（只删掉去掉的、加上新来的）；万一要退回旧状态，ledgerRestore 会重建
+            const idx=st.idx;
+            removed.forEach(r=>idx.delete(r));
+            midRecs.forEach((r,i)=>idx.set(r, midSeqs[i]));
+            return {
+                recs: old.slice(0,p).concat(midRecs, old.slice(m-q)),
+                seqs: st.seqs.slice(0,p).concat(midSeqs, st.seqs.slice(m-q)),
+                idx,
+            };
+        }
+        function ledgerDiffFull(e, aid, st, R, dirty){
+            const n=R.length;
+            const inNew=new Set(R);
+            const reuse=new Map();            // 被换掉的记录：按编号留下它原来的序号，新对象顶上去时顺序不变
+            st.recs.forEach((r,i)=>{
+                if(inNew.has(r)) return;
+                dirty.add(ledBlockKey(e.id, aid, recMonth(r)));
+                if(r.id!=null && !reuse.has(r.id)) reuse.set(r.id, st.seqs[i]);
+            });
+            const recs=[], seqs=[], idx=new Map();
+            let last=-1, broken=false;
+            for(let i=0;i<n;i++){
+                let r=R[i], s;
+                if(st.idx.has(r)){
+                    s=st.idx.get(r);
+                    if(idx.has(r)) broken=true;          // 同一个对象放了两次
+                } else {
+                    if(!r || typeof r!=='object' || Array.isArray(r)) continue;   // 不是记录的东西不存（以前存了读回来也会出错）
+                    r=sealRec(normRec(r));
+                    if(r.id!=null && reuse.has(r.id)){ s=reuse.get(r.id); reuse.delete(r.id); }
+                    dirty.add(ledBlockKey(e.id, aid, recMonth(r)));
+                }
+                if(s===undefined) s=last+1;
+                else if(s<=last) broken=true;
+                recs.push(r); seqs.push(s); idx.set(r, s); last=Math.max(last, s);
+            }
+            if(broken){
+                // 顺序被打乱了（插到中间、换了位置）：整个存档重新编号，所有月份重写
+                idx.clear();
+                recs.forEach((r,i)=>{ seqs[i]=i; idx.set(r, i); dirty.add(ledBlockKey(e.id, aid, recMonth(r))); });
+                st.recs.forEach(r=>dirty.add(ledBlockKey(e.id, aid, recMonth(r))));
+            }
+            return { recs, seqs, idx };
+        }
+        function ledgerApply(e, store){
+            e.ver++;
+            const archives=store.archives || {};
+            const names=Object.keys(archives);
+            const aidName=new Map();
+            e.names.forEach((aid, n)=>aidName.set(aid, n));
+            // 每个存档对应哪个存档号：同名的沿用；改名的（数组带着原来的存档号、原名字已经不在了）沿用；其余新开一个
+            const pick=new Map(), used=new Set();
+            names.forEach(n=>{
+                const aid=e.names.get(n);
+                if(aid && !used.has(aid)){ pick.set(n, aid); used.add(aid); }
+            });
+            names.forEach(n=>{
+                if(pick.has(n)) return;
+                const a=archives[n];
+                const tag=a && !Array.isArray(a) && a.records && a.records.__aid;
+                if(tag && e.archs.has(tag) && !used.has(tag) && !(aidName.has(tag) && archives[aidName.get(tag)]!==undefined)){
+                    pick.set(n, tag); used.add(tag); return;
+                }
+                const aid=newArchiveId(e);
+                pick.set(n, aid); used.add(aid);
+                e.archs.set(aid, Object.assign(ledgerEmptyArch(), { fresh:true }));   // 先占住，免得后面再新开的撞号
+            });
+            const dirty=new Set();
+            const metaArch={};
+            names.forEach(n=>{
+                const a=normArchiveCopy(archives[n]);
+                const aid=pick.get(n);
+                const st0=e.archs.get(aid);
+                const st=(st0 && st0.fresh) ? null : st0;
+                const next=ledgerDiffArchive(e, aid, st, a.records, dirty);
+                if(next) e.archs.set(aid, next);
+                else if(!st) e.archs.set(aid, ledgerEmptyArch());
+                a.records=aid;
+                metaArch[n]=a;
+            });
+            // 不在了的存档：删掉它的全部月份块
+            [...e.archs.keys()].forEach(aid=>{
+                if(used.has(aid)) return;
+                e.archs.get(aid).recs.forEach(r=>dirty.add(ledBlockKey(e.id, aid, recMonth(r))));
+                e.archs.delete(aid);
+            });
+            e.keys.forEach(k=>{ const p=ledParseKey(e.id, k); if(p && !p.meta && !used.has(p.aid) && aidName.has(p.aid)) dirty.add(k); });
+            // meta：顶层键的顺序照调用方的（archives 在哪个位置就在哪个位置）
+            const meta={};
+            Object.keys(store).forEach(k=>{ meta[k] = (k==='archives') ? metaArch : store[k]; });
+            if(!('archives' in meta)) meta.archives=metaArch;
+            const metaStr=JSON.stringify(meta);
+            e.names=new Map(names.map(n=>[n, pick.get(n)]));
+            // 读的时候发现坏掉 / 缺字段的块，这次一起重写
+            e.pend.forEach((_, k)=>dirty.add(k)); e.pend.clear();
+            dirty.forEach(k=>e.dirty.set(k, ++e.gen));
+            if(!e.has || metaStr!==e.meta || e.pendMeta){ e.metaGen=++e.gen; e.pendMeta=false; }
+            e.meta=metaStr;
+            e.has=true;
+        }
+        // 把要写的块整理成一批（只序列化这些月份）
+        function ledgerJob(e){
+            const ops=[], done=[];
+            const byAid=new Map();
+            e.dirty.forEach((g,k)=>{
+                done.push([k,g]);
+                const p=ledParseKey(e.id, k);
+                if(!p || p.meta) return;
+                let m=byAid.get(p.aid);
+                if(!m) byAid.set(p.aid, m=new Map());
+                m.set(p.mon, { s:[], r:[] });
+            });
+            byAid.forEach((mons, aid)=>{
+                const st=e.archs.get(aid);
+                if(st){
+                    const recs=st.recs, seqs=st.seqs;
+                    for(let i=0;i<recs.length;i++){ const b=mons.get(recMonth(recs[i])); if(b){ b.s.push(seqs[i]); b.r.push(recs[i]); } }
+                }
+                mons.forEach((b, mon)=>{
+                    const k=ledBlockKey(e.id, aid, mon);
+                    if(b.r.length) ops.push(['put', k, JSON.stringify(b)]);
+                    else if(e.keys.has(k)) ops.push(['del', k]);
+                });
+            });
+            const metaGen=e.metaGen;
+            if(metaGen) ops.push(['put', ledMetaKey(e.id), e.meta]);
+            return { ops, done, metaGen };
+        }
+        function ledgerCommit(e, job){
+            job.ops.forEach(o=>{
+                if(o[0]==='put'){ e.keys.add(o[1]); e.touched.add(o[1]); }
+                else { e.keys.delete(o[1]); e.touched.delete(o[1]); }
+            });
+            job.done.forEach(([k,g])=>{ if(e.dirty.get(k)===g) e.dirty.delete(k); });
+            if(job.metaGen && e.metaGen===job.metaGen) e.metaGen=0;
+        }
+        function ledgerSnap(e){
+            return { has:e.has, meta:e.meta, names:new Map(e.names), archs:new Map(e.archs), dirty:new Map(e.dirty),
+                     metaGen:e.metaGen, pend:new Map(e.pend), pendMeta:e.pendMeta };
+        }
+        // 退回写之前的样子。查找表（idx）是新旧状态共用、就地改的，按记录和序号重建
+        function ledgerRestore(e, s){
+            Object.assign(e, s);
+            e.archs.forEach(st=>{ st.idx=new Map(); st.recs.forEach((r,i)=>st.idx.set(r, st.seqs[i])); });
+        }
+
+        // 这个账号有没有账本（库里有，或者还在 localStorage / 1013-F 的整段里等着搬）
         function ledgerExists(id){
             const k=`store_${id}`;
-            if(__ledger.has(k)) return __ledger.get(k).raw!==null;
-            if(__ledgerKeys.has(k)) return true;
+            if(__ledger.has(k)){ const e=__ledger.get(k); if(e.has || e.keys.size) return true; }
+            if(__ledgerKeys.has(ledMetaKey(id)) || __ledgerKeys.has(k)) return true;
+            const p=ledPrefix(id);
+            for(const x of __ledgerKeys){ if(x.indexOf(p)===0 && ledParseKey(id, x)) return true; }
             try{ return localStorage.getItem(k)!==null; }catch(_){ return false; }
         }
         // 进入账号 / 往别的账号导入之前调用：内存里没有就从库里读一次。已经在内存里的不重读（内存是最新的）
         function ledgerLoad(key){
             if(__ledger.has(key)) return Promise.resolve();
             return trackBusy((async()=>{
-                const raw=asRaw(await idbGet(key));
-                if(!__ledger.has(key)) __ledger.set(key, { raw, saved:raw, busy:null });
+                const id=key.slice(6);
+                const rows=await idbRange(ledPrefix(id));
+                if(!__ledger.has(key)) __ledger.set(key, ledgerBuild(id, rows));
             })());
         }
         // 只留当前账号在内存里；别的账号有没写进去的修改就先留着，等它写完
         function ledgerEvictExcept(key){
             [...__ledger.keys()].forEach(k=>{
                 const e=__ledger.get(k);
-                if(k!==key && !e.busy && e.raw===e.saved) __ledger.delete(k);
+                if(k!==key && !e.busy && !ledgerDirty(e)) __ledger.delete(k);
             });
         }
-        // 同步取原文：没读进内存就是代码走错了路，宁可报错也不能当成「没有账本」返回空的（会把真账本覆盖掉）
+        // 测试和排查用：内存里这个账号合成的一整本（JSON，和 1013-F 存的一样）；没读进内存就报错
         function ledgerGet(key){
             const e=__ledger.get(key);
             if(!e) throw new Error('notloaded:'+key);
-            return e.raw;
+            return e.has ? JSON.stringify(ledgerAssemble(e)) : null;
         }
-        // 把内存里的最新原文写进库；返回的 Promise 在「写到最新」时完成，写失败时报错（内存里的修改还留着，下次再写）
+        // 写的时候用的缓存：没读进内存、库里却有这个账号的账本，宁可报错也不能拿空的去盖
+        function ledgerEntryForWrite(key){
+            let e=__ledger.get(key);
+            if(e) return e;
+            const id=key.slice(6);
+            if(__ledgerKeys.has(ledMetaKey(id))) throw new Error('notloaded:'+key);
+            e=ledgerNewEntry(id);
+            __ledger.set(key, e);
+            return e;
+        }
+        // 把要写的块写进库；返回的 Promise 在「写到最新」时完成，写失败时报错（要写的标记还留着，下次再写）
         function ledgerKick(key){
             const e=__ledger.get(key);
             if(!e) return Promise.resolve();
             if(e.busy) return e.busy;
-            if(e.raw===e.saved) return Promise.resolve();
+            if(!ledgerDirty(e)) return Promise.resolve();
             const p=(async()=>{
                 try{
-                    while(e.raw!==e.saved){
-                        const v=e.raw;
-                        if(v===null) await idbDel(key); else await idbPut(key, v);
-                        e.saved=v;
+                    while(ledgerDirty(e)){
+                        const job=ledgerJob(e);
+                        await idbBatch(job.ops);
+                        ledgerCommit(e, job);
                     }
                 }finally{ e.busy=null; }
             })();
             e.busy=p;
             trackBusy(p);
             return p;
-        }
-        function ledgerSetRaw(key, raw){
-            let e=__ledger.get(key);
-            if(!e){ e={ raw:null, saved:undefined, busy:null }; __ledger.set(key, e); }
-            e.raw=raw;
-            if(raw!==null) __ledgerKeys.add(key);
-            return e;
         }
         // 平时的写：失败了提示一次（连续失败不重复弹），下次保存或切后台时再试
         let __ledgerFailShown=false;
@@ -2694,28 +3125,42 @@
         // 写失败就把内存退回写之前的样子，并抛出和以前一样的 quota / savefail 错误
         async function saveStoreDurable(store, user){
             const key=storeKey(user);
-            const prev=__ledger.has(key) ? __ledger.get(key).raw : undefined;
-            const raw=JSON.stringify(store);
-            const e=ledgerSetRaw(key, raw);
+            const had=__ledger.has(key);
+            const e=ledgerEntryForWrite(key);
+            const snap=ledgerSnap(e);
+            ledgerApply(e, store);
+            const ver=e.ver;
             try{ await ledgerKick(key); }
             catch(err){
-                if(e.raw===raw){
-                    if(prev===undefined) __ledger.delete(key);
-                    else e.raw=prev;
+                if(e.ver===ver){
+                    if(!had) __ledger.delete(key);
+                    else ledgerRestore(e, snap);
                 }
                 const x=new Error(isQuotaErr(err) ? 'quota' : 'savefail');
                 x.cause=err;
                 throw x;
             }
         }
-        // 切到后台：强制把当前账号再写一遍（不管内存和库是否一致），别的账号有没写完的也写掉
+        // 新建账号没登记成功：把刚写进去的账本整个删掉
+        async function ledgerDropAccount(id){
+            const key=storeKey(id);
+            const e=__ledger.get(key);
+            __ledger.delete(key);
+            const ks=new Set(e ? e.keys : []);
+            __ledgerKeys.forEach(k=>{ if(ledParseKey(id, k)) ks.add(k); });
+            await idbBatch([...ks].map(k=>['del', k]));
+        }
+        // 切到后台：当前账号的 meta 和这次写过的月份块强制再写一遍，别的账号有没写完的也写掉
         let __forceFlushing=null;
         function ledgerFlushOnHide(){
             if(__forceFlushing) return __forceFlushing;
             const cur=currentUser ? storeKey(currentUser) : null;
             const jobs=[];
             __ledger.forEach((e, k)=>{
-                if(k===cur && e.raw!==null && !e.busy) e.saved=undefined;   // 标成「没写过」，下面就会整份重写
+                if(k===cur && e.has){
+                    e.metaGen=++e.gen;
+                    e.touched.forEach(bk=>{ if(e.keys.has(bk)) e.dirty.set(bk, ++e.gen); });
+                }
                 jobs.push(ledgerKick(k).catch(()=>{}));
             });
             __forceFlushing=trackBusy(Promise.all(jobs).then(()=>{ __forceFlushing=null; }));
@@ -2736,7 +3181,7 @@
             document.addEventListener('deviceready', again, { once:true });
             setTimeout(again, 800);
         })();
-        // 损坏的账本原文另存一份（存到库里，不再挤 localStorage），只留最近 1 份旧的，连同这次共 2 份
+        // 损坏的原文另存一份（存到库里），只留最近 1 份旧的，连同这次共 2 份
         function ledgerBackupCorrupted(key, raw){
             const prefix=`${key}__corrupted_`;
             const olds=[...__ledgerKeys].filter(k=>k.indexOf(prefix)===0).sort();
@@ -2744,6 +3189,79 @@
                 for(const k of olds.slice(0, Math.max(0, olds.length-1))){ try{ await idbDel(k); }catch(_){} }
                 try{ await idbPut(`${prefix}${Date.now()}`, raw); }catch(_){}
             })());
+        }
+
+        // ===== 账本搬家（1013-G）：1013-D～F 的整段账本 store_<编号> → 按月分块 =====
+        // 做法和 1013-D 一样：写新 → 读回逐条核对 → 删旧。旧的删掉之前，账本在两边都有。
+        //   · 新块整批放在一个事务里写：被杀掉的话，要么全在，要么一块没有。
+        //   · 已经有分块、和旧的一模一样（上次搬到一半，旧的还没删）：直接删旧的。
+        //   · 已经有分块、和旧的不一样（比如装回过 1013-F 又在那边记了账）：旧位置那份才是最新的，
+        //     放进分块；原来的分块合成一整本另存为 migrate_conflict_store_<编号>_<时间>，一条都不删。
+        //   · 旧的那份本身就坏了：原文原样放到 meta 的位置——进账号时和 1013-F 一样另存原文、给空账本、
+        //     暂停云同步，第一次保存才覆盖。
+        //   · 任何一步失败，这个账号就算没搬完：这次先不让进，下次打开 App 接着搬。
+        async function dropOldLedgerKey(k){
+            try{ await idbTx('readwrite', os=>os.delete(k), true); }catch(_){ return false; }
+            let v;
+            try{ v=await idbGet(k); }catch(_){ return false; }
+            if(v!==undefined) return false;
+            __ledgerKeys.delete(k);
+            return true;
+        }
+        async function moveStoreToBlocks(id){
+            const oldKey=`store_${id}`;
+            let raw;
+            try{ raw=asRaw(await idbGet(oldKey)); }catch(_){ return false; }
+            if(raw===null){ __ledgerKeys.delete(oldKey); return true; }
+            let store=null;
+            try{ store=JSON.parse(raw); }catch(_){ store=null; }
+            if(store && (typeof store!=='object' || !store.archives || typeof store.archives!=='object')) store=null;
+            let rows;
+            try{ rows=(await idbRange(ledPrefix(id))).filter(([k])=>ledParseKey(id, k)); }catch(_){ return false; }
+            let ops, want, check;
+            if(store===null){
+                // 坏的：原文原样放进 meta 的位置（见上），旧的分块（如果有）先合成一份另存
+                want=raw;
+                ops=[['put', ledMetaKey(id), raw]];
+                check=back=>{ const m=back.find(([k])=>k===ledMetaKey(id)); return !!m && asRaw(m[1])===raw; };
+            } else {
+                Object.keys(store.archives).forEach(k=>{ store.archives[k]=normArchive(store.archives[k]); });
+                want=JSON.stringify(store);
+                const e=ledgerNewEntry(id);
+                ledgerApply(e, store);
+                ops=ledgerJob(e).ops;
+                check=back=>ledgerAssembleRows(id, back)===want;
+            }
+            if(rows.length){
+                if(check(rows)) return await dropOldLedgerKey(oldKey);   // 上次已经写好了，只差删旧的
+                const have=ledgerAssembleRows(id, rows);
+                const backup=(have!==null) ? have : JSON.stringify(Object.fromEntries(rows.map(([k,v])=>[k, asRaw(v)])));
+                try{ await idbPut(`migrate_conflict_${oldKey}_${Date.now()}`, backup, true); }catch(_){ return false; }
+                const putKeys=new Set(ops.map(o=>o[1]));
+                rows.forEach(([k])=>{ if(!putKeys.has(k)) ops.push(['del', k]); });
+            }
+            try{ await idbBatch(ops, true); }catch(_){ return false; }
+            // 读回来核对：合成的一整本必须和旧的逐字一样（每条记录、顺序、分类预算模板都在里面）
+            let back;
+            try{ back=(await idbRange(ledPrefix(id))).filter(([k])=>ledParseKey(id, k)); }catch(_){ return false; }
+            if(!check(back)) return false;
+            if(!(await dropOldLedgerKey(oldKey))) return false;
+            __ledger.delete(oldKey);
+            return true;
+        }
+        async function migrateLedgersToBlocks(){
+            const ids=[...__ledgerKeys].filter(k=>k.indexOf('store_')===0 && isAccountId(k.slice(6))).map(k=>k.slice(6)).sort();
+            let ok=true;
+            for(const id of ids){
+                // 还在 localStorage 那一步没搬完的，先不动（两边都有时 localStorage 那份更新，等它先搬进来）
+                if(__ledgerPending.has(id)){ ok=false; continue; }
+                const acc=accountById(id);
+                if(acc && typeof acc.legacy==='string'){ __ledgerPending.add(id); ok=false; continue; }
+                let moved=false;
+                try{ moved=await moveStoreToBlocks(id); }catch(_){ moved=false; }
+                if(!moved){ __ledgerPending.add(id); ok=false; }
+            }
+            return ok;
         }
 
         // ===== 账本搬家：localStorage → IndexedDB（只跑一次；没搬完下次打开接着搬）=====
@@ -2828,53 +3346,48 @@
         }
 
         // 【P0 守卫】本次会话中「曾被检测到损坏」的 store key 集合。
-        //   loadStore 发现损坏时会回退一个空结构以保证界面不白屏——这是对的，
+        //   账本读进内存时发现损坏（1013-G 起在 ledgerBuild：坏了的月份块先不显示，meta 坏了用月份块重建，
+        //   一条都救不回来就回退一个空结构）以保证界面不白屏——这是对的，
         //   但云同步（odSyncNow）也是通过 loadStore 取数据的，于是形成一条致命链路：
         //     存档损坏 → 界面显示空账本 → 用户记一笔 → 触发同步 → 空数据覆盖云端完好备份。
         //   偏偏这正是最需要备份的时刻。所以在此登记，同步前据此拒绝写入。
         //   只存在于内存：重启 App 后若数据已正常，自然解除；仍损坏则会被重新登记。
         const __corruptedStores = new Set();
 
-        // 【1013-D】原文从内存缓存里取（进入账号时已从 IndexedDB 读好），之后的解析、校验、损坏处理与以前一模一样，
-        //   每次都解析出一个新对象，调用方随便改，不碰缓存。
+        // 【1013-G】从内存缓存里取（进入账号时已从 IndexedDB 读好、解析好）。每次给一个新的 store：
+        //   meta 部分（分类、预算、模板、last……）是新解析出来的副本，随便改；
+        //   records 是缓存数组的浅拷贝，push / filter / 删都行，但里面的记录是冻结的——要改就换成新对象。
+        //   坏了的块在读进内存时已经另存原文、登记了损坏（见 ledgerBuild），这里不用再管。
+        function ledgerTagRecords(arr, aid){
+            Object.defineProperty(arr, '__aid', { value:aid, enumerable:false, writable:true, configurable:true });
+            return arr;
+        }
         function loadStore(user){
             const u = (user!==undefined) ? user : currentUser;
-            const raw = ledgerGet(storeKey(u));
-            let store, corrupted=false;
-            if (raw) {
-                try { store = JSON.parse(raw); } catch(e) { store = null; corrupted = true; }
-                // 解析成功但结构不对（缺 archives）也视为损坏，避免后续访问报错
-                if (store && (typeof store!=='object' || !store.archives || typeof store.archives!=='object')) {
-                    store = null; corrupted = true;
-                }
-            }
-            if (corrupted) {
-                // 登记到会话级损坏名单，供云同步据此拒绝写入（见 odSyncNow）
-                __corruptedStores.add(storeKey(u));
-                // 数据存在但损坏：备份原始串到独立 key，避免被随后的 saveStore 覆盖而永久丢失。
-                // 仍回退到可用结构以保证界面不白屏，但不主动写回，给用户/后续逻辑留出恢复余地。
-                // 写新备份前清理该用户的旧备份，只保留最近 1 份（连同这次共 2 份），
-                // 避免反复损坏时备份无上限堆积、最终吃满 localStorage 配额。
-                //   【1013-D】备份也放进 IndexedDB（账本多大，备份就多大，localStorage 放不下）。
-                ledgerBackupCorrupted(storeKey(u), raw);
-            }
-            if (!store) {
+            const e = __ledger.get(storeKey(u));
+            if (!e) throw new Error('notloaded:'+storeKey(u));
+            if (!e.has) {
+                // 还没有账本（或者坏到一条也救不回来）：和以前一样给一个空的默认结构，最早期的 billData 也带上
                 const old = localStorage.getItem(`billData_${u}`);
                 let arr = [];
                 try { arr = old ? JSON.parse(old) : []; } catch(_){ arr = []; }
                 if (!Array.isArray(arr)) arr = [];
-                store = { archives:{ '默认存档':{ records:arr, cats:DEFAULT_CATS.slice() } }, last:'默认存档' };
+                const store = { archives:{ '默认存档':{ records:arr, cats:DEFAULT_CATS.slice() } }, last:'默认存档' };
+                Object.keys(store.archives).forEach(k => { store.archives[k] = normArchive(store.archives[k]); });
+                return store;
             }
-            Object.keys(store.archives).forEach(k => { store.archives[k] = normArchive(store.archives[k]); });
+            const store = JSON.parse(e.meta);
+            Object.keys(store.archives).forEach(k => {
+                const a = store.archives[k], st = e.archs.get(a.records);
+                a.records = ledgerTagRecords(st ? st.recs.slice() : [], a.records);
+            });
             return store;
         }
-        // 写存档：捕获配额溢出（QuotaExceededError）等写入失败，避免静默丢数据。
-        // 失败时抛出带标记的错误，由调用方决定如何提示；返回 true/false 供需要的地方判断。
-        //   【1013-D】先改内存，马上排队写 IndexedDB。写库是异步的，失败时由 ledgerWriteSoon 提示，
+        // 写存档：先改内存（只标出改动涉及的月份），马上排队写 IndexedDB。写库是异步的，失败时由 ledgerWriteSoon 提示，
         //   内存里的修改留着，下次保存 / 切后台时再写。必须确认写进去才能往下走的地方用 saveStoreDurable。
         function saveStore(store, user){
             const key=storeKey(user);
-            ledgerSetRaw(key, JSON.stringify(store));
+            ledgerApply(ledgerEntryForWrite(key), store);
             ledgerWriteSoon(key);
             return true;
         }
@@ -3026,15 +3539,16 @@
         // 把名字抄进 store，供账号列表损坏时找回。失败不影响主流程。
         //   【1013-D】账本在内存缓存里（当前账号）就改缓存再写库；1010-K7 迁移途中账本还在 localStorage，用 stampAccountNameLS
         function stampAccountName(id, name){
+            //   【1013-G】名字在 meta 里，只改 meta、只写 meta 这一个小键，月份块不动
             try{
                 const key=`store_${id}`;
-                if(!__ledger.has(key)) return;
-                const raw=ledgerGet(key);
-                if(raw===null) return;
-                const s=JSON.parse(raw);
+                const e=__ledger.get(key);
+                if(!e || !e.has) return;
+                const s=JSON.parse(e.meta);
                 if(!s || typeof s!=='object' || s.accountName===name) return;
                 s.accountName=name;
-                ledgerSetRaw(key, JSON.stringify(s));
+                e.meta=JSON.stringify(s);
+                e.metaGen=++e.gen;
                 ledgerWriteSoon(key);
             }catch(_){}
         }
@@ -3058,9 +3572,7 @@
             await saveStoreDurable(store, id);
             try{ saveAccounts([{ id, name }].concat(list)); }
             catch(err){
-                const key=`store_${id}`;
-                __ledger.delete(key);
-                try{ await idbDel(key); }catch(_){}
+                try{ await ledgerDropAccount(id); }catch(_){}
                 throw err;
             }
             return id;
@@ -3092,8 +3604,12 @@
                 const k=localStorage.key(i);
                 if(k && k.indexOf('store_')===0 && isAccountId(k.slice(6))) ids.push(k.slice(6));
             }
+            //   【1013-G】分块存的账本看 meta 键（led_<编号>_m），还没搬成分块的看 store_<编号>
             __ledgerKeys.forEach(k=>{
-                if(k.indexOf('store_')===0 && isAccountId(k.slice(6)) && !ids.includes(k.slice(6))) ids.push(k.slice(6));
+                let id=null;
+                if(k.indexOf('store_')===0 && isAccountId(k.slice(6))) id=k.slice(6);
+                else { const m=/^led_(.+)_m$/.exec(k); if(m && isAccountId(m[1])) id=m[1]; }
+                if(id && !ids.includes(id)) ids.push(id);
             });
             if(raw===null && !ids.length) return;              // 新装的 App：本来就没有账号
             if(raw!==null){ try{ localStorage.setItem(`${ACCOUNTS_KEY}__corrupted_${Date.now()}`, raw); }catch(_){} }
@@ -3104,6 +3620,7 @@
                 try{
                     let r=localStorage.getItem(`store_${id}`);
                     if(r===null) r=asRaw(await idbGet(`store_${id}`));
+                    if(r===null) r=asRaw(await idbGet(ledMetaKey(id)));
                     const s=JSON.parse(r); name=(s && typeof s.accountName==='string') ? charSlice(s.accountName.trim(), 8) : '';
                 }catch(_){}
                 while(!name || list.some(a=>a.name===name)) name=`账号${n++}`;
@@ -4377,7 +4894,7 @@ ${detail}
                 if(!name || name===oldName) return;
                 const store=loadStore(); const a=curArchive(store);
                 a.cats=a.cats.map(c=>c===oldName?name:c);
-                a.records.forEach(r=>{ if(r.cat===oldName) r.cat=name; });
+                a.records=a.records.map(r=>r.cat===oldName ? Object.assign({}, r, { cat:name }) : r);
                 // 预算跟着分类改名，否则改名后预算悄悄失效
                 if(a.budgets && a.budgets[oldName]!=null){
                     a.budgets=Object.assign({}, a.budgets);
@@ -4406,7 +4923,7 @@ ${detail}
                 const s=loadStore(); const ar=curArchive(s);
                 ar.cats=ar.cats.filter(c=>c!==name);
                 if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
-                ar.records.forEach(r=>{ if(r.cat===name) r.cat='未分类'; });
+                ar.records=ar.records.map(r=>r.cat===name ? Object.assign({}, r, { cat:'未分类' }) : r);
                 if(ar.budgets && ar.budgets[name]!=null){ ar.budgets=Object.assign({}, ar.budgets); delete ar.budgets[name]; }
                 // 常用模板与记录一致：归入「未分类」
                 if(Array.isArray(ar.tpls)) ar.tpls.forEach(t=>{ if(t.cat===name) t.cat='未分类'; });
@@ -4415,7 +4932,14 @@ ${detail}
             }, '删除分类');
         }
 
-        function getUserData(){ return curArchive(loadStore()).records; }
+        // 【1013-G】只拷当前存档的记录数组（浅拷贝），不用把整个 store 都拼出来
+        function getUserData(){
+            const e=__ledger.get(storeKey());
+            const aid=e && e.has ? e.names.get(currentArchive) : undefined;
+            const st=aid ? e.archs.get(aid) : undefined;
+            if(!st) return curArchive(loadStore()).records;
+            return ledgerTagRecords(st.recs.slice(), aid);
+        }
         // silent=true 时不弹通用失败提示，由调用方自行给出对症提示（避免同一次失败连弹两个弹窗）
         //   【1013-D】saveStore 改成先改内存、再异步写库，这里不会再同步拿到失败；
         //   写库失败由 ledgerWriteSoon 统一提示一次，修改留在内存里，下次保存 / 切后台时再写。
@@ -5085,14 +5609,16 @@ ${detail}
                 .map(x=>x.r);
 
             let running=0;
-            // 把每笔的累计结余直接挂在「排序后的记录对象」上（__bal）。
+            // 每笔的累计结余按「记录对象」记在 balOf 里。
             // 后续筛选/反转/分页都带着同一对象走，渲染时按对象取值，不经过 id 查表，
             // 因此旧数据里即便存在偶发重复 id 也绝不会互相覆盖、算错结余。
+            //   【1013-G】以前直接挂在记录上（__bal）；现在记录是账本缓存里共用的、冻结的，不能往上挂东西
+            const balOf=new Map();
             allAsc.forEach(item=>{
                 const c=balContrib(item);        // 结余口径：只有「不计入」不算，「只算结余」照算
                 running += c.inc - c.exp;
                 running = Math.round(running*100)/100;   // 每步对齐到分，避免浮点误差累积（如 19.99 显示成 20.00）
-                item.__bal=running;
+                balOf.set(item, running);
             });
 
             // 再按筛选条件取出要显示的子集（仍保持时间正序）：分类标签 + 搜索条件叠加
@@ -5206,7 +5732,7 @@ ${detail}
 
             const rMap=refundedMap(raw);        // 原账单 id → 已退总额（1010-J）
             pageItems.forEach(item=>{
-                const balance=item.__bal;
+                const balance=balOf.get(item);
                 const isExp = item.type==='expense';
                 const amt=safeNum(item.money);
                 const typeTag = (isExp
@@ -5286,21 +5812,24 @@ ${detail}
             const data=getUserData();
             const prev=[];
             const byId=new Map();
-            data.forEach(r=>{
+            // 【1013-G】账本里的记录是冻结的：改过的换成新对象
+            data.forEach((r,i)=>{
                 if(!idSet.has(r.id) || isRefund(r)) return;
                 prev.push({ id:r.id, cat:r.cat, mode:recMode(r) });
-                if(change.cat!==undefined) r.cat=change.cat;
-                if(change.mode!==undefined) setRecMode(r, change.mode);
-                byId.set(r.id, r);
+                const n=Object.assign({}, r);
+                if(change.cat!==undefined) n.cat=change.cat;
+                if(change.mode!==undefined) setRecMode(n, change.mode);
+                data[i]=n;
+                byId.set(n.id, n);
             });
             if(!prev.length) return;
             const mainN=prev.length;
             // 挂在这些原账单上的退款跟着改；旧值一并记下，撤销时一起还原
-            data.forEach(r=>{
+            data.forEach((r,i)=>{
                 if(!isRefund(r) || !byId.has(r.refundOf)) return;
                 const o=byId.get(r.refundOf);
                 prev.push({ id:r.id, cat:r.cat, mode:recMode(r), follow:true });
-                r.cat=o.cat; setRecMode(r, recMode(o));
+                const n=Object.assign({}, r); n.cat=o.cat; setRecMode(n, recMode(o)); data[i]=n;
             });
             if(!saveUserData(data)) return;      // 一次写盘、一次同步；失败已有提示
             // 按分类筛选时改了分类：命中的记录全部离开当前分类，列表会瞬间变空，看着像数据没了。
@@ -5321,10 +5850,12 @@ ${detail}
             if(!u || u.archive!==currentArchive) return;
             const map=new Map(u.prev.map(p=>[p.id, p]));
             const data=getUserData();
-            data.forEach(r=>{
+            data.forEach((r,i)=>{
                 const p=map.get(r.id); if(!p) return;
-                r.cat=p.cat;
-                setRecMode(r, p.mode);
+                const n=Object.assign({}, r);
+                n.cat=p.cat;
+                setRecMode(n, p.mode);
+                data[i]=n;
             });
             if(!saveUserData(data)) return;
             filterCat.value=u.prevFilter;         // 分类表没变，原筛选值一定还在
@@ -6171,9 +6702,9 @@ ${detail}
                 const text=(v||'').trim();
                 if(!text) return;                 // 空内容不写（理论上 prompt 已拦空，双保险）
                 const data=getUserData();
-                const rec=data.find(r=>r.id===id);
-                if(!rec) return;                  // 记录意外不存在则放弃
-                rec.remark = text.slice(0, 5000); // 与记账表单一致的长度上限
+                const i=data.findIndex(r=>r.id===id);
+                if(i<0) return;                   // 记录意外不存在则放弃
+                data[i]=Object.assign({}, data[i], { remark:text.slice(0, 5000) });   // 与记账表单一致的长度上限；换成新对象（1013-G）
                 saveUserData(data);               // 写失败时 saveUserData 内部已提示
                 refreshAllViews();
             }, '备注', null, { maxlen:5000 });
@@ -7545,12 +8076,12 @@ ${detail}
             Object.keys(store.archives).forEach(name=>{
                 const a=store.archives[name];
                 if(!a || !Array.isArray(a.records)) return;
-                a.records.forEach(r=>{
+                a.records.forEach((r,i)=>{
                     scanned++;
                     if(!isDirtyTime(r.time)) return;
                     const before=r.time;
                     const after=repairTime(before) || nowDtValue();
-                    r.time=after;
+                    a.records[i]=Object.assign({}, r, { time:after });   // 换成新对象（1013-G：账本里的记录是冻结的）
                     fixed++;
                     if(samples.length<5){
                         samples.push({ archive:name, before:String(before), after });
@@ -8185,6 +8716,8 @@ ${detail}
                 // 1013-D：再把账本从 localStorage 搬进 IndexedDB（只跑一次；没搬完下次接着搬）
                 let moved=true;
                 if(dbOk){ try{ moved=await migrateLedgersToIdb(); }catch(_){ moved=false; } }
+                // 1013-G：再把整段的账本拆成按月分块（只跑一次；没搬完下次接着搬）
+                if(dbOk){ let ok2=true; try{ ok2=await migrateLedgersToBlocks(); }catch(_){ ok2=false; } moved=moved && ok2; }
                 else {
                     moved=false;
                     getAccounts().forEach(a=>__ledgerPending.add(a.id));   // 库打不开：哪个账号都读不了账本

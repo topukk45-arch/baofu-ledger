@@ -10,6 +10,8 @@ function install(w, factory){
   const f = factory || new IDBFactory();
   w.indexedDB = f;
   w.IDBKeyRange = IDBKeyRange;
+  // 1013-G：账本里的记录是冻结的，测试里打开「一改就报错」，漏改成「换新对象」的地方会直接红
+  w.__LEDGER_STRICT = true;
   return f;
 }
 
@@ -31,10 +33,40 @@ function dumpDb(factory){
       const tx = db.transaction('kv', 'readonly'), os = tx.objectStore('kv');
       const cur = os.openCursor();
       cur.onsuccess = () => { const c = cur.result; if (c) { out[c.key] = c.value; c.continue(); } };
-      tx.oncomplete = () => { db.close(); resolve(out); };
+      tx.oncomplete = () => { db.close(); resolve(withMerged(out)); };
       tx.onerror = () => reject(tx.error);
     };
   });
 }
 
-module.exports = { newPhone, install, idle, dumpDb };
+// 1013-G 起账本按月分块存（led_<账号>_m + led_<账号>_<存档号>_<月份>）。
+// 为了让「库里那本账是什么样」的断言照旧好写，dumpDb 额外合成一个 store_<账号>：
+// 和 1013-F 整段存的一模一样（meta 里的存档号换回记录数组，按序号排好）。库里真有 store_<账号>（还没搬）就不合成。
+// 合成的键不可枚举，Object.keys(db) 看到的仍是库里真实的键。
+function withMerged(out){
+  const metas = Object.keys(out).filter(k => /^led_.+_m$/.test(k));
+  metas.forEach(mk => {
+    const id = mk.slice(4, -2);
+    if (out['store_' + id] !== undefined) return;
+    let meta;
+    try { meta = JSON.parse(out[mk]); } catch (_) { return; }
+    if (!meta || !meta.archives) return;
+    const re = new RegExp('^led_' + id + '_(a[0-9a-z]+)_(\\d{4}-\\d{2}|none)$');
+    const by = {};
+    Object.keys(out).forEach(k => {
+      const m = re.exec(k); if (!m) return;
+      let blk; try { blk = JSON.parse(out[k]); } catch (_) { return; }
+      if (!blk || !Array.isArray(blk.s) || !Array.isArray(blk.r)) return;
+      const list = (by[m[1]] = by[m[1]] || []);
+      blk.r.forEach((r, i) => list.push([blk.s[i], r]));
+    });
+    Object.keys(meta.archives).forEach(n => {
+      const a = meta.archives[n];
+      a.records = (by[a.records] || []).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+    });
+    Object.defineProperty(out, 'store_' + id, { value: JSON.stringify(meta), enumerable: false, configurable: true });
+  });
+  return out;
+}
+
+module.exports = { newPhone, install, idle, dumpDb, withMerged };

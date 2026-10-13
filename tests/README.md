@@ -2,7 +2,7 @@
 
 用 [jsdom](https://github.com/jsdom/jsdom) 在 Node 里加载完整的 `www/index.html`，像真人一样点按钮、填表单，再检查页面和存档数据。不需要浏览器，也不需要手机。
 
-1013-D 起账本存在 IndexedDB。jsdom 没有 IndexedDB，测试用 [fake-indexeddb](https://github.com/dumbmatter/fakeIndexedDB)（纯 JS 实现，只在测试里用，不进 App）。
+1013-D 起账本存在 IndexedDB，1013-G 起按月分块存。jsdom 没有 IndexedDB，测试用 [fake-indexeddb](https://github.com/dumbmatter/fakeIndexedDB)（纯 JS 实现，只在测试里用，不进 App）。
 
 **所有测试数据都是虚构的**，不含任何真实账单。
 
@@ -37,7 +37,8 @@ GitHub Actions 每次打包前都会先跑 `npm test`，不通过就不出包。
 | `m-accounts.test.js` | 账号改为内部编号：新建账号、老数据迁移（多账号、云备份连接、损坏备份、早期 billData）、迁移中途失败后续跑、账号列表损坏找回、移走与找回账号、改名不搬数据、重名拦截 |
 | `n-migrate-partial.test.js` | 迁移没一次搬完时：搬完的账号马上能进、不被卡住的账号拖累；提示点名没整理完的账号；没整理完的账号不能往里导入；1013-A 时已经导进去的那份另存起来，老账本照样搬回来 |
 | `o-name-input.test.js` | 名字输入：撞上「已移走」账号名字时提示可以找回；账号、存档、分类、日子名称的输入框按实际字数限长，8 个 emoji 也能打进去 |
-| `p-idb-storage.test.js` | 账本搬到 IndexedDB：缓存给副本、先改内存再写库、切后台强制写、写到一半被杀、写失败提示与重试、新建账号 / 导入要确认写进去、搬家（中途失败续搬、读回对不上、旧的删不掉、两边内容不一样）、库里账本坏了、打不开库、1.7 万条进入账号的耗时；第 14 组：12 万条（一年导入量，带 src / 交易对方编号）进入账号、记一笔、翻页、切到统计页的耗时。1013-F 基线（服务器上）：进入约 1000–1150ms、记一笔约 360–410ms、翻页约 310–380ms、切统计页约 500–640ms |
+| `p-idb-storage.test.js` | 账本搬到 IndexedDB：缓存给副本、先改内存再写库、切后台强制写、写到一半被杀、写失败提示与重试、新建账号 / 导入要确认写进去、搬家（中途失败续搬、读回对不上、旧的删不掉、两边内容不一样）、库里账本坏了、打不开库、1.7 万条进入账号的耗时；第 14 组：12 万条（一年导入量，带 src / 交易对方编号）进入账号、记一笔、翻页、切到统计页。断言数的是每个操作处理了多少字符的 JSON（和机器快慢无关）：进入账号约 1 本、记一笔约 0.03 本、翻页和切统计页 0（1013-F 分别是 5、3、1、3 本）；另外记一笔连写库要比整本解析一次还快。设 `OLD_HTML` 时同一份数据再用老版本跑一遍，直接比 |
+| `q-ledger-blocks.test.js` | 1013-G 账本按月分块：搬成分块（记录顺序、没写时间的单独一块、合起来逐字节一样）、改时间跨月、批量跨月与撤销（同一个事务，写到一半死掉两边都不变）、存档改名只写 meta / 删存档连块一起删、没时间的记录补上时间、改分类名只写用到的月份、账号改名只写 meta、坏了一块只影响那一块、meta 坏了用月份块重建、从 1013-F 搬（中途被杀续搬、读回对不上、旧的删不掉、两边不一样、旧的本身就坏了）、往别的账号导入整批一个事务、内存只留当前账号、记录不能直接改、插到中间的顺序、账号列表坏了从 meta 找回、装回 1013-F（设 `OLD_HTML` 才跑） |
 
 ## 逐字节回归
 
@@ -48,7 +49,24 @@ node regress.js /tmp/old.html ../www/index.html
 
 用 `fixtures/sample-records.js` 生成的同一份假账单（约 130 条），对比两个版本的账单列表、分类汇总、筛选、统计页、当日明细和 AI 导出。新旧版本都能比（老版本同步启动，新版本等它准备好再取）。
 
-`p-idb-storage.test.js` 第 13 组会顺带和老版本比一下 1.7 万条进入账号的耗时：`OLD_HTML=/tmp/old.html node p-idb-storage.test.js`。
+`p-idb-storage.test.js` 第 14 组会和老版本比 12 万条的耗时，`q-ledger-blocks.test.js` 第 15 组会真的装回老版本试一遍：
+
+```bash
+git show HEAD~1:www/index.html > /tmp/old.html
+OLD_HTML=/tmp/old.html node p-idb-storage.test.js
+OLD_HTML=/tmp/old.html node q-ledger-blocks.test.js
+```
+
+12 万条耗时（服务器上，同一台机器、同一份数据）：
+
+| 操作 | 1013-F（整段存） | 1013-G（按月分块） |
+|---|---|---|
+| 进入账号 | 约 1200–1450ms | 约 390–510ms |
+| 记一笔（连写库） | 约 330–430ms | 约 25–30ms |
+| 翻页 | 约 270–370ms | 约 180–230ms（剩下的是排序和算结余，和存储无关） |
+| 切到统计页 | 约 450–530ms | 约 125–140ms |
+
+`regress.js` 1013-G 起还比导出的备份文件、云备份内容、用 App 里的数据做的 AI 导出（账号编号是随机的，比之前换成同一个占位）。
 
 - 纯重构（不该改变行为）：应当「全部一致」；
 - 有意的改动：只允许预期的那几项不一致。
@@ -61,6 +79,9 @@ node regress.js /tmp/old.html ../www/index.html
 - 账本在 IndexedDB（1013-D 起），启动、进入账号、新建账号、导入都是异步的：
   - `boot()` 是 async，用 `const t=await boot(...)`，返回时页面已经准备好；
   - 点账号、新建账号、导入之后 `await t.idle()` 再检查（等页面里进行中的读写都结束，见 `helpers/idb.js`）；
-  - 读当前账号的账本：`JSON.parse(t.w.ledgerGet(t.w.storeKey()))`（内存里那份）；要确认真写进库了用 `(await t.db())['store_'+编号]`；
+  - 读当前账号的账本：`JSON.parse(t.w.ledgerGet(t.w.storeKey()))`（内存里那份，合成一整本）；要确认真写进库了用 `(await t.db())['store_'+编号]`；
+  - 1013-G 起库里是 `led_<编号>_m`（meta）和 `led_<编号>_<存档号>_<年-月>` / `…_none`（月份块）。`helpers/idb.js` 的 `dumpDb` 会额外合成一个
+    `store_<编号>`，和 1013-F 整段存的一模一样，方便照旧断言；它不可枚举，`Object.keys(db)` 看到的仍是库里真实的键；
+  - 测试里账本记录是「一改就报错」的（`helpers/idb.js` 打开了 `__LEDGER_STRICT`）：要改记录就换成新对象，`d[i]={...d[i], cat:'新'}`；
   - 模拟「重开 App」要用同一台手机：`boot` 时传同一个 IndexedDB（各文件里的 `reboot(t, 快照)`）。
 - 每组结尾输出 `N 通过，M 失败`，并在有失败时 `process.exit(1)`，`run-all.js` 靠这个汇总。

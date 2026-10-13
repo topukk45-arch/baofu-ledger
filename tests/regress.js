@@ -1,4 +1,5 @@
-// 逐字节回归：用同一份假账单，对比两个版本的页面输出（账单、分类汇总、筛选、统计、当日明细、AI 导出）。
+// 逐字节回归：用同一份假账单，对比两个版本的页面输出（账单、分类汇总、筛选、统计、当日明细、AI 导出），
+// 以及导出的备份文件、云备份内容、用 App 里的数据做的 AI 导出（1013-G 起账本分块存，这三样必须和以前逐字节一样）。
 // 用法：node tests/regress.js <旧版 index.html> <新版 index.html>
 // 与上一次提交对比：git show HEAD~1:www/index.html > /tmp/old.html && node tests/regress.js /tmp/old.html www/index.html
 // 纯重构（不该改变行为）时应「全部一致」；有意的改动只允许预期的那几项不一致。
@@ -9,10 +10,18 @@ const store={archives:{'默认存档':{cats:['未分类','餐饮','购物','出�
 async function snap(file){
   const dom=new JSDOM(fs.readFileSync(file,'utf8'),{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',
     beforeParse(w){IDB.install(w);w.localStorage.setItem('app_logged_in_user','小明');w.localStorage.setItem('store_小明',JSON.stringify(store));
-      w.localStorage.setItem('app_time_repaired_小明','1');w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=function(){};
+      w.localStorage.setItem('app_time_repaired_小明','1');w.scrollTo=()=>{};
+      w.__files=[]; w.Capacitor={ isNativePlatform:()=>true, Plugins:{ Filesystem:{ writeFile:async o=>{ w.__files.push(o.data); return {}; } } } };w.HTMLElement.prototype.scrollIntoView=function(){};
       w.Date=class extends Date{constructor(...a){a.length?super(...a):super('2026-09-15T10:00:00');}static now(){return new Date('2026-09-15T10:00:00').getTime();}};}});
   await IDB.idle(dom.window);
   const d=dom.window.document, $=id=>d.getElementById(id), out={};
+  // 备份文件、云备份内容、AI 导出：都从 App 里的账本取
+  $('exportBtn').click(); for(let i=0;i<20 && !dom.window.__files.length;i++) await new Promise(r=>setTimeout(r,5));
+  // 账号编号是新建时随机生成的，两次跑本来就不一样，比之前换成同一个占位
+  const noId=x=>x.replace(/"accountId": ?"u\d+"/g, '"accountId":"<编号>"');
+  out.backup=noId(dom.window.__files[0]||'');
+  out.cloud=noId(JSON.stringify(dom.window.odBuildPayload()));
+  out.aiApp=dom.window.buildAiText(dom.window.getUserData().filter(r=>r.time.startsWith('2026-08')),'2026年8月','按月');
   out.overall=$('summaryOverall').innerHTML; out.cats=$('catStats').innerHTML;
   const pages=[]; for(let p=0;p<10;p++){ pages.push($('billList').innerHTML); const nx=[...$('pager').querySelectorAll('button')].pop(); if(!nx||nx.disabled)break; nx.click(); }
   out.pages=pages.join('|');
