@@ -1188,10 +1188,10 @@
             border-radius:10px; background:var(--c-surface); }
         .bg-detail .stat-flow .sf-item { padding:8px 6px; }
         .bg-detail-empty { padding:10px 2px; font-size:13px; color:var(--c-text-soft); }
-        .bg-detail-foot { display:flex; justify-content:space-between; align-items:center; gap:10px;
-            padding-top:8px; margin-top:2px; border-top:1px solid var(--c-border); font-size:12px; color:var(--c-text-soft); }
-        /* 【1013-E】展开明细底部的「改预算」：小一号，和「设预算」一个样子 */
-        .bg-detail-foot .bg-edit { flex-shrink:0; padding:5px 12px; font-size:12.5px; border:1px solid var(--c-border-mid);
+        .bg-detail-head { display:flex; justify-content:space-between; align-items:center; gap:10px;
+            padding:6px 0 8px; margin-bottom:2px; border-bottom:1px solid var(--c-border); font-size:12px; color:var(--c-text-soft); }
+        /* 【1013-E】展开明细顶部的「改预算」：小一号，和「设预算」一个样子 */
+        .bg-detail-head .bg-edit { flex-shrink:0; padding:5px 12px; font-size:12.5px; border:1px solid var(--c-border-mid);
             background:var(--c-surface); color:var(--c-primary-dark); border-radius:8px; }
         .bgu-row.bg-click { cursor:pointer; }
         .bgu-row.bg-click:active { background:var(--c-chip); }
@@ -1296,7 +1296,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-E</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-F</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -5614,8 +5614,9 @@ ${detail}
             const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计入 / 只算结余，未算在内`:''}`;
             // 【1013-E】设了预算的分类，展开后就地改上限，不用再跑去设置里的分类管理
             const edit = r.limit>0 ? `<button class="mini-btn bg-edit" data-act="bgSet" data-cat="${escapeHtml(r.cat)}">改预算</button>` : '';
-            return `<div class="bg-detail">${items}`
-                + `<div class="bg-detail-foot"><span>${note}</span>${edit}</div></div>`;
+            // 【1013-E】说明和「改预算」放在明细最上面：这个月要是有几十笔，不用滑到底才能改
+            return `<div class="bg-detail"><div class="bg-detail-head"><span>${note}</span>${edit}</div>`
+                + `${items}</div>`;
         }
         // 预算页签的所有点击（事件委托，一次绑定）
         $('statPaneBudget').addEventListener('click', e=>{
