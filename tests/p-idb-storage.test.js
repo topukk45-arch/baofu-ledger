@@ -338,6 +338,42 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   console.log(`  耗时：首次打开（含搬家）${tBoot}ms，进入账号 ${tEnter}ms，记一笔 ${tSave}ms / 连写库 ${tSaveAll}ms`);
 }
 
+// ===== 14. 一年导入量：12 万条（带 src / 交易对方编号），进入账号、记一笔、翻页、切到统计页 =====
+//   1013-F 的基线（服务器上）：见 README 测试表。结果写到 BENCH_OUT（如有），方便新旧版本对比。
+{
+  const N=120000, recs=[];
+  const cats=['餐饮','购物','出行','转账','其他'];
+  for(let i=0;i<N;i++){
+    const d=new Date(Date.UTC(2025,9,10)+Math.floor(i*365/N)*86400000);
+    const ds=d.toISOString().slice(0,10);
+    recs.push({ id:'r'+String(i).padStart(7,'0'), time:`${ds}T${String(i%24).padStart(2,'0')}:${String(i%60).padStart(2,'0')}`,
+      money:Math.round((1+(i*37)%500)*100)/100, type:i%25===0?'income':'expense', cat:cats[i%5],
+      remark:['扫码付款','收款','便利店','虚构商户'+(i%97),''][i%5], src:i%2?'wx':'ali', peer:'p'+String(i%3000).padStart(5,'0') });
+  }
+  const big=JSON.stringify({ archives:{'默认存档':{cats:['未分类'].concat(cats),records:recs}}, last:'默认存档', accountName:'小明' });
+  // 1013-F 的样子：库里一个账号一整段。localStorage 装不下 20M，直接放进库
+  const phone=IDB.newPhone();
+  await new Promise((res,rej)=>{ const q=phone.open('jiwen',1); q.onupgradeneeded=()=>q.result.createObjectStore('kv');
+    q.onsuccess=()=>{ const tx=q.result.transaction('kv','readwrite'); tx.objectStore('kv').put(big, 'store_'+ID_A); tx.oncomplete=()=>{ q.result.close(); res(); }; tx.onerror=rej; }; });
+  const seed=Object.assign({}, OLD); delete seed['store_'+ID_A]; seed.app_logged_in_user='';
+  const t=await boot(seed, { phone });
+  const ms=()=>Number(process.hrtime.bigint()/1000000n);
+  let t0=ms(); t.chip('小明').click(); await t.idle(); const tEnter=ms()-t0;
+  ok(t.inMain() && t.$('summaryOverall').textContent.includes(`共 ${N} 条`), `14 进入账号（读库 + 显示）${tEnter}ms`);
+  t0=ms(); await t.addBill(1, '大账本里记一笔'); const tSave=ms()-t0; await t.idle(); const tSaveAll=ms()-t0;
+  const nextBtn=()=>[...t.$('pager').querySelectorAll('button')].find(b=>b.textContent.includes('下一页'));
+  t0=ms(); nextBtn().click(); const tPage=ms()-t0;
+  ok(t.$('pager').textContent.includes('第 2 /'), `14 翻页 ${tPage}ms`);
+  t0=ms(); t.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle(); const tStats=ms()-t0;
+  ok(t.d.querySelector('.tab-btn[data-tab="stats"]').classList.contains('active'), `14 切到统计页 ${tStats}ms`);
+  t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
+  const all=JSON.stringify(t.w.getUserData());
+  ok(all.includes('大账本里记一笔') && t.w.getUserData().length===N+1, '14 记的那笔在账本里');
+  const line=`进入账号 ${tEnter}ms，记一笔 ${tSave}ms / 连写库 ${tSaveAll}ms，翻页 ${tPage}ms，切到统计页 ${tStats}ms`;
+  console.log(`  12 万条（${(big.length/1e6).toFixed(1)}M 字符）耗时：${line}`);
+  if(process.env.BENCH_OUT) fs.writeFileSync(process.env.BENCH_OUT, JSON.stringify({ tEnter, tSave, tSaveAll, tPage, tStats }));
+}
+
 console.log(`\n${pass} 通过，${fail} 失败`);
 process.exit(fail?1:0);
 })();
