@@ -279,9 +279,13 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
 
 // ===== 11. 库里的账本坏了：照旧不白屏、另存原文、暂停云同步 =====
 {
-  const t0=await boot(OLD);
-  await new Promise((res,rej)=>{ const q=t0.phone.open('jiwen',1); q.onsuccess=()=>{ const tx=q.result.transaction('kv','readwrite'); tx.objectStore('kv').put('{坏了', 'store_'+ID_A); tx.oncomplete=()=>{ q.result.close(); res(); }; tx.onerror=rej; }; });
-  const t=await reboot(t0, t0.dump());
+  // 1013-F 的样子：库里只有一整段、而且坏了（1013-H 起分块好好的时候旁边的坏整本不会顶掉分块，见 q-ledger-blocks 第 21 组）
+  const phone=IDB.newPhone();
+  await new Promise((res,rej)=>{ const q=phone.open('jiwen',1); q.onupgradeneeded=()=>q.result.createObjectStore('kv');
+    q.onsuccess=()=>{ const tx=q.result.transaction('kv','readwrite'); tx.objectStore('kv').put('{坏了', 'store_'+ID_A); tx.oncomplete=()=>{ q.result.close(); res(); }; tx.onerror=rej; }; });
+  const seed=Object.assign({}, OLD); delete seed['store_'+ID_A]; delete seed['store_'+ID_B];
+  const t=await boot(seed, { phone });
+  if(t.open()) t.$('askOk').click();   // 1013-H：先提示「有数据读不出来」
   ok(t.inMain() && t.$('billList').textContent.includes('暂无记账记录'), '11 坏账本：界面照常打开（空的）');
   const db=await t.db();
   const bk=Object.keys(db).find(k=>k.startsWith('store_'+ID_A+'__corrupted_'));

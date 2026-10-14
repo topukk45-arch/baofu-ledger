@@ -1296,7 +1296,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-G</div>
+            <div style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1013-H</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2434,6 +2434,7 @@
         function isSkip(r){ return !!(r && r.skip===true); }
         function isFlow(r){ return !!(r && r.flow===true && r.skip!==true); }
         function recMode(r){ return isSkip(r) ? 'skip' : (isFlow(r) ? 'flow' : 'normal'); }
+        // 就地改 r：只能用在新对象上（账本缓存里的记录是冻结的，要改先 Object.assign({}, r) 换一个）
         function setRecMode(r, mode){
             delete r.skip; delete r.flow;
             if(mode==='skip') r.skip=true; else if(mode==='flow') r.flow=true;
@@ -2728,7 +2729,8 @@
         function ledgerNewEntry(id){
             return { id, has:false, meta:null, names:new Map(), archs:new Map(), keys:new Set(),
                      dirty:new Map(), metaGen:0, gen:0, pend:new Map(), pendMeta:false,
-                     touched:new Set(), busy:null, ver:0, broken:false };
+                     touched:new Set(), busy:null, ver:0, broken:false,
+                     damage:[], badBlocks:new Set(), badAids:new Set() };
         }
         function ledgerDirty(e){ return e.dirty.size>0 || e.metaGen>0; }
         function validMeta(m){
@@ -2761,27 +2763,30 @@
                 else blocks.push({ k, aid:p.aid, mon:p.mon, raw:asRaw(v) });
             });
             if(!metaSeen && !blocks.length) return e;          // 这个账号还没有账本
-            const bad=(bk, raw)=>{
+            //   【1013-H】坏了什么记进 e.damage（进账号时告诉用户、暂停受影响存档的云同步，见 ledgerReportDamage）
+            const bad=(bk, raw, info)=>{
                 e.broken=true;
                 if(quiet) return;
-                // 登记到会话级损坏名单，供云同步据此拒绝写入（见 odSyncNow）
-                __corruptedStores.add(skey);
+                e.damage.push(Object.assign({ key:bk, len: raw===null ? 0 : raw.length }, info));
                 // 原文另存一份再说（meta 沿用以前整本账本的备份名 store_<编号>__corrupted_）
                 if(raw!==null) ledgerBackupCorrupted(bk, raw);
             };
             let meta=null;
             if(metaSeen){
                 try{ meta=JSON.parse(metaRaw); }catch(_){ meta=null; }
-                if(!validMeta(meta)){ meta=null; bad(skey, metaRaw); }
-            } else bad(skey, null);                              // 有月份块却没有 meta：也算坏了
+                if(!validMeta(meta)){ meta=null; bad(skey, metaRaw, { kind:'meta' }); }
+            } else bad(skey, null, { kind:'meta' });             // 有月份块却没有 meta：也算坏了
             // 各月份块
             const pairs=new Map();
             blocks.forEach(b=>{
                 let arr=null;
                 try{ arr=JSON.parse(b.raw); }catch(_){ arr=null; }
                 if(!validBlock(arr)){
-                    bad(b.k, b.raw);
-                    e.pend.set(b.k, true);     // 坏块：下次保存时按内存里的样子重写（备份已经另存）
+                    // 坏块：原文另存，这个月的记录先不显示。
+                    //   【1013-H】不再在下一次保存（进账号那次就会存）时顺手删掉：留在库里，每次打开都还认得出它坏了，
+                    //   云同步也就一直拦得住。真改到这个月、删了这个存档、或者用户点「重新选择备份文件」认可现状时才重写。
+                    bad(b.k, b.raw, { kind:'block', aid:b.aid, mon:b.mon });
+                    e.badBlocks.add(b.k); e.badAids.add(b.aid);
                     return;
                 }
                 let list=pairs.get(b.aid);
@@ -2791,7 +2796,10 @@
             if(!meta){
                 // meta 坏了：用还在的月份块把存档重建出来（名字叫「恢复的存档 N」，分类用默认的），记录不丢
                 const aids=[...pairs.keys()].sort();
-                if(!aids.length) return e;     // 一条也救不回来：当成没有账本（和以前坏了给空的一样，第一次保存时覆盖）
+                if(!aids.length){                // 一条也救不回来：当成没有账本（和以前坏了给空的一样，第一次保存时覆盖）
+                    e.damage.forEach(d=>{ if(d.kind==='meta') d.kind='all'; });
+                    return e;
+                }
                 meta={ archives:{} };
                 aids.forEach((aid,i)=>{ meta.archives[`恢复的存档 ${i+1}`]={ records:aid, cats:DEFAULT_CATS.slice() }; });
                 meta.last=`恢复的存档 1`;
@@ -3032,6 +3040,7 @@
             job.ops.forEach(o=>{
                 if(o[0]==='put'){ e.keys.add(o[1]); e.touched.add(o[1]); }
                 else { e.keys.delete(o[1]); e.touched.delete(o[1]); }
+                e.badBlocks.delete(o[1]);       // 坏块按内存里的样子重写了（原文早已另存）
             });
             job.done.forEach(([k,g])=>{ if(e.dirty.get(k)===g) e.dirty.delete(k); });
             if(job.metaGen && e.metaGen===job.metaGen) e.metaGen=0;
@@ -3061,7 +3070,11 @@
             return trackBusy((async()=>{
                 const id=key.slice(6);
                 const rows=await idbRange(ledPrefix(id));
-                if(!__ledger.has(key)) __ledger.set(key, ledgerBuild(id, rows));
+                if(!__ledger.has(key)){
+                    const e=ledgerBuild(id, rows);
+                    __ledger.set(key, e);
+                    ledgerReportDamage(e);
+                }
             })());
         }
         // 只留当前账号在内存里；别的账号有没写进去的修改就先留着，等它写完
@@ -3182,24 +3195,98 @@
             setTimeout(again, 800);
         })();
         // 损坏的原文另存一份（存到库里），只留最近 1 份旧的，连同这次共 2 份
+        //   【1013-H】坏块留在库里、每次打开都会再认出来：已经另存过一模一样的原文就不再存（不然两份备份很快都是同一个东西）
         function ledgerBackupCorrupted(key, raw){
             const prefix=`${key}__corrupted_`;
             const olds=[...__ledgerKeys].filter(k=>k.indexOf(prefix)===0).sort();
             trackBusy((async()=>{
+                for(const k of olds){
+                    try{ if(asRaw(await idbGet(k))===raw) return; }catch(_){}
+                }
                 for(const k of olds.slice(0, Math.max(0, olds.length-1))){ try{ await idbDel(k); }catch(_){} }
                 try{ await idbPut(`${prefix}${Date.now()}`, raw); }catch(_){}
             })());
+        }
+        // 账本读进内存时发现坏了：
+        //   · 马上（不等云同步那 1.5 秒）把受影响存档的云备份连接标成「已暂停」——存在 localStorage 里，
+        //     重启 App 也不会自己恢复，只有用户点「重新选择备份文件」才解除（见 odSyncNow 开头）。
+        //     坏了一个月 → 只停这个存档；存档设置（meta）坏了 → 存档名都对不上了，停这个账号的全部连接。
+        //   · 登记会话级损坏名单（odSyncNow 守卫一）。
+        function ledgerReportDamage(e){
+            if(!e.damage.length) return;
+            const skey=`store_${e.id}`;
+            const aidName=new Map(); e.names.forEach((aid, n)=>aidName.set(aid, n));
+            const whole=e.damage.some(d=>d.kind!=='block');
+            if(whole) __corruptedStores.add(skey);
+            const arcs=new Set(e.damage.filter(d=>d.kind==='block').map(d=>aidName.get(d.aid)).filter(n=>n!==undefined));
+            const prefix=`onedrive_link_${e.id}__`;
+            const ks=[];
+            try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf(prefix)===0) ks.push(k); } }catch(_){}
+            ks.forEach(k=>{
+                const arc=k.slice(prefix.length);
+                if(!whole && !arcs.has(arc)) return;
+                try{
+                    const link=JSON.parse(localStorage.getItem(k));
+                    if(!link || !link.uri || link.blocked) return;
+                    link.blocked=true;
+                    link.lastError = whole ? '本地账本有一部分读不出来，已暂停自动同步以保护云端备份'
+                                           : '本地存档有一个月的记录读不出来，已暂停自动同步以保护云端备份';
+                    localStorage.setItem(k, JSON.stringify(link));
+                }catch(_){}
+            });
+        }
+        // 进账号时告诉用户哪里坏了（同一处坏了只说一次；坏块留在库里、下次打开不会再说）
+        function ledgerDamageNotice(id){
+            const e=__ledger.get(`store_${id}`);
+            if(!e || !e.damage.length) return '';
+            const seenKey=`ledger_damage_seen_${id}`;
+            let seen=[];
+            try{ seen=JSON.parse(localStorage.getItem(seenKey)) || []; if(!Array.isArray(seen)) seen=[]; }catch(_){ seen=[]; }
+            const fresh=e.damage.filter(d=>!seen.includes(`${d.key}:${d.len}`));
+            if(!fresh.length) return '';
+            try{ localStorage.setItem(seenKey, JSON.stringify(seen.concat(fresh.map(d=>`${d.key}:${d.len}`)).slice(-50))); }catch(_){}
+            const aidName=new Map(); e.names.forEach((aid, n)=>aidName.set(aid, n));
+            const lines=[];
+            fresh.forEach(d=>{
+                if(d.kind==='all') lines.push('这个账号的账本读不出来，先给你一个空账本。');
+                else if(d.kind==='meta') lines.push('存档设置（存档名、分类、预算、常用模板）读不出来，已经用还在的记录重建成「恢复的存档」，分类等回到了默认。');
+                else {
+                    const n=aidName.get(d.aid);
+                    const when = d.mon==='none' ? '没写时间的那些记录' : `${+d.mon.slice(0,4)}年${+d.mon.slice(5)}月的记录`;
+                    lines.push(`存档「${n!==undefined ? n : '?'}」${when}读不出来，暂时看不到。`);
+                }
+            });
+            const hasLink=(()=>{ try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k && k.indexOf(`onedrive_link_${id}__`)===0) return true; } }catch(_){} return false; })();
+            return lines.join('\n') + '\n\n读不出来的原文已经另存在手机里，没有删。'
+                + (hasLink ? '\n为保护云备份，受影响存档的自动同步已暂停；确认现在的数据没问题后，到设置里点「重新选择备份文件」恢复。' : '');
+        }
+        // 用户点「重新选择备份文件」= 认可这个存档现在的样子：把它读不出来的月份按内存里的样子重写掉（原文早已另存），
+        //   以后打开不会再认出坏块、不会再暂停同步
+        function ledgerAcceptDamage(id, archive){
+            const key=`store_${id}`;
+            const e=__ledger.get(key);
+            if(!e) return;
+            const aid=e.names.get(archive);
+            if(aid===undefined) return;
+            e.badAids.delete(aid);
+            let any=false;
+            e.badBlocks.forEach(k=>{ const p=ledParseKey(id, k); if(p && p.aid===aid){ e.dirty.set(k, ++e.gen); any=true; } });
+            if(any) ledgerWriteSoon(key);
         }
 
         // ===== 账本搬家（1013-G）：1013-D～F 的整段账本 store_<编号> → 按月分块 =====
         // 做法和 1013-D 一样：写新 → 读回逐条核对 → 删旧。旧的删掉之前，账本在两边都有。
         //   · 新块整批放在一个事务里写：被杀掉的话，要么全在，要么一块没有。
-        //   · 已经有分块、和旧的一模一样（上次搬到一半，旧的还没删）：直接删旧的。
-        //   · 已经有分块、和旧的不一样（比如装回过 1013-F 又在那边记了账）：旧位置那份才是最新的，
-        //     放进分块；原来的分块合成一整本另存为 migrate_conflict_store_<编号>_<时间>，一条都不删。
-        //   · 旧的那份本身就坏了：原文原样放到 meta 的位置——进账号时和 1013-F 一样另存原文、给空账本、
-        //     暂停云同步，第一次保存才覆盖。
+        //   · 已经有分块（上次搬到一半旧的还没删，或者装回过 1013-F 又在那边记了账）：
+        //     【1013-H】两边按编号合并（见 ledgerMergeOld），不再二选一——以前「旧位置那份算最新」，
+        //     装回旧版记一笔再升级，全部历史就被藏进了备份。合并结果和分块一模一样（上次已经搬好 / 已经合并过）就只删旧的；
+        //     真合并了，原来的分块合成一整本另存为 migrate_conflict_store_<编号>_<时间>，进 App 时告诉用户。
+        //   · 旧的那份里有不是对象的记录 / 存档：丢掉，旧的原文原样另存为 migrate_skipped_store_<编号>（和新块同一个事务）。
+        //   · 缺编号的记录补上固定的编号（同一份数据算几次都一样），被杀后续搬时才对得上。
+        //   · 旧的那份本身就坏了：分块好好的就留着分块、旧的原文另存成损坏备份；没有分块就把原文原样放到 meta 的位置——
+        //     进账号时和 1013-F 一样另存原文、给空账本、暂停云同步，第一次保存才覆盖。
         //   · 任何一步失败，这个账号就算没搬完：这次先不让进，下次打开 App 接着搬。
+        const __ledgerMergeNotes=[];     // 这次启动合并了装回旧版时记的账：{ id, added:[{ archive, n }] }
         async function dropOldLedgerKey(k){
             try{ await idbTx('readwrite', os=>os.delete(k), true); }catch(_){ return false; }
             let v;
@@ -3208,6 +3295,70 @@
             __ledgerKeys.delete(k);
             return true;
         }
+        // 整理旧的整段账本（就地改刚解析出来的 store）。返回丢掉了几样东西
+        function ledgerTidyOld(store){
+            let dropped=0;
+            Object.keys(store.archives).forEach((n, ai)=>{
+                let a=store.archives[n];
+                if(Array.isArray(a)) a={ records:a, cats:DEFAULT_CATS.slice() };
+                if(!a || typeof a!=='object'){ dropped++; a={ records:[] }; }
+                if(a.records!==undefined && !Array.isArray(a.records)){ dropped++; a.records=[]; }
+                const recs=a.records || [];
+                const ids=new Set(recs.filter(r=>isRecObj(r) && r.id).map(r=>r.id));
+                a.records=[];
+                recs.forEach((r, i)=>{
+                    if(!isRecObj(r)){ dropped++; return; }
+                    if(!r.id){
+                        let id=`rfix${ai}x${i}`;
+                        while(ids.has(id)) id+='x';
+                        ids.add(id); r.id=id;
+                    }
+                    a.records.push(r);
+                });
+                store.archives[n]=normArchive(a);
+            });
+            return dropped;
+        }
+        // 两边都有时按编号合并。have：分块那份（历史都在这里）；old：旧位置那份（多半是装回旧版本后记的）。
+        //   · 同一个编号两边都有：用旧位置那份（沿用「旧位置的更新」）；只在旧位置有的：接在这个存档后面。
+        //   · 同名存档：分类取并集，预算补上没有的，常用模板按编号补上；只在旧位置有的存档整个加进来。
+        //   · 合并几次结果都一样（被杀后续搬时，合并结果和已写好的分块逐字相同，就只删旧的）。
+        function ledgerMergeOld(have, old){
+            const out=JSON.parse(JSON.stringify(have));
+            const added=[];
+            Object.keys(old.archives).forEach(n=>{
+                const o=old.archives[n], h=out.archives[n];
+                if(!h){
+                    out.archives[n]=o;
+                    if(o.records.length) added.push({ archive:n, n:o.records.length });
+                    return;
+                }
+                const pos=new Map(h.records.map((r,i)=>[r.id, i]));
+                let cnt=0;
+                o.records.forEach(r=>{
+                    if(pos.has(r.id)){ h.records[pos.get(r.id)]=r; return; }
+                    pos.set(r.id, h.records.length); h.records.push(r); cnt++;
+                });
+                if(cnt) added.push({ archive:n, n:cnt });
+                (o.cats||[]).forEach(c=>{ if(!h.cats.includes(c)) h.cats.push(c); });
+                if(o.budgets && typeof o.budgets==='object' && !Array.isArray(o.budgets)){
+                    Object.keys(o.budgets).forEach(c=>{
+                        if(h.budgets && typeof h.budgets==='object' && c in h.budgets) return;
+                        h.budgets=Object.assign({}, h.budgets||{}); h.budgets[c]=o.budgets[c];
+                    });
+                }
+                if(Array.isArray(o.tpls) && o.tpls.length){
+                    if(!Array.isArray(h.tpls)) h.tpls=[];
+                    const seen=new Set(h.tpls.map(t=>(t && t.id) ? 'id:'+t.id : JSON.stringify(t)));
+                    o.tpls.forEach(t=>{
+                        const k=(t && t.id) ? 'id:'+t.id : JSON.stringify(t);
+                        if(!seen.has(k)){ seen.add(k); h.tpls.push(t); }
+                    });
+                }
+            });
+            if(!out.archives[out.last]) out.last=Object.keys(out.archives)[0];
+            return { store:out, added };
+        }
         async function moveStoreToBlocks(id){
             const oldKey=`store_${id}`;
             let raw;
@@ -3215,38 +3366,72 @@
             if(raw===null){ __ledgerKeys.delete(oldKey); return true; }
             let store=null;
             try{ store=JSON.parse(raw); }catch(_){ store=null; }
-            if(store && (typeof store!=='object' || !store.archives || typeof store.archives!=='object')) store=null;
+            if(store && (typeof store!=='object' || Array.isArray(store) || !store.archives || typeof store.archives!=='object' || Array.isArray(store.archives))) store=null;
             let rows;
             try{ rows=(await idbRange(ledPrefix(id))).filter(([k])=>ledParseKey(id, k)); }catch(_){ return false; }
-            let ops, want, check;
+            // 已有的分块（读不全也照样合成能读的部分）
+            let haveObj=null, have=null, rowsBroken=false;
+            if(rows.length){
+                const e0=ledgerBuild(id, rows, true);
+                rowsBroken=e0.broken;
+                if(e0.has){ haveObj=ledgerAssemble(e0); have=JSON.stringify(haveObj); }
+            }
+            const rowsRaw=()=>JSON.stringify(Object.fromEntries(rows.map(([k,v])=>[k, asRaw(v)])));
+            const stamp=Date.now();
+            let ops, check, added=null;
+            const extra=[];
             if(store===null){
-                // 坏的：原文原样放进 meta 的位置（见上），旧的分块（如果有）先合成一份另存
-                want=raw;
+                if(haveObj && !rowsBroken){
+                    // 分块好好的，旧的坏了：留着分块，旧的原文另存成损坏备份，删掉旧的就算完
+                    try{ await idbBatch([['put', `${oldKey}__corrupted_${stamp}`, raw]], true); }catch(_){ return false; }
+                    if(!(await dropOldLedgerKey(oldKey))) return false;
+                    __ledger.delete(oldKey);
+                    return true;
+                }
+                // 坏的：原文原样放进 meta 的位置（见上）
                 ops=[['put', ledMetaKey(id), raw]];
                 check=back=>{ const m=back.find(([k])=>k===ledMetaKey(id)); return !!m && asRaw(m[1])===raw; };
+                if(rows.length){
+                    if(check(rows)) return await dropOldLedgerKey(oldKey);   // 上次已经放好了，只差删旧的
+                    extra.push(['put', `migrate_conflict_${oldKey}_${stamp}`, have!==null ? have : rowsRaw()]);
+                }
             } else {
-                Object.keys(store.archives).forEach(k=>{ store.archives[k]=normArchive(store.archives[k]); });
-                want=JSON.stringify(store);
+                if(ledgerTidyOld(store)) extra.push(['put', `migrate_skipped_${oldKey}`, raw]);
+                let target=store;
+                if(haveObj){
+                    const m=ledgerMergeOld(haveObj, store);
+                    target=m.store;
+                    if(!rowsBroken && JSON.stringify(target)===have){
+                        // 上次已经写好了（或者已经合并过），只差删旧的
+                        if(extra.length){ try{ await idbBatch(extra, true); }catch(_){ return false; } }
+                        if(!(await dropOldLedgerKey(oldKey))) return false;
+                        __ledger.delete(oldKey);
+                        return true;
+                    }
+                    // 真的要合并：原来的分块合成一整本另存（读不全时连原样的块一起另存）
+                    extra.push(['put', `migrate_conflict_${oldKey}_${stamp}`, have]);
+                    if(rowsBroken) extra.push(['put', `migrate_conflict_${oldKey}_${stamp}_raw`, rowsRaw()]);
+                    if(m.added.length) added=m.added;
+                } else if(rows.length){
+                    // 分块一条都读不出来：原样另存
+                    extra.push(['put', `migrate_conflict_${oldKey}_${stamp}`, rowsRaw()]);
+                }
+                const want=JSON.stringify(target);
                 const e=ledgerNewEntry(id);
-                ledgerApply(e, store);
+                ledgerApply(e, target);
                 ops=ledgerJob(e).ops;
                 check=back=>ledgerAssembleRows(id, back)===want;
             }
-            if(rows.length){
-                if(check(rows)) return await dropOldLedgerKey(oldKey);   // 上次已经写好了，只差删旧的
-                const have=ledgerAssembleRows(id, rows);
-                const backup=(have!==null) ? have : JSON.stringify(Object.fromEntries(rows.map(([k,v])=>[k, asRaw(v)])));
-                try{ await idbPut(`migrate_conflict_${oldKey}_${Date.now()}`, backup, true); }catch(_){ return false; }
-                const putKeys=new Set(ops.map(o=>o[1]));
-                rows.forEach(([k])=>{ if(!putKeys.has(k)) ops.push(['del', k]); });
-            }
-            try{ await idbBatch(ops, true); }catch(_){ return false; }
-            // 读回来核对：合成的一整本必须和旧的逐字一样（每条记录、顺序、分类预算模板都在里面）
+            const putKeys=new Set(ops.map(o=>o[1]));
+            rows.forEach(([k])=>{ if(!putKeys.has(k)) ops.push(['del', k]); });
+            try{ await idbBatch(extra.concat(ops), true); }catch(_){ return false; }
+            // 读回来核对：合成的一整本必须和要写的逐字一样（每条记录、顺序、分类预算模板都在里面）
             let back;
             try{ back=(await idbRange(ledPrefix(id))).filter(([k])=>ledParseKey(id, k)); }catch(_){ return false; }
             if(!check(back)) return false;
             if(!(await dropOldLedgerKey(oldKey))) return false;
             __ledger.delete(oldKey);
+            if(added) __ledgerMergeNotes.push({ id, added });
             return true;
         }
         async function migrateLedgersToBlocks(){
@@ -3333,10 +3518,15 @@
             return 'r'+ts+seq+rnd;
         }
 
+        // 就地改 a 和里面的记录：只能用在刚解析出来的数据上（账本缓存里的记录是冻结的，改了也改不动）
+        //   【1013-H】不是对象的存档 / 记录不再让它报错：存档当成空的，记录丢掉（搬家时原文另存，见 ledgerTidyOld）
+        function isRecObj(r){ return !!r && typeof r==='object' && !Array.isArray(r); }
         function normArchive(a){
             if (Array.isArray(a)) a = { records:a, cats:DEFAULT_CATS.slice() };
-            if (!a.records) a.records = [];
+            if (!a || typeof a!=='object') a = { records:[] };
+            if (!Array.isArray(a.records)) a.records = [];
             if (!a.cats || !a.cats.length) a.cats = DEFAULT_CATS.slice();
+            a.records = a.records.filter(isRecObj);
             a.records.forEach(r => {
                 if (!r.cat) r.cat = '未分类';
                 if (!r.id) r.id = genId();
@@ -3814,6 +4004,9 @@
                 if(seq!==__loginSeq) return;          // 读的过程中又点了别的账号：以最后一次为准
                 ledgerEvictExcept(key);
                 enterAccount(id);
+                // 【1013-H】账本有读不出来的地方：如实告诉用户（同一处只说一次）
+                const dmg=ledgerDamageNotice(id);
+                if(dmg) customAlert(dmg, '有数据读不出来');
             }, ()=>{
                 if(seq!==__loginSeq) return;
                 customAlert('读取账本失败，请关掉 App 重新打开后再试。', '读取失败');
@@ -4080,9 +4273,15 @@
             const link = odGetLink(user, archive);
             if(!plugin || !link || !link.uri) return;
 
+            // 【守卫零】1013-H：已经暂停的就一直停着，直到用户点「重新选择备份文件」（界面上就是这么说的）。
+            //   以前这里不看 blocked：损坏只记在内存里，重启 App 后坏数据不再被认出来，就会拿缺了一块的账本覆盖云端。
+            if(link.blocked){ odRefreshStatusUI(); return; }
+
             // 【守卫一】本地存档本次会话被检测到损坏过：坚决不写。
             //   此时 loadStore 给出的是空回退结构，写上去等于亲手销毁唯一的完好备份。
-            if(__corruptedStores.has(storeKey(user))){
+            const __le=__ledger.get(storeKey(user));
+            const __aid=__le ? __le.names.get(archive) : undefined;
+            if(__corruptedStores.has(storeKey(user)) || (__aid!==undefined && __le.badAids.has(__aid))){
                 link.lastError = '本地存档曾损坏，已暂停自动同步以保护云端备份';
                 link.blocked = true;
                 odSetLink(user, archive, link);
@@ -4164,6 +4363,7 @@
                     if(!res || !res.uri) return;
                     // 重新选择 = 明确的用户意图，解除守卫（含损坏名单），否则一旦拦下就再也恢复不了
                     __corruptedStores.delete(storeKey(currentUser));
+                    ledgerAcceptDamage(currentUser, currentArchive);   // 这个存档读不出来的月份按现在的样子重写，以后不再暂停
                     odSetLink(currentUser, currentArchive, { uri: res.uri, name: res.name || suggested,
                         lastSyncAt:null, lastError:null, blocked:false, lastCount:0 });
                     odRefreshStatusUI();
@@ -8736,15 +8936,23 @@ ${detail}
                 }
                 // 【1013-B】如实说是哪几个账号没整理完：只有它们暂时进不去，其它账号照常用。
                 //   放在自动登录之后，免得进入账号时弹出的别的提示把它盖掉。
+                // 【1013-H】装回过旧版本、在那边记的账合并进来了：说一声，别让人以为账多出来了
+                const mergeText=__ledgerMergeNotes.length
+                    ? '装回过旧版本期间记的账已经合并进来：' + __ledgerMergeNotes.map(m=>
+                        m.added.map(x=>`账号「${nameOf(m.id)}」存档「${x.archive}」${x.n} 笔`).join('、')).join('、')
+                      + '。合并前的那份另存在手机里，没有删。'
+                    : '';
                 if(!dbOk){
                     customAlert('打不开手机上的账本数据库，暂时进不了账号。请关掉 App 重新打开；还不行的话，先别清除 App 数据，联系开发者。', '提示');
+                } else if(mergeText && migrated && moved){
+                    customAlert(mergeText, '提示');
                 } else if(!migrated || !moved){
                     const pendingNames=getAccounts()
                         .filter(a=>typeof a.legacy==='string' || __ledgerPending.has(a.id))
                         .map(a=>`「${a.name}」`);
                     customAlert('升级时整理账号数据没有全部完成（可能是手机存储空间不足）。'
                         + (pendingNames.length ? `${pendingNames.join('、')}暂时进不去，其它账号可以正常使用。` : '')
-                        + '下次打开 App 会接着整理。', '提示');
+                        + '下次打开 App 会接着整理。' + (mergeText ? '\n\n' + mergeText : ''), '提示');
                 }
             })().finally(()=>{ loginBox.style.visibility=''; }));
         })();

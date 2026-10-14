@@ -3,6 +3,8 @@
 //      存档改名 / 删除、改分类名、账号改名只写 meta、坏了一块只影响那一块、meta 坏了用月份块重建、
 //      搬家（中途被杀续搬、读回对不上、旧的删不掉、两边不一样、旧的本身就坏了）、
 //      往别的账号导入、内存只留当前账号、记录不能直接改、账号列表坏了从 meta 找回、
+//      1013-H：坏了一个月开几次 App 都不覆盖云备份、进账号提示、点「重新选择备份文件」认可现状、整本坏了也一直停同步、
+//      旧账本里有不是对象的记录、缺编号续搬、两边按编号合并、分块好旧本坏、
 //      装回 1013-F（设了 OLD_HTML 才跑）。
 // 所有数据都是虚构的。
 const fs=require('fs'); const path=require('path'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
@@ -242,12 +244,15 @@ const merged=(db,id)=>JSON.parse(db['store_'+id]);
   await t.w.odSyncNow();
   ok(JSON.parse(t.ls.getItem(`onedrive_link_${ID_A}__默认存档`)).blocked===true, '7 云同步被拦住，不拿缺了一个月的账本覆盖云端');
   ok(!t.errs.length, '7 无报错 '+t.errs.join('|'));
-  // 第一次保存时坏块按内存里的样子重写（和以前坏了的整本在第一次保存时被覆盖一样；原文已另存）
+  // 1013-H：改别的月份不碰坏块（留在库里，下次打开还认得出来）；真改到这个月才按内存里的样子重写（原文已另存）
   t.add(R('a7','2026-10-09T10:00',1,'expense','餐饮','坏了以后记的'));
   db=await t.db();
-  ok(db[k9]===undefined && realKeys(db).some(k=>k.startsWith(k9+'__corrupted_')), '7 第一次保存后：坏块清掉了，备份还在');
+  ok(db[k9]==='{坏了', '7 改十月：九月的坏块原样留着');
+  t.add(R('a8','2026-09-20T10:00',2,'expense','餐饮','九月补记的'));
+  db=await t.db();
+  ok(blocksOf(db, ID_A)[aid]['2026-09'].join()==='九月补记的' && realKeys(db).some(k=>k.startsWith(k9+'__corrupted_')), '7 改到九月：九月块按现在的样子重写，备份还在');
   const t2=await reboot(t);
-  ok(t2.inMain() && t2.list().includes('坏了以后记的') && !t2.errs.length, '7 重开照常');
+  ok(t2.inMain() && t2.list().includes('坏了以后记的') && t2.list().includes('九月补记的') && !t2.errs.length, '7 重开照常');
 }
 
 // ===== 8. meta 坏了：用月份块把存档重建出来，记录不丢 =====
@@ -325,10 +330,17 @@ const F_SEED=Object.assign({}, BASE);
   await seedIdb(phone, { ['store_'+ID_A]:fromF });
   const t2=await reboot(t);
   const db=await t2.db();
-  ok(!realKeys(db).includes('store_'+ID_A) && db['store_'+ID_A]===fromF, '10 旧位置那份搬进了分块');
+  // 1013-H：按编号合并，不再二选一（以前旧位置那份胜出，全部历史就被藏进了备份）
+  const recs=merged(db, ID_A).archives['默认存档'].records;
+  ok(!realKeys(db).includes('store_'+ID_A) && recs.length===RECS_A.length+2 && recs[recs.length-1].remark==='旧版里记的'
+     && recs.some(r=>r.remark==='新版里记的') && recs[0].remark==='十月午饭', '10 合并：历史、新版里记的、旧版里记的都在，旧版的接在后面');
   const ck=realKeys(db).find(k=>k.startsWith('migrate_conflict_store_'+ID_A+'_'));
-  ok(ck && db[ck]===newer, '10 分块原来那份合成一整本另存着（1013-F 的格式），没删');
-  ok(t2.inMain() && t2.list().includes('旧版里记的'), '10 进去看到的是最新的');
+  ok(ck && db[ck]===newer, '10 合并前的分块合成一整本另存着（1013-F 的格式），没删');
+  ok(t2.open() && t2.msg().includes('合并进来') && t2.msg().includes('「默认存档」1 笔'), '10 告诉用户合并了几笔、在哪个存档：'+t2.msg());
+  t2.$('askOk').click();
+  ok(t2.inMain() && t2.list().includes('旧版里记的') && t2.list().includes('十月午饭'), '10 进去都看得到');
+  const t3=await reboot(t2);
+  ok(!t3.open() && !realKeys(await t3.db()).filter(k=>k.startsWith('migrate_conflict_')).slice(1).length, '10 再开一次：不再合并、不再提示');
 }
 
 // ===== 11. 旧的那本本身就坏了：和 1013-F 一样不白屏、另存原文、暂停云同步，第一次保存才覆盖 =====
@@ -414,6 +426,129 @@ const F_SEED=Object.assign({}, BASE);
   ok(list.some(a=>a.id===ID_A && a.name==='小明') && list.some(a=>a.id===ID_B && a.name==='小红'), '14 两个账号都从 meta 找回来了，名字也对');
 }
 
+// ===== 16. 坏了一个月 + 已连云备份：开几次 App 都不会拿缺了这个月的账本覆盖云端（1013-H，检查记录 P0）=====
+{
+  const t0=await boot(OLD_LS);
+  const aid=aidOf(await t0.db(), ID_A, '默认存档');
+  const k9=`led_${ID_A}_${aid}_2026-09`;
+  t0.$('newArchive').click(); t0.prompt('旅行'); await t0.idle();
+  t0.$('archiveSelect').value='默认存档'; t0.$('archiveSelect').dispatchEvent(new t0.w.Event('change')); await t0.idle();
+  const LK=`onedrive_link_${ID_A}__默认存档`, LK2=`onedrive_link_${ID_A}__旅行`;
+  t0.ls.setItem(LK, JSON.stringify({ uri:'content://a', name:'a.json', lastCount:6 }));
+  t0.ls.setItem(LK2, JSON.stringify({ uri:'content://b', name:'b.json', lastCount:0 }));
+  await seedIdb(t0.phone, { [k9]:'{坏了' });
+  const spy=t=>{ const calls=[]; t.w.Capacitor.Plugins.OneDriveLink.writeText=async o=>{ calls.push(JSON.parse(o.text)); }; return calls; };
+  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  // 第一次打开
+  const t1=await reboot(t0); const c1=spy(t1);
+  ok(t1.inMain() && t1.open() && t1.title()==='有数据读不出来' && t1.msg().includes('存档「默认存档」2026年9月的记录读不出来') && t1.msg().includes('重新选择备份文件'),
+     '16 进账号时告诉用户哪个存档哪个月读不出来：'+t1.msg().replace(/\n/g,' '));
+  t1.$('askOk').click();
+  const l1=JSON.parse(t1.ls.getItem(LK));
+  ok(l1.blocked===true && l1.lastError.includes('读不出来'), '16 一认出来就把这个存档的云备份标成暂停（不等同步）');
+  ok(JSON.parse(t1.ls.getItem(LK2)).blocked!==true, '16 别的存档的云备份不受影响');
+  await sleep(1700); await t1.idle(); await t1.w.odSyncNow();
+  let db=await t1.db();
+  ok(c1.length===0 && db[k9]==='{坏了', '16 第一次打开：没往云端写，坏块还在库里（进账号那次保存不会顺手删掉它）');
+  // 第二次打开：什么也不做
+  const t2=await reboot(t1); const c2=spy(t2);
+  ok(t2.inMain() && !t2.open(), '16 第二次打开：同一处坏了不再重复提示');
+  await sleep(1700); await t2.idle(); await t2.w.odSyncNow();
+  ok(c2.length===0 && JSON.parse(t2.ls.getItem(LK)).blocked===true, '16 第二次打开：照样没往云端写，仍是暂停');
+  db=await t2.db();
+  ok(realKeys(db).filter(k=>k.startsWith(k9+'__corrupted_')).length===1, '16 原文只另存了一份（没有每次打开都再存）');
+  // 在别的月份记账：仍然不同步；改到九月以后也不同步（暂停只有用户能解除）
+  t2.add(R('a7','2026-10-09T10:00',1,'expense','餐饮','坏了以后记的'));
+  t2.add(R('a8','2026-09-20T10:00',2,'expense','餐饮','九月补记的'));
+  await sleep(1700); await t2.idle(); await t2.w.odSyncNow();
+  const t3=await reboot(t2); const c3=spy(t3);
+  await sleep(1700); await t3.idle(); await t3.w.odSyncNow();
+  ok(c2.length===0 && c3.length===0 && !t3.open(), '16 改到九月、重开以后：坏块已经重写、认不出来了，云同步照样停着');
+  // 用户点「重新选择备份文件」：恢复同步
+  t3.w.Capacitor.Plugins.OneDriveLink.pickFile=async()=>({ uri:'content://a2', name:'a2.json' });
+  t3.$('odConnectBtn').click(); await sleep(20); await t3.idle();
+  ok(c3.length===1 && c3[0].data.some(r=>r.remark==='九月补记的') && JSON.parse(t3.ls.getItem(LK)).blocked===false, '16 点「重新选择备份文件」：恢复同步');
+  t3.$('askOk').click();
+}
+// ===== 17. 坏块还在时点「重新选择备份文件」= 认可现状：坏的月份按现在的样子重写，以后不再暂停 =====
+{
+  const t0=await boot(OLD_LS);
+  const aid=aidOf(await t0.db(), ID_A, '默认存档');
+  const k9=`led_${ID_A}_${aid}_2026-09`, LK=`onedrive_link_${ID_A}__默认存档`;
+  t0.ls.setItem(LK, JSON.stringify({ uri:'content://a', name:'a.json', lastCount:6 }));
+  await seedIdb(t0.phone, { [k9]:'{坏了' });
+  const t=await reboot(t0); t.$('askOk').click();
+  const calls=[]; t.w.Capacitor.Plugins.OneDriveLink.writeText=async o=>{ calls.push(JSON.parse(o.text)); };
+  t.w.Capacitor.Plugins.OneDriveLink.pickFile=async()=>({ uri:'content://a2', name:'a2.json' });
+  t.$('odConnectBtn').click(); await new Promise(r=>setTimeout(r,20)); await t.idle();
+  const db=await t.db();
+  ok(db[k9]===undefined && realKeys(db).some(k=>k.startsWith(k9+'__corrupted_')), '17 坏块按现在的样子重写了（这个月没别的记录，就删掉），原文备份还在');
+  ok(calls.length===1 && calls[0].data.length===RECS_A.length-1, '17 同步恢复，写的就是界面上看到的那些');
+  t.$('askOk').click();
+  const t2=await reboot(t);
+  ok(t2.inMain() && !t2.open() && JSON.parse(t2.ls.getItem(LK)).blocked===false, '17 重开：不再提示、不再暂停');
+}
+// ===== 18. 整本坏了（1013-F 时就坏了）：第一次保存写成新账本以后，云同步也一直停着 =====
+{
+  const phone=IDB.newPhone(); await seedIdb(phone, { ['store_'+ID_A]:'{坏了', ['store_'+ID_B]:F_B });
+  const LK=`onedrive_link_${ID_A}__默认存档`;
+  const t=await boot(Object.assign({}, F_SEED, { [LK]:JSON.stringify({ uri:'content://a', name:'a.json', lastCount:6 }) }), { phone });
+  ok(t.inMain() && t.title()==='有数据读不出来' && t.msg().includes('先给你一个空账本'), '18 告诉用户账本读不出来：'+t.msg().replace(/\n/g,' '));
+  t.$('askOk').click();
+  t.add(R('c1','2026-10-09T12:00',1,'expense','未分类','坏了以后记的'));
+  const t2=await reboot(t);
+  const calls=[]; t2.w.Capacitor.Plugins.OneDriveLink.writeText=async o=>{ calls.push(o); };
+  await t2.w.odSyncNow();
+  ok(!t2.open() && calls.length===0 && JSON.parse(t2.ls.getItem(LK)).blocked===true, '18 重开后账本是好的了，但云同步仍停着，不拿 1 条的账本覆盖云端的 6 条');
+}
+// ===== 19. 旧整段账本里有不是对象的记录 / 存档：丢掉它们、原文另存，账号照常进（检查记录 P1）=====
+{
+  for(const [nm, mk] of [
+    ['null 记录', s=>s.archives['默认存档'].records.push(null)],
+    ['字符串记录', s=>s.archives['默认存档'].records.splice(2, 0, '垃圾')],
+    ['数组记录', s=>s.archives['默认存档'].records.push([1,2])],
+    ['存档是 null', s=>{ s.archives['坏存档']=null; }],
+    ['records 不是数组', s=>{ s.archives['坏存档']={ cats:['未分类'], records:{ a:1 } }; }],
+  ]){
+    const s=JSON.parse(JSON.stringify(storeOf(RECS_A,'小明'))); mk(s);   // 拷一份，别改到全局的 RECS_A
+    const raw=JSON.stringify(s);
+    const phone=IDB.newPhone(); await seedIdb(phone, { ['store_'+ID_A]:raw, ['store_'+ID_B]:F_B });
+    const t=await boot(F_SEED, { phone });
+    const db=await t.db();
+    ok(t.inMain() && !t.open() && t.w.getUserData().length===RECS_A.length && !realKeys(db).includes('store_'+ID_A), `19 ${nm}：搬完了，账号照常进，记录都在`);
+    ok(db['migrate_skipped_store_'+ID_A]===raw, `19 ${nm}：旧的原文原样另存了`);
+    ok(JSON.stringify(t.w.getUserData().map(r=>r.id))===JSON.stringify(RECS_A.map(r=>r.id)), `19 ${nm}：顺序不变`);
+  }
+}
+// ===== 20. 旧记录缺编号：补出来的编号固定，被杀后续搬对得上，不多出冲突备份（检查记录 P2）=====
+{
+  const s=JSON.parse(F_A); delete s.archives['默认存档'].records[1].id; s.archives['默认存档'].records[3].id='';
+  const phone=IDB.newPhone(); await seedIdb(phone, { ['store_'+ID_A]:JSON.stringify(s), ['store_'+ID_B]:F_B });
+  breakDel(k=>k==='store_'+ID_A);
+  const t=await boot(F_SEED, { phone });
+  restore();
+  const db1=await t.db();
+  ok(realKeys(db1).includes('store_'+ID_A) && !t.inMain(), '20 删旧的失败：先不让进');
+  // 库里还有真的 store_ 时 dumpDb 不合成，这里去掉它、直接用分块合成
+  const c1=Object.assign({}, db1); delete c1['store_'+ID_A];
+  const ids1=JSON.parse(IDB.withMerged(c1)['store_'+ID_A]).archives['默认存档'].records.map(r=>r.id);
+  const t2=await reboot(t);
+  const db2=await t2.db();
+  const ids2=merged(db2, ID_A).archives['默认存档'].records.map(r=>r.id);
+  ok(t2.inMain() && !realKeys(db2).includes('store_'+ID_A) && !realKeys(db2).some(k=>k.startsWith('migrate_conflict_')), '20 下次打开：只删旧的，不当成冲突');
+  ok(JSON.stringify(ids1)===JSON.stringify(ids2) && ids2[1] && ids2[3] && ids2[1]!==ids2[3] && new Set(ids2).size===ids2.length, '20 补出来的编号前后一样、不重复（'+ids2[1]+'、'+ids2[3]+'）');
+}
+// ===== 21. 分块好好的、旁边的旧整段账本坏了：留着分块，旧的另存成损坏备份 =====
+{
+  const t0=await boot(OLD_LS);
+  const before=(await t0.db())['store_'+ID_A];
+  await seedIdb(t0.phone, { ['store_'+ID_A]:'{坏了' });
+  const t=await reboot(t0);
+  const db=await t.db();
+  ok(t.inMain() && !t.open() && db['store_'+ID_A]===before && !realKeys(db).includes('store_'+ID_A), '21 账本照旧，没被坏的那份顶掉');
+  ok(realKeys(db).some(k=>k.startsWith('store_'+ID_A+'__corrupted_') && db[k]==='{坏了'), '21 坏的那份另存了');
+}
+
 // ===== 15. 装回 1013-F（设了 OLD_HTML 才跑）=====
 {
   const oldFile=process.env.OLD_HTML;
@@ -427,12 +562,14 @@ const F_SEED=Object.assign({}, BASE);
     ok(o.inMain() && o.list().includes('暂无记账记录') && !o.errs.length, '15 装回 1013-F：能进账号，看到的是空账本，不报错 '+o.errs.join('|'));
     const mid=await o.db();
     ok(realKeys(before).filter(k=>k.startsWith('led_')).every(k=>mid[k]===before[k]), '15 1013-F 不碰分块的数据');
-    // 在 1013-F 里记一笔，再装回新版：1013-F 那份算最新的，分块那份另存
+    // 在 1013-F 里记一笔，再装回新版：两边合并（1013-H 起），合并前的分块另存
     const d=o.w.getUserData(); d.push(R('f9','2026-10-11T12:00',7,'expense','餐饮','旧版里记的')); o.w.saveUserData(d); await o.idle();
     const t2=await boot(o.dump(), { phone:t.phone });
     const db=await t2.db();
     const ck=realKeys(db).find(k=>k.startsWith('migrate_conflict_store_'+ID_A+'_'));
-    ok(t2.inMain() && t2.list().includes('旧版里记的') && ck && db[ck]===before['store_'+ID_A], '15 再装回新版：看到 1013-F 里记的，原来的分块合成一整本另存着');
+    ok(ck && db[ck]===before['store_'+ID_A] && t2.msg().includes('合并进来'), '15 再装回新版：提示合并了，合并前的分块合成一整本另存着');
+    t2.$('askOk').click();
+    ok(t2.inMain() && t2.list().includes('旧版里记的') && t2.list().includes('十月午饭') && t2.list().includes('八月夜宵'), '15 历史和 1013-F 里记的都看得到');
   } else console.log('  （没设 OLD_HTML，跳过「装回 1013-F」）');
 }
 
