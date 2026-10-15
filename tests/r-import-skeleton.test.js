@@ -192,7 +192,7 @@ async function openEntry(t) {
   ok(outText(t).includes('主线程') && outText(t).includes('不支持后台线程'), '5 说明是在主线程算的、为什么');
   ok(outText(t).includes('文本：12 行') && outText(t).includes('字节：12 行'), '5 文本和字节都数出 12 行');
   ok(outText(t).includes('GBK 解码：正常（读出 2 笔支付宝账单，第一笔对方「青禾便利」）'), '5 自检里 GBK 解码正常：' + outText(t).split('\n').find(l => l.startsWith('GBK')));
-  const FALLBACK = 'import/import.js,import/core.js,import/merchants.js,import/vendor/tiny-inflate.js,import/parse.js';
+  const FALLBACK = 'import/import.js,import/core.js,import/merchants.js,import/vendor/tiny-inflate.js,import/parse.js,import/route.js';
   ok(importReqs(t).join(',') === FALLBACK, '5 加载了 import.js 和兜底要的四个文件：' + importReqs(t).join(','));
   ok(t.w.JiwenImport.state().mode === 'main', '5 state 是 main');
   t.$('devImportClose').click();

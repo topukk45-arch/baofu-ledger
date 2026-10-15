@@ -257,13 +257,34 @@ const csvOf = (app, opt) => B.bill(app, app === 'alipay' ? tAli : tWx, opt);
   const many = []; for (let i = 0; i < 50000; i++) many.push(B.txn({ time: T(1 + i % 28, i % 24, i % 60, i % 60), fen: 1 + i % 99999, cp: '虚构商户' + (i % 800), desc: i % 3 ? '虚构商品, 规格' + i : '', no: '2026090122001' + String(i).padStart(15, '0') }));
   const range = { from: '2026-09-01 00:00:00', to: '2026-09-30 23:59:59' };
   const cases = [['支付宝 CSV（GBK）', B.bill('alipay', many, { encoding: 'gbk', range })], ['微信 xlsx', B.bill('wechat', many, { format: 'xlsx', range })]];
+  // 以前比的是毫秒（< 3 秒），机器忙时会偶发不过；改成数解码、解压了多少字节：每个文件 / 每个用到的压缩包成员只处理一遍
+  const tinyPath = require.resolve(path.join(IMP, 'vendor', 'tiny-inflate.js'));
+  require(tinyPath);
+  const tinyOrig = require.cache[tinyPath].exports;
+  let inflated = 0, decoded = 0;
+  require.cache[tinyPath].exports = function (src, out) { const r = tinyOrig(src, out); inflated += r.length; return r; };
+  const decOrig = TextDecoder.prototype.decode;
+  TextDecoder.prototype.decode = function (b) { const r = decOrig.apply(this, arguments); decoded += b ? b.byteLength : 0; return r; };   // 解码失败（抛错）的不算
+  // 压缩包目录：各成员解压后的大小、名字长度
+  const zipDir = u8 => { const b = Buffer.from(u8); let e = b.length - 22; while (b.readUInt32LE(e) !== 0x06054b50) e--;
+    const n = b.readUInt16LE(e + 10); let off = b.readUInt32LE(e + 16); const out = [];
+    for (let i = 0; i < n; i++) { const nl = b.readUInt16LE(off + 28); out.push({ name: b.slice(off + 46, off + 46 + nl).toString(), usize: b.readUInt32LE(off + 24), nl });
+      off += 46 + nl + b.readUInt16LE(off + 30) + b.readUInt16LE(off + 32); } return out; };
   for (const [nm, b] of cases) {
-    let best = Infinity, f;
-    for (let i = 0; i < 2; i++) { const t0 = ms(); f = one(b.bytes); best = Math.min(best, ms() - t0); }
-    console.log(`    ${nm} 5 万行（${(b.bytes.length / 1048576).toFixed(1)}MB）解析 ${best}ms`);
+    inflated = 0; decoded = 0;
+    const t0 = ms(); const f = one(b.bytes); const el = ms() - t0;
+    console.log(`    ${nm} 5 万行（${(b.bytes.length / 1048576).toFixed(1)}MB）解析 ${el}ms（只打印不比）`);
     ok(!f.fatal && f.rows.length === 50000 && f.stats.countOk, `5 ${nm} 5 万行都读出来了`);
-    ok(best < 3000, `5 ${nm} 5 万行解析 ${best}ms（上限 3000ms）`);
+    if (f.format === 'csv') ok(decoded === b.bytes.length && inflated === 0, `5 ${nm}：整份只解码一遍（解码 ${decoded} 字节，文件 ${b.bytes.length} 字节）`);
+    else {
+      const dir = zipDir(b.bytes), used = dir.filter(e => e.name !== '[Content_Types].xml');
+      const want = used.reduce((s, e) => s + e.usize, 0), names = dir.reduce((s, e) => s + e.nl, 0);
+      ok(inflated === want, `5 ${nm}：用到的压缩包成员各解压一遍（解压 ${inflated} 字节，应为 ${want}）`);
+      ok(decoded === want + names, `5 ${nm}：解压出来的各解码一遍（解码 ${decoded} 字节，应为 ${want + names}，含成员名）`);
+    }
   }
+  require.cache[tinyPath].exports = tinyOrig;
+  TextDecoder.prototype.decode = decOrig;
 }
 
 // ===== 7. 两家的退款样本（tests/fixtures/refund-samples.js，用户给的真实结构、虚构内容）=====

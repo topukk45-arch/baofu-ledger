@@ -5,14 +5,20 @@ const fs = require('fs'), path = require('path');
 const html = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
 const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.test.js')).sort();
 let bad = 0, total = 0;
+const failed = [];   // 失败的条目：[文件, 那一条的名字]
 for (const f of files) {
   const r = spawnSync(process.execPath, [path.join(__dirname, f), html], { encoding: 'utf8' });
   const out = (r.stdout || '') + (r.stderr || '');
   const m = out.match(/(\d+) 通过，(\d+) 失败/);
   const pass = m ? +m[1] : 0, fail = m ? +m[2] : 1;
   total += pass;
-  if (r.status !== 0 || fail) { bad++; console.log(`✗ ${f}\n${out.trim()}\n`); }
+  if (r.status !== 0 || fail) {
+    bad++; console.log(`✗ ${f}\n${out.trim()}\n`);
+    const lines = out.split('\n').filter(l => /^\s*✗ /.test(l)).map(l => l.replace(/^\s*✗\s*/, ''));
+    if (lines.length) lines.forEach(l => failed.push([f, l])); else failed.push([f, '（没有失败条目，可能是中途出错退出了，见上面的输出）']);
+  }
   else console.log(`✓ ${f}  ${pass} 条`);
 }
 console.log(`\n${files.length} 组测试，共 ${total} 条通过${bad ? `，${bad} 组失败` : '，全部通过'}`);
+if (failed.length) { console.log('失败的条目：'); failed.forEach(([f, l]) => console.log(`  ${f}：${l.split('\n')[0]}`)); }
 process.exit(bad ? 1 : 0);

@@ -12,6 +12,7 @@
     - `core.js`：纯计算（解析、配对、分类都放这里或同样写法的兄弟文件）；
     - `merchants.js`：内置商户词表；
     - `parse.js`：解析账单（1015-C 起）：认来源、解码、切 CSV、读 xlsx、找表头、取值、合并、多文件去重、核笔数；
+    - `route.js`：定去向（1015-D 起）：状态、单号表去重、类型规则、退款配原单、不计入、合并分分捐和收款；单号表和账本由主页面先按 `lookups()` 查好、拼成 `known` 交进来；
     - `vendor/`：第三方库原样收录（外面包一层同样的写法），现在只有 `tiny-inflate.js`（解压，读 xlsx 用）；
     - `worker.js`：后台线程，载入上面两个文件干活；
     - `import.js`：主页面这一侧，起线程、收进度和结果、取消。
@@ -19,7 +20,7 @@
 - `www/import/` 的规矩：
   1. 纯计算文件（`core.js`、`merchants.js` 这类）只做计算：不碰页面、不碰存储、不发网络请求，输入是参数、输出是返回值。
   2. 纯计算文件开头用同一个写法（见 `core.js`），浏览器 / 后台线程里是全局变量，Node 里能直接 `require`，测试不用 jsdom。
-  3. 主页面和线程之间的消息：`{id, cmd, data}`，`data` 是文本、ArrayBuffer，或 `{ files:[{ name, data: ArrayBuffer }] }`（里面的 ArrayBuffer 都用 transfer 交过去，不复制）；线程回 `ready` / `progress` / `done` / `error`。取消就是停掉线程（terminate），下次重新起。
+  3. 主页面和线程之间的消息：`{id, cmd, data}`，`data` 是文本、ArrayBuffer、`{ files:[{ name, data: ArrayBuffer }] }`（里面的 ArrayBuffer 都用 transfer 交过去，不复制），或别的普通对象（如定去向的 `{ parsed, known, rules }`）；线程回 `ready` / `progress` / `done` / `error`。取消就是停掉线程（terminate），下次重新起。
   4. 只有「线程起不来」（没有 Worker、线程脚本没加载上）才在主线程算；线程里算出错要原样报错，不许换到主线程重算。
   5. 新加的文件放在 `www/` 下就会自动进 APK，不用改打包配置。
 - 导入的数据（1015-B 起，见 `index.html` 里「导入数据」一节）：

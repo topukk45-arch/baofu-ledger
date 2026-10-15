@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1015-C</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1015-D</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3346,16 +3346,19 @@
                 });
             });
             const sortedOf=t=>t.sorted || (t.sorted=[...t.map.keys()].sort());
+            // 只读的计数：上一次「按开头查」看了几个单号（二分的步数 + 往后数的条数），测试用它核对查询的代价，不比毫秒
+            const stats={ lastScan:0 };
             return {
-                size,
+                size, stats,
                 get(app, no){ const t=by.get(app); return (t && t.map.get(no)) || null; },
                 // 单号以 prefix 开头的条目（按单号排序），最多 limit 条
                 findPrefix(app, prefix, limit){
                     const t=by.get(app); if(!t || typeof prefix!=='string' || !prefix) return [];
                     const arr=sortedOf(t), max=limit>0 ? limit : 50, out=[];
-                    let lo=0, hi=arr.length;
-                    while(lo<hi){ const mid=(lo+hi)>>1; if(arr[mid]<prefix) lo=mid+1; else hi=mid; }
-                    for(let i=lo;i<arr.length && out.length<max && arr[i].startsWith(prefix);i++) out.push(t.map.get(arr[i]));
+                    let lo=0, hi=arr.length, steps=0;
+                    while(lo<hi){ steps++; const mid=(lo+hi)>>1; if(arr[mid]<prefix) lo=mid+1; else hi=mid; }
+                    for(let i=lo;i<arr.length && out.length<max && arr[i].startsWith(prefix);i++){ steps++; out.push(t.map.get(arr[i])); }
+                    stats.lastScan=steps;
                     return out;
                 }
             };

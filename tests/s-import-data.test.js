@@ -459,24 +459,31 @@ let backupText;
     const best = async (from, h) => { let b = Infinity; for (let i = 0; i < 3; i++) b = Math.min(b, (await runEnter(from, h)).ms); return b; };
     const tNew = await best(t), tOld = await best(t, oldHtml);
     console.log('    同一份数据进入账号（三次取最快）：新版 ' + tNew + 'ms，旧版 ' + tOld + 'ms');
-    ok(tNew < tOld * 1.3 + 50, '8 进入账号的耗时和旧版差不多（新 ' + tNew + 'ms，旧 ' + tOld + 'ms）');
+    // 只打印不比：进入账号没读单号表，上面已经按「读进来的字符数一样」核过了
   }
 
   // 按单号开头查：读全表建索引一次，查的耗时有上限
+  // 读单号表：数页面里 JSON.parse 处理了多少字符，应当正好是单号表的大小（每块只解析一次）
+  const J = t.w.JSON, op = J.parse; let parsed = 0;
+  J.parse = function (x) { if (typeof x === 'string') parsed += x.length; return op.apply(this, arguments); };
   t0 = ms();
   const T = await t.S().ordersRead();
   const tLoad = ms() - t0;
+  J.parse = op;
   ok(T.size === N, '8 读出 12 万条');
-  ok(tLoad < 3000, '8 读单号表、建索引 ' + tLoad + 'ms（上限 3000ms）');
+  ok(parsed === ordChars, '8 读单号表只把每块解析一遍：解析了 ' + parsed + ' 字符，单号表 ' + ordChars + ' 字符（耗时 ' + tLoad + 'ms，只打印不比）');
+  // 按开头查：数看了几个单号（二分 + 往后数），不比毫秒
   t0 = ms();
-  let hits = 0;
+  let hits = 0, maxScan = 0;
   for (let i = 0; i < 1000; i++) {
     const o = orders[(i * 997) % N];
     if (T.get(o.app, o.no) && T.findPrefix(o.app, o.no.slice(0, 14), 20).length) hits++;
+    maxScan = Math.max(maxScan, T.stats.lastScan);
   }
   const tQ = ms() - t0;
   ok(hits === 1000, '8 1000 次按单号查、按开头查都查到');
-  ok(tQ < 500, '8 1000 次查询共 ' + tQ + 'ms（上限 500ms，含第一次排序）');
+  const bound = Math.ceil(Math.log2(N)) + 20 + 1;
+  ok(maxScan <= bound, '8 按开头查最多看了 ' + maxScan + ' 个单号（上限 log₂N + 条数上限 + 1 = ' + bound + '；1000 次共 ' + tQ + 'ms，只打印不比）');
 
   // 导出备份再导回来：不超上限、能成功
   t0 = ms();

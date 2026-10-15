@@ -12,12 +12,12 @@
 //     { id, type:'done', result }
 //     { id, type:'error', name, message }          算的时候出错，原样报回去；主页面不会换到主线程重算
 //   取消：主页面直接 terminate() 这个线程，下次用时重新起一个。
-importScripts('core.js', 'merchants.js', 'vendor/tiny-inflate.js', 'parse.js');
+importScripts('core.js', 'merchants.js', 'vendor/tiny-inflate.js', 'parse.js', 'route.js');
 
 (function () {
   'use strict';
   var core = self.JiwenImportCore;
-  var ctx = { merchants: self.JiwenImportMerchants, parse: self.JiwenImportParse };
+  var ctx = { merchants: self.JiwenImportMerchants, parse: self.JiwenImportParse, route: self.JiwenImportRoute };
 
   self.onmessage = function (e) {
     var m = e.data || {};

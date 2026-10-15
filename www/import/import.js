@@ -65,12 +65,12 @@
   }
   function loadMain() {
     var need = [['JiwenImportCore', 'core.js'], ['JiwenImportMerchants', 'merchants.js'],
-                ['JiwenTinyInflate', 'vendor/tiny-inflate.js'], ['JiwenImportParse', 'parse.js']];
+                ['JiwenTinyInflate', 'vendor/tiny-inflate.js'], ['JiwenImportParse', 'parse.js'], ['JiwenImportRoute', 'route.js']];
     return need.reduce(function (p, x) {
       return p.then(function () { return window[x[0]] ? null : loadScript(x[1]); });
     }, Promise.resolve());
   }
-  function mainCtx() { return { merchants: window.JiwenImportMerchants, parse: window.JiwenImportParse }; }
+  function mainCtx() { return { merchants: window.JiwenImportMerchants, parse: window.JiwenImportParse, route: window.JiwenImportRoute }; }
   // 要交给线程的 ArrayBuffer：data 本身，或 data.files 里每个文件的字节（同一个只交一次）
   function transferOf(data) {
     if (tagOf(data) === '[object ArrayBuffer]') return [data];
