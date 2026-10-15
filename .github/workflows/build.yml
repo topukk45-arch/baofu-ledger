@@ -20,7 +20,19 @@ jobs:
         run: |
           cd tests
           npm ci --no-audit --no-fund
-          npm test
+          set -o pipefail
+          npm test 2>&1 | tee "$RUNNER_TEMP/test-output.txt"
+
+      # 测试没过：把失败的条目逐条标成注释，在 Actions 页面上直接看得到（不用翻日志）
+      - name: 标出失败的测试
+        if: failure()
+        run: |
+          sed -n '/^失败的条目：/,$p' "$RUNNER_TEMP/test-output.txt" | tail -n +2 | head -50 | while IFS= read -r line; do
+            echo "::error title=测试失败::${line}"
+          done
+          grep -E '^\s*✗ ' "$RUNNER_TEMP/test-output.txt" | head -50 | while IFS= read -r line; do
+            echo "::error title=失败详情::${line}"
+          done
 
       - name: 安装 JDK 21
         uses: actions/setup-java@v4

@@ -463,15 +463,17 @@ let backupText;
   }
 
   // 按单号开头查：读全表建索引一次，查的耗时有上限
-  // 读单号表：数页面里 JSON.parse 处理了多少字符，应当正好是单号表的大小（每块只解析一次）
-  const J = t.w.JSON, op = J.parse; let parsed = 0;
-  J.parse = function (x) { if (typeof x === 'string') parsed += x.length; return op.apply(this, arguments); };
+  // 读单号表：每块只解析一次。只数单号表那几块被解析了几次——页面里同时可能有别的事在解析别的 JSON（刷新、云同步的定时器），不算进来
+  const blockVals = new Map(impKeys(db).filter(k => k.includes('_o_')).map(k => [db[k], 0]));
+  const J = t.w.JSON, op = J.parse;
+  J.parse = function (x) { if (typeof x === 'string' && blockVals.has(x)) blockVals.set(x, blockVals.get(x) + 1); return op.apply(this, arguments); };
   t0 = ms();
   const T = await t.S().ordersRead();
   const tLoad = ms() - t0;
   J.parse = op;
   ok(T.size === N, '8 读出 12 万条');
-  ok(parsed === ordChars, '8 读单号表只把每块解析一遍：解析了 ' + parsed + ' 字符，单号表 ' + ordChars + ' 字符（耗时 ' + tLoad + 'ms，只打印不比）');
+  const times = [...blockVals.values()];
+  ok(times.length === 24 && times.every(n => n === 1), '8 读单号表每块正好解析一遍（' + times.length + ' 块，共 ' + ordChars + ' 字符；耗时 ' + tLoad + 'ms，只打印不比）：' + JSON.stringify(times));
   // 按开头查：数看了几个单号（二分 + 往后数），不比毫秒
   t0 = ms();
   let hits = 0, maxScan = 0;
