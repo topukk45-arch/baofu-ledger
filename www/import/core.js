@@ -1,0 +1,77 @@
+// 记问 · 账单导入 · 纯计算部分
+// 以后的解析、配对、分类都放在这个文件（或同样写法的兄弟文件）里。
+//
+// 【规矩】
+//   1. 只做计算：不碰页面（document / window）、不碰存储（localStorage / IndexedDB）、不发网络请求。
+//      输入是参数，输出是返回值；要报进度就调传进来的回调。
+//   2. 同一份文件三处都能用：
+//        浏览器主页面：<script src="import/core.js"> 后是全局变量 JiwenImportCore（只在后台线程起不来时才这么用）；
+//        后台线程：worker.js 里 importScripts('core.js')，同样是 JiwenImportCore；
+//        Node 测试：require('../www/import/core.js')，不需要 jsdom。
+//   3. 金额以后一律按「分」的整数算（见需求「导入稳定性」第 4 条）。
+//
+// 1015-A（第一期 ① 骨架）：只有一个占位函数 countLines，用来验证「主页面 → 后台线程 → 结果 / 进度」这条路是通的。
+(function (root, factory) {
+  var api = factory();
+  if (typeof module === 'object' && module && module.exports) module.exports = api;
+  else root.JiwenImportCore = api;
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  var VERSION = '1015-A';
+  // 每处理这么多个字符 / 字节报一次进度
+  var STEP = 1 << 16;
+
+  // 不用 instanceof：页面、线程、Node 测试里的 ArrayBuffer 可能来自不同的全局环境
+  function tagOf(x) { return Object.prototype.toString.call(x); }
+  function isBytes(x) { return tagOf(x) === '[object ArrayBuffer]' || tagOf(x) === '[object Uint8Array]'; }
+
+  // 数一数有多少行（占位）。
+  //   data：文本，或字节（ArrayBuffer / Uint8Array，不解码，直接数换行字节 0x0A——UTF-8 和 GBK 里换行都是这个字节）
+  //   onProgress(done, total)：可不传；最后一次一定是 done === total
+  //   行的算法：「\n」和「\r\n」都算一个换行；最后一行没有换行也算一行；空内容 0 行。
+  function countLines(data, onProgress) {
+    var total, lines = 0, last, i, end;
+    var report = typeof onProgress === 'function' ? onProgress : null;
+    if (typeof data === 'string') {
+      total = data.length;
+      for (i = 0; i < total; i = end) {
+        end = Math.min(total, i + STEP);
+        for (var j = i; j < end; j++) if (data.charCodeAt(j) === 10) lines++;
+        if (report) report(end, total);
+      }
+      last = total ? data.charCodeAt(total - 1) : 10;
+    } else if (isBytes(data)) {
+      var u8 = tagOf(data) === '[object Uint8Array]' ? data : new Uint8Array(data);
+      total = u8.length;
+      for (i = 0; i < total; i = end) {
+        end = Math.min(total, i + STEP);
+        for (var k = i; k < end; k++) if (u8[k] === 10) lines++;
+        if (report) report(end, total);
+      }
+      last = total ? u8[total - 1] : 10;
+    } else {
+      throw new TypeError('countLines 只收文本或字节（ArrayBuffer），收到的是 ' + (data === null ? 'null' : typeof data));
+    }
+    if (total === 0) { if (report) report(0, 0); return { lines: 0, size: 0 }; }
+    if (last !== 10) lines++;
+    return { lines: lines, size: total };
+  }
+
+  // 后台线程和主线程兜底都走这个入口：按命令名分派。
+  //   ctx：线程里能拿到的附加数据（比如内置词表），纯计算函数需要什么就从这里取
+  var COMMANDS = {
+    countLines: function (data, onProgress) { return countLines(data, onProgress); },
+    info: function (data, onProgress, ctx) {
+      var m = ctx && ctx.merchants;
+      return { core: VERSION, merchants: m && m.items ? m.items.length : 0 };
+    }
+  };
+
+  function run(cmd, data, onProgress, ctx) {
+    if (!Object.prototype.hasOwnProperty.call(COMMANDS, cmd)) throw new Error('不认识的命令：' + cmd);
+    return COMMANDS[cmd](data, onProgress, ctx);
+  }
+
+  return { VERSION: VERSION, countLines: countLines, run: run, commands: Object.keys(COMMANDS) };
+});

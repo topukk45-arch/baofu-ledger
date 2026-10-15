@@ -2,6 +2,8 @@
 
 用 [jsdom](https://github.com/jsdom/jsdom) 在 Node 里加载完整的 `www/index.html`，像真人一样点按钮、填表单，再检查页面和存档数据。不需要浏览器，也不需要手机。
 
+1015-A 起账单导入的代码单独放在 `www/import/` 下：纯计算部分（`core.js`、`merchants.js`）直接在 Node 里 `require` 进来测，不用 jsdom；要加载整个页面时，jsdom 用 `helpers/import-files.js` 里的资源读取器把外部脚本读进来。
+
 1013-D 起账本存在 IndexedDB，1013-G 起按月分块存。jsdom 没有 IndexedDB，测试用 [fake-indexeddb](https://github.com/dumbmatter/fakeIndexedDB)（纯 JS 实现，只在测试里用，不进 App）。
 
 **所有测试数据都是虚构的**，不含任何真实账单。
@@ -39,6 +41,7 @@ GitHub Actions 每次打包前都会先跑 `npm test`，不通过就不出包。
 | `o-name-input.test.js` | 名字输入：撞上「已移走」账号名字时提示可以找回；账号、存档、分类、日子名称的输入框按实际字数限长，8 个 emoji 也能打进去 |
 | `p-idb-storage.test.js` | 账本搬到 IndexedDB：缓存给副本、先改内存再写库、切后台强制写、写到一半被杀、写失败提示与重试、新建账号 / 导入要确认写进去、搬家（中途失败续搬、读回对不上、旧的删不掉、两边内容不一样）、库里账本坏了、打不开库、1.7 万条进入账号的耗时；第 14 组：12 万条（一年导入量，带 src / 交易对方编号）进入账号、记一笔、翻页、切到统计页。断言数的是每个操作处理了多少字符的 JSON（和机器快慢无关）：进入账号约 1 本、记一笔约 0.03 本、翻页和切统计页 0（1013-F 分别是 5、3、1、3 本）；另外记一笔连写库要比整本解析一次还快。设 `OLD_HTML` 时同一份数据再用老版本跑一遍，直接比 |
 | `q-ledger-blocks.test.js` | 1013-G 账本按月分块：搬成分块（记录顺序、没写时间的单独一块、合起来逐字节一样）、改时间跨月、批量跨月与撤销（同一个事务，写到一半死掉两边都不变）、存档改名只写 meta / 删存档连块一起删、没时间的记录补上时间、改分类名只写用到的月份、账号改名只写 meta、坏了一块只影响那一块、meta 坏了用月份块重建、从 1013-F 搬（中途被杀续搬、读回对不上、旧的删不掉、两边不一样、旧的本身就坏了）、往别的账号导入整批一个事务、内存只留当前账号、记录不能直接改、插到中间的顺序、账号列表坏了从 meta 找回、装回 1013-F（设 `OLD_HTML` 才跑）；1013-H：坏了一个月开几次 App 都不拿缺月的账本覆盖云备份（一认出来就暂停受影响存档的同步、只有「重新选择备份文件」能解除）、进账号提示哪个存档哪个月读不出来（同一处只说一次）、坏块留在库里直到真改到那个月或用户认可现状、整本坏了也一直停同步、旧账本里有不是对象的记录 / 存档（丢掉、原文另存、照常进账号）、缺编号的记录补固定编号（被杀后续搬对得上）、装回旧版后两边按编号合并并提示、分块好旧整本坏时留着分块 |
+| `r-import-skeleton.test.js` | 1015-A 导入骨架。Node 部分（不用 jsdom）：`core.js` 数行数（文本、字节、`\r\n`、空内容、进度只增不减且最后一次等于总数、收到不认识的东西报错）、词表格式、纯计算文件不碰页面和存储；用假 Worker 跑真的 `worker.js`：先说「准备好」、ArrayBuffer 交过去后发送方变空、算错原样报 error、脚本没加载上时报错不说准备好。jsdom 部分：启动不请求 `import/` 下任何文件；设置页底部版本号连点 5 次开关入口（4 次不算、点慢了不算、重开还在、不进备份 / 云备份 / 账本库）；没有 Worker 时在主线程算（兜底①）；有 Worker 时在线程算、消息只有 `id/cmd/data`、主页面不加载 `core.js`；线程里算出错原样报错、不换到主线程重算、线程照旧可用；取消后线程被停掉、进行中的任务以「已取消」结束、再用时重新起线程正常；线程脚本没加载上时换到主线程（兜底②）；`import.js` 本身没加载上时提示失败、不影响记账 |
 
 ## 逐字节回归
 
@@ -70,6 +73,17 @@ OLD_HTML=/tmp/old.html node q-ledger-blocks.test.js
 
 - 纯重构（不该改变行为）：应当「全部一致」；
 - 有意的改动：只允许预期的那几项不一致。
+
+## 导入代码怎么测（1015-A 起）
+
+- 纯计算（`www/import/core.js` 这类）：`const core=require('../www/import/core.js')`，直接调函数断言，不用 jsdom，也不用 `boot`。以后的解析、配对、分类、性质测试都这样写，快。
+- 后台线程：`helpers/import-files.js` 的 `makeFakeWorker(www目录, opts)` 给一个假的 Worker 类，在 Node 的 vm 里跑真的 `worker.js`。
+  消息用 `structuredClone` 传，transfer 的 ArrayBuffer 真会被交走；`opts.failLoad(文件名)` 模拟线程脚本没加载上；`FakeWorker.created` 是起过的所有线程。
+  在页面里用：`beforeParse` 里 `w.Worker=makeFakeWorker(...)`；不装就是「这台手机没有 Worker」，走主线程兜底。
+- 加载整个页面又要用到 `import/` 下的脚本：JSDOM 选项加 `resources:{ interceptors:[ interceptor(www目录, 请求记录, { missing }) ] }`，
+  `https://localhost/<路径>` 会映射到 `www/<路径>`（和安卓上一样）；请求记录用来断言「启动时没去加载」，`missing` 模拟某个文件缺了。
+- jsdom 加载外部脚本要真的读文件，等结果时按时间等（见 `r-import-skeleton.test.js` 的 `until`），别只让几拍。
+- 逐字节回归（`regress.js`）只比 `index.html` 启动后的输出，`import/` 下的文件不在里面。
 
 ## 写新测试的约定
 

@@ -6,14 +6,29 @@
 - 只改文档、测试、不需要出包时，标题末尾加 `[skip ci]`，避免白跑打包。
 
 ## 项目结构
-- App 全部代码在 `www/index.html`（单文件，Capacitor 打包成安卓 APK）。
-- 版本号写在登录页标题下方：`build 1010-K4` 这种格式，每发一版都要改。
+- App 的代码都在 `www/` 下，Capacitor 把整个 `www/` 打包成安卓 APK（以 `www/` 为准；仓库根目录那个 `index.html` 是老拷贝，不参与打包，别改它）。
+  - `www/index.html`：主程序（记账、统计、设置、存储），启动时只加载这一个文件。
+  - `www/import/`：账单导入（1015-A 起），**启动时一个都不加载**，打开导入时 `index.html` 的 `loadImportModule()` 才插入 `import/import.js`：
+    - `core.js`：纯计算（解析、配对、分类都放这里或同样写法的兄弟文件）；
+    - `merchants.js`：内置商户词表；
+    - `worker.js`：后台线程，载入上面两个文件干活；
+    - `import.js`：主页面这一侧，起线程、收进度和结果、取消。
+  - 安卓上页面地址是 `https://localhost/index.html`，`import/` 就在 `https://localhost/import/`，一律写相对路径，不用 file://、blob。
+- `www/import/` 的规矩：
+  1. 纯计算文件（`core.js`、`merchants.js` 这类）只做计算：不碰页面、不碰存储、不发网络请求，输入是参数、输出是返回值。
+  2. 纯计算文件开头用同一个写法（见 `core.js`），浏览器 / 后台线程里是全局变量，Node 里能直接 `require`，测试不用 jsdom。
+  3. 主页面和线程之间的消息：`{id, cmd, data}`，`data` 是文本或 ArrayBuffer（用 transfer 交过去，不复制）；线程回 `ready` / `progress` / `done` / `error`。取消就是停掉线程（terminate），下次重新起。
+  4. 只有「线程起不来」（没有 Worker、线程脚本没加载上）才在主线程算；线程里算出错要原样报错，不许换到主线程重算。
+  5. 新加的文件放在 `www/` 下就会自动进 APK，不用改打包配置。
+- 版本号写在登录页标题下方：`build 1010-K4` 这种格式，每发一版都要改（设置页底部的版本号是从登录页那行抄过去的，不用另改）。
+- 开发中的功能藏在开发开关后面：设置页底部版本号 2 秒内连点 5 次，开关「导入（开发中）」，只存在这台手机上（`localStorage` 的 `app_dev_import`），不进账本、备份、云备份。
 - 推送到 main 会自动打包（`.github/workflows/build.yml`），APK 在 Actions 页面下载。
 
 ## 改代码的流程
 1. 改之前先跑一遍测试：`cd tests && npm install && npm test`，确认起点是绿的。
 2. 小步改，一个版本只做一件事。
 3. 改完再跑 `npm test`；纯重构时再用 `node tests/regress.js 旧版.html www/index.html` 做逐字节对比，应当全部一致。
+   逐字节对比只管 `index.html` 启动后的输出（账单列表、分类汇总、筛选、统计、当日明细、AI 导出、备份文件、云备份）；`www/import/` 下的文件启动时不加载，不在对比范围里，靠 `tests/r-*` 这类 Node 测试兜住。等导入能真的写进账本了，再把「导入以后的账本」加进对比。
 4. 新功能要补测试（见 `tests/README.md`）。
 5. 全部通过才推送。打包流程里也会先跑测试，不通过不出包。
 
