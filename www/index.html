@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1015-B</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1015-C</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -5305,6 +5305,8 @@ ${detail}
                     + '\n算的地方：' + (r.mode==='worker' ? '后台线程' : '主线程（' + (st.fallbackReason||'后台线程起不来') + '）')
                     + '\n文本：' + r.textLines + ' 行（应为 ' + r.expect + '）'
                     + '\n字节：' + r.byteLines + ' 行，' + r.bytes + ' 字节' + (r.bufferAfter===0 ? '，直接交给线程没复制' : '')
+                    + '\nGBK 解码：' + (r.gbkOk ? '正常（读出 ' + r.gbk.rows + ' 笔支付宝账单，第一笔对方「' + r.gbk.cp + '」）'
+                        : '不对（' + (r.gbk ? (r.gbk.fatal || ('编码 ' + r.gbk.encoding + '，' + r.gbk.rows + ' 笔')) : '没跑') + '）')
                     + '\n内置词表：' + r.merchants + ' 条 · 计算部分 ' + r.core
                     + '\n用时：' + r.ms + ' 毫秒';
             }).catch(e=>{

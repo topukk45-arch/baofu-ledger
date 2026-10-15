@@ -2,7 +2,8 @@
 // index.html 只在打开导入时才插入这个脚本（loadImportModule），平时启动不加载 import/ 下的任何文件。
 // 载入后是全局变量 JiwenImport：
 //   JiwenImport.run(cmd, data, { onProgress }) → Promise<{ result, mode }>
-//       data：文本，或 ArrayBuffer（用 transfer 交给后台线程，不复制；交出去以后调用方手里的那个就空了）
+//       data：文本，或 ArrayBuffer（用 transfer 交给后台线程，不复制；交出去以后调用方手里的那个就空了），
+//             或 { files: [{ name, data: ArrayBuffer }] }（解析账单，里面的 ArrayBuffer 也都交出去）
 //       mode：'worker'（后台线程算的）或 'main'（线程起不来，在主线程算的）
 //   JiwenImport.cancel()     退出导入页时调：停掉线程，进行中的任务都以「已取消」失败；下次 run 重新起线程
 //   JiwenImport.state()      { mode, starts, fallbackReason, busy }（自检和测试用）
@@ -63,8 +64,21 @@
     });
   }
   function loadMain() {
-    var p = window.JiwenImportCore ? Promise.resolve() : loadScript('core.js');
-    return p.then(function () { return window.JiwenImportMerchants ? null : loadScript('merchants.js'); });
+    var need = [['JiwenImportCore', 'core.js'], ['JiwenImportMerchants', 'merchants.js'],
+                ['JiwenTinyInflate', 'vendor/tiny-inflate.js'], ['JiwenImportParse', 'parse.js']];
+    return need.reduce(function (p, x) {
+      return p.then(function () { return window[x[0]] ? null : loadScript(x[1]); });
+    }, Promise.resolve());
+  }
+  function mainCtx() { return { merchants: window.JiwenImportMerchants, parse: window.JiwenImportParse }; }
+  // 要交给线程的 ArrayBuffer：data 本身，或 data.files 里每个文件的字节（同一个只交一次）
+  function transferOf(data) {
+    if (tagOf(data) === '[object ArrayBuffer]') return [data];
+    var out = [];
+    if (data && Array.isArray(data.files)) data.files.forEach(function (f) {
+      if (f && tagOf(f.data) === '[object ArrayBuffer]' && out.indexOf(f.data) < 0) out.push(f.data);
+    });
+    return out;
   }
 
   function ensure() {
@@ -136,7 +150,7 @@
         return new Promise(function (resolve, reject) {
           var id = ++seq;
           pending[id] = { resolve: resolve, reject: reject, onProgress: onProgress };
-          var transfer = tagOf(data) === '[object ArrayBuffer]' ? [data] : [];
+          var transfer = transferOf(data);
           try { worker.postMessage({ id: id, cmd: cmd, data: data }, transfer); }
           catch (err) { delete pending[id]; reject(err); }
         });
@@ -146,7 +160,7 @@
         setTimeout(function () {
           if (gen !== generation) { reject(cancelled()); return; }
           try {
-            var r = window.JiwenImportCore.run(cmd, data, onProgress, { merchants: window.JiwenImportMerchants });
+            var r = window.JiwenImportCore.run(cmd, data, onProgress, mainCtx());
             resolve({ result: r, mode: 'main' });
           } catch (err) { reject(err); }
         }, 0);
@@ -175,7 +189,12 @@
     return u;
   }
 
-  // 通路自检：一段虚构的账单样子的文本，文本数一遍、转成字节再数一遍，两次都要对
+  // GBK 解码自检用：一份两笔的虚构支付宝账单，GBK 编码（测试里用 tests/helpers/bills.js 生成的）
+  var GBK_SAMPLE = 'LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tDQq1vLP20MXPoqO6DQrQ1cP7o7qy4srU08O7pw0K1qe4trGm1cu7p6O6dGVzdCoqKkBleGFtcGxlLmNvbQ0KxvDKvMqxvOSjulsyMDI2LTAxLTA1IDAwOjAwOjAwXSAgICDW1da5yrG85KO6WzIwMjYtMDEtMDYgMjM6NTk6NTldDQq1vLP2vbvS18Dg0M2julvIq7K/XQ0Ktbyz9sqxvOSjulsyMDI2LTEwLTAxIDEwOjAwOjAwXQ0KubIyscq8x8K8DQrK1cjro7owscogMC4wMNSqDQrWp7P2o7oyscogMjQuNTDUqg0Ksru8xsrV1qejujCxyiAwLjAw1KoNCg0KzNix8Mzhyr6jug0KMS6xvrvYtaXE2sjdv8mx7cP31qe4trGmytzA7cHLz+C52NanuLbJ6sfro6jQ6bm5y7XD96OpDQoyLrG+u9i1pbK71/fOqsrVv+63vbeiu/XSwL7do6jQ6bm5y7XD96OpDQozLtDpubnLtcP3yP0NCjQu0Om5ucu1w/fLxA0KNS7Q6bm5y7XD987lDQo2LtDpubnLtcP3wfkNCjcu0Om5ucu1w/fG3w0KOC7Q6bm5y7XD97DLDQotLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS3Wp7i2saajqNbQufqjqc34wue8vMr109DP3rmry74gILXn19O/zbunu9i1pS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLQ0KvbvS18qxvOQsvbvS17fWwOAsvbvS17bUt70sttS3vdXLusUsyczGt8u1w/csytUv1qcsvfC27izK1S+4tr/ut73KvSy9u9LX17TMrCy9u9LXtqm1pbrFLMnMvNK2qbWlusUssbjXoiwNCjIwMjYtMDEtMDUgMDg6MTA6MDAsss3S+8PAyrMsx+C6zLHjwPsscWgqKipAZXhhbXBsZS5jb20s1OeyzSzWp7P2LDYuNTAs0+C27iy9u9LXs8m5piwiMjAyNjAxMDUyMjAwMTQwMDAwMDAwMDAwMDAwMQkiLCIJIiwiCSIsDQoyMDI2LTAxLTA2IDA5OjAwOjAwLLLN0vvDwMqzLNTGyby/p7fILHFoKioqQGV4YW1wbGUuY29tLMTDzPos1qez9iwxOC4wMCzEs9L40NC0otDuv6gsvbvS17PJuaYsIjIwMjYwMTA2MjIwMDE0MDAwMDAwMDAwMDAwMDIJIiwiCSIsIgkiLA0K';
+  function b64bytes(s) { var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+
+  // 通路自检：一段虚构的账单样子的文本，文本数一遍、转成字节再数一遍，两次都要对；
+  //   1015-C：再解析一份 GBK 编码的虚构账单（确认手机的浏览器内核能解 GBK、解析能在线程里跑）
   function selfTest() {
     var rows = ['交易时间,交易对方,收/支,金额'];
     var names = ['青禾便利', '云杉咖啡', '橘子超市', '小满公交'];
@@ -199,8 +218,13 @@
     }).then(function (r) {
       out.byteLines = r.result.lines;
       out.byteMode = r.mode;
+      return run('parse', { files: [{ name: '自检.csv', data: b64bytes(GBK_SAMPLE).buffer }] });
+    }).then(function (r) {
+      var f = r.result.files[0];
+      out.gbk = { encoding: f.encoding, app: f.app, rows: f.rows.length, cp: f.rows[0] && f.rows[0].cp, countOk: f.stats && f.stats.countOk, fatal: f.fatal && f.fatal.msg };
+      out.gbkOk = !f.fatal && f.encoding === 'gb18030' && f.app === 'alipay' && f.rows.length === 2 && f.rows[0].cp === '青禾便利' && f.stats.countOk === true;
       out.ms = Date.now() - t0;
-      out.ok = out.textLines === expect && out.byteLines === expect;
+      out.ok = out.textLines === expect && out.byteLines === expect && out.gbkOk;
       return out;
     });
   }

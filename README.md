@@ -59,3 +59,4 @@ This project is licensed under the [PolyForm Noncommercial License 1.0.0](LICENS
 
 - 底栏文字字体：[霞鹜文楷 LXGW WenKai](https://github.com/lxgw/LxgwWenKai)（SIL OFL 1.1）
 - 图标：[Lucide](https://lucide.dev)（ISC）、[Tabler Icons](https://tabler.io/icons)（MIT）
+- 读 xlsx 账单的解压：[tiny-inflate](https://github.com/foliojs/tiny-inflate)（MIT，Devon Govett），原样收录在 `www/import/vendor/tiny-inflate.js`

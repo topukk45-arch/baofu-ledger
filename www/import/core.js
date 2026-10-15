@@ -11,6 +11,7 @@
 //   3. 金额以后一律按「分」的整数算（见需求「导入稳定性」第 4 条）。
 //
 // 1015-A（第一期 ① 骨架）：只有一个占位函数 countLines，用来验证「主页面 → 后台线程 → 结果 / 进度」这条路是通的。
+// 1015-C（第一期 ③ 解析）：解析在兄弟文件 parse.js 里，这里只分派命令 parse（ctx.parse 由线程 / 主线程兜底传进来）。
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module && module.exports) module.exports = api;
@@ -18,7 +19,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1015-A';
+  var VERSION = '1015-C';
   // 每处理这么多个字符 / 字节报一次进度
   var STEP = 1 << 16;
 
@@ -64,7 +65,12 @@
     countLines: function (data, onProgress) { return countLines(data, onProgress); },
     info: function (data, onProgress, ctx) {
       var m = ctx && ctx.merchants;
-      return { core: VERSION, merchants: m && m.items ? m.items.length : 0 };
+      return { core: VERSION, merchants: m && m.items ? m.items.length : 0, parse: ctx && ctx.parse ? ctx.parse.VERSION : null };
+    },
+    // 解析账单：data = { files: [{ name, data: ArrayBuffer }] }，见 parse.js
+    parse: function (data, onProgress, ctx) {
+      if (!ctx || !ctx.parse) throw new Error('解析模块没有载入');
+      return ctx.parse.parseFiles(data && data.files, onProgress);
     }
   };
 
