@@ -266,6 +266,36 @@ const csvOf = (app, opt) => B.bill(app, app === 'alipay' ? tAli : tWx, opt);
   }
 }
 
+// ===== 7. 两家的退款样本（tests/fixtures/refund-samples.js，用户给的真实结构、虚构内容）=====
+{
+  const R = require('./fixtures/refund-samples');
+  const ali = [['CSV', { noPad: true, range: R.range }], ['CSV GBK', { noPad: true, range: R.range, encoding: 'gbk' }],
+               ['Excel 改过的时间', { noPad: true, range: R.range, timeFmt: R.excelTime }]];
+  for (const [nm, opt] of ali) {
+    const f = one(B.bill('alipay', R.alipay, opt).bytes);
+    ok(!f.fatal && f.rows.length === 2 && f.errors.length === 0 && f.stats.countOk, '7 支付宝退款样本（' + nm + '）：两行都读出来，笔数对得上');
+    const [o, r] = f.rows;
+    ok(o.io === 'expense' && o.fen === 39600 && o.status === '交易成功' && o.no === '2026092922001400000000000001' && o.noRest === '', '7 支付宝（' + nm + '）：原单支出 396.00');
+    ok(r.io === 'neutral' && r.fen === 39600 && r.status === '退款成功' && r.kind === '交通出行' && r.desc === '退款-火车票', '7 支付宝（' + nm + '）：退款行是不计收支、分类照旧是「交通出行」');
+    ok(r.no === o.no && r.noRest === '_M20261004000000000001' && r.remark === '', '7 支付宝（' + nm + '）：退款单号开头就是原单号，后缀留在单号里（按开头能配原单、去重时和原单不撞）');
+    ok(r.pm === '示例银行信用卡(1234)' && !/\t/.test(r.no + r.noRest + o.no), '7 支付宝（' + nm + '）：单号末尾的制表符去掉了');
+    if (nm === 'Excel 改过的时间') ok(r.time === '2026-10-04T15:52' && r.sec === null && o.time === '2026-09-29T10:15', '7 支付宝 Excel 写法 2026/10/4 15:52（月日不补零、没秒）读对');
+    else ok(r.time === '2026-10-04T15:52' && r.sec === 7, '7 支付宝（' + nm + '）：退款时间');
+    ok(R.pairs.alipay[r.no + r.noRest] === o.no, '7 支付宝（' + nm + '）：读出的单号和第 ④ 版的预期配对对得上');
+  }
+  for (const fmt of ['csv', 'xlsx']) {
+    const f = one(B.bill('wechat', R.wechat, { range: R.range, format: fmt }).bytes);
+    ok(!f.fatal && f.rows.length === 4 && f.errors.length === 0 && f.stats.countOk, '7 微信退款样本（' + fmt + '）：四行都读出来，笔数对得上');
+    const [o1, r1, o2, r2] = f.rows;
+    ok(r1.io === 'income' && r1.fen === 90 && r1.status === '已退款¥0.90' && r1.kind === '美团-退款' && r1.remark === '', '7 微信（' + fmt + '）：美团退款收入 0.90，状态带金额原样');
+    ok(o1.status === '已退款¥0.90' && o1.fen === 2350, '7 微信（' + fmt + '）：原单的状态也是「已退款¥0.90」');
+    ok(r2.kind === '某某自助烤肉（示例万象天地店）-退款' && r2.cp === '某某自助烤肉（示例万象天地店）' && r2.status === '已全额退款' && r2.fen === 5000, '7 微信（' + fmt + '）：交易类型带商户全名、对方名全角括号原样');
+    ok(r1.no === '50300000002026092900000000001' && r1.noRest === '' && r2.no === '50100000002026092800000000002', '7 微信（' + fmt + '）：退款单号读出来是它自己的（和原单无关）');
+    ok(r2.time > o2.time && r1.time > o1.time, '7 微信（' + fmt + '）：退款时间在原单之后');
+    ok(Object.keys(R.pairs.wechat).every(k => f.rows.some(x => x.no === k) && f.rows.some(x => x.no === R.pairs.wechat[k])), '7 微信（' + fmt + '）：第 ④ 版预期配对里的单号都读得到');
+  }
+}
+
 // ===== 6. 在后台线程里跑（假 Worker 跑真的 worker.js）=====
 {
   const FW = makeFakeWorker(path.dirname(htmlFile));

@@ -57,7 +57,7 @@ function cells(app, t, opts) {
     交易时间: opts.timeFmt ? opts.timeFmt(t.time) : fmtTime(t.time), 交易分类: t.kind, 交易类型: t.kind, 交易对方: t.cp, 对方账号: t.acct,
     商品说明: t.desc, 商品: t.desc || '/', '收/支': (app === 'alipay' ? IO_ALI : IO_WX)[t.io], 金额: yuan(t.fen), '金额(元)': (opts.yen === false ? '' : '¥') + yuan(t.fen),
     '收/付款方式': t.pm, 支付方式: t.pm || '/', 交易状态: t.status, 当前状态: t.status,
-    交易订单号: t.no, 交易单号: t.no, 商家订单号: t.mno, 商户单号: t.mno || '/', 备注: t.remark || (app === 'wechat' ? '/' : ''),
+    交易订单号: t.no, 交易单号: t.no, 商家订单号: t.mno, 商户单号: t.mno, 备注: t.remark || (app === 'wechat' ? '/' : ''),   // 微信退款行的商户单号是空的（不是「/」）
   };
   return v;
 }
