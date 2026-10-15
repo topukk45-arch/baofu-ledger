@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1015-A</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1015-B</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2562,9 +2562,11 @@
 
         // 导入相关的共用上限常量（预校验与清洗逻辑共用同一个值，避免两处魔数不一致）：
         //   MAX_IMPORT_RECORDS —— 单次导入记录条数上限
-        //   IMPORT_MAX_BYTES   —— 导入文件体积上限（约 8MB 文本，避免超大文件 JSON.parse 卡死 UI）
+        //   IMPORT_MAX_BYTES   —— 导入文件体积上限（避免超大文件 JSON.parse 卡死 UI）。
+        //                         【1015-B】8MB → 24MB：备份里多了导入的单号表（12 万单号约 4.3MB），
+        //                         12 万单号 + 2 万条记录约 11MB，留一倍余量
         const MAX_IMPORT_RECORDS = 50000;
-        const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
+        const IMPORT_MAX_BYTES = 24 * 1024 * 1024;
 
         // 数据层统一支持「显式指定用户」：传入 user 则操作该用户的数据，省略则默认当前登录用户。
         // 这样导入到其它账号时无需临时改写全局 currentUser（旧做法在异步/重入下会写错账号）。
@@ -2750,9 +2752,12 @@
             return { id, has:false, meta:null, names:new Map(), archs:new Map(), keys:new Set(),
                      dirty:new Map(), metaGen:0, gen:0, pend:new Map(), pendMeta:false,
                      touched:new Set(), busy:null, ver:0, broken:false,
-                     damage:[], badBlocks:new Set(), badAids:new Set() };
+                     damage:[], badBlocks:new Set(), badAids:new Set(),
+                     extra:new Map() };
         }
-        function ledgerDirty(e){ return e.dirty.size>0 || e.metaGen>0; }
+        //   extra   【1015-B】账本以外、要和账本放进同一个事务写的键（导入的单号表、待处理池、导入记录）：
+        //           键 → { v: 值（null 表示删）, g: 第几次修改 }。见「导入数据」一节
+        function ledgerDirty(e){ return e.dirty.size>0 || e.metaGen>0 || e.extra.size>0; }
         function validMeta(m){
             if(!m || typeof m!=='object' || Array.isArray(m) || !m.archives || typeof m.archives!=='object' || Array.isArray(m.archives)) return false;
             const seen=new Set();
@@ -3013,6 +3018,7 @@
                 if(used.has(aid)) return;
                 e.archs.get(aid).recs.forEach(r=>dirty.add(ledBlockKey(e.id, aid, recMonth(r))));
                 e.archs.delete(aid);
+                impQueueDropArchive(e, aid);     // 【1015-B】单号表、待处理池、导入记录跟着删，和月份块同一个事务
             });
             e.keys.forEach(k=>{ const p=ledParseKey(e.id, k); if(p && !p.meta && !used.has(p.aid) && aidName.has(p.aid)) dirty.add(k); });
             // meta：顶层键的顺序照调用方的（archives 在哪个位置就在哪个位置）
@@ -3054,7 +3060,10 @@
             });
             const metaGen=e.metaGen;
             if(metaGen) ops.push(['put', ledMetaKey(e.id), e.meta]);
-            return { ops, done, metaGen };
+            // 【1015-B】账本以外的键（导入数据）：和账本放进同一批，一起成、一起不算
+            const xops=[], xdone=[];
+            e.extra.forEach((x, k)=>{ xops.push(x.v===null ? ['del', k] : ['put', k, x.v]); xdone.push([k, x.g]); });
+            return { ops, done, metaGen, xops, xdone };
         }
         function ledgerCommit(e, job){
             job.ops.forEach(o=>{
@@ -3064,10 +3073,11 @@
             });
             job.done.forEach(([k,g])=>{ if(e.dirty.get(k)===g) e.dirty.delete(k); });
             if(job.metaGen && e.metaGen===job.metaGen) e.metaGen=0;
+            (job.xdone || []).forEach(([k,g])=>{ const x=e.extra.get(k); if(x && x.g===g) e.extra.delete(k); });
         }
         function ledgerSnap(e){
             return { has:e.has, meta:e.meta, names:new Map(e.names), archs:new Map(e.archs), dirty:new Map(e.dirty),
-                     metaGen:e.metaGen, pend:new Map(e.pend), pendMeta:e.pendMeta };
+                     metaGen:e.metaGen, pend:new Map(e.pend), pendMeta:e.pendMeta, extra:new Map(e.extra) };
         }
         // 退回写之前的样子。查找表（idx）是新旧状态共用、就地改的，按记录和序号重建
         function ledgerRestore(e, s){
@@ -3094,6 +3104,7 @@
                     const e=ledgerBuild(id, rows);
                     __ledger.set(key, e);
                     ledgerReportDamage(e);
+                    impQueueOrphans(e);
                 }
             })());
         }
@@ -3130,7 +3141,7 @@
                 try{
                     while(ledgerDirty(e)){
                         const job=ledgerJob(e);
-                        await idbBatch(job.ops);
+                        await idbBatch(job.xops.length ? job.ops.concat(job.xops) : job.ops);
                         ledgerCommit(e, job);
                     }
                 }finally{ e.busy=null; }
@@ -3156,12 +3167,15 @@
         }
         // 要确认写进去了才往下走的地方（导入、新建账号、修复历史数据）：
         // 写失败就把内存退回写之前的样子，并抛出和以前一样的 quota / savefail 错误
-        async function saveStoreDurable(store, user){
+        //   extra(e)：【1015-B】ledgerApply 之后调用（这时新存档已经有存档号了），返回要一起写的 [键, 值]，
+        //            和账本放进同一个事务（导入备份带进来的单号表、待处理池、导入记录）
+        async function saveStoreDurable(store, user, extra){
             const key=storeKey(user);
             const had=__ledger.has(key);
             const e=ledgerEntryForWrite(key);
             const snap=ledgerSnap(e);
             ledgerApply(e, store);
+            if(extra) extra(e).forEach(([k, v])=>impQueue(e, k, v));
             const ver=e.ver;
             try{ await ledgerKick(key); }
             catch(err){
@@ -3180,9 +3194,412 @@
             const e=__ledger.get(key);
             __ledger.delete(key);
             const ks=new Set(e ? e.keys : []);
-            __ledgerKeys.forEach(k=>{ if(ledParseKey(id, k)) ks.add(k); });
+            __ledgerKeys.forEach(k=>{ if(ledParseKey(id, k) || k.indexOf(impPrefix(id))===0) ks.add(k); });
             await idbBatch([...ks].map(k=>['del', k]));
         }
+        // ===== 导入数据（1015-B，账单导入第一期 ② 数据结构）=====
+        // 账单导入要用、平时记账用不到的东西，按「账号 + 存档」单独存，不放进 meta 和月份块：
+        //   · imp_<账号>_<存档号>_o_<来源>_<年-月>   单号表：一个来源一个月一块（月份按账单那一行的交易时间，没时间的放 none）
+        //   · imp_<账号>_<存档号>_p                  待处理池
+        //   · imp_<账号>_<存档号>_i                  导入记录（最近 10 次）
+        // 为什么不放进账本：进入账号会把 led_<账号>_ 开头的键全部读出来，一年的单号可能十几万个，这些只在导入时才读。
+        // 为什么单号表按月分块、不一个单号一个键：启动时会读一遍库里全部的键名，十几万个键会拖慢每次启动。
+        // 和账本在同一个库、同一张表里；写的时候排进账本的写入队列（e.extra），和账本同一个事务，要么全成、要么全不算。
+        // 存档删了一起删（同一个事务）；存档改名不用动（键用存档号）；账号移走一起删；进账号时清掉不属于任何存档的（旧版本删存档时留下的）。
+        //
+        // 单号表一块（库里和备份文件里是同一种写法）：
+        //   { ids:[记录id…], bs:[批次…], n:"单号,单号,…", r:"0,0,1,-,…", b:"0,0,1,…" }
+        //   r：这个单号对应的记录在 ids 里的位置，「-」= 忽略（点过「不要了」，没有记录）；b：批次在 bs 里的位置。
+        //   记录 id 和批次在一块里只写一次：收款按天合并时几百个单号指向同一条记录，每条都写 id 太占地方。
+        //   单号里不能有逗号（两家都是数字；没有单号时导入代码拼的指纹也不许带逗号，登记时会拦）。
+        // 记录上的新字段（都可有可无，手记不填，没有就不写）：
+        //   cp 交易对方（存档里 cps 名单的编号）、pm 支付方式（pms 名单的编号）、oc 原始分类（原文）、
+        //   src { app }（alipay / wechat）、batch 导入批次号。名单只往后加，编号就是位置；撤销按导入前的长度截断。
+        // 存档里（meta）：cps、pms、importRules { cat:[{kw,cat}], type:[{app, type 或 status, as}] }。
+        const IMP_APPS=['alipay','wechat'];
+        const IMP_LOG_MAX=10;
+        const IMP_TYPE_AS=['normal','transfer','refund','skip'];   // 新交易类型怎么处理：照收/支、转账不计入、当退款（1.1）、跳过
+        const IMP_STATUS_AS=['import','skip'];                      // 新交易状态：导入 / 跳过
+        const IMP_BATCH_RE=/^[0-9a-z]{1,40}$/;
+        function impPrefix(id){ return `imp_${id}_`; }
+        function impArchPrefix(id, aid){ return `imp_${id}_${aid}_`; }
+        function impOrdKey(id, aid, app, mon){ return `imp_${id}_${aid}_o_${app}_${mon}`; }
+        function impPendKey(id, aid){ return `imp_${id}_${aid}_p`; }
+        function impLogKey(id, aid){ return `imp_${id}_${aid}_i`; }
+        function impParseOrdKey(id, aid, k){
+            const p=impArchPrefix(id, aid)+'o_';
+            if(typeof k!=='string' || k.indexOf(p)!==0) return null;
+            const m=/^(alipay|wechat)_(\d{4}-\d{2}|none)$/.exec(k.slice(p.length));
+            return m ? { app:m[1], mon:m[2] } : null;
+        }
+        function impErr(code, extra){ const e=new Error(code); e.code=code; if(extra) Object.assign(e, extra); return e; }
+
+        // ---- 排进账本的写入队列 ----
+        function impQueue(e, k, v){ e.extra.set(k, { v, g:++e.gen }); }
+        // 存档没了：它的导入数据全删（和月份块同一个事务）
+        function impQueueDropArchive(e, aid){
+            const p=impArchPrefix(e.id, aid);
+            __ledgerKeys.forEach(k=>{ if(k.indexOf(p)===0) impQueue(e, k, null); });
+            [...e.extra.keys()].forEach(k=>{ if(k.indexOf(p)===0) impQueue(e, k, null); });
+        }
+        // 进账号时：不属于任何存档的导入数据（旧版本删存档时不认识它们，会留下来）删掉。账本有坏的时候不动
+        function impQueueOrphans(e){
+            if(!e.has || e.broken) return;
+            const aids=new Set(e.names.values()), p=impPrefix(e.id);
+            let n=0;
+            __ledgerKeys.forEach(k=>{
+                if(k.indexOf(p)!==0) return;
+                const m=/^(a[0-9a-z]+)_/.exec(k.slice(p.length));
+                if(m && !aids.has(m[1])){ impQueue(e, k, null); n++; }
+            });
+            if(n) ledgerKick(storeKey(e.id)).catch(()=>{});
+        }
+
+        // ---- 单号表一块：编码 / 解码 ----
+        // 解码成 [{ no, id, batch, st }]，st：0 已导入、1 忽略（id 为空串）。格式不对返回 null
+        function impBlkDecode(v){
+            let o=v;
+            if(typeof v==='string'){ try{ o=JSON.parse(v); }catch(_){ return null; } }
+            if(!o || typeof o!=='object' || Array.isArray(o) || !Array.isArray(o.ids) || !Array.isArray(o.bs)
+                || typeof o.n!=='string' || typeof o.r!=='string' || typeof o.b!=='string') return null;
+            if(o.n==='') return (o.r==='' && o.b==='') ? [] : null;
+            const n=o.n.split(','), r=o.r.split(','), b=o.b.split(',');
+            if(r.length!==n.length || b.length!==n.length) return null;
+            const out=new Array(n.length);
+            for(let i=0;i<n.length;i++){
+                if(!n[i]) return null;
+                let id='', st=1, batch='';
+                if(r[i]!=='-'){
+                    const x=Number(r[i]);
+                    if(!Number.isInteger(x) || x<0 || x>=o.ids.length || typeof o.ids[x]!=='string' || !o.ids[x]) return null;
+                    id=o.ids[x]; st=0;
+                }
+                if(b[i]!=='-'){
+                    const y=Number(b[i]);
+                    if(!Number.isInteger(y) || y<0 || y>=o.bs.length || typeof o.bs[y]!=='string') return null;
+                    batch=o.bs[y];
+                }
+                out[i]={ no:n[i], id, batch, st };
+            }
+            return out;
+        }
+        function impBlkEncode(list){
+            const ids=[], bs=[], im=new Map(), bm=new Map(), n=[], r=[], b=[];
+            list.forEach(x=>{
+                n.push(x.no);
+                if(x.st===1) r.push('-');
+                else { let i=im.get(x.id); if(i===undefined){ i=ids.length; im.set(x.id, i); ids.push(x.id); } r.push(i); }
+                if(!x.batch) b.push('-');
+                else { let j=bm.get(x.batch); if(j===undefined){ j=bs.length; bm.set(x.batch, j); bs.push(x.batch); } b.push(j); }
+            });
+            return { ids, bs, n:n.join(','), r:r.join(','), b:b.join(',') };
+        }
+        // 登记一条单号要满足的：来源是两家之一、单号不空不带逗号、已导入的要有记录 id
+        function impCleanOrder(x){
+            if(!x || typeof x!=='object' || !IMP_APPS.includes(x.app)) return null;
+            const no=typeof x.no==='string' ? x.no.trim() : '';
+            if(!no || no.length>80 || no.indexOf(',')>=0) return null;
+            const st=x.st===1 ? 1 : 0;
+            const id=st===0 && typeof x.id==='string' && x.id ? x.id : '';
+            if(st===0 && !id) return null;
+            const batch=typeof x.batch==='string' && IMP_BATCH_RE.test(x.batch) ? x.batch : '';
+            return { app:x.app, no, id, batch, st, mon:recMonth({ time:x.time }) };
+        }
+
+        // ---- 读 ----
+        // 一个键现在的值：写入队列里还没写进库的为准
+        async function impGetRaw(e, k){
+            const x=e.extra.get(k);
+            if(x) return x.v;
+            return asRaw(await idbGet(k));
+        }
+        async function impGetJson(e, k){
+            const raw=await impGetRaw(e, k);
+            if(raw===null) return null;
+            try{ return JSON.parse(raw); }catch(_){ ledgerBackupCorrupted(k, raw); throw impErr('impdamaged', { keys:[k] }); }
+        }
+        // 这个存档的单号表全部分块：键 → 解码后的列表。有读不出来的块就报 impdamaged（原文另存一份）
+        async function impReadOrders(e, aid){
+            const rows=await idbRange(impArchPrefix(e.id, aid)+'o_');
+            const raws=new Map();
+            rows.forEach(([k, v])=>{ if(impParseOrdKey(e.id, aid, k)) raws.set(k, asRaw(v)); });
+            e.extra.forEach((x, k)=>{ if(impParseOrdKey(e.id, aid, k)){ if(x.v===null) raws.delete(k); else raws.set(k, x.v); } });
+            const out=new Map(), bad=[];
+            [...raws.keys()].sort().forEach(k=>{
+                const list=impBlkDecode(raws.get(k));
+                if(list===null){ bad.push(k); ledgerBackupCorrupted(k, raws.get(k)); }
+                else out.set(k, list);
+            });
+            if(bad.length) throw impErr('impdamaged', { keys:bad });
+            return out;
+        }
+        // 查询用的单号表：每个来源一张「单号 → 条目」和一份排好序的单号（按开头查用二分）
+        function impOrderTable(e, aid, blocks){
+            const by=new Map(); IMP_APPS.forEach(a=>by.set(a, { map:new Map(), sorted:null }));
+            let size=0;
+            blocks.forEach((list, k)=>{
+                const p=impParseOrdKey(e.id, aid, k);
+                const t=by.get(p.app);
+                list.forEach(x=>{
+                    if(!t.map.has(x.no)) size++;
+                    t.map.set(x.no, { app:p.app, no:x.no, id:x.id, batch:x.batch, st:x.st, mon:p.mon });
+                });
+            });
+            const sortedOf=t=>t.sorted || (t.sorted=[...t.map.keys()].sort());
+            return {
+                size,
+                get(app, no){ const t=by.get(app); return (t && t.map.get(no)) || null; },
+                // 单号以 prefix 开头的条目（按单号排序），最多 limit 条
+                findPrefix(app, prefix, limit){
+                    const t=by.get(app); if(!t || typeof prefix!=='string' || !prefix) return [];
+                    const arr=sortedOf(t), max=limit>0 ? limit : 50, out=[];
+                    let lo=0, hi=arr.length;
+                    while(lo<hi){ const mid=(lo+hi)>>1; if(arr[mid]<prefix) lo=mid+1; else hi=mid; }
+                    for(let i=lo;i<arr.length && out.length<max && arr[i].startsWith(prefix);i++) out.push(t.map.get(arr[i]));
+                    return out;
+                }
+            };
+        }
+
+        // ---- 写：排进队列，等它和账本一起写进库；失败就把这几个键退回原样，报 quota / savefail ----
+        async function impWrite(e, key, pairs){
+            const prev=pairs.map(([k])=>[k, e.extra.get(k)]);
+            pairs.forEach(([k, v])=>impQueue(e, k, v));
+            try{ await ledgerKick(key); }
+            catch(err){
+                prev.forEach(([k, x])=>{ if(x===undefined) e.extra.delete(k); else e.extra.set(k, x); });
+                const x=new Error(isQuotaErr(err) ? 'quota' : 'savefail'); x.cause=err; throw x;
+            }
+        }
+
+        // ---- 清洗（导入备份和对外的写函数共用）。mapId(旧记录 id) → 新 id，找不到返回 null ----
+        function impCleanNames(a){
+            if(!Array.isArray(a)) return [];
+            // 不能删掉不合格的：编号就是位置，删一个后面的全错位。不合格的换成空串占位
+            return a.slice(0, 200000).map(x=>typeof x==='string' ? x.slice(0, 64) : '');
+        }
+        function impCleanRules(r, cats){
+            if(!r || typeof r!=='object' || Array.isArray(r)) return null;
+            const cat=(Array.isArray(r.cat) ? r.cat : []).slice(0, 5000).map(x=>{
+                if(!x || typeof x!=='object') return null;
+                const kw=typeof x.kw==='string' ? x.kw.trim().slice(0, 32) : '';
+                const c=typeof x.cat==='string' ? x.cat : '';
+                return (kw && cats.includes(c)) ? { kw, cat:c } : null;
+            }).filter(Boolean);
+            const type=(Array.isArray(r.type) ? r.type : []).slice(0, 500).map(x=>{
+                if(!x || typeof x!=='object' || !IMP_APPS.includes(x.app)) return null;
+                if(typeof x.type==='string' && x.type.trim() && x.status===undefined && IMP_TYPE_AS.includes(x.as))
+                    return { app:x.app, type:x.type.trim().slice(0, 32), as:x.as };
+                if(typeof x.status==='string' && x.status.trim() && x.type===undefined && IMP_STATUS_AS.includes(x.as))
+                    return { app:x.app, status:x.status.trim().slice(0, 32), as:x.as };
+                return null;
+            }).filter(Boolean);
+            return (cat.length || type.length) ? { cat, type } : null;
+        }
+        function impCleanPending(items, mapId){
+            if(!Array.isArray(items)) return [];
+            const str=(v, n)=>typeof v==='string' ? v.slice(0, n) : '';
+            return items.map(x=>{
+                if(!x || typeof x!=='object' || !IMP_APPS.includes(x.app)) return null;
+                const amt=Number(x.amt);
+                if(!Number.isInteger(amt) || amt<0) return null;
+                const o={ app:x.app, no:str(x.no, 80), t:str(x.t, 16), amt, io:x.io==='income' ? 'income' : 'expense',
+                          cp:str(x.cp, 64), d:str(x.d, 200),
+                          cand:(Array.isArray(x.cand) ? x.cand : []).map(mapId).filter(Boolean),
+                          b:typeof x.b==='string' && IMP_BATCH_RE.test(x.b) ? x.b : '', why:str(x.why, 32) };
+                return o;
+            }).filter(Boolean);
+        }
+        function impCleanLog(list, mapId, cats, cpsLen, pmsLen){
+            if(!Array.isArray(list)) return [];
+            const str=(v, n)=>typeof v==='string' ? v.slice(0, n) : '';
+            const len=(v, max)=>Number.isInteger(v) && v>=0 && v<=max ? v : max;
+            return list.slice(-IMP_LOG_MAX).map(x=>{
+                if(!x || typeof x!=='object' || typeof x.b!=='string' || !IMP_BATCH_RE.test(x.b)) return null;
+                const chg=(Array.isArray(x.chg) ? x.chg : []).map(c=>{
+                    if(!c || typeof c!=='object') return null;
+                    const id=mapId(c.id); if(!id) return null;
+                    const was={};
+                    if(c.was && typeof c.was==='object' && !Array.isArray(c.was)){
+                        Object.keys(c.was).slice(0, 20).forEach(k=>{ const v=c.was[k]; if(v===null || ['string','number','boolean'].includes(typeof v)) was[k]=v; });
+                    }
+                    const nos=(Array.isArray(c.nos) ? c.nos : []).filter(p=>Array.isArray(p) && IMP_APPS.includes(p[0]) && typeof p[1]==='string' && p[1]).map(p=>[p[0], p[1].slice(0, 80)]);
+                    return { id, was, nos };
+                }).filter(Boolean);
+                const ra=impCleanRules(x.rulesAdded, cats) || { cat:[], type:[] };
+                return { b:x.b, at:str(x.at, 16),
+                         apps:(Array.isArray(x.apps) ? x.apps : []).filter(a=>IMP_APPS.includes(a)),
+                         from:str(x.from, 10), to:str(x.to, 10),
+                         add:(Array.isArray(x.add) ? x.add : []).map(mapId).filter(Boolean),
+                         chg, cpLen:len(x.cpLen, cpsLen), pmLen:len(x.pmLen, pmsLen),
+                         catsAdded:(Array.isArray(x.catsAdded) ? x.catsAdded : []).filter(c=>typeof c==='string' && cats.includes(c)),
+                         rulesAdded:ra };
+            }).filter(Boolean);
+        }
+        // 备份文件里的单号表 { 来源: { 月份: 一块 } } → 库里的 [键, 值]。记录 id 换成新的；已导入但记录找不到的不要（按规则本来就等于没导过）
+        function impCleanOrdersFromBackup(o, mapId, id, aid){
+            const out=[]; let kept=0, dropped=0;
+            if(!o || typeof o!=='object' || Array.isArray(o)) return { pairs:out, kept, dropped };
+            IMP_APPS.forEach(app=>{
+                const months=o[app];
+                if(!months || typeof months!=='object' || Array.isArray(months)) return;
+                Object.keys(months).forEach(mon=>{
+                    if(!/^(\d{4}-\d{2}|none)$/.test(mon)) return;
+                    const list=impBlkDecode(months[mon]);
+                    if(!list){ dropped++; return; }
+                    const seen=new Set(), next=[];
+                    list.forEach(x=>{
+                        if(seen.has(x.no)) return;
+                        if(x.st===0){ const nid=mapId(x.id); if(!nid){ dropped++; return; } x={ ...x, id:nid }; }
+                        if(x.batch && !IMP_BATCH_RE.test(x.batch)) x={ ...x, batch:'' };
+                        seen.add(x.no); next.push(x); kept++;
+                    });
+                    if(next.length) out.push([impOrdKey(id, aid, app, mon), JSON.stringify(impBlkEncode(next))]);
+                });
+            });
+            return { pairs:out, kept, dropped };
+        }
+        // 存档里和导入有关的设置（在 meta 里，跟着备份 / 云备份走）。空的不写，没导入过的存档备份内容不变
+        function impArchFields(a){
+            const o={};
+            if(Array.isArray(a.cps) && a.cps.length) o.cps=a.cps;
+            if(Array.isArray(a.pms) && a.pms.length) o.pms=a.pms;
+            if(a.importRules && ((a.importRules.cat||[]).length || (a.importRules.type||[]).length)) o.importRules=a.importRules;
+            return o;
+        }
+        // 单独存的那几样（导出备份 / 云同步时读）。withOrders：要不要带单号表（云同步不带，见 odSyncNow）
+        async function impExportFields(user, archive, withOrders){
+            const e=__ledger.get(storeKey(user)), aid=e && e.names.get(archive);
+            const o={};
+            if(!aid) return o;
+            const log=await impGetJson(e, impLogKey(e.id, aid));
+            if(log && Array.isArray(log.list) && log.list.length) o.imports=log.list;
+            const pend=await impGetJson(e, impPendKey(e.id, aid));
+            if(pend && Array.isArray(pend.items) && pend.items.length) o.pending=pend.items;
+            if(withOrders){
+                const blocks=await impReadOrders(e, aid);
+                if(blocks.size){
+                    o.orders={};
+                    blocks.forEach((list, k)=>{
+                        const p=impParseOrdKey(e.id, aid, k);
+                        (o.orders[p.app]=o.orders[p.app]||{})[p.mon]=impBlkEncode(list);
+                    });
+                }
+            }
+            return o;
+        }
+        // 分类改名 / 删除时，分类规则跟着改 / 一起删
+        function impRulesRenameCat(a, from, to){
+            if(!a.importRules || !Array.isArray(a.importRules.cat)) return;
+            a.importRules=Object.assign({}, a.importRules, { cat:a.importRules.cat.map(r=>r.cat===from ? { kw:r.kw, cat:to } : r) });
+        }
+        function impRulesDropCat(a, name){
+            if(!a.importRules || !Array.isArray(a.importRules.cat)) return;
+            a.importRules=Object.assign({}, a.importRules, { cat:a.importRules.cat.filter(r=>r.cat!==name) });
+        }
+
+        // ---- 存储估算：导入前预检用 ----
+        //   records：要新增的记录条数；orders：要登记的单号数；names：名单要新加的词（字符串数组）或个数
+        //   返回 { chars: 多占的字符数, bytes: 按每个字符 2 字节估的字节数（库里中文占 2 字节，偏保守）}
+        //   记录按这个存档现有记录的平均长度算（没有记录或没带导入字段时按导入记录的典型长度）；
+        //   单号表按每条 40 字符（单号约 30 + 两个位置编号和逗号；记录 id、批次一块里只写一次，分摊下来很少）
+        const IMP_EST={ rec:150, recExtra:70, order:40, name:12 };
+        function impEstimate(o, archive){
+            o=o||{};
+            const n=Math.max(0, Math.floor(+o.records||0)), k=Math.max(0, Math.floor(+o.orders||0));
+            let recLen=IMP_EST.rec;
+            try{
+                const t=impTarget(archive);
+                const st=t.e.archs.get(t.aid), recs=st ? st.recs : [];
+                if(recs.length){
+                    const step=Math.max(1, Math.floor(recs.length/500));
+                    let sum=0, cnt=0, withSrc=0;
+                    for(let i=0;i<recs.length;i+=step){ sum+=JSON.stringify(recs[i]).length; cnt++; if(recs[i].src) withSrc++; }
+                    // 现有记录多半是手记（不带导入字段），要加上导入字段的长度
+                    recLen=Math.round(sum/cnt) + (withSrc*2>=cnt ? 0 : IMP_EST.recExtra) + 8;   // 8：序号和逗号
+                }
+            }catch(_){}
+            let nameChars=0;
+            if(Array.isArray(o.names)) o.names.forEach(s=>{ nameChars+=String(s).length+3; });
+            else nameChars=Math.max(0, Math.floor(+o.names||0))*IMP_EST.name;
+            const chars=n*recLen + k*IMP_EST.order + nameChars;
+            return { chars, bytes:chars*2 };
+        }
+
+        // ---- 对外：给以后的导入代码用的一组读写函数（这一版不接界面）----
+        // 都是当前账号；archive 是存档名，不传就是当前存档。
+        function impTarget(archive){
+            if(!currentUser) throw impErr('nologin');
+            const key=storeKey(currentUser), e=__ledger.get(key);
+            if(!e || !e.has) throw impErr('notloaded');
+            const name=archive!==undefined ? archive : currentArchive;
+            const aid=e.names.get(name);
+            if(!aid) throw impErr('noarchive');
+            return { e, key, aid, name };
+        }
+        window.JiwenImportStore={
+            // 单号表：{ size, get(app, no), findPrefix(app, 开头, 最多几条) }；条目 { app, no, id, batch, st, mon }
+            async ordersRead(archive){
+                const t=impTarget(archive);
+                return impOrderTable(t.e, t.aid, await impReadOrders(t.e, t.aid));
+            },
+            // 批量登记 [{ app, no, time, id, batch, st }]：同来源同单号的覆盖。一个事务写进去
+            async ordersRegister(archive, entries){
+                const t=impTarget(archive);
+                const list=(Array.isArray(entries) ? entries : []).map(impCleanOrder);
+                const badAt=list.indexOf(null);
+                if(badAt>=0) throw impErr('badorder', { index:badAt });
+                const byKey=new Map();
+                list.forEach(x=>{ const k=impOrdKey(t.e.id, t.aid, x.app, x.mon); let a=byKey.get(k); if(!a) byKey.set(k, a=[]); a.push(x); });
+                const pairs=[]; let added=0, updated=0;
+                for(const [k, xs] of byKey){
+                    const raw=await impGetRaw(t.e, k);
+                    const cur=raw===null ? [] : impBlkDecode(raw);
+                    if(cur===null){ ledgerBackupCorrupted(k, raw); throw impErr('impdamaged', { keys:[k] }); }
+                    const at=new Map(cur.map((x, i)=>[x.no, i]));
+                    xs.forEach(x=>{
+                        const v={ no:x.no, id:x.id, batch:x.batch, st:x.st };
+                        if(at.has(x.no)){ cur[at.get(x.no)]=v; updated++; }
+                        else { at.set(x.no, cur.length); cur.push(v); added++; }
+                    });
+                    pairs.push([k, JSON.stringify(impBlkEncode(cur))]);
+                }
+                if(pairs.length) await impWrite(t.e, t.key, pairs);
+                return { added, updated };
+            },
+            async pendingRead(archive){
+                const t=impTarget(archive);
+                const o=await impGetJson(t.e, impPendKey(t.e.id, t.aid));
+                return o && Array.isArray(o.items) ? o.items : [];
+            },
+            async pendingWrite(archive, items){
+                const t=impTarget(archive);
+                const clean=impCleanPending(items, x=>typeof x==='string' && x ? x : null);
+                await impWrite(t.e, t.key, [[impPendKey(t.e.id, t.aid), clean.length ? JSON.stringify({ v:1, items:clean }) : null]]);
+                return clean.length;
+            },
+            async importsRead(archive){
+                const t=impTarget(archive);
+                const o=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
+                return o && Array.isArray(o.list) ? o.list : [];
+            },
+            // 只留最近 10 次（数组末尾是最新的）
+            async importsWrite(archive, list){
+                const t=impTarget(archive);
+                const a=ledgerAssembleArchive(t.e, t.aid);
+                const clean=impCleanLog(list, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
+                await impWrite(t.e, t.key, [[impLogKey(t.e.id, t.aid), clean.length ? JSON.stringify({ v:1, list:clean }) : null]]);
+                return clean.length;
+            },
+            estimate(o, archive){ return impEstimate(o, archive); }
+        };
+        // meta 里这个存档的设置（分类、名单……，不含记录）
+        function ledgerAssembleArchive(e, aid){
+            const s=JSON.parse(e.meta);
+            const n=Object.keys(s.archives).find(k=>s.archives[k].records===aid);
+            return n ? s.archives[n] : { cats:[] };
+        }
+
         // 切到后台：当前账号的 meta 和这次写过的月份块强制再写一遍，别的账号有没写完的也写掉
         let __forceFlushing=null;
         function ledgerFlushOnHide(){
@@ -3630,7 +4047,7 @@
             const file=e.target.files[0]; if(!file) return;
             // 文件体积预校验：与主界面导入一致，避免超大文件读入后 JSON.parse 卡死 UI
             if(file.size > IMPORT_MAX_BYTES){
-                customAlert('文件太大啦（超过 8MB），请确认是否为正确的备份文件。');
+                customAlert('文件太大啦（超过 24MB），请确认是否为正确的备份文件。');
                 $('loginImportFile').value=''; return;
             }
             const reader=new FileReader();
@@ -4171,9 +4588,18 @@
             // 注意它是账号级的（全局一份），不是存档级的——多存档时每份导出文件都会
             // 各带一份相同副本。这是可接受的冗余：真把它挪进 archives[x] 才是错的
             // （切到「旅行」存档，「入职纪念日」难道就不存在了）。
+            // 【1015-B】导入的名单、规则、导入记录、待处理池、单号表一起带上（空的不写，没导入过的存档备份内容不变）
+            let impExtra;
+            try{ impExtra=await impExportFields(currentUser, currentArchive, true); }
+            catch(err){
+                customAlert(err && err.code==='impdamaged'
+                    ? '导入的单号表有一部分读不出来，这次没有导出。原文已另存在手机里，请联系开发者。'
+                    : '读取导入数据失败，请重试。', '导出失败');
+                return;
+            }
             const payload={ app:'记问', user:nameOf(currentUser), accountId:currentUser, archive:currentArchive,
-                cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], data:a.records, days:loadDays(),
-                exportedAt:new Date().toLocaleString() };
+                cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], ...impArchFields(a), data:a.records, days:loadDays(),
+                ...impExtra, exportedAt:new Date().toLocaleString() };
             const json=JSON.stringify(payload,null,2);
             const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;
 
@@ -4239,8 +4665,9 @@
         // 每个「账号+存档」独立连接一个文件（跟导出/导入的粒度保持一致）。
         function odBuildPayload(){
             const store=loadStore(); const a=curArchive(store);
+            // 【1015-B】导入用的名单、规则在 meta 里（空的不写）；导入记录、待处理池在 odSyncNow 里另读
             return { app:'记问', user:nameOf(currentUser), accountId:currentUser, archive:currentArchive,
-                cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], data:a.records, days:loadDays(),
+                cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], ...impArchFields(a), data:a.records, days:loadDays(),
                 exportedAt:new Date().toLocaleString() };
         }
         function odPlugin(){
@@ -4311,6 +4738,19 @@
 
             const payload = odBuildPayload();
             const cnt = Array.isArray(payload.data) ? payload.data.length : 0;
+            // 【1015-B】导入记录、待处理池（都很小）一起带上。单号表不带：每记一笔都同步，十几万单号不能每次都传，
+            //   以后单独放一个云端文件、只在导入时传（第 ⑥ / ⑨ 版接界面时做）。读不出来就暂停同步，不拿缺了的去盖云端
+            try{ Object.assign(payload, await impExportFields(user, archive, false)); }
+            catch(err){
+                if(err && err.code==='impdamaged'){
+                    link.lastError = '导入数据有一部分读不出来，已暂停自动同步以保护云端备份';
+                    link.blocked = true;
+                    odSetLink(user, archive, link);
+                    odRefreshStatusUI();
+                    return;
+                }
+                throw err;
+            }
 
             // 【守卫二】记录数从「有」塌到「零」：兜住守卫一覆盖不到的未知路径。
             //   正常使用绝不会出现这种跳变，出现即说明本地数据异常。
@@ -4600,7 +5040,9 @@ ${detail}
         $('exportAiBtn').addEventListener('click', aiChooseDim);
         // 校验并清洗导入的单条记录：金额非正数/非法、类型非法都会被拒，避免脏数据污染结余。
         // 返回 { records, stats }，stats 记录做了哪些「静默修正」，供导入后如实提示用户。
-        function sanitizeImportedRecords(records){
+        //   ctx：【1015-B】{ cpsLen, pmsLen } 存档里对方 / 支付方式名单的长度，记录上的编号超出就丢掉这个字段
+        function sanitizeImportedRecords(records, ctx){
+            const cpsLen=(ctx && ctx.cpsLen) || 0, pmsLen=(ctx && ctx.pmsLen) || 0;
             // 条数上限：超大数组会让 localStorage 写入与后续渲染卡死，直接拒绝
             if(records.length > MAX_IMPORT_RECORDS){ throw new Error('toomany'); }
             const out=[];
@@ -4638,6 +5080,12 @@ ${detail}
                 const rec={ id:genId(), time, money:m.val, cat, remark, type };
                 // 不重建会丢：从备份还原后口径标记必须还在
                 if(r.skip===true) rec.skip=true; else if(r.flow===true) rec.flow=true;
+                // 【1015-B】账单导入带来的字段：合格的照搬，不合格的这个字段不要（记录照留）
+                if(r.src && typeof r.src==='object' && IMP_APPS.includes(r.src.app)) rec.src={ app:r.src.app };
+                if(typeof r.batch==='string' && IMP_BATCH_RE.test(r.batch)) rec.batch=r.batch;
+                if(Number.isInteger(r.cp) && r.cp>=0 && r.cp<cpsLen) rec.cp=r.cp;
+                if(Number.isInteger(r.pm) && r.pm>=0 && r.pm<pmsLen) rec.pm=r.pm;
+                if(typeof r.oc==='string' && r.oc.trim()) rec.oc=r.oc.trim().slice(0, 32);
                 if(r.id!=null) idMap.set(String(r.id), rec);
                 if(type==='income' && r.refundOf!=null && r.refundOf!=='') pend.push([rec, String(r.refundOf)]);
                 out.push(rec);
@@ -4652,7 +5100,7 @@ ${detail}
                 used.set(o, tot);
                 rec.refundOf=o.id; rec.cat=o.cat; setRecMode(rec, recMode(o));
             });
-            return { records:out, stats };
+            return { records:out, stats, idMap };
         }
 
         // 导入的倒数日条数上限。倒数日是账号级的唯一一份（不像存档能并存多个），
@@ -4704,7 +5152,9 @@ ${detail}
             const parsed=JSON.parse(text);   // 解析失败由调用方 catch
             const rawRecords=Array.isArray(parsed)?parsed:parsed.data;
             if(!Array.isArray(rawRecords)) throw new Error('bad');
-            const { records, stats }=sanitizeImportedRecords(rawRecords);
+            // 【1015-B】对方 / 支付方式名单先清洗：记录上的编号要对着它们查
+            const cps=impCleanNames(parsed && parsed.cps), pms=impCleanNames(parsed && parsed.pms);
+            const { records, stats, idMap }=sanitizeImportedRecords(rawRecords, { cpsLen:cps.length, pmsLen:pms.length });
             // 一条有效记录都没有：视为无效文件，避免悄悄建一个空存档
             if(records.length===0) throw new Error('empty');
 
@@ -4738,9 +5188,26 @@ ${detail}
             }
             // 常用模板：逐条清洗，分类不在分类表里的丢掉；旧备份没有 tpls 字段 → 空数组
             const tpls=sanitizeTpls(parsed && parsed.tpls, cats);
-            store.archives[finalName]={ records, cats, budgets, tpls };
+            // 【1015-B】导入的规则、名单照原样保留；导入记录、待处理池、单号表里的记录 id 换成这次重新编的号
+            //   （导入备份总是新建一个存档、每条记录重新编号，idMap：文件里的旧 id → 新记录）
+            const mapId=old=>{ const r=(typeof old==='string' && old) ? idMap.get(old) : null; return r ? r.id : null; };
+            const importRules=impCleanRules(parsed && parsed.importRules, cats);
+            const arch={ records, cats, budgets, tpls };
+            if(cps.length) arch.cps=cps;
+            if(pms.length) arch.pms=pms;
+            if(importRules) arch.importRules=importRules;
+            const impLog=impCleanLog(parsed && parsed.imports, mapId, cats, cps.length, pms.length);
+            const impPend=impCleanPending(parsed && parsed.pending, mapId);
+            store.archives[finalName]=arch;
             store.last=finalName;
-            await saveStoreDurable(store, targetUser);   // 抛错（配额满等）由调用方 catch 处理
+            // 单号表、待处理池、导入记录和账本放进同一个事务：要么全进去，要么全不算
+            await saveStoreDurable(store, targetUser, e=>{
+                const aid=e.names.get(finalName);
+                const pairs=impCleanOrdersFromBackup(parsed && parsed.orders, mapId, e.id, aid).pairs;
+                if(impLog.length) pairs.push([impLogKey(e.id, aid), JSON.stringify({ v:1, list:impLog })]);
+                if(impPend.length) pairs.push([impPendKey(e.id, aid), JSON.stringify({ v:1, items:impPend })]);
+                return pairs;
+            });   // 抛错（配额满等）由调用方 catch 处理
 
             // 倒数日：「文件里的账号 === 要导进的账号」时自动合并。
             //   存档可以并存十份（重名自动加序号，从不覆盖），倒数日却是账号级的唯一一份，
@@ -4855,7 +5322,7 @@ ${detail}
         $('importFile').addEventListener('change', e => {
             const file=e.target.files[0]; if(!file) return;
             if(file.size > IMPORT_MAX_BYTES){
-                customAlert('文件太大啦（超过 8MB），请确认是否为正确的备份文件。');
+                customAlert('文件太大啦（超过 24MB），请确认是否为正确的备份文件。');
                 $('importFile').value=''; return;
             }
             const reader=new FileReader();
@@ -5181,6 +5648,8 @@ ${detail}
                 }
                 // 常用模板也跟着改名
                 if(Array.isArray(a.tpls)) a.tpls.forEach(t=>{ if(t.cat===oldName) t.cat=name; });
+                // 【1015-B】导入的分类规则也跟着改名
+                impRulesRenameCat(a, oldName, name);
                 saveStoreSafe(store);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '重命名分类', (name)=>{
@@ -5206,6 +5675,8 @@ ${detail}
                 if(ar.budgets && ar.budgets[name]!=null){ ar.budgets=Object.assign({}, ar.budgets); delete ar.budgets[name]; }
                 // 常用模板与记录一致：归入「未分类」
                 if(Array.isArray(ar.tpls)) ar.tpls.forEach(t=>{ if(t.cat===name) t.cat='未分类'; });
+                // 【1015-B】导入的分类规则：指向这个分类的直接删（「关键词 → 未分类」没有意义）
+                impRulesDropCat(ar, name);
                 saveStoreSafe(s);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '删除分类');
