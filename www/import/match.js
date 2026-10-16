@@ -38,7 +38,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-C';
+  var VERSION = '1016-D';
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
   var BUCKETS = ['add', 'merge', 'skip', 'neutral', 'refund', 'pending', 'error'];
 
@@ -135,6 +135,7 @@
     var bills = [];
     rowItems.forEach(function (it) {
       var r = rowOf(parsed, it);
+      if (it.noMerge) return;                 // 已全额退款、退款以前导入过的原单：照常新增，不和手记配（1016-C）
       var normal = it.bucket === 'add' && !it.group;
       var neutral = it.bucket === 'neutral';
       if (!normal && !neutral) return;
@@ -246,6 +247,7 @@
     toClass.forEach(function (it, i) { it.rec = cl.recs[i]; });
 
     // ---------- 第二轮（1016-C）：多笔合一，先于金额相近 / 部分付款 ----------
+    multiSum.skipped = [];
     var multiSums = multiSum(bills.filter(function (b) { return !b.done && !b.neutral && !b.personal; }), idx, free, function (m) { mstate.set(m.id, 'reserved'); });
 
     // ---------- 第二轮：拿不准的进待处理（只有普通行；不计入的配不上照常导入）----------
@@ -311,6 +313,7 @@
     perFile.forEach(function (p) { p.ok = p.fatal || p.sum === p.total; });
     var used = 0; mstate.forEach(function (v) { if (v === 'used') used++; });
     stats.merged = merges.length; stats.manualUsed = used;
+    stats.comboSkippedDays = multiSum.skipped.slice();     // 一天剩下的账单超过 COMBO_DAY_MAX，没试不同对方的凑法
     return { version: VERSION, items: items, summaries: routed.summaries || [], suspects: routed.suspects || [],
              newCats: cl.newCats, learned: learnedRules, multiSums: multiSums, counts: counts, perFile: perFile, stats: stats };
   }
@@ -328,7 +331,7 @@
   //   返回 [{ id, options: [{ record, bills: [账单在 items 里的引用], kind: 'samecp' | 'combo' }], suggest: 0 | null }]
   var COMBO_DAY_MAX = 120, HOUR = 60;   // 一天里剩下的账单超过 120 笔就不试 2–3 笔的凑法（只看同一对方的）
   function multiSum(bills, idx, free, reserve) {
-    var C = classifier(), byDay = new Map();
+    var C = classifier(), byDay = new Map(), skipped = [];
     bills.forEach(function (b) { var k = b.type + '|' + b.day, a = byDay.get(k); if (!a) byDay.set(k, a = []); a.push(b); });
     var combos = [];
     byDay.forEach(function (list) {
@@ -341,7 +344,7 @@
       list.forEach(function (b) { var c = C.cleanCp(b.r.cp || ''); if (!c) return; var a = byCp.get(c); if (!a) byCp.set(c, a = []); a.push(b); b.ccp = c; });
       byCp.forEach(function (a) { if (a.length >= 2) hit(a, 'samecp'); });
       // b. 2–3 笔不同对方：推荐分类一样（未分类不算），或者都在 1 小时内
-      if (list.length > COMBO_DAY_MAX) return;
+      if (list.length > COMBO_DAY_MAX) { skipped.push(dayStr(day)); return; }
       var catOf = function (b) { var r = b.it.rec; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; };
       var ok = function (bs) {
         for (var i = 0; i < bs.length; i++) for (var j = i + 1; j < bs.length; j++) if (!bs[i].ccp || bs[i].ccp === bs[j].ccp) return false;
@@ -363,6 +366,7 @@
         }
       }
     });
+    multiSum.skipped = skipped;
     if (!combos.length) return [];
     // 有共同账单或共同手记的凑法连成一组
     var parent = combos.map(function (_, i) { return i; });
@@ -394,5 +398,5 @@
     return out;
   }
 
-  return { VERSION: VERSION, ledgerQuery: ledgerQuery, match: match, isPersonal: isPersonal, EXACT_DAYS: EXACT_DAYS, PEND_DAYS: PEND_DAYS, REFUND_BACK_DAYS: REFUND_BACK_DAYS };
+  return { VERSION: VERSION, ledgerQuery: ledgerQuery, match: match, isPersonal: isPersonal, COMBO_DAY_MAX: COMBO_DAY_MAX, EXACT_DAYS: EXACT_DAYS, PEND_DAYS: PEND_DAYS, REFUND_BACK_DAYS: REFUND_BACK_DAYS };
 });

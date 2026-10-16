@@ -95,11 +95,11 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
     '2 交易成功以后部分退 2 笔：退款挂到原单');
   ok(expect.ok.slice(0, 3).every(no => m[no].bucket === 'skip' && m[no].why === 'fullrefund' && Object.values(m).some(x => x.r.no === no && x.r.noRest && x.bucket === 'skip' && x.why === 'fullrefund')),
     '2 交易成功以后全额退 3 笔：原单和退款两条都跳过');
-  ok(expect.refunded.slice(0, 6).every(no => m[no].bucket === 'skip' && m[no].why === 'fullrefundold'), '2 退款成功、没有退款行、单号表里有退款的 6 笔：跳过');
+  ok(expect.refunded.slice(0, 6).every(no => m[no].bucket === 'add' && m[no].why === 'fullrefundold' && m[no].noMerge && m[no].io === 'expense'), '2 退款成功、没有退款行、单号表里有退款的 6 笔：照常新增（支出，不和手记合并），和以前的退款一出一进');
   ok(expect.refunded.slice(6).every(no => m[no].bucket === 'pending' && m[no].why === 'fullnorefund' && m[no].msg === '这笔已全额退款，退款不在这次的文件里'), '2 退款成功、没有退款行、哪都找不到退款的 5 笔：进待处理');
   ok(R.lookups(parsed).fullRefunds.filter(f => f.app === 'alipay').length === 11 + 3, '2 lookups 带上了要查退款的原单（11 笔没退款行的 + 3 笔原单退款成功又有退款行的）');
   ok(expect.rpair.every(no => m[no].why === 'refunded' && Object.values(m).some(x => x.r.no === no && x.r.noRest && x.why === 'refundedpair')), '2 原单退款成功、又有退款行：两条都跳过');
-  ok(res.counts.skip === 44 + 6 + 6 + 6 && res.counts.refund === 2 && res.counts.add === 2 && res.counts.pending === 5 && conserved(res), '2 各桶笔数：跳过 62、退款 2、新增 2、待处理 5，守恒：' + JSON.stringify(res.counts));
+  ok(res.counts.skip === 44 + 6 + 6 && res.counts.refund === 2 && res.counts.add === 2 + 6 && res.counts.pending === 5 && conserved(res), '2 各桶笔数：跳过 56、退款 2、新增 8、待处理 5，守恒：' + JSON.stringify(res.counts));
   ok(R.lookups(parsed).orders.includes('alipay|' + expect.ok[0]), '2 lookups 里带上了退款行要找的原单键');
 }
 
@@ -357,7 +357,8 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
     '11 信用卡还款（不管写的收 / 支）、零钱通、理财通、零钱提现、零钱充值：一律不计入');
   const res = run(parsed, { rules, oldRefunds: [{ cp: '某虚构饭店', fen: 5000, time: '2026-03-07T09:30', id: 'oldR' }] }), m = by(parsed, res);
   ok(m[nos.ruled].bucket === 'add', '11 用户把类型定成「正常收支」的照规则');
-  ok(m[nos.oldfull].bucket === 'skip' && m[nos.oldfull].why === 'fullrefundold' && m[nos.oldfull].refundRec === 'oldR', '11 已全额退款、退款以前导入过：跳过，记下那条退款记录');
+  ok(m[nos.oldfull].bucket === 'add' && m[nos.oldfull].why === 'fullrefundold' && m[nos.oldfull].noMerge && m[nos.oldfull].refundRec === 'oldR', '11 已全额退款、退款以前导入过：照常新增、不和手记合并，记下那条退款记录');
+  ok(m[nos.nofull].regIgnore.length === 2 && m[nos.nofull].regIgnore[1] === R.refundMarkKey('wechat', '某虚构饭店', 5000), '11 退款不在文件里的原单：带上「不要了」时要登记的忽略键（原单 + 退款记号）');
   ok(m[nos.nofull].bucket === 'pending' && m[nos.nofull].why === 'fullnorefund', '11 已全额退款、退款时间早于原单的不算：进待处理');
   ok(conserved(res), '11 守恒');
 }

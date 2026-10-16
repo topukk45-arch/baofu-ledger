@@ -332,13 +332,16 @@ const before = await t.snapshot();
 // ===== 8. 1016-C：主页面查「已全额退款的原单，以前导入过退款没有」=====
 {
   const R8 = [rec('m1', 1, 15),
+    { id: 'mi', time: '2026-03-11T09:00', money: 50, type: 'income', cat: '其他', remark: '手记的收入' },
+    { id: 'wx2', time: '2026-03-14T09:00', money: 50, type: 'income', cat: '其他', remark: '', src: { app: 'wechat' }, cp: 0, oc: '某虚构饭店-退款' },
     { id: 'wr', time: '2026-03-12T09:00', money: 50, type: 'income', cat: '其他', remark: '', src: { app: 'wechat' }, cp: 0, oc: '某虚构饭店-退款' },
     { id: 'ar', time: '2026-03-12T09:00', money: 30, type: 'income', cat: '其他', remark: '', src: { app: 'alipay' }, cp: 1, oc: '日用百货' }];
   const seed = SEED(); seed['store_' + ID] = JSON.stringify({ archives: { '默认存档': { cats: CATS, records: R8, cps: ['某虚构饭店', '虚构商户'] } }, last: '默认存档', accountName: '小明' });
   const t = await boot({ seed });
   const st = t.w.JiwenImportStore;
   const aNo = ano(), aNo2 = ano();
-  await st.ordersRegister(undefined, [{ app: 'alipay', no: aNo + '_R1', time: '2026-03-12T09:00', id: 'ar', st: 0 }]);
+  await st.ordersRegister(undefined, [{ app: 'alipay', no: aNo + '_R1', time: '2026-03-12T09:00', id: 'ar', st: 0 },
+                                      { app: 'wechat', no: '50300000009999999999999999901', time: '2026-03-12T09:00', id: 'wr', st: 0 }]);
   const wo = wx({ time: T(3, 10), cp: '某虚构饭店', fen: 5000, status: '已全额退款' });
   const wo2 = wx({ time: T(3, 13), cp: '某虚构饭店', fen: 5000, status: '已全额退款' });      // 时间在那条退款之后：不算
   const ao = ali({ time: T(3, 10), no: aNo, fen: 3000, status: '退款成功', io: 'neutral' });
@@ -347,11 +350,11 @@ const before = await t.snapshot();
   const lk = R.lookups(parsed);
   const known = await st.knownFor(lk);
   const kOf = (fi, x) => R.fullRefundKey(R.orderKey(fi ? 'alipay' : 'wechat', parsed.files[fi].rows.find(r => r.no === x.no)));
-  ok(known[kOf(0, wo)] && known[kOf(0, wo)].found && known[kOf(0, wo)].id === 'wr' && !known[kOf(0, wo2)], '8 微信：账本里有同对方、同金额、时间在后的退款记录 → 找到了');
+  ok(known[kOf(0, wo)] && known[kOf(0, wo)].found && known[kOf(0, wo)].id === 'wr' && !known[kOf(0, wo2)], '8 微信：以前导入的退款记录（单号表里有）→ 找到了；手记的收入、单号表里没登记的不算');
   ok(known[kOf(1, ao)] && known[kOf(1, ao)].found && known[kOf(1, ao)].id === 'ar' && !known[kOf(1, ao2)], '8 支付宝：单号表里有「原单号_…」→ 找到了');
   const res = R.route(parsed, { known, rules: [] });
   const b = (fi, x) => res.items.find(it => it.file === fi && it.src === 'row' && parsed.files[fi].rows[it.row].no === x.no);
-  ok(b(0, wo).why === 'fullrefundold' && b(0, wo2).why === 'fullnorefund' && b(1, ao).why === 'fullrefundold' && b(1, ao2).why === 'fullnorefund', '8 找到的跳过，找不到的进待处理');
+  ok(b(0, wo).why === 'fullrefundold' && b(0, wo).bucket === 'add' && b(0, wo2).why === 'fullnorefund' && b(1, ao).why === 'fullrefundold' && b(1, ao2).why === 'fullnorefund', '8 找到的照常新增，找不到的进待处理');
   ok(!t.errs.length && !t.jsErr.length, '8 无报错 ' + t.errs.concat(t.jsErr).join('|'));
 }
 

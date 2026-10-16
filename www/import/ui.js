@@ -315,6 +315,8 @@
     if (p.records !== p.importN) c.appendChild(el('div', 'imp-soft', '分分捐、收款这类合并以后，实际新建 ' + p.records + ' 条记录'));
     if (p.blocking.length) c.appendChild(el('div', 'imp-line imp-bad', '有账单笔数对不上，先不能导入'));
     if (S.lost) c.appendChild(el('div', 'imp-soft', '有 ' + S.lost + ' 处改动因为重新计算失效了'));
+    var cs = p.sections.comboSkippedDays || [];
+    if (cs.length) { var cn = el('div', 'imp-soft', '有 ' + cs.length + ' 天账单太多（一天超过 120 笔），没试「几家不同商家加起来等于一条手记」的配法，只看了同一商家的几笔'); cn.id = 'impComboNote'; c.appendChild(cn); }
     return c;
   }
 

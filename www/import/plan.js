@@ -29,7 +29,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-C';
+  var VERSION = '1016-D';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -377,6 +377,15 @@
       if (['add', 'neutral', 'refund', 'merge'].indexOf(d.group) >= 0 || (d.group === 'skip' && d.item.register)) orders += d.units;
     });
 
+    // ---- 要登记成「忽略」的单号（1016-C，⑥b 写入时用）：全额退款跳过的一对；已全额退款、退款不在文件里、你选了「不要了」的原单
+    //      （微信再加一个退款记号键），以后退款行进来查到是忽略就跟着跳过，不会多出一笔收入
+    var ignoreOrders = [];
+    rows.forEach(function (d) {
+      if (d.src !== 'row' || !d.item.regIgnore) return;
+      if (d.group === 'skip' || (d.group === 'excluded' && d.why === 'fullnorefund')) d.item.regIgnore.forEach(function (k) { if (ignoreOrders.indexOf(k) < 0) ignoreOrders.push(k); });
+    });
+    sec.comboSkippedDays = (matched.stats && matched.stats.comboSkippedDays) || [];
+
     // ---- 明细分组（按时间倒序，和账单列表一样）----
     var groups = {};
     GROUPS.forEach(function (g) { groups[g] = []; });
@@ -402,7 +411,7 @@
     GROUPS.forEach(function (g) { groups[g].sort(function (a, b) { return (b.time || '') < (a.time || '') ? -1 : (b.time || '') > (a.time || '') ? 1 : 0; }); });
 
     return { version: VERSION, files: files, counts: counts, sums: sums, importN: importN, mergeM: mergeM, records: records, orders: orders,
-             canImport: canImport, blocking: blocking.map(function (f) { return f.name; }), sections: sec, groups: groups,
+             ignoreOrders: ignoreOrders, canImport: canImport, blocking: blocking.map(function (f) { return f.name; }), sections: sec, groups: groups,
              groupNames: GROUP_NAME, rows: rows };
   }
 

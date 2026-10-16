@@ -285,6 +285,105 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   ok(r3.item(o2).bucket === 'pending' && r3.item(o2).why === 'fullnorefund' && r3.item(o2).msg === '这笔已全额退款，退款不在这次的文件里' && !r3.item(o2).cands, '11 退款不在这次的文件里：进待处理，不合并');
 }
 
+// ===== 13. 全额退款跨两次导入：先原单后退款、先退款后原单，导完净额都是 0，没有多出的收入 =====
+{
+  // 一个假的「主页面 + ⑥b 写入」：按方案把新增 / 不计入 / 退款写成记录，登记单号（忽略的登记成 st 1），下一次导入照着查
+  function ledger() {
+    const L = { recs: [], orders: {}, n: 0 };
+    L.known = parsed => {
+      const lk = R.lookups(parsed), known = {};
+      const info = id => { const r = L.recs.find(x => x.id === id); return r ? { type: r.type, fen: r.fen, refunded: L.recs.filter(x => x.refundOf === id).reduce((a, x) => a + x.fen, 0), mode: r.mode } : null; };
+      lk.orders.forEach(k => { const e = L.orders[k]; if (e) known[k] = { st: e.st, id: e.id, rec: e.st === 0 ? info(e.id) : null }; });
+      lk.fullRefunds.forEach(f => {
+        if (f.app === 'alipay') { const k = Object.keys(L.orders).find(x => x.startsWith('alipay|' + f.no + '_')); if (k) known[f.key] = { found: true, id: L.orders[k].id }; return; }
+        const ids = new Set(Object.keys(L.orders).filter(k => k.startsWith('wechat|') && L.orders[k].st === 0).map(k => L.orders[k].id));
+        const r = L.recs.find(x => ids.has(x.id) && x.app === 'wechat' && (x.refundOf || /-退款$/.test(x.oc)) && x.fen === f.fen && x.cp === f.cp && x.time >= f.time);
+        if (r) known[f.key] = { found: true, id: r.id };
+      });
+      return known;
+    };
+    L.run = (app, txns, decide, manual) => {
+      const parsed = P.parseFiles([{ name: 'f', data: B.ab(B.bill(app, txns, { range: RANGE }).bytes) }]);
+      const routed = R.route(parsed, { known: L.known(parsed), rules: [] });
+      const q = M.ledgerQuery(routed, parsed);
+      const cands = L.recs.filter(r => r.type === 'expense' && q.refunds.some(x => r.time < x.before && r.fen >= x.minFen)).map(r => ({ id: r.id, time: r.time, type: r.type, fen: r.fen, refunded: 0, cp: r.cp, cat: r.cat }));
+      const matched = M.match(routed, parsed, { manual: manual || [], refundCands: cands, cats: CATS, merchants: W });
+      const byId = {}; (manual || []).concat(cands).forEach(m => { byId[m.id] = m; });
+      const input = { parsed, matched, info: { cats: CATS, isNewUser: false }, manualById: byId, overlaps: [] };
+      const p0 = PL.plan(input), edits = decide ? decide(p0) : {};
+      const p = PL.plan(input, edits);
+      p.rows.forEach(d => {
+        if (d.src !== 'row') return;
+        if (['add', 'neutral', 'refund'].includes(d.group)) {
+          const id = 'R' + (++L.n);
+          L.recs.push({ id, app, type: d.type, fen: d.fen, mode: d.mode, cp: d.cp, oc: d.kind, time: d.time, cat: d.cat,
+                        refundOf: d.group === 'refund' && d.refundTo ? (d.refundTo.record || null) : null });
+          L.orders[d.key] = { st: 0, id };
+        } else if (d.group === 'merge') L.orders[d.key] = { st: 0, id: d.into };
+      });
+      p.ignoreOrders.forEach(k => { L.orders[k] = { st: 1, id: '' }; });
+      return { p, routed, matched };
+    };
+    L.net = () => L.recs.reduce((a, r) => a + (r.type === 'income' ? r.fen : -r.fen), 0);
+    L.income = () => L.recs.filter(r => r.type === 'income').length;
+    return L;
+  }
+  const pickAll = (why, pick) => p => { const rows = {}; p.rows.forEach(d => { if (d.why === why && d.group === 'pending') rows[d.key] = { pick: typeof pick === 'function' ? pick(d) : pick }; }); return { rows }; };
+  const m50 = [man('hand50', 5, 9, 5000, { cat: '其他' })];       // 一条无关的 50 元手记：原单不能和它合并
+  // 微信
+  const wo = () => wx({ time: T(5, 10, 12), cp: '某虚构饭店', fen: 5000, status: '已全额退款' });
+  const wr = () => wx({ time: T(5, 12, 9), cp: '某虚构饭店', kind: '某虚构饭店-退款', io: 'income', fen: 5000, status: '已全额退款', no: wrno() });
+  {
+    const L = ledger();                                   // 先原单（退款不在文件里，选「不要了」），再退款
+    const a = L.run('wechat', [wo()], pickAll('fullnorefund', 'drop'), m50);
+    ok(a.p.ignoreOrders.length === 2, '13 微信先原单：选「不要了」，登记原单和退款记号两个忽略键');
+    const b = L.run('wechat', [wr()], null, m50);
+    ok(b.routed.items[0].why === 'origignored' && L.recs.length === 0 && L.net() === 0, '13 微信先原单（不要了）再退款：退款也跳过，账本净额 0，没有多出的收入');
+  }
+  {
+    const L = ledger();                                   // 先原单（选「作为新增」），再退款（挂到原单）
+    L.run('wechat', [wo()], pickAll('fullnorefund', 'new'), m50);
+    const b = L.run('wechat', [wr()], pickAll('refundcands', d => ({ record: d.cands[0].record })), m50);
+    ok(L.recs.length === 2 && L.recs[1].refundOf === L.recs[0].id && L.net() === 0, '13 微信先原单（作为新增）再退款：退款挂到原单，净额 0');
+  }
+  {
+    const L = ledger();                                   // 先退款（只算结余），再原单
+    L.run('wechat', [wr()], null, m50);
+    ok(L.income() === 1 && L.recs[0].mode === 'flow', '13 微信先退款：按只算结余导入');
+    const b = L.run('wechat', [wo()], null, m50);
+    const it = b.matched.items[0];
+    ok(it.bucket === 'add' && it.why === 'fullrefundold' && !L.recs.some(r => r.id === 'hand50') && L.recs.length === 2 && L.net() === 0, '13 微信先退款再原单：原单照常新增（不和那条 50 元手记合并），净额 0，不用删旧记录');
+  }
+  // 支付宝
+  const no = ano();
+  const ao = () => ali({ time: T(5, 10, 12), no, cp: '某虚构商城', fen: 5000, status: '退款成功', io: 'neutral' });
+  const ar = () => ali({ time: T(5, 12, 9), no: no + '_R1', cp: '某虚构商城', fen: 5000, status: '退款成功', io: 'neutral', desc: '退款-虚构商品' });
+  {
+    const L = ledger();
+    L.run('alipay', [ao()], pickAll('fullnorefund', 'drop'), m50);
+    const b = L.run('alipay', [ar()], null, m50);
+    ok(b.routed.items[0].why === 'origignored' && L.recs.length === 0 && L.net() === 0, '13 支付宝先原单（不要了）再退款：退款也跳过，净额 0');
+  }
+  {
+    const L = ledger();
+    L.run('alipay', [ar()], null, m50);
+    const b = L.run('alipay', [ao()], null, m50);
+    ok(b.matched.items[0].why === 'fullrefundold' && L.recs.length === 2 && L.recs[1].type === 'expense' && L.net() === 0, '13 支付宝先退款再原单：原单作为支出新增，净额 0');
+  }
+  {
+    const L = ledger();                                   // 同一批里成对：两条都跳过、都登记成忽略；再导一次同样的文件，还是全跳过
+    L.run('wechat', [wo(), wr()], null, m50);
+    ok(L.recs.length === 0 && Object.values(L.orders).filter(e => e.st === 1).length === 2, '13 同一批全额退款的一对：都不写，两个单号登记成忽略');
+  }
+}
+
+// ===== 14. 一天账单太多、没试不同商家凑法：方案里带上是哪几天 =====
+{
+  const many = Array.from({ length: M.COMBO_DAY_MAX + 5 }, (_, i) => wx({ time: T(8, 8, 8 + Math.floor(i / 60), i % 60), cp: '虚构店' + i, fen: 100 + i }));
+  const r = run([{ app: 'wechat', txns: many }], [man('big', 8, 8, 999999)]);
+  ok(r.plan().sections.comboSkippedDays.join() === '2026-08-08', '14 一天超过 ' + M.COMBO_DAY_MAX + ' 笔：记下这一天，确认页加一行说明');
+}
+
 // ===== 12. 性质测试：随机账单 + 随机手记 + 随机改动 =====
 {
   let s = 20261016;
