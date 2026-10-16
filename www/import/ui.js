@@ -753,7 +753,7 @@
           t.keys.forEach(function (k) { var e = S.edits.rows[k] || (S.edits.rows[k] = {}); e.mode = t.allSkip ? 'normal' : 'skip'; });
           replan();
         });
-        all.className += ' imp-tr-all'; box.appendChild(all);
+        all.className += ' imp-tr-all'; all.style.marginTop = '8px'; box.appendChild(all);
         tc.appendChild(box);
       });
       tc.appendChild(el('div', 'imp-soft', '只收微信转账、微信红包、支付宝转账红包，相邻两笔隔不到 3 天的串成一段。随礼、还钱这类来回抵掉的，可以标成不计入。'));
@@ -998,7 +998,7 @@
     // 1016-G：为什么没配上（开发用：试过哪几条手记、每条卡在哪）
     if (d.item && d.item.trace && d.group !== 'merge') {
       // 1016-UI2：不再写「开发用」；默认收起，点开才看试过哪几条
-      var tb = el('div', 'imp-trace'); tb.id = 'impTrace'; tb.style.marginTop = '4px';
+      var tb = el('div', 'imp-trace'); tb.id = 'impTrace'; tb.style.marginTop = '8px';
       var tt = btn('为什么没配上手记 ▸', 'imp-link imp-trace-toggle', function () { var o = tb.classList.toggle('open'); tt.textContent = o ? '为什么没配上手记 ▾' : '为什么没配上手记 ▸'; });
       tb.appendChild(tt);
       var rows = el('div', 'imp-trace-rows'); tb.appendChild(rows);

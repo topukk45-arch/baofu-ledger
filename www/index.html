@@ -1336,13 +1336,58 @@
         .bgy-row.empty .bg-bar { background:repeating-linear-gradient(45deg, var(--c-chip) 0 4px, transparent 4px 8px); }
         .bgy-row.empty .bgy-v { color:var(--c-text-soft); font-style:italic; }
         .bgy-note { font-size:11.5px; color:var(--c-text-soft); padding:4px 4px 0; }
+
+        /* ===== 1016-UI3：老页面只把「太小、点不准」的点击区域撑到 48px（布局风格不变）=====
+           能长高一点不碍事的直接加 min-height；长高会挤乱一行的（小字链接、分段按钮、日历翻页箭头）
+           用 ::after 叠一块看不见的点击区域（和 .ui-hit 同一个做法），外观一点不变。 */
+        .login-btn, .login-import-btn, .user-chip, .recent-users .hidden-toggle { min-height:var(--ui-tap); }
+        .save, .cancel, .add-btn, .edit-del-btn, .mini-btn, .ask-extra-btn, .pager button,
+        .days-back, .days-add, .days-manage, .bg-detail-head .bg-edit, .bgu-set, .bgu-head, .tpl-save-btn { min-height:var(--ui-tap); }
+        .days-card-head { margin-bottom:12px; }
+        @media (max-width: 600px) { tbody td.ops-cell { padding-top:12px; } }
+        #askInput, .search-input, .form-box input, .form-box select, .edit-dialog input, .edit-dialog select, .remark-area { min-height:var(--ui-tap); }
+        .edit-dialog .dt-input, .form-box .dt-input { padding-top:14px; padding-bottom:13px; }
+        .cs-display { padding-top:14px; padding-bottom:14px; }
+        .cs-opt { padding-top:14px; padding-bottom:14px; }
+        .cat-chips .cc { padding-top:13px; padding-bottom:13px; }
+        .mode-chips .cc { padding:13px 0; }
+        .filter-chips .cc { padding-top:13px; padding-bottom:13px; }
+        .to-top, .clear-filter-fab { width:var(--ui-tap); height:var(--ui-tap); }
+        .theme-swatch { width:var(--ui-tap); height:var(--ui-tap); }
+        .days-row { min-height:var(--ui-tap); }
+        .days-empty-row { min-height:var(--ui-tap); display:flex; align-items:center; justify-content:center; padding-top:4px; padding-bottom:4px; }
+        @media (max-width: 600px) { tbody td.ops-cell .operate-btn { min-height:var(--ui-tap); } }
+        /* 分段按钮（从大到小 / 默认进入页面 / 收支·预算…）：不改外观，上下各叠一块点击区域；宽度至少 48 */
+        .seg { overflow:visible; }
+        .seg button { position:relative; min-width:var(--ui-tap); }
+        .seg button:first-child { border-radius:8px 0 0 8px; }
+        .seg button:last-child { border-radius:0 8px 8px 0; }
+        .seg button::after { content:''; position:absolute; left:0; right:0; top:50%; height:max(100%, var(--ui-tap)); transform:translateY(-50%); }
+        /* 小字链接、翻页箭头、月份标题、备注：外观不变，点击区域撑到 48×48 */
+        .dt-nav, #statMonthLabel, #bgMonthLabel, .days-card-more, .remark-view, .link-btn, .user-chip .u-del { position:relative; }
+        .dt-nav::after, #statMonthLabel::after, #bgMonthLabel::after, .days-card-more::after, .remark-view::after, .link-btn::after, .user-chip .u-del::after {
+            content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:max(100%, var(--ui-tap)); height:max(100%, var(--ui-tap)); }
+        /* 开发开关里的几处（空账本入口、月初提醒、统计页待处理横幅）：按钮做成正经按钮 */
+        .imp-empty-entry { min-height:var(--ui-tap); }
+        .stat-pend-banner { flex-wrap:wrap; padding:8px 10px; }
+        .stat-pend-banner span { flex:1 1 100%; line-height:1.6; }
+        .stat-pend-banner button { flex:1 1 0; min-height:var(--ui-tap); padding:0 14px; border:1px solid var(--c-border-mid);
+            border-radius:10px; background:var(--c-bg); color:var(--c-primary-deep); text-decoration:none; font-size:14px; }
+        /* 预算建议：每行至少 48 高、行间隔 8；「写入勾上的」贴在屏幕下方（底栏上面），不用滑到底 */
+        #bgSuggestList { display:flex; flex-direction:column; gap:var(--ui-gap); margin-top:8px; }
+        .bg-suggest-row { min-height:var(--ui-tap); padding:6px 10px !important; border:1px solid var(--c-border); border-radius:10px; background:var(--c-bg); cursor:pointer; }
+        .bg-suggest-row input { width:20px; height:20px; flex:0 0 20px; accent-color:var(--c-primary); -webkit-appearance:checkbox; appearance:auto; }
+        .bg-suggest-foot { position:sticky; bottom:calc(64px + env(safe-area-inset-bottom)); z-index:5; display:flex; gap:var(--ui-gap);
+            margin:10px -14px -14px; padding:10px 14px; background:var(--c-surface); border-top:1px solid var(--c-border); border-radius:0 0 14px 14px; }
+        .bg-suggest-foot > * { flex:1 1 0; }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-UI2</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-UI3</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -7741,6 +7786,8 @@ ${detail}
                 card.appendChild(b); return;
             }
             const S=budgetSuggest(dec), budgets=getBudgets(), cats=getCats();
+            // 1016-UI3：「收起 / 写入勾上的」放在一条贴着屏幕下方的操作条里（主按钮在右边），不用滑到底
+            const foot=document.createElement('div'); foot.className='bg-suggest-foot';
             const h=document.createElement('div'); h.className='stat-day-title'; h.textContent='预算建议'; card.appendChild(h);
             const note=document.createElement('div'); note.style.fontSize='12px'; note.style.color='var(--c-text-soft)'; card.appendChild(note);
             if(!S.list.length){
@@ -7757,7 +7804,7 @@ ${detail}
                     row.appendChild(cb); row.appendChild(tx); box.appendChild(row);
                 });
                 card.appendChild(box);
-                const go=document.createElement('button'); go.type='button'; go.className='mini-btn gold'; go.id='bgSuggestApply'; go.textContent='写入勾上的'; go.style.marginTop='8px';
+                const go=document.createElement('button'); go.type='button'; go.className='mini-btn gold'; go.id='bgSuggestApply'; go.textContent='写入勾上的';
                 go.addEventListener('click', ()=>{
                     const pick=[...box.querySelectorAll('.bg-suggest-row')].filter(r=>r.querySelector('input').checked).map(r=>S.list.find(x=>x.cat===r.dataset.cat));
                     if(!pick.length){ customAlert('一个都没勾。', '预算建议'); return; }
@@ -7769,11 +7816,12 @@ ${detail}
                     customAlert(`写好了 ${pick.length} 个分类的每月预算。以后可以在「设置 → 管理账单分类」或预算页里改。`, '预算建议');
                     renderStats();
                 });
-                card.appendChild(go);
+                foot.appendChild(go);
             }
-            const cl=document.createElement('button'); cl.type='button'; cl.className='mini-btn'; cl.id='bgSuggestClose'; cl.textContent='收起'; cl.style.marginTop='8px'; cl.style.marginLeft='8px';
+            const cl=document.createElement('button'); cl.type='button'; cl.className='mini-btn'; cl.id='bgSuggestClose'; cl.textContent='收起';
             cl.addEventListener('click', ()=>{ bgSuggestOpen=false; renderBudgetSuggest(dec); });
-            card.appendChild(cl);
+            foot.insertBefore(cl, foot.firstChild);
+            card.appendChild(foot);
         }
         // 「预算」页签
         function renderBudgetPane(dec){
