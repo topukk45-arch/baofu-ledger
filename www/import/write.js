@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-J';
+  var VERSION = '1016-K';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -230,5 +230,21 @@
     };
   }
 
-  return { VERSION: VERSION, build: build, FINAL_SKIP: FINAL_SKIP };
+  // 1016-K：记录的指纹（给 ⑦ 撤销认「导入后你改过没有」）。不含 id、refundOf（导入备份时会重新编号），
+  //   字段按名字排序（编辑时字段顺序变了不算改过），对象字段同样排序。53 位哈希，36 进制
+  function canon(v) {
+    if (v === null || typeof v !== 'object') return JSON.stringify(v === undefined ? null : v);
+    if (Array.isArray(v)) return '[' + v.map(canon).join(',') + ']';
+    return '{' + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(v[k]); }).join(',') + '}';
+  }
+  function recHash(r) {
+    var o = {}; Object.keys(r || {}).forEach(function (k) { if (k !== 'id' && k !== 'refundOf' && r[k] !== undefined) o[k] = r[k]; });
+    var str = canon(o), h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+    for (var i = 0; i < str.length; i++) { var ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+  }
+
+  return { VERSION: VERSION, build: build, FINAL_SKIP: FINAL_SKIP, recHash: recHash };
 });

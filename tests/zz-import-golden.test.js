@@ -93,11 +93,12 @@ async function snap() {
   out.stats = $('statCal').innerHTML + $('statMonthIn').textContent + $('statMonthOut').textContent + $('statMonthCatList').innerHTML;
   const days = [...$('statCal').querySelectorAll('.day.has')];
   out.day = days.length ? (days[Math.min(5, days.length - 1)].click(), $('statFlowList').innerHTML) : '';
-  // 每次不一样的：记录编号、批次号、账号编号、导出时间 → 按出现顺序的占位
+  // 每次不一样的：记录编号、批次号、账号编号、导出时间、新增记录的指纹（含批次号）→ 按出现顺序的占位
   const ids = new Map(), bs = new Map();
   const norm = s => s.replace(/r\d{23}/g, m => { if (!ids.has(m)) ids.set(m, '<记录' + (ids.size + 1) + '>'); return ids.get(m); })
     .replace(/("(?:batch|b)": ?")(b[0-9a-z]+)"/g, (m0, a, b) => { if (!bs.has(b)) bs.set(b, '<批次' + (bs.size + 1) + '>'); return a + bs.get(b) + '"'; })
     .replace(/("bs": ?\[)([^\]]*)\]/g, (m0, a, list) => a + list.replace(/"(b[0-9a-z]+)"/g, (m1, b) => { if (!bs.has(b)) bs.set(b, '<批次' + (bs.size + 1) + '>'); return '"' + bs.get(b) + '"'; }) + ']')
+    .replace(/("h": ?\[)([^\]]*)\]/g, (m0, a, list) => a + '"<指纹 ' + (list ? list.split(',').length : 0) + ' 个>"]')   // 1016-K：指纹里含批次号，跟时区走
     .replace(/"accountId": ?"u\d+"/g, '"accountId":"<编号>"').replace(/"exportedAt": ?"[^"]*"/g, '"exportedAt":"<时间>"').replace(/"at": ?"[^"]*"/g, '"at":"<时间>"');
   Object.keys(out).forEach(k => { out[k] = norm(out[k]); });
   return out;

@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-J</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-K</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1469,6 +1469,7 @@
                     <!-- 1015-A：账单导入还在开发，入口默认藏着；设置页底部版本号连点 5 次才出现（只在这台手机上） -->
                     <button class="set-item" id="devImportBtn" style="display:none"><span>导入（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devRestoreBtn" style="display:none"><span>恢复到导入前（开发中）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="devUndoBtn" style="display:none"><span>撤销导入（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
                 </div>
@@ -3440,16 +3441,30 @@
                         Object.keys(c.was).slice(0, 20).forEach(k=>{ const v=c.was[k]; if(v===null || ['string','number','boolean'].includes(typeof v)) was[k]=v; });
                     }
                     const nos=(Array.isArray(c.nos) ? c.nos : []).filter(p=>Array.isArray(p) && IMP_APPS.includes(p[0]) && typeof p[1]==='string' && p[1]).map(p=>[p[0], p[1].slice(0, 80)]);
+                    // 1016-K：导入写进去的值（撤销时比一比，不一样就是你后来改过）。旧批次没有
+                    if(c.now && typeof c.now==='object' && !Array.isArray(c.now)){
+                        const now={};
+                        Object.keys(c.now).slice(0, 20).forEach(k=>{ const v=c.now[k]; if(v===null || ['string','number','boolean'].includes(typeof v)) now[k]=v; });
+                        return { id, was, now, nos };
+                    }
                     return { id, was, nos };
                 }).filter(Boolean);
+                // 新增的记录 id 和指纹（1016-K 起，一一对应）一起换编号、一起丢
+                const add0=Array.isArray(x.add) ? x.add : [], withH=Array.isArray(x.h) && x.h.length===add0.length;
+                const addPairs=add0.map((id, k)=>[mapId(id), withH && typeof x.h[k]==='string' ? x.h[k].slice(0, 16) : '']).filter(p=>p[0]);
+                const endOk=(v, from, max)=>Number.isInteger(v) && v>=from && v<=max;
                 const ra=impCleanRules(x.rulesAdded, cats) || { cat:[], type:[] };
-                return { b:x.b, at:str(x.at, 16),
+                const o={ b:x.b, at:str(x.at, 16),
                          apps:(Array.isArray(x.apps) ? x.apps : []).filter(a=>IMP_APPS.includes(a)),
                          from:str(x.from, 10), to:str(x.to, 10),
-                         add:(Array.isArray(x.add) ? x.add : []).map(mapId).filter(Boolean),
-                         chg, cpLen:len(x.cpLen, cpsLen), pmLen:len(x.pmLen, pmsLen),
-                         catsAdded:(Array.isArray(x.catsAdded) ? x.catsAdded : []).filter(c=>typeof c==='string' && cats.includes(c)),
-                         rulesAdded:ra };
+                         add:addPairs.map(p=>p[0]) };
+                if(withH) o.h=addPairs.map(p=>p[1]);
+                o.chg=chg; o.cpLen=len(x.cpLen, cpsLen); o.pmLen=len(x.pmLen, pmsLen);
+                if(endOk(x.cpEnd, o.cpLen, cpsLen)) o.cpEnd=x.cpEnd;
+                if(endOk(x.pmEnd, o.pmLen, pmsLen)) o.pmEnd=x.pmEnd;
+                o.catsAdded=(Array.isArray(x.catsAdded) ? x.catsAdded : []).filter(c=>typeof c==='string' && cats.includes(c));
+                o.rulesAdded=ra;
+                return o;
             }).filter(Boolean);
         }
         // 备份文件里的单号表 { 来源: { 月份: 一块 } } → 库里的 [键, 值]。记录 id 换成新的；已导入但记录找不到的不要（按规则本来就等于没导过）
@@ -3565,11 +3580,12 @@
         const IMP_BK_MAX=3;
         function impBkPrefix(id, aid){ return `imp_${id}_${aid}_bk_`; }
         function impBkKeys(id, aid){ const p=impBkPrefix(id, aid); return [...__ledgerKeys].filter(k=>k.indexOf(p)===0).sort(); }
-        async function impMakeBackup(t, batch){
+        // kind：'import' 导入前（键 …_bk_<时间>）/ 'undo' 撤销前（1016-K，键 …_bk_<时间>_u），共用最多 3 份的位置
+        async function impMakeBackup(t, batch, kind){
             const store=loadStore(t.e.id), a=store.archives[t.name];
             const ex=await impExportFields(t.e.id, t.name, true);
             const arch={}; Object.keys(a).forEach(k=>{ arch[k] = k==='records' ? null : a[k]; });
-            return JSON.stringify({ app:'记问', kind:'导入前备份', user:nameOf(t.e.id), accountId:t.e.id, archive:t.name, aid:t.aid, batch,
+            return JSON.stringify({ app:'记问', kind:kind==='undo' ? '撤销前备份' : '导入前备份', user:nameOf(t.e.id), accountId:t.e.id, archive:t.name, aid:t.aid, batch,
                 cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], ...impArchFields(a), data:a.records, ...ex,
                 _arch:arch, exportedAt:new Date().toLocaleString() });
         }
@@ -3638,7 +3654,10 @@
                     if(o){ was.cat=old.cat; was.skip=old.skip===true ? true : null; was.flow=old.flow===true ? true : null; n.cat=o.cat; setRecMode(n, recMode(o)); }
                 }
                 recs[i]=n;
-                chg.push({ id:c.id, was, nos:c.nos });
+                // 1016-K：导入写进去的值，和原值同样的写法（对象存 JSON 文本，没有记 null）
+                const now={};
+                Object.keys(was).forEach(k=>{ const v=n[k]; now[k]= v===undefined ? null : (v!==null && typeof v==='object' ? JSON.stringify(v) : v); });
+                chg.push({ id:c.id, was, now, nos:c.nos });
             });
             // 退款：分类、口径照原单
             const byId=new Map(recs.map(r=>[r.id, r])); made.forEach(r=>byId.set(r.id, r));
@@ -3676,7 +3695,11 @@
             const logs=((curLog && curLog.list) || []).slice();
             const ra0=(ws.log && ws.log.rulesAdded) || { cat:[], type:[] };
             const ra={ cat:ra0.cat||[], type:ra0.type||[] }; if(mapsDone.length) ra.map=mapsDone;   // 导入记录里只记真存进去的对照（给 ⑦ 撤销）
-            logs.push(Object.assign({}, ws.log, { add:made.map(r=>r.id), chg, rulesAdded:ra }));
+            // 1016-K：新增记录的指纹（撤销时认「导入后你改过没有」）、导完时名单多长
+            const W=window.JiwenImportWrite, hs=W && W.recHash ? made.map(r=>W.recHash(r)) : null;
+            const lg=Object.assign({}, ws.log, { add:made.map(r=>r.id), chg, rulesAdded:ra, cpEnd:(a.cps||[]).length, pmEnd:(a.pms||[]).length });
+            if(hs) lg.h=hs;
+            logs.push(lg);
             const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
             pairs.push([impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:cleanLog })]);
             if(window.__impFailAt==='beforeSave') throw impErr('test');
@@ -3689,7 +3712,7 @@
             const raw=await idbGet(key);
             if(typeof raw!=='string') throw impErr('nobackup');
             const bk=JSON.parse(raw);
-            if(!bk || bk.kind!=='导入前备份' || bk.aid!==t.aid || !bk._arch || !Array.isArray(bk.data)) throw impErr('badbackup');
+            if(!bk || (bk.kind!=='导入前备份' && bk.kind!=='撤销前备份') || bk.aid!==t.aid || !bk._arch || !Array.isArray(bk.data)) throw impErr('badbackup');
             const store=loadStore(t.e.id);
             const a={}; Object.keys(bk._arch).forEach(k=>{ a[k] = k==='records' ? bk.data : bk._arch[k]; });
             if(!('records' in a)) a.records=bk.data;
@@ -3703,6 +3726,35 @@
             pairs.set(key, null);        // 用过的这份删掉，再点就恢复到更早一次导入之前
             await saveStoreDurable(store, t.e.id, ()=>[...pairs]);
             return { records:bk.data.length, at:bk.exportedAt, batch:bk.batch||'' };
+        }
+        // ---- 1016-K：撤销要的存档样子（交给 import/undo.js）和照撤完的样子写回 ----
+        async function impUndoState(t){
+            const a=loadStore(t.e.id).archives[t.name];
+            const blocks=await impReadOrders(t.e, t.aid), orders={};
+            blocks.forEach((list, k)=>{ orders[k]={ app:impParseOrdKey(t.e.id, t.aid, k).app, list }; });
+            const pend=await impGetJson(t.e, impPendKey(t.e.id, t.aid));
+            const log=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
+            return { records:a.records, cats:(a.cats||[]).slice(), budgets:a.budgets||{}, tpls:a.tpls||[], importRules:a.importRules,
+                     cps:Array.isArray(a.cps) ? a.cps : undefined, pms:Array.isArray(a.pms) ? a.pms : undefined, orders,
+                     pending:(pend && Array.isArray(pend.items)) ? pend.items : [], logs:(log && Array.isArray(log.list)) ? log.list : [] };
+        }
+        async function impApplyUndo(t, after){
+            const user=t.e.id, store=loadStore(user), a=store.archives[t.name];
+            a.records=after.records; a.cats=after.cats.slice();
+            ['importRules', 'cps', 'pms'].forEach(k=>{ if(after[k]===undefined) delete a[k]; else a[k]=after[k]; });
+            const pairs=[];
+            const blocks=await impReadOrders(t.e, t.aid);
+            blocks.forEach((list, k)=>{
+                const x=after.orders[k];
+                if(!x) pairs.push([k, null]);
+                else if(x.list.length!==list.length) pairs.push([k, JSON.stringify(impBlkEncode(x.list))]);
+            });
+            const pend=await impGetJson(t.e, impPendKey(t.e.id, t.aid)), pl=(pend && pend.items) || [];
+            if(pl.length!==after.pending.length) pairs.push([impPendKey(t.e.id, t.aid), after.pending.length ? JSON.stringify({ v:1, items:after.pending }) : null]);
+            const cleanLog=impCleanLog(after.logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
+            pairs.push([impLogKey(t.e.id, t.aid), cleanLog.length ? JSON.stringify({ v:1, list:cleanLog }) : null]);
+            if(window.__impFailAt==='undoSave') throw impErr('test');
+            await saveStoreDurable(store, user, ()=>pairs);
         }
         window.JiwenImportStore={
             // 单号表：{ size, get(app, no), findPrefix(app, 开头, 最多几条) }；条目 { app, no, id, batch, st, mon }
@@ -3769,7 +3821,7 @@
                 const clock=()=>(window.performance && typeof performance.now==='function') ? performance.now() : Date.now();
                 const t0=clock(), ms={};
                 prog && prog('backup', 0, 1);
-                const bk=await impMakeBackup(t, ws.batch);
+                const bk=await impMakeBackup(t, ws.batch, 'import');
                 const free=await impFreeBytes(), need=Math.ceil(bk.length*2*1.2 + ws.records.length*400 + ws.orders.length*100);
                 if(free!==null && free<need) throw impErr('nospace', { need, free });
                 if(window.__impFailAt==='backup') throw impErr('test');
@@ -3791,7 +3843,37 @@
             // 本机的导入前备份（新的在后）：[{ key, at, batch, records }]（只读键名和开头，不整个解析）
             backups(archive){
                 const t=impTarget(archive);
-                return impBkKeys(t.e.id, t.aid).map(k=>({ key:k, t:parseInt(k.slice(impBkPrefix(t.e.id, t.aid).length), 36) }));
+                return impBkKeys(t.e.id, t.aid).map(k=>({ key:k, t:parseInt(k.slice(impBkPrefix(t.e.id, t.aid).length), 36), kind:/_u$/.test(k) ? 'undo' : 'import' }));
+            },
+            // ---- 1016-K：撤销（第一期 ⑦a）----
+            // 撤销方案（只读）：import/undo.js 算，带上算的时候账本的版本号。batch：要撤的批次号
+            async undoPlan(batch, archive){
+                const t=impTarget(archive);
+                if(!window.JiwenImportUndo) throw impErr('nomodule');
+                const st=await impUndoState(t);
+                const p=window.JiwenImportUndo.plan(st, batch);
+                p.ver=t.e.ver; p.archive=t.name;
+                return p;
+            },
+            // 照方案撤：账本变了就拒绝（重算）；先备份「撤销前」（放不下就不撤），再一个事务写；失败什么都不改，刚做的备份也删掉
+            async undo(p, opts){
+                opts=opts||{};
+                const t=impTarget(opts.archive!==undefined ? opts.archive : p && p.archive);
+                if(!p || !p.ok || !p.after) throw impErr('badplan');
+                if(p.ver!==t.e.ver) throw impErr('stale');
+                const bk=await impMakeBackup(t, p.target, 'undo');
+                const free=await impFreeBytes(), need=Math.ceil(bk.length*2*1.2);
+                if(free!==null && free<need) throw impErr('nospace', { need, free });
+                const bkKey=impBkPrefix(t.e.id, t.aid)+Date.now().toString(36)+'_u';
+                const old=impBkKeys(t.e.id, t.aid), drop=old.slice(0, Math.max(0, old.length-(IMP_BK_MAX-1)));
+                await idbBatch([['put', bkKey, bk]].concat(drop.map(k=>['del', k])));
+                try{ await impApplyUndo(t, p.after); }
+                catch(err){ try{ await idbBatch([['del', bkKey]]); }catch(_){} throw err; }
+                if(t.e.id===currentUser && t.name===currentArchive){
+                    try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
+                    try{ odScheduleSync(); }catch(_){}
+                }
+                return { chain:p.chain.slice(), totals:p.totals };
             },
             async restoreLast(archive){
                 const t=impTarget(archive);
@@ -5593,7 +5675,7 @@ ${detail}
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = devImportOn() ? '' : 'none'; }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devUndoBtn').style.display = devImportOn() ? '' : 'none'; }
         $('setBuild').textContent=$('loginBuild').textContent;
         renderDevImport();
         // 2 秒内连点 5 次版本号：开 / 关
@@ -5631,7 +5713,7 @@ ${detail}
                 s.onload=()=>resolve(); s.onerror=()=>{ s.remove(); reject(new Error('导入模块没加载上')); };
                 document.head.appendChild(s);
             });
-            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/write.js')).then(()=>one('import/ui.js')).then(()=>{
+            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/write.js')).then(()=>one('import/undo.js')).then(()=>one('import/ui.js')).then(()=>{
                 if(!window.JiwenImportUI) throw new Error('导入模块不完整');
                 return window.JiwenImportUI;
             });
@@ -5667,8 +5749,8 @@ ${detail}
             let list=[];
             try{ list=window.JiwenImportStore.backups(); }catch(_){}
             if(!list.length){ customAlert('这个存档还没有导入前的备份（每次导入前会自动备份一份，最多留 3 份）。', '恢复到导入前'); return; }
-            const last=list[list.length-1], when=new Date(last.t).toLocaleString();
-            customConfirm(`恢复到 ${when} 那次导入之前的样子：账本、单号表、待处理一起还原。\n\n那次导入之后的所有修改（包括手记）都会没有。确定吗？`, async () => {
+            const last=list[list.length-1], when=new Date(last.t).toLocaleString(), what=last.kind==='undo' ? '撤销' : '导入';
+            customConfirm(`这份是「${what}前」的备份：恢复到 ${when} 那次${what}之前的样子，账本、单号表、待处理一起还原。\n\n那次${what}之后的所有修改（包括手记）都会没有。确定吗？`, async () => {
                 try{
                     const r=await window.JiwenImportStore.restoreLast();
                     customAlert(`已恢复，现在有 ${r.records} 条记录。` + (list.length>1 ? `\n\n还有 ${list.length-1} 份更早的导入前备份，再点一次会恢复到更早那次导入之前。` : ''), '恢复到导入前');
@@ -5676,6 +5758,30 @@ ${detail}
                     customAlert(err && err.message==='quota' ? '存储空间不够，没有恢复，账本没动。' : '恢复失败，账本没动：' + (err && (err.code || err.message) || err), '恢复到导入前');
                 }
             }, '恢复到导入前');
+        });
+        // 1016-K：撤销导入（临时入口，⑦b 换成结果页和「设置 → 导入记录」）
+        $('devUndoBtn').addEventListener('click', async () => {
+            let logs=[];
+            try{ await loadImportUI(); logs=(await window.JiwenImportStore.importsRead()).slice().reverse(); }
+            catch(e){ customAlert('读不出导入记录：' + (e && (e.code || e.message) || e), '撤销导入'); return; }
+            if(!logs.length){ customAlert('这个存档没有可以撤销的导入（只保留最近 10 次）。', '撤销导入'); return; }
+            const lines=logs.map((l, i)=>`${i+1}. ${(l.at||'').replace('T', ' ')} · ${(l.apps||[]).map(x=>x==='alipay' ? '支付宝' : '微信').join('+')} · ${l.from}～${l.to} · 新增 ${(l.add||[]).length}`);
+            customPrompt('撤销哪一次？输入序号（1 是最近一次）：\n\n' + lines.join('\n'), '1', async v=>{
+                const k=parseInt(String(v).trim(), 10);
+                if(!(k>=1 && k<=logs.length)){ customAlert('序号不对。', '撤销导入'); return; }
+                let p;
+                try{ p=await window.JiwenImportStore.undoPlan(logs[k-1].b); }
+                catch(e){ customAlert('算撤销方案时出错，什么都没改：' + (e && (e.code || e.message) || e), '撤销导入'); return; }
+                customConfirm(window.JiwenImportUndo.describe(p) + '\n\n撤销前会自动备份一份。确定撤销吗？', async () => {
+                    try{
+                        const r=await window.JiwenImportStore.undo(p);
+                        customAlert(`撤销好了（${r.chain.length} 次导入）。`, '撤销导入');
+                    }catch(err){
+                        const c=err && (err.code || err.message);
+                        customAlert(c==='stale' ? '账本在这期间变了，没有撤销，请再点一次重新算。' : c==='quota' || c==='nospace' ? '存储空间不够，没有撤销，账本没动。' : '撤销失败，账本没动：' + c, '撤销导入');
+                    }
+                }, '撤销导入');
+            }, '撤销导入');
         });
         function openDevImportCheck(){ $('devImportMask').style.display='flex'; runDevImportCheck(); }
         $('devImportRerun').addEventListener('click', runDevImportCheck);
