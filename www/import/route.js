@@ -33,7 +33,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-F';
+  var VERSION = '1016-O';
   var FX_RATE = 0.05;            // 跨境退款汇率差：差 5% 以内算汇率差
   var RECEIPT_MONTH_MAX = 300;   // 一个月收款超过这么多条，建议按天合并
   var PETTY_MIN = 5, PETTY_FEN = 100;   // 疑似零碎扣款：同一对方一个月 5 次以上，且这个对方所有交易都不超过 1 元
@@ -179,7 +179,8 @@
       if (k && k.st === 1) { put(it, 'skip', 'ignored', '以前点过「不要了」'); return; }
       if (k && k.st === 0 && k.rec) { put(it, 'skip', 'imported', k.fp ? '以前导入过（没有单号表，按时间、金额、对方认出来的）' : '以前导入过'); it.recId = k.id; return; }
       // 1016-F：已经在待处理池里（同一份文件导第二次）；没有单号表时只有日期和金额对得上的
-      if (k && k.pend) { put(it, 'skip', 'inpending', '已经在待处理里了'); return; }
+      // 1016-O：已经在待处理池里的，用这次的文件重新判断（照常往下走）；配对完还是拿不准的才跳过、不重复列出（见 match.js）
+      if (k && k.pend) it.wasPend = true;
       if (k && k.fpLoose) { put(it, 'pending', 'fpmaybe', '没有单号表，账本里有一笔同一天、同金额的导入记录，可能导入过，请你确认'); return; }
       // 类型规则（用户的优先）
       var tr = typeRule(it);
@@ -416,6 +417,7 @@
         if (it.noMerge) o.noMerge = true;
         if (it.regIgnore) o.regIgnore = it.regIgnore;
         if (it.markerCands) o.markerCands = it.markerCands;
+        if (it.wasPend) o.wasPend = true;
       } else if (it.src === 'error') o.err = it.err; else o.dup = it.dup;
       return o;
     });

@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-M';
+  var VERSION = '1016-O';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -181,6 +181,12 @@
                      b: batch, why: d.why || '' });
     });
 
+    // 1016-O：原来就在待处理池里、这次有了结论的（不再是待处理、也不是「已经在待处理里了」），写入时从池子里拿掉
+    var pendTaken = [];
+    rows.forEach(function (d) {
+      if (d.item && d.item.wasPend && d.group !== 'pending' && !(d.group === 'skip' && d.why === 'inpending')) pendTaken.push(d.key);
+    });
+
     // ---- 登记成忽略 ----
     var kt = {}; rows.forEach(function (d) { ((d.item && d.item.regIgnore) || []).forEach(function (k) { kt[k] = d.time; }); });
     (p.ignoreOrders || []).forEach(function (k) { order(k, kt[k] || '', 1, null); });
@@ -243,7 +249,7 @@
     var total = parsed.files.reduce(function (s, f) { return s + (f.fatal ? 0 : f.stats.parsed.total); }, 0);
     return {
       version: VERSION, batch: batch, at: ctx.at || '',
-      records: recs, changes: chgList, orders: orders, pending: pending,
+      records: recs, changes: chgList, orders: orders, pending: pending, pendTaken: pendTaken,
       cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd, typesAdd: typesAdd,
       log: { b: batch, at: ctx.at || '', apps: apps, from: from, to: to, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded,
              rulesAdded: mapsAdd.length ? { cat: rulesAdd, type: typesAdd, map: mapsAdd } : { cat: rulesAdd, type: typesAdd } },

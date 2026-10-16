@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-N</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-O</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3464,6 +3464,11 @@
                 if(endOk(x.pmEnd, o.pmLen, pmsLen)) o.pmEnd=x.pmEnd;
                 o.catsAdded=(Array.isArray(x.catsAdded) ? x.catsAdded : []).filter(c=>typeof c==='string' && cats.includes(c));
                 o.rulesAdded=ra;
+                // 1016-O：这批从待处理池里拿掉的（有了结论），带原来的位置；撤销时放回去
+                if(Array.isArray(x.pendTaken) && x.pendTaken.length){
+                    const pt=x.pendTaken.filter(p=>p && Number.isInteger(p.i) && p.i>=0).map(p=>{ const c=impCleanPending([p.x], mapId)[0]; return c ? { i:p.i, x:c } : null; }).filter(Boolean);
+                    if(pt.length) o.pendTaken=pt;
+                }
                 return o;
             }).filter(Boolean);
         }
@@ -3695,12 +3700,20 @@
             // 单号表、待处理池、导入记录
             const orders=ws.orders.map(x=>impCleanOrder({ app:x.app, no:x.no, time:x.time, id:res(x.ref)||'', batch:ws.batch, st:x.st })).filter(Boolean);
             const pairs=await impOrderPairs(t.e, t.aid, orders);
-            if(ws.pending.length){
+            // 1016-O：原来在待处理池里、这次有了结论的拿掉，拿掉的（带原来的位置）记进导入记录，撤销时放回原处
+            const taken=new Set(Array.isArray(ws.pendTaken) ? ws.pendTaken : []), pendTaken=[];
+            if(ws.pending.length || taken.size){
                 const cur=await impGetJson(t.e, impPendKey(t.e.id, t.aid));
-                const list=((cur && cur.items) || []).slice(), seen=new Set(list.map(x=>x.app+'|'+x.no));
+                let list=((cur && cur.items) || []).slice();
+                if(taken.size){
+                    const keep=[];
+                    list.forEach((x, i)=>{ if(taken.has(x.app+'|'+x.no)) pendTaken.push({ i, x }); else keep.push(x); });
+                    list=keep;
+                }
+                const seen=new Set(list.map(x=>x.app+'|'+x.no));
                 ws.pending.forEach(x=>{ if(!seen.has(x.app+'|'+x.no)){ seen.add(x.app+'|'+x.no); list.push(x); } });
                 const clean=impCleanPending(list, x=>typeof x==='string' && x ? x : null);
-                pairs.push([impPendKey(t.e.id, t.aid), clean.length ? JSON.stringify({ v:1, items:clean }) : null]);
+                if(pendTaken.length || ws.pending.length) pairs.push([impPendKey(t.e.id, t.aid), clean.length ? JSON.stringify({ v:1, items:clean }) : null]);
             }
             const curLog=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
             const logs=((curLog && curLog.list) || []).slice();
@@ -3709,6 +3722,7 @@
             // 1016-K：新增记录的指纹（撤销时认「导入后你改过没有」）、导完时名单多长
             const W=window.JiwenImportWrite, hs=W && W.recHash ? made.map(r=>W.recHash(r)) : null;
             const lg=Object.assign({}, ws.log, { add:made.map(r=>r.id), chg, rulesAdded:ra, cpEnd:(a.cps||[]).length, pmEnd:(a.pms||[]).length });
+            if(pendTaken.length) lg.pendTaken=pendTaken;
             if(hs) lg.h=hs;
             logs.push(lg);
             const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
@@ -3761,7 +3775,7 @@
                 else if(x.list.length!==list.length) pairs.push([k, JSON.stringify(impBlkEncode(x.list))]);
             });
             const pend=await impGetJson(t.e, impPendKey(t.e.id, t.aid)), pl=(pend && pend.items) || [];
-            if(pl.length!==after.pending.length) pairs.push([impPendKey(t.e.id, t.aid), after.pending.length ? JSON.stringify({ v:1, items:after.pending }) : null]);
+            if(JSON.stringify(pl)!==JSON.stringify(after.pending)) pairs.push([impPendKey(t.e.id, t.aid), after.pending.length ? JSON.stringify({ v:1, items:after.pending }) : null]);
             const cleanLog=impCleanLog(after.logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
             pairs.push([impLogKey(t.e.id, t.aid), cleanLog.length ? JSON.stringify({ v:1, list:cleanLog }) : null]);
             if(window.__impFailAt==='undoSave') throw impErr('test');

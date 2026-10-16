@@ -25,7 +25,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-K';
+  var VERSION = '1016-O';
   var OBJ_KEYS = ['src'];          // chg 里这些字段的原值 / 新值存的是 JSON 文本
 
   function hasher() {
@@ -88,6 +88,8 @@
         var ra = L.rulesAdded || {};
         if (X.cats.size && (recs.some(function (r) { return X.cats.has(r.cat); }) || (ra.cat || []).some(function (r) { return X.cats.has(r.cat); })
             || (ra.map || []).some(function (m) { return X.cats.has(m.cat); }))) reasons.push({ dep: X.b, why: 'cat' });
+        // 1016-O：L 再导时把 X 留下的待处理条目拿走了（有了结论）
+        if ((L.pendTaken || []).some(function (p) { return p && p.x && p.x.b === X.b; })) reasons.push({ dep: X.b, why: 'pending' });
         var ru = ruOf.get(L.b);
         if (ru && X.rw.size) { var hit = false; ru.forEach(function (k) { if (X.rw.has(k)) hit = true; }); if (hit) reasons.push({ dep: X.b, why: 'marker' }); }
       });
@@ -105,7 +107,7 @@
                 added: (log.add || []).length, deleted: 0, gone: 0, changed: [], userRefunds: [],
                 restored: 0, mergeGone: 0, kept: [], sums: 0, links: 0,
                 catsDropped: [], catsKept: [], rulesRemoved: 0, typesRemoved: 0, mapsRemoved: 0,
-                orders: 0, pending: 0, names: null };
+                orders: 0, pending: 0, pendBack: 0, names: null };
     var at = new Map(); S.records.forEach(function (r, k) { at.set(r.id, k); });
     var del = new Set();
     // 新增的
@@ -188,6 +190,10 @@
     S.orders = ord;
     var pend = (S.pending || []).filter(function (x) { return x.b !== b; });
     sum.pending = (S.pending || []).length - pend.length;
+    // 1016-O：这批从待处理池里拿掉的（再导时有了结论），按原来的位置放回去
+    (log.pendTaken || []).slice().sort(function (p, q) { return p.i - q.i; }).forEach(function (p) {
+      pend.splice(Math.min(p.i, pend.length), 0, p.x); sum.pendBack++;
+    });
     S.pending = pend;
     S.logs = S.logs.filter(function (x, k) { return k !== i; });
     return sum;
@@ -205,19 +211,19 @@
     var chain = d.chain.map(function (k) { return state.logs[k].b; }).reverse();
     var steps = chain.map(function (x) { return undoOne(S, x); });
     var totals = { deleted: 0, gone: 0, changed: 0, userRefunds: 0, restored: 0, kept: 0, sums: 0, links: 0, catsDropped: 0, catsKept: 0,
-                   rules: 0, orders: 0, pending: 0, legacy: false };
+                   rules: 0, orders: 0, pending: 0, pendBack: 0, legacy: false };
     steps.forEach(function (s) {
       totals.deleted += s.deleted; totals.gone += s.gone + s.mergeGone; totals.changed += s.changed.length; totals.userRefunds += s.userRefunds.length;
       totals.restored += s.restored; totals.kept += s.kept.length; totals.sums += s.sums; totals.links += s.links;
       totals.catsDropped += s.catsDropped.length; totals.catsKept += s.catsKept.length;
-      totals.rules += s.rulesRemoved + s.typesRemoved + s.mapsRemoved; totals.orders += s.orders; totals.pending += s.pending;
+      totals.rules += s.rulesRemoved + s.typesRemoved + s.mapsRemoved; totals.orders += s.orders; totals.pending += s.pending; totals.pendBack += s.pendBack;
       if (s.legacy) totals.legacy = true;
     });
     return { ok: true, version: VERSION, target: b, chain: chain, why: d.why, steps: steps, totals: totals, after: S };
   }
 
   // 给确认框的大白话摘要（⑦b 的界面另做，这里先给开发开关里的临时按钮用）
-  var WHY = { same: '合并或追加了同一条记录', refund: '有退款挂在这批的记录上', names: '用到了这批新加的对方名或支付方式', cat: '用到了这批新建的分类', marker: '用到了这批登记的退款记号' };
+  var WHY = { same: '合并或追加了同一条记录', refund: '有退款挂在这批的记录上', names: '用到了这批新加的对方名或支付方式', cat: '用到了这批新建的分类', marker: '用到了这批登记的退款记号', pending: '处理了这批留下的待处理' };
   function describe(p) {
     if (!p || !p.ok) return '找不到这次导入的记录。';
     var t = p.totals, out = [];
@@ -237,6 +243,7 @@
     if (t.catsDropped || t.catsKept) out.push('新建的分类删 ' + t.catsDropped + ' 个' + (t.catsKept ? '，' + t.catsKept + ' 个还在用，留下' : '') + '。');
     if (t.rules) out.push('删掉 ' + t.rules + ' 条规则和对照。');
     if (t.pending) out.push('待处理里这几次带进来的 ' + t.pending + ' 笔一起清掉。');
+    if (t.pendBack) out.push('这几次处理掉的以前的待处理 ' + t.pendBack + ' 笔放回待处理。');
     if (t.legacy) out.push('这批是旧版本导入的，看不出你导入后改没改过，撤销会按导入前的样子还原。');
     return out.join('\n');
   }

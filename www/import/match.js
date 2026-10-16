@@ -38,7 +38,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-J';
+  var VERSION = '1016-O';
   var PARTIAL_MAX = 3;
   var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
@@ -399,6 +399,17 @@
         return { record: m.id, time: m.time, fen: m.fen, cat: m.cat || '', why: why };
       }));
     });
+
+    // ---------- 1016-O：原来就在待处理池里的 ----------
+    //   这次还是拿不准（进待处理）→ 跳过、不重复列出；有了结论（配上手记、挂上退款、按规则跳过……）→ 照常，写入时移出待处理池。
+    //   和这次的新账单一起凑「几笔加起来是一条手记」的照旧留在待处理里（要你一起选）
+    var pendResolved = 0;
+    items.forEach(function (it) {
+      if (!it.wasPend) return;
+      if (it.bucket === 'pending' && !it.msum) { it.bucket = 'skip'; it.why = 'inpending'; it.msg = '已经在待处理里了'; it.cands = null; }
+      else if (it.bucket !== 'pending') pendResolved += it.units;
+    });
+    stats.pendResolved = pendResolved;
 
     // ---------- 汇总 ----------
     var counts = {}; BUCKETS.forEach(function (k) { counts[k] = 0; });
