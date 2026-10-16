@@ -273,7 +273,7 @@ async function run(cfg, port, browser) {
     await page.waitForSelector('#impPick', { timeout: 15000 });
     await measure(page, 'imp-pick', { scope: IMP, primary: ['#impPick'] });
     await click(page, '#impGuideWx'); await page.waitForTimeout(200);
-    await measure(page, 'imp-guide-wechat', { scope: IMP, primary: ['#impGuideBack'], more: true });
+    await measure(page, 'imp-guide-wechat', { scope: IMP, primary: ['#impGuideBack', '#impGuidePick'], more: true });
     await click(page, '#impGuideBack'); await click(page, '#impGuideAli'); await page.waitForTimeout(200);
     await measure(page, 'imp-guide-alipay', { scope: IMP, primary: ['#impGuideBack'] });
     await click(page, '#impGuideBack');
@@ -350,7 +350,7 @@ async function run(cfg, port, browser) {
     // 待处理页
     if (await page.$('#impResPending')) {
       await click(page, '#impResPending'); await page.waitForSelector('#impPendHead', { timeout: 15000 });
-      await measure(page, 'imp-pending', { scope: IMP, primary: ['#impPendDropAll', '.imp-pend-new'], more: true });
+      await measure(page, 'imp-pending', { scope: IMP, primary: ['#impPendDropAll', '#impBarClose'], more: true });
       await click(page, '#impPendDropAll'); await askOpen(page);
       await measure(page, 'imp-pending-dropall-confirm', { scope: ASK, primary: ['#askOk'] });
       await askClose(page, false);
