@@ -13,6 +13,7 @@
 // 1015-A（第一期 ① 骨架）：只有一个占位函数 countLines，用来验证「主页面 → 后台线程 → 结果 / 进度」这条路是通的。
 // 1015-C（第一期 ③ 解析）：解析在兄弟文件 parse.js 里，这里只分派命令 parse（ctx.parse 由线程 / 主线程兜底传进来）。
 // 1015-D（第一期 ④ 定去向）：定去向在 route.js 里，命令 route。
+// 1016-A（第一期 ⑤ 配对与分类）：在 match.js / classify.js 里，命令 match。
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module && module.exports) module.exports = api;
@@ -20,7 +21,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1015-D';
+  var VERSION = '1016-A';
   // 每处理这么多个字符 / 字节报一次进度
   var STEP = 1 << 16;
 
@@ -67,7 +68,17 @@
     info: function (data, onProgress, ctx) {
       var m = ctx && ctx.merchants;
       return { core: VERSION, merchants: m && m.items ? m.items.length : 0, parse: ctx && ctx.parse ? ctx.parse.VERSION : null,
-               route: ctx && ctx.route ? ctx.route.VERSION : null };
+               route: ctx && ctx.route ? ctx.route.VERSION : null, match: ctx && ctx.match ? ctx.match.VERSION : null };
+    },
+    // 配对与分类：data = { routed, parsed, manual, refundCands, cats, rules, isNewUser }，见 match.js
+    //   （manual、refundCands 由主页面按 match.ledgerQuery 从账本里取出来；内置词表线程里自己有）
+    match: function (data, onProgress, ctx) {
+      if (!ctx || !ctx.match) throw new Error('配对模块没有载入');
+      data = data || {};
+      var r = ctx.match.match(data.routed, data.parsed, { manual: data.manual, refundCands: data.refundCands, cats: data.cats,
+        rules: data.rules, isNewUser: data.isNewUser, merchants: ctx.merchants });
+      if (onProgress) onProgress(1, 1);
+      return r;
     },
     // 定去向：data = { parsed: parse 的结果, known, rules }，见 route.js（known 由主页面查好单号表和账本拼出来）
     route: function (data, onProgress, ctx) {
