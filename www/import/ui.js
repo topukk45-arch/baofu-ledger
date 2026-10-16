@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-U：文件卡上写「上次微信导到 YYYY-MM-DD，这之后的才是新的」（按导入记录算，每个来源各算各的）。
 // 1016-T：结果页「接下来可以」：去看统计、按过去几个月设预算（现在先到预算页）、补一笔期初余额（主页面的 JiwenImportNext）。
 // 1016-S：选文件页有「微信怎么导出」「支付宝怎么导出」两页文字教程（截图位置先占位），返回键回到选文件。
 // 1016-Q：确认页写「这段时间漏记了 N 笔，共 x 元」；底部「只对账」进勾选清单，「补进 K 笔」只写勾选的（write.js 的 onlyKeys）。
@@ -281,6 +282,15 @@
     }).then(function (logs) {
       if (!alive() || !logs) return;
       S.overlaps = logs.map(function (l) { return { apps: l.apps || [], from: l.from, to: l.to }; });
+      // 1016-U：每个来源上次导到哪天（导入记录里的；只对账的不算；撤销了自然就退回去）
+      S.lastTo = {};
+      logs.forEach(function (l) {
+        if (l.only) return;
+        (l.apps || []).forEach(function (app) {
+          var to = l.rng && l.rng[app] ? l.rng[app][1] : l.to;
+          if (to && (!S.lastTo[app] || to > S.lastTo[app])) S.lastTo[app] = to;
+        });
+      });
       // 重算以后，套不上的改动丢掉（那一行已经不在原来的组里了）
       var lost = 0, keys = {};
       S.matched.items.forEach(function (it) { if (it.key) keys[it.key] = it.bucket; });
@@ -385,6 +395,13 @@
       }
       c.appendChild(el('div', 'imp-line', (APP[f.app] || f.app) + (f.range ? ' · ' + f.range.from.slice(0, 10) + ' 至 ' + f.range.to.slice(0, 10) : '') + ' · 共 ' + f.parsedTotal + ' 笔'));
       c.appendChild(el('div', 'imp-soft', f.name));
+      var lt = S.lastTo && S.lastTo[f.app];
+      if (lt) {
+        var ln = el('div', 'imp-soft imp-last-to', f.range && f.range.to.slice(0, 10) <= lt
+          ? '上次' + (APP[f.app] || '') + '导到 ' + lt + '，这份账单的时间都在那之前（导过的会自动跳过）'
+          : '上次' + (APP[f.app] || '') + '导到 ' + lt + '，这之后的才是新的');
+        c.appendChild(ln);
+      }
       var chk;
       if (f.countOk === true) chk = el('div', 'imp-line imp-ok imp-check', '✓ 笔数和账单统计一致');
       else if (f.countOk === false) chk = el('div', 'imp-line imp-bad imp-check', '✗ 笔数和账单统计对不上：账单写着 ' + f.headerTotal + ' 笔，读出来 ' + f.parsedTotal + ' 笔，可能读漏了，这一份不能直接导入');

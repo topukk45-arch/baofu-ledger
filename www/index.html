@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-T</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-U</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3469,6 +3469,12 @@
                 o.catsAdded=(Array.isArray(x.catsAdded) ? x.catsAdded : []).filter(c=>typeof c==='string' && cats.includes(c));
                 o.rulesAdded=ra;
                 if(x.only===true) o.only=true;      // 1016-Q：只对账（只补了勾选的几笔）
+                // 1016-U：每个来源各自的账单起止 { 来源: [起, 止] }（记住上次导到哪天）
+                if(x.rng && typeof x.rng==='object' && !Array.isArray(x.rng)){
+                    const rng={};
+                    IMP_APPS.forEach(app=>{ const r=x.rng[app]; if(Array.isArray(r) && /^\d{4}-\d{2}-\d{2}$/.test(r[0]) && /^\d{4}-\d{2}-\d{2}$/.test(r[1])) rng[app]=[r[0], r[1]]; });
+                    if(Object.keys(rng).length) o.rng=rng;
+                }
                 // 1016-O：这批从待处理池里拿掉的（有了结论），带原来的位置；撤销时放回去
                 if(Array.isArray(x.pendTaken) && x.pendTaken.length){
                     const pt=x.pendTaken.filter(p=>p && Number.isInteger(p.i) && p.i>=0).map(p=>{ const c=impCleanPending([p.x], mapId)[0]; return c ? { i:p.i, x:c } : null; }).filter(Boolean);

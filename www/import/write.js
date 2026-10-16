@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Q';
+  var VERSION = '1016-U';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -238,20 +238,22 @@
     });
 
     // ---- 这一批的导入记录（新记录的编号由主页面填进 add）----
-    var apps = [], from = '', to = '';
+    var apps = [], from = '', to = '', rng = {};
     parsed.files.forEach(function (f) {
       if (f.fatal) return;
       if (apps.indexOf(f.app) < 0) apps.push(f.app);
       var a = f.range ? f.range.from.slice(0, 10) : '', b = f.range ? f.range.to.slice(0, 10) : '';
       if (a && (!from || a < from)) from = a;
       if (b && (!to || b > to)) to = b;
+      // 1016-U：每个来源各自的账单起止（记住上次导到哪天用）
+      if (a && b) { var r0 = rng[f.app]; rng[f.app] = r0 ? [a < r0[0] ? a : r0[0], b > r0[1] ? b : r0[1]] : [a, b]; }
     });
     var total = parsed.files.reduce(function (s, f) { return s + (f.fatal ? 0 : f.stats.parsed.total); }, 0);
     return {
       version: VERSION, batch: batch, at: ctx.at || '',
       records: recs, changes: chgList, orders: orders, pending: pending, pendTaken: pendTaken,
       cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd, typesAdd: typesAdd,
-      log: { b: batch, at: ctx.at || '', apps: apps, from: from, to: to, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded,
+      log: { b: batch, at: ctx.at || '', apps: apps, from: from, to: to, rng: rng, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded,
              rulesAdded: mapsAdd.length ? { cat: rulesAdd, type: typesAdd, map: mapsAdd } : { cat: rulesAdd, type: typesAdd } },
       counts: counts, total: total
     };
