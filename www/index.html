@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-U</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-V</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -5820,6 +5820,7 @@ ${detail}
             try{ if(on) localStorage.setItem(DEV_IMPORT_KEY,'1'); else localStorage.removeItem(DEV_IMPORT_KEY); }catch(_){}
             renderDevImport();
             try{ if(currentUser) renderBill(); }catch(_){}     // 1016-R：空账本的小入口跟着开关出现 / 消失
+            renderStorageUse();
             customAlert(on ? '已打开「导入（开发中）」，入口在上面「存档管理」里。只在这台手机上有效。' : '已关闭「导入（开发中）」。', '开发开关');
         });
         let __importLoading=null;
@@ -8704,6 +8705,36 @@ ${detail}
             });
         }
 
+        // 1016-V：设置里「存储已用 x%」，超过 70% 提醒。按浏览器给这个 App 的配额算（navigator.storage.estimate，账本在 IndexedDB 里）。
+        //   这一版只在开发开关开着时显示（入口先不放出去）；拿不到配额时不显示
+        const STORAGE_WARN=0.7;
+        var __storageSeq=0;
+        function renderStorageUse(){
+            const my=++__storageSeq;
+            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const old=$('storageUse');
+            if(!on || !navigator.storage || !navigator.storage.estimate){ if(old) old.remove(); return; }
+            Promise.resolve().then(()=>navigator.storage.estimate()).then(q=>{
+                if(my!==__storageSeq) return;
+                let b=$('storageUse');
+                if(!q || !q.quota){ if(b) b.remove(); return; }
+                const used=q.usage||0, pct=used/q.quota;
+                if(!b){
+                    b=document.createElement('div'); b.id='storageUse'; b.className='set-item set-static';
+                    b.style.flexDirection='column'; b.style.alignItems='stretch'; b.style.gap='4px';
+                    const anchor=$('devLogsBtn'); anchor.parentNode.insertBefore(b, anchor.nextSibling);
+                }
+                b.textContent='';
+                const l1=document.createElement('span'); l1.id='storageUsePct';
+                l1.textContent=`存储已用 ${Math.max(pct*100, used ? 0.1 : 0).toFixed(1)}%（约 ${(used/1048576).toFixed(1)} MB / 共 ${(q.quota/1048576).toFixed(0)} MB）`;
+                b.appendChild(l1);
+                if(pct>STORAGE_WARN){
+                    const w=document.createElement('span'); w.id='storageUseWarn'; w.style.color='var(--c-neg)'; w.style.fontSize='12px';
+                    w.textContent='空间快满了：可以先导出备份，再删掉不用的存档或旧的导入前备份。满了以后记账会存不进去。';
+                    b.appendChild(w);
+                }
+            }).catch(()=>{ if(my===__storageSeq){ const b=$('storageUse'); if(b) b.remove(); } });
+        }
         function switchTab(tab){
             closeAllCs();   // 收起可能展开的下拉：其面板已传送到 body，切页隐藏容器不会带走它
             currentTab=tab;
@@ -8728,6 +8759,7 @@ ${detail}
             // 进入记账页时按当前筛选状态决定清除浮钮显隐
             if(tab==='ledger' && window.syncFilterFab) window.syncFilterFab();
             if(tab==='stats') renderStats();
+            if(tab==='settings') renderStorageUse();
             // 切换标签后回到顶部：延到布局完成后执行，避免在 display 切换同帧里失效
             window.scrollTo(0,0);
             requestAnimationFrame(()=>{ window.scrollTo(0,0); document.documentElement.scrollTop=0; document.body.scrollTop=0; });
