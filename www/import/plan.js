@@ -31,7 +31,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Z';
+  var VERSION = '1016-Z1';
   // 1.1（1016-Z）异常金额提醒的参考值。都是先拍的数，标「待真实数据调」：用真实账单跑过以后再定（目标是每次导入只提醒几笔）
   var AMOUNT = {
     RATIO: 5,              // 比这个分类平时大多数单笔（第 80 百分位）高 5 倍以上……（待真实数据调）
@@ -242,9 +242,11 @@
       // 1016-H：待你确认的不进，等选成新增（「都不是」或被自动作为新增）再进；不计入的、转账往来里的也不用选
       if (['add', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;
       var k = clean(d.cp) || '（没有交易对方）';
-      var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [] });
+      var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [], wd: 0, we: 0 });
       g.n += d.units; g.fen += d.fen; g.min = Math.min(g.min, d.fen); g.max = Math.max(g.max, d.fen); g.keys.push(d.key);
       var h = +d.time.slice(11, 13); g.hours[h] = (g.hours[h] || 0) + 1;
+      var wk = new Date(Date.UTC(+d.time.slice(0, 4), +d.time.slice(5, 7) - 1, +d.time.slice(8, 10))).getUTCDay();
+      if (wk === 0 || wk === 6) g.we++; else g.wd++;
       if (cpCats[k]) { d.cat = cpCats[k]; d.catFrom = 'cpgroup'; }
     });
     rows.forEach(function (d) {
@@ -334,7 +336,9 @@
     sec.cpGroups = Object.keys(cpg).map(function (k) {
       var g = cpg[k], hb = null, hn = 0;
       Object.keys(g.hours).forEach(function (h) { if (g.hours[h] > hn) { hn = g.hours[h]; hb = +h; } });
-      return { cp: g.cp, n: g.n, fen: g.fen, min: g.min, max: g.max, hour: hn * 2 > g.keys.length ? hb : null, cat: cpCats[k] || null, keys: g.keys };
+      var hour = hn * 2 > g.keys.length ? hb : null;
+      return { cp: g.cp, n: g.n, fen: g.fen, min: g.min, max: g.max, hour: hour, cat: cpCats[k] || null, keys: g.keys,
+               hint: patternHint(g.keys.length, g.wd, g.we, g.hours) };
     }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; });
     var notes = { neutralVsNormal: [], joined: [], noNote: [], overlap: [] };
     rows.forEach(function (d) { d.tags.forEach(function (t) { if (notes[t] && d.key) notes[t].push(d.key); }); });
@@ -488,6 +492,22 @@
   }
 
   // 「复制给开发者」：只带表头、交易类型、交易状态，不带金额、对方、单号、文件名
+  // 1.1（1016-Z1）未分类按对方归组的规律说明：「工作日中午 12 点左右」「周末晚上」这类，只用来帮你认出是谁，不用来自动分类。
+  //   至少 2 笔才说；八成以上在工作日 / 周末才说「工作日」「周末」；一半以上落在同一个钟点（或相邻两个钟点）才说几点
+  function dayPart(h) { return h < 5 ? '深夜' : h < 11 ? '早上' : h < 14 ? '中午' : h < 18 ? '下午' : h < 22 ? '晚上' : '深夜'; }
+  function patternHint(n, wd, we, hours) {
+    if (n < 2) return '';
+    var parts = [];
+    if (wd >= n * 0.8) parts.push('工作日'); else if (we >= n * 0.8) parts.push('周末');
+    var best = null, bn = 0;
+    Object.keys(hours).forEach(function (h) { var c = (hours[h] || 0) + (hours[+h + 1] || 0); if (c > bn || (c === bn && best !== null && +h < best)) { bn = c; best = +h; } });
+    if (best !== null && bn * 2 > n) {
+      var one = (hours[best] || 0) * 2 > n, at = one ? best : ((hours[best + 1] || 0) > (hours[best] || 0) ? best + 1 : best);
+      parts.push(dayPart(at) + ' ' + at + ' 点左右');
+    }
+    return parts.join('');
+  }
+
   // 1016-Q：漏记报告 / 只对账。漏记 = 「新增」组（没和手记配上、要新建的），合并记录（分分捐等）算一项；
   //   往已有合并记录上追加的不算（只对账不改以前的记录）。→ { n:笔数, out:支出分, inc:收入分, items:[{ id, keys, title, time, fen, type, cat, units }] }
   function missed(p) {
@@ -517,6 +537,6 @@
     return out.join('\n');
   }
 
-  return { VERSION: VERSION, AMOUNT: AMOUNT, plan: plan, devText: devText, missed: missed, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
+  return { VERSION: VERSION, AMOUNT: AMOUNT, patternHint: patternHint, plan: plan, devText: devText, missed: missed, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
            GROUPS: GROUPS, GROUP_NAME: GROUP_NAME };
 });
