@@ -1125,7 +1125,7 @@
       card.appendChild(el('div', 'imp-soft', '待处理的 ' + c.pending + ' 笔没进账本，存在待处理里，以后处理。'));
       var pl = btn('还有 ' + c.pending + ' 笔待处理，去处理 ›', 'ui-btn block', function () { openPending(); }); pl.id = 'impResPending'; pl.style.marginTop = '8px'; card.appendChild(pl);
     }
-    card.appendChild(el('div', 'imp-soft imp-res-batch', '批次号 ' + res.ws.batch + ' · 写入用时 ' + (res.ms / 1000).toFixed(1) + ' 秒'));
+    card.appendChild(el('div', 'imp-soft imp-res-batch', '写入用时 ' + (res.ms / 1000).toFixed(1) + ' 秒（这次导入的编号 ' + res.ws.batch + '，出问题时告诉开发者）'));   // 1016-UI5：「批次号」是开发用语，改成大白话
     card.appendChild(el('div', 'imp-soft', '写之前自动备份了一份。导错了可以点下面「撤销这次导入」，以后也能在「设置 → 导入记录」里撤销。'));
     // 1016-UI2：「撤销这次导入」「回到账本」放进底部操作栏
     var go = btn('回到账本', 'ui-btn primary', function () {
