@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-T：结果页「接下来可以」：去看统计、按过去几个月设预算（现在先到预算页）、补一笔期初余额（主页面的 JiwenImportNext）。
 // 1016-S：选文件页有「微信怎么导出」「支付宝怎么导出」两页文字教程（截图位置先占位），返回键回到选文件。
 // 1016-Q：确认页写「这段时间漏记了 N 笔，共 x 元」；底部「只对账」进勾选清单，「补进 K 笔」只写勾选的（write.js 的 onlyKeys）。
 // 1016-O：再导入时原来待处理的用新文件重新判断，有了结论的确认页提示「原来待处理的 N 笔有结论了」。
@@ -921,10 +922,21 @@
     });
     go.id = 'impBackToLedger'; go.style.marginTop = '12px'; go.style.width = '100%';
     card.appendChild(go);
+    // 1016-T：导完指下一步
+    var nx = el('div', 'imp-card'); nx.id = 'impNext';
+    nx.appendChild(el('h4', null, '接下来可以'));
+    var nr = el('div', 'imp-chips');
+    var goNext = function (k) { return function () { close(); var N = window.JiwenImportNext; if (N && N[k]) N[k](); }; };
+    var n1 = btn('去看统计', 'imp-btn', goNext('stats')); n1.id = 'impNextStats';
+    var n2 = btn('按过去几个月设预算', 'imp-btn', goNext('budget')); n2.id = 'impNextBudget';
+    var n3 = btn('补一笔期初余额', 'imp-btn', goNext('opening')); n3.id = 'impNextOpening';
+    nr.appendChild(n1); nr.appendChild(n2); nr.appendChild(n3); nx.appendChild(nr);
+    nx.appendChild(el('div', 'imp-soft', '结余是按记录现算的：导进来的只是这段时间的收支差额，不等于钱包里的实际余额。想让结余对上，补一笔「只算结余」的期初余额（不算收入）。'));
     var un = btn('撤销这次导入', 'imp-btn', function () { undoBatch(res.ws.batch); });
     un.id = 'impUndoThis'; un.style.marginTop = '8px'; un.style.width = '100%';
     card.appendChild(un);
     b.appendChild(card);
+    b.appendChild(nx);
     dom.page.scrollTop = 0;
   }
 
