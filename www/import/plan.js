@@ -32,7 +32,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Z2';
+  var VERSION = '1016-Z4';
   // 1.1（1016-Z）异常金额提醒的参考值。都是先拍的数，标「待真实数据调」：用真实账单跑过以后再定（目标是每次导入只提醒几笔）
   var AMOUNT = {
     RATIO: 5,              // 比这个分类平时大多数单笔（第 80 百分位）高 5 倍以上……（待真实数据调）
@@ -445,8 +445,20 @@
     });
     sec.amountChecks = checks;
 
+    // ---- 1.1（1016-Z4）提现服务费：微信「零钱提现」备注里写着「服务费¥2.20」的，零钱提现本身照旧不计入，服务费单独记一笔支出 ----
+    //   分类：存档里有「手续费」「服务费」就用，没有用「其他」，再没有就「未分类」。只在这笔提现这次真要写进去时记（再导时提现跳过，服务费也不会再记）
+    var feeCat = ['手续费', '服务费', '其他', '其它'].filter(function (c) { return cats.indexOf(c) >= 0; })[0] || '未分类';
+    sec.fees = [];
+    rows.forEach(function (d) {
+      if (d.src !== 'row' || d.group !== 'neutral' || d.app !== 'wechat' || !/零钱提现/.test(d.kind || '') || inGroup[d.file + ':' + d.row]) return;
+      var m = /服务费\s*[¥￥]?\s*(\d+(?:\.\d{1,2})?)/.exec(d.remark || '');
+      var fen = m ? Math.round(parseFloat(m[1]) * 100) : 0;
+      if (fen > 0) { d.feeFen = fen; sec.fees.push({ key: d.key, fen: fen, time: d.time }); }
+    });
+    sec.feeCat = feeCat;
+
     // ---- 要新建几条记录（分分捐、收款按天合并、勾上的零碎扣款合成一条）----
-    var records = 0, seenG = {};
+    var records = sec.fees.length, seenG = {};
     rows.forEach(function (d) {
       if (d.src !== 'row' || (d.group !== 'add' && d.group !== 'neutral' && d.group !== 'refund')) return;
       var g = inGroup[d.file + ':' + d.row];

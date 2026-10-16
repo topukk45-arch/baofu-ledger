@@ -24,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Y';
+  var VERSION = '1016-Z4';
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -104,6 +104,7 @@
   //          borrowRows: 本批全部支付宝行 [{ cp, kind }]（互借用）, merchants, isNewUser,
   //          maps: importRules.map [{ from, cat }]（1016-J 分类对照） }
   //   返回 { recs: 与 rows 一一对应, newCats: [{ name, count, defaultOn, mergeInto }] }
+  function gameHit(list, text) { for (var i = 0; i < (list || []).length; i++) if (text.indexOf(list[i]) >= 0) return list[i]; return null; }
   function classify(rows, ctx) {
     ctx = ctx || {};
     var cats = Array.isArray(ctx.cats) && ctx.cats.length ? ctx.cats : ['未分类'];
@@ -116,6 +117,8 @@
       if (m && typeof m.from === 'string' && m.from && cats.indexOf(m.cat) >= 0 && !(m.from in mapOf)) mapOf[m.from] = m.cat;
     });
     var words = builtinIndex(ctx.merchants);
+    var G = (ctx.merchants && ctx.merchants.games) || { cat: '游戏', strong: [], weak: [], notWith: [] };
+    var gameOn = cats.indexOf(G.cat) >= 0;
     var nonPlat = words.filter(function (x) { return !isPlatform(x[0]); });
     // 两家互借：清洗后的对方 → 支付宝分类（取次数最多的，打平不借）
     var borrow = new Map();
@@ -152,10 +155,16 @@
       var aw = r.app === 'alipay' ? aliWant(r.kind) : null;
       if (hit && !isPlatform(hit[0])) return { want: hit[1], layer: 'builtin', conf: 'mid', reason: '内置：' + hit[0] + ' → ' + hit[1] };
       if (hd) return { want: hd[1], layer: 'builtin', conf: 'low', reason: '内置（商品说明里的「' + hd[0] + '」）→ ' + hd[1], descOnly: true, cc: cc };
+      // 1016-Z4：游戏词（存档里有「游戏」分类才推荐）：首充、月卡、战令、钻石……→ 游戏（把握中）
+      var gs = gameHit(G.strong, cc + ' ' + cp + ' ' + (r.desc || ''));
+      if (gameOn && gs) return { cat: G.cat, layer: 'builtin', conf: 'mid', reason: '内置：' + gs + ' → ' + G.cat };
       // 5. 支付宝分类对照
       if (aw) return { want: aw, layer: 'alipay', conf: 'mid', reason: '支付宝分类：' + aw };
       // 平台名：最后才用，把握低
       if (hit) return { want: hit[1], layer: 'builtin', conf: 'low', reason: '内置（平台「' + hit[0] + '」，卖什么的都有）→ ' + hit[1] };
+      // 1016-Z4：「礼包」→ 游戏，把握低、排在最后；说明里有流量、零食这类词时不算（那些词前面已经认过了）
+      var gwText = cc + ' ' + cp + ' ' + (r.desc || '');
+      if (gameOn && gameHit(G.weak, gwText) && !gameHit(G.notWith, gwText)) return { cat: G.cat, layer: 'builtin', conf: 'low', reason: '内置（「礼包」多半是游戏）→ ' + G.cat };
       return { cat: '未分类', layer: 'none', conf: null, reason: '没找到依据' };
     });
 

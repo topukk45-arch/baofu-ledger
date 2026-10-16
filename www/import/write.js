@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Z2';
+  var VERSION = '1016-Z4';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -125,6 +125,12 @@
       var t = newRec(o);
       tmpOfKey[d.key] = t;
       order(d.key, d.time, 0, { tmp: t });
+      // 1.1（1016-Z4）：零钱提现的服务费单独记一笔支出（计入），跟着这笔提现的批次；不另登记单号（提现那笔登记了，再导时一起跳过）
+      if (d.feeFen > 0 && d.group === 'neutral') {
+        var fo = base(d);
+        fo.money = money(d.feeFen); fo.type = 'expense'; fo.cat = (p.sections && p.sections.feeCat) || '未分类'; fo.remark = '零钱提现服务费';
+        newRec(fo);
+      }
       // 以前导入的退款 + 这批的原单（1016-D）：旧退款挂到新原单上
       if (d.item && d.item.refundRec && d.type === 'expense') {
         var c = change(d.item.refundRec, 'link');
