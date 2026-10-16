@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z6</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z7</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -7215,6 +7215,40 @@ ${detail}
         // 1016-R：空账本的小入口「有微信、支付宝账单？可以一次导进来 ›」。只在开发开关开着、账本少于 IMP_EMPTY_MAX 条时出现，
         //   记了几条以后消失；开关关着时不生成任何东西
         const IMP_EMPTY_MAX=5;
+        // 第二期（1016-Z7）：月初导入提醒，只在 App 里（不发系统通知）。每月前 IMP_REMIND_DAYS 天，这个存档导入过账单、
+        //   而最后一次导到的日子还没到上个月月底，就在账单上方放一条「上个月的账单可以导了」；点「这个月不提醒」只在这台手机上记住
+        //   （localStorage 的 app_imp_remind_<账号>__<存档> = 年-月，不进备份）。开发开关开着才有
+        const IMP_REMIND_DAYS=10;
+        var __remindSeq=0;
+        function renderImpRemind(){
+            const my=++__remindSeq;
+            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const old=$('impRemind');
+            let t=null; if(on){ try{ t=impTarget(); }catch(_){ t=null; } }
+            const now=new Date(), ym=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+            const rk=`app_imp_remind_${currentUser}__${currentArchive}`;
+            let dismissed=false; try{ dismissed=localStorage.getItem(rk)===ym; }catch(_){}
+            if(!t || now.getDate()>IMP_REMIND_DAYS || dismissed){ if(old) old.remove(); return; }
+            const pm=new Date(now.getFullYear(), now.getMonth(), 0), pmEnd=`${pm.getFullYear()}-${pad(pm.getMonth()+1)}-${pad(pm.getDate())}`;
+            impGetJson(t.e, impLogKey(t.e.id, t.aid)).then(o=>{
+                if(my!==__remindSeq) return;
+                const logs=((o && o.list) || []).filter(l=>!l.only);
+                let last=''; logs.forEach(l=>{ if(l.to && l.to>last) last=l.to; });
+                let b=$('impRemind');
+                if(!logs.length || last>=pmEnd){ if(b) b.remove(); return; }
+                if(!b){
+                    b=document.createElement('div'); b.id='impRemind'; b.className='stat-pend-banner';
+                    const head=$('billHead'); head.parentNode.insertBefore(b, head);
+                }
+                b.textContent='';
+                const tx=document.createElement('span'); tx.textContent=`${pm.getMonth()+1} 月的微信、支付宝账单可以导了（上次导到 ${last}）`;
+                const go=document.createElement('button'); go.type='button'; go.id='impRemindGo'; go.textContent='去导入';
+                go.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入')); });
+                const no=document.createElement('button'); no.type='button'; no.id='impRemindOff'; no.textContent='这个月不提醒';
+                no.addEventListener('click', ()=>{ try{ localStorage.setItem(rk, ym); }catch(_){} const x=$('impRemind'); if(x) x.remove(); });
+                b.appendChild(tx); b.appendChild(go); b.appendChild(no);
+            }).catch(()=>{ if(my===__remindSeq){ const x=$('impRemind'); if(x) x.remove(); } });
+        }
         function renderImpEmptyEntry(n){
             let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
             let b=$('impEmptyEntry');
@@ -7233,6 +7267,7 @@ ${detail}
             // 它天然稳定且唯一，不依赖 id 的字符串大小（旧 id 不定长，字符串比较会乱序）。
             const raw=getUserData();
             renderImpEmptyEntry(raw.length);
+            renderImpRemind();
             // 【为什么先算时间戳再排序】比较器里每调一次 parseRecTime 就是一次
             //   正则 + new Date()。而排序要做 O(n log n) 次比较，每次比较调两遍
             //   —— 12000 条记录约 16 万次比较、32 万次解析，实测占掉 renderBill
