@@ -177,11 +177,16 @@ const importReqs = t => t.log.filter(p => p.startsWith('import/'));
 }
 
 const devOn = { app_dev_import: '1' };
+// 1016-B 起开发入口打开的是导入页，通路自检在导入页里（「通路自检」按钮）
 async function openEntry(t) {
   t.$('devImportBtn').click();
-  ok(t.$('devImportMask').style.display === 'flex', '入口弹窗打开');
+  await until(() => t.$('impSelfTest'));
+  ok(!!t.$('impSelfTest'), '导入页打开，里面有「通路自检」');
+  t.$('impSelfTest').click();
+  ok(t.$('devImportMask').style.display === 'flex', '自检弹窗打开');
   await until(() => !outText(t).startsWith('正在'));
 }
+const UI_FILES = 'import/import.js,import/plan.js,import/ui.js';
 
 // ===== 5. 兜底①：没有 Worker（jsdom 本来就没有）→ 主线程算，结果一样 =====
 {
@@ -192,12 +197,12 @@ async function openEntry(t) {
   ok(outText(t).includes('主线程') && outText(t).includes('不支持后台线程'), '5 说明是在主线程算的、为什么');
   ok(outText(t).includes('文本：12 行') && outText(t).includes('字节：12 行'), '5 文本和字节都数出 12 行');
   ok(outText(t).includes('GBK 解码：正常（读出 2 笔支付宝账单，第一笔对方「青禾便利」）'), '5 自检里 GBK 解码正常：' + outText(t).split('\n').find(l => l.startsWith('GBK')));
-  const FALLBACK = 'import/import.js,import/core.js,import/merchants.js,import/vendor/tiny-inflate.js,import/parse.js,import/route.js,import/classify.js,import/match.js';
-  ok(importReqs(t).join(',') === FALLBACK, '5 加载了 import.js 和兜底要的四个文件：' + importReqs(t).join(','));
+  const FALLBACK = UI_FILES + ',import/core.js,import/merchants.js,import/vendor/tiny-inflate.js,import/parse.js,import/route.js,import/classify.js,import/match.js';
+  ok(importReqs(t).join(',') === FALLBACK, '5 加载了导入页的三个文件和兜底要的几个文件：' + importReqs(t).join(','));
   ok(t.w.JiwenImport.state().mode === 'main', '5 state 是 main');
   t.$('devImportClose').click();
   ok(t.$('devImportMask').style.display === 'none', '5 关闭');
-  t.$('devImportBtn').click(); await until(() => !outText(t).startsWith('正在'));
+  t.$('impSelfTest').click(); await until(() => !outText(t).startsWith('正在'));
   ok(outText(t).startsWith('通路正常') && importReqs(t).join(',') === FALLBACK, '5 再打开不重复加载脚本：' + outText(t).split('\n')[0] + ' / ' + importReqs(t).join(','));
   t.$('devImportClose').click();
   ok(!t.errs.length, '5 无报错 ' + t.errs.join('|'));
@@ -216,7 +221,7 @@ let FW6;
   const ps = FW6.created[0].received.find(m => m.cmd === 'parse');
   ok(ps && Object.prototype.toString.call(ps.data.files[0].data) === '[object ArrayBuffer]', '6 解析的文件字节交给了线程');
   ok(outText(t).includes('内置词表：' + require(path.join(IMP, 'merchants.js')).items.length + ' 条'), '6 线程里载入了词表');
-  ok(importReqs(t).join(',') === 'import/import.js', '6 主页面只加载了 import.js：' + importReqs(t).join(','));
+  ok(importReqs(t).join(',') === UI_FILES, '6 主页面只加载了导入页的三个文件（计算部分只在线程里）：' + importReqs(t).join(','));
   ok(t.w.JiwenImportCore === undefined, '6 主线程没加载计算部分');
   ok(FW6.created.length === 1 && FW6.created[0].url === 'https://localhost/import/worker.js', '6 线程地址是 https://localhost/import/worker.js（和安卓上一样）');
   const sent = FW6.created[0].received.filter(m => m.cmd === 'countLines');
@@ -234,7 +239,7 @@ let FW6;
   let e7 = null;
   try { await J.run('countLines', 123); } catch (e) { e7 = e; }
   ok(e7 && e7.name === 'TypeError' && e7.message.includes('只收文本或字节') && e7.fromWorker === true, '7 线程里的错原样报回来：' + (e7 && e7.name + ' ' + e7.message));
-  ok(t.w.JiwenImportCore === undefined && importReqs(t).length === 1, '7 没有换到主线程重算（没加载 core.js）');
+  ok(t.w.JiwenImportCore === undefined && importReqs(t).join(',') === UI_FILES, '7 没有换到主线程重算（没加载 core.js）');
   ok(J.state().mode === 'worker' && FW6.created.length === 1, '7 线程照旧可用，没重起');
   const r7 = await J.run('countLines', 'a\nb');
   ok(r7.mode === 'worker' && r7.result.lines === 2, '7 出错后接着用正常');
@@ -260,7 +265,7 @@ let FW6;
   const r8c = await J.run('info', null);
   ok(r8c.mode === 'worker', '8 之后再用照样正常');
   // 自检里点「关闭」后再点入口，又是好的
-  t.$('devImportBtn').click(); await until(() => !outText(t).startsWith('正在'));
+  t.$('impSelfTest').click(); await until(() => !outText(t).startsWith('正在'));
   ok(outText(t).startsWith('通路正常') && outText(t).includes('后台线程'), '8 关了再进入口自检照样通过');
   t.$('devImportClose').click();
   ok(!t.errs.length && !t.jsdomErrs.length, '6-8 无报错 ' + t.errs.concat(t.jsdomErrs).join('|'));
@@ -282,9 +287,10 @@ let FW6;
 // ===== 10. import.js 本身没加载上：提示失败，不影响记账 =====
 {
   const t = await bootIn({ ls: devOn, missing: p => p === 'import/import.js' });
-  await openEntry(t);
-  ok(outText(t).includes('自检失败') && outText(t).includes('没加载上'), '10 提示导入模块没加载上：' + outText(t));
-  t.$('devImportClose').click();
+  t.$('devImportBtn').click();
+  await until(() => t.$('askMask').style.display === 'flex');
+  ok(t.$('askMsg').textContent.includes('没加载上') && !t.$('impPage'), '10 提示导入模块没加载上，导入页没打开：' + t.$('askMsg').textContent);
+  t.$('askOk').click();
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
   ok(t.d.getElementById('pageLedger') ? t.d.getElementById('pageLedger').style.display !== 'none' : true, '10 记账页照常能切过去');
   ok(!t.errs.length, '10 页面脚本无报错 ' + t.errs.join('|'));

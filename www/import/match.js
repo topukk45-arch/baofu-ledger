@@ -136,7 +136,8 @@
         amts.forEach(function (fen) {
           var f = function (m, dd) {
             if (Math.abs(dd) !== d || !free(m) || seen.has(m.id)) return;
-            if (b.neutral && m.mode !== 'skip') return;
+            // 不计入的账单碰上同金额的普通手记：不合并，记下来让确认页提示一句
+            if (b.neutral && m.mode !== 'skip') { (b.normalHits = b.normalHits || []).indexOf(m.id) < 0 && b.normalHits.push(m.id); return; }
             seen.add(m.id); edges.push([b, m]);
           };
           if (d === 0) scan(b.type, b.day, 0, 0, fen, fen, f);
@@ -190,6 +191,9 @@
       }
     });
 
+    bills.forEach(function (b) {
+      if (b.neutral && b.normalHits && b.it.bucket === 'neutral') { b.it.flags.push('neutralVsNormal'); b.it.normalHits = b.normalHits.slice(); }
+    });
     // ---------- 从合并里学：清洗后的对方 → 手记的分类 ----------
     var learnCount = new Map();
     merges.forEach(function (x) {

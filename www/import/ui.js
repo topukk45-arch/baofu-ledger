@@ -1,0 +1,590 @@
+// 记问 · 账单导入 · 导入页（确认页，第一期 ⑥a：只看，不写）
+// 整页盖在别的页面上面（不是小弹窗：要放核对、汇总、要你定的几块和几千行明细）。顶上「‹ 取消」、安卓返回键都等于取消。
+// 流程：选文件（可多选）→ 线程里依次跑 parse、route、match（中间主页面按两步把单号表、手记、退款候选查好交进去）
+//       → 进度 → 确认页。确认页上改的东西只改内存里的方案（plan.js），点「导入」这一版只提示「开发中」。
+// 页面元素和样式都在打开时由这里生成，index.html 里只有入口；用户数据一律 textContent，不拼进 innerHTML。
+// 只通过 window.JiwenImportStore 的只读函数拿账本数据，不碰账本内部。
+(function () {
+  'use strict';
+  if (window.JiwenImportUI) return;
+  var PAGE = 50;                    // 明细每次显示几行
+  var APP = { alipay: '支付宝', wechat: '微信' };
+  var Plan = window.JiwenImportPlan;
+  var S = null;                     // 这一次导入的状态（关掉就清掉）
+  var runId = 0;
+  var dom = null;
+
+  // ---------- 小工具 ----------
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; }
+  function btn(text, cls, fn) { var b = el('button', cls || 'imp-btn', text); b.type = 'button'; if (fn) b.addEventListener('click', fn); return b; }
+  function yuan(f) { return Plan.yuan(f); }
+  function alertMsg(msg, title) { if (typeof window.customAlert === 'function') window.customAlert(msg, title || '导入'); }
+  function store() { return window.JiwenImportStore; }
+  function J() { return window.JiwenImport; }
+  function fmtTime(t) { return String(t || '').slice(5, 16).replace('T', ' '); }
+
+  // ---------- 样式 ----------
+  var CSS = [
+    '#impPage{position:fixed;left:0;top:0;right:0;bottom:0;z-index:990;background:var(--c-bg);overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 0 84px;display:none;color:var(--c-text);}',
+    '#impPage .imp-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:12px 14px;background:var(--c-bg);border-bottom:1px solid var(--c-border);}',
+    '#impPage .imp-back{background:none;border:none;color:var(--c-primary-deep);font-size:16px;padding:4px 6px;cursor:pointer;}',
+    '#impPage .imp-title{flex:1;font-weight:bold;font-size:16px;color:var(--c-primary-deep);}',
+    '#impPage .imp-sub{font-size:12px;color:var(--c-text-soft);}',
+    '#impBody{padding:12px 14px;}',
+    '.imp-card{background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2));border:1px solid var(--c-border);border-radius:12px;padding:12px;margin-bottom:12px;}',
+    '.imp-card h4{font-size:14px;margin-bottom:8px;color:var(--c-primary-deep);}',
+    '.imp-line{font-size:13px;line-height:1.7;}',
+    '.imp-soft{font-size:12px;color:var(--c-text-soft);line-height:1.6;}',
+    '.imp-ok{color:var(--c-pos);}.imp-bad{color:var(--c-neg);font-weight:bold;}',
+    '.imp-chips{display:flex;flex-wrap:wrap;gap:6px;}',
+    '.imp-chip{border:1px solid var(--c-border-mid);background:var(--c-surface);color:var(--c-text);border-radius:14px;padding:4px 10px;font-size:13px;cursor:pointer;}',
+    '.imp-chip b{color:var(--c-primary-deep);}',
+    '.imp-btn{border:1px solid var(--c-border-mid);background:var(--c-surface);color:var(--c-text);border-radius:8px;padding:6px 10px;font-size:13px;cursor:pointer;}',
+    '.imp-btn.gold{background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary));color:var(--c-on-primary);border:none;}',
+    '.imp-btn[disabled]{opacity:.45;cursor:not-allowed;}',
+    '.imp-row-opt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed var(--c-border);font-size:13px;}',
+    '.imp-row-opt:last-child{border-bottom:none;}',
+    '.imp-row-opt .grow{flex:1 1 160px;min-width:0;}',
+    '.imp-row-opt select{max-width:9em;}',
+    '.imp-link{background:none;border:none;color:var(--c-primary-deep);text-decoration:underline;font-size:12px;padding:0;cursor:pointer;}',
+    '.imp-gh{display:flex;justify-content:space-between;align-items:center;padding:10px 4px;border-bottom:1px solid var(--c-border);cursor:pointer;font-size:14px;}',
+    '.imp-list{background:var(--c-surface);border:1px solid var(--c-border);border-radius:8px;margin:6px 0 10px;}',
+    '.imp-list .al-row{display:flex;align-items:center;gap:8px;padding:9px 10px 2px;cursor:pointer;}',
+    '.imp-list .imp-why{font-size:11.5px;color:var(--c-text-soft);padding:0 10px 8px;border-bottom:1px solid var(--c-border);cursor:pointer;}',
+    '.imp-tag{display:inline-block;font-size:11px;border:1px solid var(--c-border-mid);border-radius:8px;padding:0 5px;margin-left:4px;}',
+    '#impBar{position:fixed;left:0;right:0;bottom:0;z-index:991;display:none;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:var(--c-bg);border-top:1px solid var(--c-border);}',
+    '#impBar .imp-btn{flex:1;padding:10px;font-size:15px;}',
+    '#impSheetMask{position:fixed;inset:0;z-index:995;background:rgba(0,0,0,.3);display:none;align-items:flex-end;justify-content:center;}',
+    '#impSheet{background:var(--c-surface-2);width:100%;max-width:520px;max-height:85vh;overflow-y:auto;border-radius:14px 14px 0 0;padding:16px;}',
+    '#impSheet h4{font-size:15px;margin-bottom:8px;color:var(--c-primary-deep);}',
+    '#impSheet .kv{display:flex;gap:8px;font-size:13px;padding:3px 0;}#impSheet .kv span:first-child{flex:0 0 5em;color:var(--c-text-soft);}',
+    '#impSheet .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}',
+    '#impProg{position:fixed;inset:0;z-index:996;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;}',
+    '#impProg .box{background:var(--c-surface-2);border-radius:12px;padding:18px;width:80%;max-width:320px;text-align:center;}',
+    '#impProg .bar{height:6px;background:var(--c-chip);border-radius:3px;margin:12px 0;overflow:hidden;}#impProg .bar i{display:block;height:100%;width:0;background:var(--c-primary);}'
+  ].join('\n');
+
+  // ---------- 页面骨架 ----------
+  function build() {
+    if (dom) return dom;
+    var st = el('style'); st.id = 'impStyle'; st.textContent = CSS; document.head.appendChild(st);
+    var page = el('div'); page.id = 'impPage';
+    var head = el('div', 'imp-head');
+    var back = btn('‹ 取消', 'imp-back', function () { close(); }); back.id = 'impBack';
+    var tt = el('div', 'imp-title', '导入账单'); tt.id = 'impTitle';
+    var sub = el('div', 'imp-sub'); sub.id = 'impArchive';
+    head.appendChild(back); head.appendChild(tt); head.appendChild(sub);
+    var body = el('div'); body.id = 'impBody';
+    page.appendChild(head); page.appendChild(body);
+    var bar = el('div'); bar.id = 'impBar';
+    var cancel = btn('取消', 'imp-btn', function () { close(); }); cancel.id = 'impCancel';
+    var go = btn('导入', 'imp-btn gold', onImport); go.id = 'impGo';
+    bar.appendChild(cancel); bar.appendChild(go);
+    var file = el('input'); file.type = 'file'; file.id = 'impFile'; file.multiple = true; file.accept = '.csv,.xlsx,text/csv'; file.style.display = 'none';
+    file.addEventListener('change', function () { var fs = [].slice.call(file.files || []); file.value = ''; if (fs.length) start(fs); });
+    var sm = el('div'); sm.id = 'impSheetMask'; var sh = el('div'); sh.id = 'impSheet'; sm.appendChild(sh);
+    sm.addEventListener('click', function (e) { if (e.target === sm) closeSheet(); });
+    var pg = el('div'); pg.id = 'impProg';
+    var box = el('div', 'box'); var pt = el('div', 'imp-line', ''); pt.id = 'impProgText';
+    var pb = el('div', 'bar'); var pi = el('i'); pi.id = 'impProgBar'; pb.appendChild(pi);
+    box.appendChild(pt); box.appendChild(pb); box.appendChild(btn('取消', 'imp-btn', function () { close(); }));
+    pg.appendChild(box);
+    [page, bar, file, sm, pg].forEach(function (x) { document.body.appendChild(x); });
+    dom = { page: page, body: body, bar: bar, go: go, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub };
+    return dom;
+  }
+
+  // ---------- 打开 / 关掉 ----------
+  function open() {
+    build();
+    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, receipt: true }, types: {}, statuses: {}, view: { details: false, open: {}, shown: {}, tag: null } };
+    try { dom.archive.textContent = '导入到存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
+    dom.title.textContent = '导入账单';
+    dom.page.style.display = 'block'; dom.bar.style.display = 'none';
+    renderPick();
+  }
+  function close() {
+    runId++;
+    if (J()) try { J().cancel(); } catch (_) {}
+    if (!dom) return;
+    dom.page.style.display = 'none'; dom.bar.style.display = 'none';
+    dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none';
+    dom.body.innerHTML = '';
+    S = null;
+  }
+  function isOpen() { return !!dom && dom.page.style.display === 'block'; }
+  // 返回键：先关最上面那一层（行详情 → 进度（停掉线程，整页也关掉）→ 整页）
+  function canBack() { return isOpen(); }
+  function back() {
+    if (dom.sheetMask.style.display === 'flex') { closeSheet(); return; }
+    close();
+  }
+
+  // ---------- 第一步：选文件 ----------
+  function renderPick() {
+    var b = dom.body; b.innerHTML = '';
+    var c = el('div', 'imp-card');
+    c.appendChild(el('h4', null, '导入微信 / 支付宝账单（开发中）'));
+    c.appendChild(el('div', 'imp-soft', '先在微信或支付宝里导出账单（选「用于个人对账」），把压缩包解压出来，再选里面的 csv / xlsx 文件。可以一次选好几个。这一版只看导入方案，不会写进账本。'));
+    var row = el('div', 'imp-chips'); row.style.marginTop = '12px';
+    var pick = btn('选账单文件', 'imp-btn gold', function () { dom.file.click(); }); pick.id = 'impPick';
+    row.appendChild(pick);
+    if (typeof window.openDevImportCheck === 'function') { var chk = btn('通路自检', 'imp-btn', function () { window.openDevImportCheck(); }); chk.id = 'impSelfTest'; row.appendChild(chk); }
+    c.appendChild(row);
+    b.appendChild(c);
+  }
+
+  // ---------- 进度 ----------
+  function progress(text, done, total) {
+    dom.prog.style.display = 'flex';
+    dom.progText.textContent = text;
+    dom.progBar.style.width = total ? Math.round(done / total * 100) + '%' : '0';
+  }
+  function readAll(files) {
+    return Promise.all(files.map(function (f) {
+      if (typeof f.arrayBuffer === 'function') return f.arrayBuffer().then(function (ab) { return { name: f.name, data: ab }; });
+      return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res({ name: f.name, data: r.result }); }; r.onerror = function () { rej(r.error); }; r.readAsArrayBuffer(f); });
+    }));
+  }
+  // 这一次的类型 / 状态规则：存档里的规则，加上确认页上临时选的（只影响这次的方案）
+  function typeRules() {
+    var out = (S.info.typeRules || []).filter(function (r) {
+      return !(r.type !== undefined && S.types[r.app + '|' + r.type]) && !(r.status !== undefined && S.statuses[r.app + '|' + r.status]);
+    });
+    Object.keys(S.types).forEach(function (k) { var i = k.indexOf('|'); out.push({ app: k.slice(0, i), type: k.slice(i + 1), as: S.types[k] }); });
+    Object.keys(S.statuses).forEach(function (k) { var i = k.indexOf('|'); out.push({ app: k.slice(0, i), status: k.slice(i + 1), as: S.statuses[k] }); });
+    return out;
+  }
+  function start(files) {
+    var my = ++runId;
+    S.phase = 'progress';
+    progress('读文件…', 0, 1);
+    var alive = function () { return my === runId && S; };
+    readAll(files).then(function (fs) {
+      if (!alive()) return;
+      return J().run('parse', { files: fs }, { onProgress: function (d, t) { if (alive()) progress('读文件…', d, t); } }).then(function (r) {
+        if (!alive()) return;
+        S.parsed = r.result;
+        S.info = store().archiveInfo();
+        progress('查以前导入过的…', 0, 1);
+        return J().run('lookups', { parsed: S.parsed });
+      }).then(function (r) {
+        if (!alive() || !r) return;
+        return store().knownFor(r.result);
+      }).then(function (known) {
+        if (!alive() || !known) return;
+        S.known = known;
+        return compute(my);
+      });
+    }).catch(function (e) {
+      if (!alive() || (e && e.cancelled)) return;
+      dom.prog.style.display = 'none';
+      alertMsg('导入出错了：' + (e && e.message || e));
+      S.phase = 'pick'; renderPick();
+    });
+  }
+  // 从 route 起算一遍（类型 / 状态选择变了也走这里，parse 的结果和单号表不重查）
+  function compute(my) {
+    var alive = function () { return my === runId && S; };
+    progress('定去向…', 0, 1);
+    return J().run('route', { parsed: S.parsed, known: S.known, rules: typeRules() }).then(function (r) {
+      if (!alive()) return;
+      S.routed = r.result;
+      return J().run('ledgerQuery', { routed: S.routed, parsed: S.parsed });
+    }).then(function (r) {
+      if (!alive() || !r) return;
+      S.ledger = store().ledgerFor(r.result);
+      progress('和手记配对、推荐分类…', 0, 1);
+      return J().run('match', { routed: S.routed, parsed: S.parsed, manual: S.ledger.manual, refundCands: S.ledger.refundCands,
+                                cats: S.info.cats, rules: S.info.catRules, isNewUser: S.info.isNewUser });
+    }).then(function (r) {
+      if (!alive() || !r) return;
+      S.matched = r.result;
+      S.manualById = {};
+      S.ledger.manual.forEach(function (m) { S.manualById[m.id] = m; });
+      S.ledger.refundCands.forEach(function (m) { S.manualById[m.id] = m; });
+      return store().importsRead().catch(function () { return []; });
+    }).then(function (logs) {
+      if (!alive() || !logs) return;
+      S.overlaps = logs.map(function (l) { return { apps: l.apps || [], from: l.from, to: l.to }; });
+      // 重算以后，套不上的改动丢掉（那一行已经不在原来的组里了）
+      var lost = 0, keys = {};
+      S.matched.items.forEach(function (it) { if (it.key) keys[it.key] = it.bucket; });
+      Object.keys(S.edits.rows).forEach(function (k) {
+        var e = S.edits.rows[k], b = keys[k];
+        var ok = b && !((e.split && b !== 'merge') || (e.pick && b !== 'pending'));
+        if (!ok) { delete S.edits.rows[k]; lost++; }
+      });
+      S.lost = lost;
+      dom.prog.style.display = 'none';
+      S.phase = 'confirm';
+      replan();
+    });
+  }
+  function rerun() {
+    var my = ++runId;
+    compute(my).catch(function (e) { if (my !== runId || (e && e.cancelled)) return; dom.prog.style.display = 'none'; alertMsg('重新计算出错了：' + (e && e.message || e)); });
+  }
+
+  // ---------- 方案 → 页面 ----------
+  function replan() {
+    S.plan = Plan.plan({ parsed: S.parsed, matched: S.matched, info: S.info, manualById: S.manualById, overlaps: S.overlaps }, S.edits);
+    render();
+  }
+  function render() {
+    var y = dom.page.scrollTop;
+    var b = dom.body, p = S.plan; b.innerHTML = '';
+    dom.title.textContent = '导入确认';
+    b.appendChild(renderFiles(p));
+    b.appendChild(renderSummary(p));
+    renderDecide(p).forEach(function (c) { b.appendChild(c); });
+    b.appendChild(renderStorage(p));
+    b.appendChild(renderDetails(p));
+    // 底部按钮
+    dom.bar.style.display = 'flex';
+    dom.go.textContent = '导入 ' + p.importN + ' 笔，合并 ' + p.mergeM + ' 笔';
+    dom.go.disabled = !p.canImport;
+    dom.page.scrollTop = y;
+  }
+
+  function renderFiles(p) {
+    var wrap = el('div'); wrap.id = 'impFiles';
+    p.files.forEach(function (f, i) {
+      var c = el('div', 'imp-card'); c.dataset.file = i;
+      if (f.fatal) {
+        c.appendChild(el('div', 'imp-line imp-bad', '✗ 认不出这个文件：' + f.fatal.msg));
+        c.appendChild(el('div', 'imp-soft', f.name + '（这个文件不会导入）'));
+        if (f.fatal.header) c.appendChild(el('div', 'imp-soft', '读到的表头：' + f.fatal.header.join('，')));
+        var cp = btn('复制给开发者', 'imp-btn', function () { copyDev(); }); cp.className += ' imp-copy'; cp.style.marginTop = '8px';
+        c.appendChild(cp);
+        wrap.appendChild(c); return;
+      }
+      c.appendChild(el('div', 'imp-line', (APP[f.app] || f.app) + (f.range ? ' · ' + f.range.from.slice(0, 10) + ' 至 ' + f.range.to.slice(0, 10) : '') + ' · 共 ' + f.parsedTotal + ' 笔'));
+      c.appendChild(el('div', 'imp-soft', f.name));
+      var chk;
+      if (f.countOk === true) chk = el('div', 'imp-line imp-ok imp-check', '✓ 笔数和账单统计一致');
+      else if (f.countOk === false) chk = el('div', 'imp-line imp-bad imp-check', '✗ 笔数和账单统计对不上：账单写着 ' + f.headerTotal + ' 笔，读出来 ' + f.parsedTotal + ' 笔，可能读漏了，这一份不能直接导入');
+      else chk = el('div', 'imp-line imp-soft imp-check', '账单里没写总笔数，没法核对');
+      c.appendChild(chk);
+      if (f.errors) c.appendChild(el('div', 'imp-soft', '有 ' + f.errors + ' 行读不出来，见下面「出错」'));
+      // 差额拆开
+      var tg = btn('差额拆开 ▸', 'imp-link'); tg.className += ' imp-diff-toggle';
+      var box = el('div', 'imp-diff'); box.style.display = S.view['diff' + i] ? '' : 'none';
+      tg.addEventListener('click', function () { S.view['diff' + i] = !S.view['diff' + i]; box.style.display = S.view['diff' + i] ? '' : 'none'; });
+      ['expense', 'income', 'neutral'].forEach(function (io) {
+        var d = f.diff[io];
+        if (!d || (!d.header && !d.sum)) return;
+        var parts = d.parts.filter(function (x) { return x.n; }).map(function (x) { return x.label + ' ' + yuan(x.fen); });
+        var head = d.header ? d.title + ' ' + yuan(d.header.fen) + '（' + d.header.n + ' 笔）' : d.title + '（账单没写）';
+        var tail = '';
+        if (d.header) {
+          if (d.unreadable && f.errors) { parts.push('读不出来的 ' + yuan(d.unreadable)); tail = ' · 合计差 0.00'; }
+          else tail = ' · 合计差 ' + yuan(d.unreadable || 0);
+        }
+        var line = el('div', 'imp-soft imp-diff-' + io, head + ' = ' + (parts.join(' + ') || '0.00') + tail);
+        if (d.header && d.ok === false) line.className += ' imp-bad';
+        box.appendChild(line);
+        if (d.mergeDelta) box.appendChild(el('div', 'imp-soft', '其中合并的手记比账单' + (d.mergeDelta > 0 ? '多记 ' : '少记 ') + yuan(Math.abs(d.mergeDelta)) + '（金额按手记的算）'));
+      });
+      c.appendChild(tg); c.appendChild(box);
+      wrap.appendChild(c);
+    });
+    return wrap;
+  }
+
+  function renderSummary(p) {
+    var c = el('div', 'imp-card'); c.id = 'impSummary';
+    var chips = el('div', 'imp-chips');
+    ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'].forEach(function (g) {
+      if (!p.counts[g] && (g === 'excluded' || g === 'error' || g === 'refund')) return;
+      var ch = el('button', 'imp-chip'); ch.type = 'button'; ch.dataset.group = g;
+      ch.appendChild(document.createTextNode(p.groupNames[g] + ' ')); ch.appendChild(el('b', null, String(p.counts[g])));
+      ch.addEventListener('click', function () { S.view.details = true; S.view.open[g] = true; S.view.tag = null; render(); var h = document.getElementById('impG-' + g); if (h && h.scrollIntoView) h.scrollIntoView(); });
+      chips.appendChild(ch);
+    });
+    c.appendChild(chips);
+    if (p.records !== p.importN) c.appendChild(el('div', 'imp-soft', '分分捐、收款这类合并以后，实际新建 ' + p.records + ' 条记录'));
+    if (p.blocking.length) c.appendChild(el('div', 'imp-line imp-bad', '有账单笔数对不上，先不能导入'));
+    if (S.lost) c.appendChild(el('div', 'imp-soft', '有 ' + S.lost + ' 处改动因为重新计算失效了'));
+    return c;
+  }
+
+  // 要你定的几块，哪块没内容就不出现
+  function renderDecide(p) {
+    var out = [], s = p.sections;
+    var catOpts = function () {
+      var list = ['未分类'].concat(S.info.cats.filter(function (c) { return c !== '未分类'; }));
+      s.newCats.forEach(function (n) { if (n.on && list.indexOf(n.name) < 0) list.push(n.name); });
+      return list;
+    };
+    function select(opts, val, fn, cls) {
+      var se = el('select', cls || '');
+      opts.forEach(function (o) { var op = el('option', null, o[1]); op.value = o[0]; se.appendChild(op); });
+      se.value = val; se.addEventListener('change', function () { fn(se.value); });
+      return se;
+    }
+    if (s.unknownTypes.length || s.unknownStatuses.length) {
+      var c = el('div', 'imp-card'); c.id = 'impTypes';
+      c.appendChild(el('h4', null, '没见过的交易类型 / 状态'));
+      s.unknownTypes.forEach(function (t) {
+        var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.type;
+        r.appendChild(el('span', 'grow', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔，共 ' + yuan(t.fen) + ' 元'));
+        r.appendChild(select([['', '照收支导入（放进其他）'], ['normal', '照收支导入'], ['transfer', '当转账（不计入）'], ['skip', '跳过']], S.types[k] || '',
+          function (v) { if (v) S.types[k] = v; else delete S.types[k]; rerun(); }, 'imp-type-sel'));
+        c.appendChild(r);
+      });
+      s.unknownStatuses.forEach(function (t) {
+        var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.status;
+        r.appendChild(el('span', 'grow', '状态「' + t.status + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
+        r.appendChild(select([['', '导入（放进其他）'], ['import', '导入'], ['skip', '跳过']], S.statuses[k] || '',
+          function (v) { if (v) S.statuses[k] = v; else delete S.statuses[k]; rerun(); }, 'imp-status-sel'));
+        c.appendChild(r);
+      });
+      c.appendChild(el('div', 'imp-soft', '这里选的只影响这一次（这一版先不记成规则）。'));
+      out.push(c);
+    }
+    if (s.receipt) {
+      var rc = el('div', 'imp-card'); rc.id = 'impReceipt';
+      rc.appendChild(el('h4', null, '收款按天合并'));
+      rc.appendChild(el('div', 'imp-line', '收款 ' + s.receipt.n + ' 笔，共 ' + yuan(s.receipt.fen) + ' 元，看起来是收款账号。按天合成 ' + s.receipt.days + ' 条？'));
+      var rr = el('div', 'imp-chips'); rr.style.marginTop = '8px';
+      var yes = btn('按天合并', s.receipt.on ? 'imp-btn gold' : 'imp-btn', function () { S.edits.receipt = true; replan(); }); yes.dataset.v = 'on';
+      var no = btn('逐条导入', s.receipt.on ? 'imp-btn' : 'imp-btn gold', function () { S.edits.receipt = false; replan(); }); no.dataset.v = 'off';
+      rr.appendChild(yes); rr.appendChild(no); rc.appendChild(rr); out.push(rc);
+    }
+    if (s.petty.length) {
+      var pc = el('div', 'imp-card'); pc.id = 'impPetty';
+      pc.appendChild(el('h4', null, '疑似零碎扣款'));
+      s.petty.forEach(function (x) {
+        var r = el('label', 'imp-row-opt'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
+        cb.addEventListener('change', function () { S.edits.petty[x.key] = cb.checked; replan(); });
+        r.appendChild(cb); r.appendChild(el('span', 'grow', x.cp + ' · ' + x.month + ' · ' + x.n + ' 笔 · 共 ' + yuan(x.fen) + ' 元 · 合成一条'));
+        pc.appendChild(r);
+      });
+      out.push(pc);
+    }
+    if (s.newCats.length) {
+      var nc = el('div', 'imp-card'); nc.id = 'impNewCats';
+      nc.appendChild(el('h4', null, '新建分类（' + s.newCats.length + '）'));
+      s.newCats.forEach(function (x) {
+        var r = el('div', 'imp-row-opt'); r.dataset.cat = x.name;
+        var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
+        cb.addEventListener('change', function () { S.edits.newCats[x.name] = { on: cb.checked, into: cb.checked ? null : (x.into || null) }; replan(); });
+        r.appendChild(cb); r.appendChild(el('span', 'grow', '建「' + x.name + '」 ' + x.count + ' 笔'));
+        var opts = [['', '并到已有…']].concat(S.info.cats.map(function (c) { return [c, '并到「' + c + '」']; }));
+        r.appendChild(select(opts, x.into || '', function (v) { S.edits.newCats[x.name] = { on: false, into: v || null }; replan(); }, 'imp-into'));
+        nc.appendChild(r);
+      });
+      out.push(nc);
+    }
+    if (s.cpGroups.length) {
+      var gc = el('div', 'imp-card'); gc.id = 'impCpGroups';
+      gc.appendChild(el('h4', null, '还没有分类的，按对方一组选一次（' + s.cpGroups.length + ' 组）'));
+      s.cpGroups.forEach(function (g) {
+        var r = el('div', 'imp-row-opt'); r.dataset.cp = g.cp;
+        var desc = g.cp + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元' + (g.n > 1 ? ' · 每笔 ' + yuan(g.min) + '–' + yuan(g.max) + ' 元' : '') + (g.hour !== null ? ' · 多在 ' + g.hour + ' 点左右' : '');
+        r.appendChild(el('span', 'grow', desc));
+        r.appendChild(select(catOpts().map(function (c) { return [c, c]; }), g.cat || '未分类', function (v) {
+          if (v === '未分类') delete S.edits.cpCats[g.cp]; else S.edits.cpCats[g.cp] = v; replan();
+        }, 'imp-cp-sel'));
+        gc.appendChild(r);
+      });
+      gc.appendChild(el('div', 'imp-soft', '这一版只改这次的推荐，不记成规则。'));
+      out.push(gc);
+    }
+    var nt = s.notes, items = [];
+    if (nt.neutralVsNormal.length) items.push(['neutralVsNormal', nt.neutralVsNormal.length + ' 笔「不计入」的账单和同金额的普通手记撞上了，没合并，请看一眼是不是记重了']);
+    if (nt.joined.length) items.push(['joined', nt.joined.length + ' 笔是被换行拆开、拼回来的']);
+    if (nt.noNote.length) items.push(['noNote', nt.noNote.length + ' 笔单号带了附加信息，已按开头部分去重（附加信息挪进了备注）']);
+    if (nt.overlap.length) items.push(['overlap', nt.overlap.length + ' 笔新增落在以前导入过的时间段里，可能是你删过的']);
+    if (items.length) {
+      var ncard = el('div', 'imp-card'); ncard.id = 'impNotes';
+      ncard.appendChild(el('h4', null, '提个醒'));
+      items.forEach(function (x) {
+        var l = btn('· ' + x[1], 'imp-link'); l.dataset.tag = x[0]; l.style.display = 'block'; l.style.textAlign = 'left'; l.style.marginBottom = '4px';
+        l.addEventListener('click', function () { S.view.details = true; S.view.tag = x[0]; render(); var d = document.getElementById('impDetails'); if (d && d.scrollIntoView) d.scrollIntoView(); });
+        ncard.appendChild(l);
+      });
+      out.push(ncard);
+    }
+    return out;
+  }
+
+  function renderStorage(p) {
+    var c = el('div', 'imp-card'); c.id = 'impStorage';
+    var e = null;
+    try { e = store().estimate({ records: p.records, orders: p.orders, names: 0 }); } catch (_) {}
+    var mb = e ? (e.bytes / 1048576) : 0;
+    c.appendChild(el('div', 'imp-line', '存储：预计多占约 ' + (mb < 0.1 ? '不到 0.1' : mb.toFixed(1)) + ' MB'));
+    if (navigator.storage && navigator.storage.estimate) {
+      var sp = el('div', 'imp-soft'); c.appendChild(sp);
+      navigator.storage.estimate().then(function (q) { if (q && q.quota) sp.textContent = '手机上还能用约 ' + ((q.quota - (q.usage || 0)) / 1048576).toFixed(0) + ' MB'; }).catch(function () {});
+    }
+    return c;
+  }
+
+  // ---------- 全部明细 ----------
+  var TAGNAME = { joined: '拼回', noNote: '单号带附加信息', overlap: '以前导入过这段', otherType: '新类型', otherStatus: '新状态', neutralVsNormal: '撞上普通手记' };
+  var MODENAME = { normal: '计入', flow: '只算结余', skip: '不计入' };
+  function renderDetails(p) {
+    var wrap = el('div'); wrap.id = 'impDetails';
+    var tg = btn(S.view.details ? '收起全部明细' : '查看全部明细', 'imp-btn', function () { S.view.details = !S.view.details; render(); });
+    tg.id = 'impDetailsToggle'; tg.style.width = '100%'; tg.style.marginBottom = '8px';
+    wrap.appendChild(tg);
+    if (!S.view.details) return wrap;
+    if (S.view.tag) {
+      var f = el('div', 'imp-soft');
+      f.appendChild(document.createTextNode('只看「' + TAGNAME[S.view.tag] + '」的 '));
+      var clr = btn('看全部', 'imp-link', function () { S.view.tag = null; render(); }); f.appendChild(clr);
+      wrap.appendChild(f);
+    }
+    Plan.GROUPS.forEach(function (g) {
+      var list = p.groups[g].filter(function (d) { return !S.view.tag || d.tags.indexOf(S.view.tag) >= 0; });
+      if (!list.length) return;
+      var n = list.reduce(function (s, d) { return s + d.units; }, 0), sum = list.reduce(function (s, d) { return s + (d.fen || 0); }, 0);
+      var h = el('div', 'imp-gh'); h.id = 'impG-' + g; h.dataset.group = g;
+      h.appendChild(el('span', null, p.groupNames[g] + ' ' + n + ' 笔'));
+      h.appendChild(el('span', 'imp-soft', '共 ' + yuan(sum) + ' 元 ' + (S.view.open[g] ? '▾' : '▸')));
+      h.addEventListener('click', function () { S.view.open[g] = !S.view.open[g]; render(); });
+      wrap.appendChild(h);
+      if (!S.view.open[g]) return;
+      var box = el('div', 'imp-list'); box.dataset.group = g;
+      var shown = S.view.shown[g] || PAGE;
+      list.slice(0, shown).forEach(function (d) { renderRow(box, d); });
+      wrap.appendChild(box);
+      if (list.length > shown) {
+        var more = btn('再显示 ' + Math.min(PAGE, list.length - shown) + ' 行（还有 ' + (list.length - shown) + ' 行）', 'imp-btn', function () { S.view.shown[g] = shown + PAGE; render(); });
+        more.className += ' imp-more'; more.dataset.group = g; more.style.width = '100%';
+        wrap.appendChild(more);
+      }
+    });
+    return wrap;
+  }
+  function renderRow(box, d) {
+    var row = el('div', 'al-row'); row.dataset.key = d.key || '';
+    var open = function () { if (d.src === 'row') openSheet(d.key); };
+    if (d.src !== 'row') {
+      row.appendChild(el('span', 'al-time', d.line ? '第 ' + d.line + ' 行' : ''));
+      row.appendChild(el('span', 'al-remark', d.src === 'error' ? (d.raw || []).filter(Boolean).slice(0, 2).join(' · ') || '—' : '重复的一行'));
+      if (d.fen !== null) row.appendChild(el('span', 'al-amt', yuan(d.fen)));
+    } else {
+      row.appendChild(el('span', 'al-time', fmtTime(d.time)));
+      var c = el('span', 'al-cat'); c.appendChild(el('span', 'cat-tag', d.cat || '未分类')); row.appendChild(c);
+      row.appendChild(el('span', 'al-remark', (d.desc || '').trim() || d.cp || '—'));
+      var isExp = d.type === 'expense';
+      row.appendChild(el('span', 'al-amt ' + (isExp ? 'neg' : 'pos'), (isExp ? '−' : '+') + yuan(d.fen)));
+      row.appendChild(el('span', 'al-go', '›'));
+    }
+    row.addEventListener('click', open);
+    box.appendChild(row);
+    var why = el('div', 'imp-why');
+    var bits = [];
+    if (d.reason) bits.push(d.reason);
+    if (d.src === 'row' && (d.group === 'add' || d.group === 'neutral') && d.mode !== 'normal') bits.push('口径：' + MODENAME[d.mode]);
+    why.textContent = bits.join(' · ');
+    d.tags.forEach(function (t) { if (TAGNAME[t]) why.appendChild(el('span', 'imp-tag', TAGNAME[t])); });
+    why.addEventListener('click', open);
+    box.appendChild(why);
+  }
+
+  // ---------- 一行的详情：在这里改 ----------
+  function rowByKey(key) { var r = null; S.plan.rows.forEach(function (d) { if (d.key === key) r = d; }); return r; }
+  function setEdit(key, patch) {
+    var e = S.edits.rows[key] || {};
+    Object.keys(patch).forEach(function (k) { if (patch[k] === null || patch[k] === undefined) delete e[k]; else e[k] = patch[k]; });
+    if (Object.keys(e).length) S.edits.rows[key] = e; else delete S.edits.rows[key];
+    replan();
+    if (dom.sheetMask.style.display === 'flex') openSheet(key);
+  }
+  function openSheet(key) {
+    var d = rowByKey(key); if (!d) return;
+    var sh = dom.sheet; sh.innerHTML = '';
+    sh.dataset.key = key;
+    sh.appendChild(el('h4', null, (d.type === 'expense' ? '−' : '+') + yuan(d.fen) + ' · ' + (S.plan.groupNames[d.group])));
+    var kv = function (k, v) { if (!v) return; var r = el('div', 'kv'); r.appendChild(el('span', null, k)); r.appendChild(el('span', null, v)); sh.appendChild(r); };
+    kv('时间', d.time.replace('T', ' ')); kv('交易对方', d.cp); kv('商品', d.desc); kv('备注', d.remark);
+    kv('支付方式', (S.parsed.files[d.file].rows[d.row] || {}).pm); kv(d.app === 'alipay' ? '交易分类' : '交易类型', d.kind); kv('状态', d.status);
+    kv('来源', APP[d.app]); kv('去向', d.reason);
+    if (d.rec) kv('分类推荐', d.rec.cat + '（' + d.rec.reason + (d.rec.conf ? '，把握' + { high: '高', mid: '中', low: '低' }[d.rec.conf] : '') + '）');
+    if (d.into && S.manualById[d.into]) { var m = S.manualById[d.into]; kv('合并到', '手记 ' + fmtTime(m.time) + ' · ' + m.cat + ' · ' + yuan(m.fen)); }
+    var acts = el('div', 'acts');
+    if (d.canCat) {
+      var se = el('select', 'imp-row-cat');
+      var list = ['未分类'].concat(S.info.cats.filter(function (c) { return c !== '未分类'; }));
+      S.plan.sections.newCats.forEach(function (n) { if (n.on && list.indexOf(n.name) < 0) list.push(n.name); });
+      if (d.cat && list.indexOf(d.cat) < 0) list.push(d.cat);
+      list.forEach(function (c) { var o = el('option', null, c); o.value = c; se.appendChild(o); });
+      se.value = d.cat || '未分类';
+      se.addEventListener('change', function () { setEdit(key, { cat: se.value }); });
+      var l = el('label', 'imp-line', '分类 '); l.appendChild(se); acts.appendChild(l);
+    }
+    if (d.canMode) {
+      ['normal', 'flow', 'skip'].forEach(function (m) {
+        var b = btn(MODENAME[m], d.mode === m ? 'imp-btn gold' : 'imp-btn', function () { setEdit(key, { mode: m }); });
+        b.className += ' imp-mode'; b.dataset.mode = m; acts.appendChild(b);
+      });
+    }
+    if (d.canExclude) { var x = btn('勾掉（不导入）', 'imp-btn', function () { setEdit(key, { exclude: true }); }); x.id = 'impExclude'; acts.appendChild(x); }
+    if (d.canRestore) { var rs = btn('恢复', 'imp-btn', function () { setEdit(key, { exclude: null, pick: null }); }); rs.id = 'impRestore'; acts.appendChild(rs); }
+    if (d.canSplit) { var sp = btn('拆开（改为新增）', 'imp-btn', function () { setEdit(key, { split: true }); }); sp.id = 'impSplit'; acts.appendChild(sp); }
+    if (d.bucket0 === 'merge' && !d.canSplit) { var un = btn('不拆了（照旧合并）', 'imp-btn', function () { setEdit(key, { split: null }); }); un.id = 'impUnsplit'; acts.appendChild(un); }
+    sh.appendChild(acts);
+    if (d.canPick) {
+      sh.appendChild(el('div', 'imp-soft', '可能是这几条（选一条，或者作为新增 / 不要了）：'));
+      var used = {};
+      S.plan.rows.forEach(function (r) { if (r.group === 'merge' && r.key !== key) used[r.into] = true; });
+      (d.cands || []).forEach(function (c, i) {
+        var r = el('div', 'imp-row-opt'); r.dataset.i = i;
+        var label, pick;
+        if (c.record) {
+          var m = S.manualById[c.record];
+          label = m ? fmtTime(m.time) + ' · ' + (m.cat || '') + ' · ' + yuan(m.fen) + (m.cp ? ' · ' + m.cp : '') : '账本里的一条记录';
+          pick = { record: c.record };
+        } else {
+          var o = S.parsed.files[c.row.file].rows[c.row.row];
+          label = '这一批里的 ' + fmtTime(o.time) + ' · ' + (o.cp || '') + ' · ' + yuan(o.fen);
+          pick = { row: c.row };
+        }
+        r.appendChild(el('span', 'grow', label));
+        var chosen = d.item && S.edits.rows[key] && S.edits.rows[key].pick && JSON.stringify(S.edits.rows[key].pick) === JSON.stringify(pick);
+        // 退款类的候选是「挂到这笔原单」，其余是「和这条手记合并」
+        var isRefund = d.why === 'refundcands' || !!c.row;
+        var b = btn(chosen ? '已选' : (isRefund ? '挂到这笔' : '和这条合并'), chosen ? 'imp-btn gold' : 'imp-btn', function () { setEdit(key, { pick: pick }); });
+        b.className += ' imp-pick';
+        if (!isRefund && used[c.record] && !chosen) b.disabled = true;      // 这条手记已经和别的账单合并了
+        r.appendChild(b); sh.appendChild(r);
+      });
+      var a2 = el('div', 'acts');
+      var nb = btn('作为新增', 'imp-btn', function () { setEdit(key, { pick: 'new' }); }); nb.id = 'impPickNew';
+      var db = btn('不要了', 'imp-btn', function () { setEdit(key, { pick: 'drop' }); }); db.id = 'impPickDrop';
+      var cb = btn('还是待确认', 'imp-btn', function () { setEdit(key, { pick: null }); }); cb.id = 'impPickClear';
+      a2.appendChild(nb); a2.appendChild(db); a2.appendChild(cb); sh.appendChild(a2);
+    }
+    var cl = btn('关闭', 'imp-btn', closeSheet); cl.id = 'impSheetClose'; cl.style.marginTop = '12px'; cl.style.width = '100%';
+    sh.appendChild(cl);
+    dom.sheetMask.style.display = 'flex';
+  }
+  function closeSheet() { if (dom) dom.sheetMask.style.display = 'none'; }
+
+  // ---------- 底部按钮、复制 ----------
+  function onImport() {
+    if (!S || !S.plan || !S.plan.canImport) return;
+    alertMsg('开发中，这一版不写入。\n\n算好的方案：导入 ' + S.plan.importN + ' 笔、合并 ' + S.plan.mergeM + ' 笔，实际新建 ' + S.plan.records + ' 条记录。', '导入（开发中）');
+  }
+  function copyDev() {
+    var text = Plan.devText(S.plan);
+    UI._lastCopy = text;
+    var done = function () { alertMsg('已复制。发给开发者时只有表头、交易类型和状态，没有金额、对方和单号。', '复制给开发者'); };
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text); done(); }); return; }
+    } catch (_) {}
+    fallbackCopy(text); done();
+  }
+  function fallbackCopy(text) {
+    try { var ta = el('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand && document.execCommand('copy'); ta.remove(); } catch (_) {}
+  }
+
+  var UI = { open: open, close: close, canBack: canBack, back: back, isOpen: isOpen,
+             _state: function () { return S; }, _lastCopy: null };
+  window.JiwenImportUI = UI;
+})();

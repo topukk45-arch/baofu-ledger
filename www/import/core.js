@@ -21,7 +21,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-A';
+  var VERSION = '1016-B';
   // 每处理这么多个字符 / 字节报一次进度
   var STEP = 1 << 16;
 
@@ -70,6 +70,9 @@
       return { core: VERSION, merchants: m && m.items ? m.items.length : 0, parse: ctx && ctx.parse ? ctx.parse.VERSION : null,
                route: ctx && ctx.route ? ctx.route.VERSION : null, match: ctx && ctx.match ? ctx.match.VERSION : null };
     },
+    // 主页面要查单号表 / 账本之前，先问线程这一批要查什么（route.js / match.js 主页面不载入）
+    lookups: function (data, onProgress, ctx) { return ctx.route.lookups(data && data.parsed); },
+    ledgerQuery: function (data, onProgress, ctx) { return ctx.match.ledgerQuery(data && data.routed, data && data.parsed); },
     // 配对与分类：data = { routed, parsed, manual, refundCands, cats, rules, isNewUser }，见 match.js
     //   （manual、refundCands 由主页面按 match.ledgerQuery 从账本里取出来；内置词表线程里自己有）
     match: function (data, onProgress, ctx) {

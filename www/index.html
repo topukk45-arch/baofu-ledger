@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-A</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-B</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3594,7 +3594,66 @@
                 await impWrite(t.e, t.key, [[impLogKey(t.e.id, t.aid), clean.length ? JSON.stringify({ v:1, list:clean }) : null]]);
                 return clean.length;
             },
-            estimate(o, archive){ return impEstimate(o, archive); }
+            estimate(o, archive){ return impEstimate(o, archive); },
+
+            // ---- 1016-B：导入确认页要的只读数据（不写任何东西）----
+            // 存档的分类、规则、对方名单，是不是新用户（记录少于 30 条、分类还是默认那 7 个）
+            archiveInfo(archive){
+                const t=impTarget(archive);
+                const a=ledgerAssembleArchive(t.e, t.aid), st=t.e.archs.get(t.aid), n=st ? st.recs.length : 0;
+                const cats=(a.cats||[]).slice(), rules=a.importRules||{};
+                const isDefault=cats.length===DEFAULT_CATS.length && DEFAULT_CATS.every(c=>cats.includes(c));
+                return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(),
+                         cps:(a.cps||[]).slice(), records:n, isNewUser: n<30 && isDefault };
+            },
+            // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）
+            async knownFor(lk, archive){
+                const t=impTarget(archive);
+                const blocks=await impReadOrders(t.e, t.aid), T=impOrderTable(t.e, t.aid, blocks);
+                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, byId=new Map(), refunded=new Map(), nOf=new Map();
+                recs.forEach(r=>{
+                    byId.set(r.id, r);
+                    if(r.refundOf) refunded.set(r.refundOf, (refunded.get(r.refundOf)||0)+Math.round(safeNum(r.money)*100));
+                });
+                blocks.forEach(list=>list.forEach(x=>{ if(x.st===0) nOf.set(x.id, (nOf.get(x.id)||0)+1); }));
+                const info=id=>{ const r=byId.get(id); return r ? { type:r.type, fen:Math.round(safeNum(r.money)*100), refunded:refunded.get(id)||0, mode:recMode(r) } : null; };
+                const known={};
+                (lk && lk.orders || []).forEach(key=>{
+                    const i=key.indexOf('|'); if(i<0) return;
+                    const ent=T.get(key.slice(0,i), key.slice(i+1));
+                    if(ent) known[key]={ st:ent.st, id:ent.id, rec: ent.st===0 ? info(ent.id) : null };
+                });
+                (lk && lk.groups || []).forEach(g=>{
+                    const r=recs.find(x=>x.src && x.src.app===g.app && x.oc===g.oc && typeof x.time==='string' && x.time.indexOf(g.period)===0);
+                    if(r) known[g.key]={ rec:{ id:r.id, fen:Math.round(safeNum(r.money)*100), n:nOf.get(r.id)||1 } };
+                });
+                return known;
+            },
+            // 按 match.ledgerQuery() 取手记和退款候选（见 match.js 开头）
+            ledgerFor(q, archive){
+                const t=impTarget(archive);
+                const a=ledgerAssembleArchive(t.e, t.aid), cps=a.cps||[];
+                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, refunded=new Map();
+                recs.forEach(r=>{ if(r.refundOf) refunded.set(r.refundOf, (refunded.get(r.refundOf)||0)+Math.round(safeNum(r.money)*100)); });
+                const fen=r=>Math.round(safeNum(r.money)*100);
+                const manual=[], cands=[], seen=new Set();
+                const m=q && q.manual;
+                recs.forEach(r=>{
+                    if(typeof r.time!=='string') return;
+                    if(m && !r.src && !r.refundOf){
+                        const d=r.time.slice(0,10);
+                        if(d>=m.from && d<=m.to) manual.push({ id:r.id, time:r.time, type:r.type, fen:fen(r), cat:r.cat, mode:recMode(r) });
+                    }
+                    if(r.src && r.type==='expense' && Number.isInteger(r.cp)){
+                        (q && q.refunds || []).forEach(x=>{
+                            if(seen.has(r.id) || r.time<x.from || r.time>=x.before || fen(r)-(refunded.get(r.id)||0)<x.minFen) return;
+                            seen.add(r.id);
+                            cands.push({ id:r.id, time:r.time, type:r.type, fen:fen(r), refunded:refunded.get(r.id)||0, cp:cps[r.cp]||'', cat:r.cat });
+                        });
+                    }
+                });
+                return { manual, refundCands:cands };
+            }
         };
         // meta 里这个存档的设置（分类、名单……，不含记录）
         function ledgerAssembleArchive(e, aid){
@@ -5297,6 +5356,23 @@ ${detail}
             });
             return __importLoading;
         }
+        // 1016-B：导入页（确认页）要的另外两个文件，按顺序载入；都只在打开导入时才载入
+        let __importUiLoading=null;
+        function loadImportUI(){
+            if(window.JiwenImportUI) return Promise.resolve(window.JiwenImportUI);
+            if(__importUiLoading) return __importUiLoading;
+            const one=src=>new Promise((resolve, reject)=>{
+                const s=document.createElement('script'); s.src=src;
+                s.onload=()=>resolve(); s.onerror=()=>{ s.remove(); reject(new Error('导入模块没加载上')); };
+                document.head.appendChild(s);
+            });
+            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/ui.js')).then(()=>{
+                if(!window.JiwenImportUI) throw new Error('导入模块不完整');
+                return window.JiwenImportUI;
+            });
+            __importUiLoading.catch(()=>{ __importUiLoading=null; });
+            return __importUiLoading;
+        }
         let __devImportRun=0;
         function runDevImportCheck(){
             const out=$('devImportOut'), my=++__devImportRun;
@@ -5317,7 +5393,11 @@ ${detail}
                 out.textContent='自检失败：' + (e && e.message || e);
             });
         }
-        $('devImportBtn').addEventListener('click', () => { $('devImportMask').style.display='flex'; runDevImportCheck(); });
+        // 1016-B：开发入口改成真的导入页（选文件 → 确认页）；通路自检挪进导入页里
+        $('devImportBtn').addEventListener('click', () => {
+            loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
+        });
+        function openDevImportCheck(){ $('devImportMask').style.display='flex'; runDevImportCheck(); }
         $('devImportRerun').addEventListener('click', runDevImportCheck);
         $('devImportClose').addEventListener('click', () => {
             __devImportRun++;
@@ -9120,6 +9200,8 @@ ${detail}
             const LAYERS=[
                 // 1040 提示/确认：走 closeAsk(null)，等价于「取消」，会触发它自己的 onCancel
                 { can:askIsPrompt,              close:()=>closeAsk(null) },
+                // 1016-B 导入页（整页，盖在别的页面上面）：里面先关哪一层（行详情 → 进度 → 整页）由它自己定
+                { can:()=>!!(window.JiwenImportUI && window.JiwenImportUI.canBack()), close:()=>window.JiwenImportUI.back() },
                 // 1035 日期时间选择器
                 { can:()=>isOpen('dtMask'),     close:()=>closeDtPicker() },
                 // 1032 退款弹窗（从修改账单里打开）
