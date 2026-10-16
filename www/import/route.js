@@ -33,7 +33,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-E';
+  var VERSION = '1016-F';
   var FX_RATE = 0.05;            // 跨境退款汇率差：差 5% 以内算汇率差
   var RECEIPT_MONTH_MAX = 300;   // 一个月收款超过这么多条，建议按天合并
   var PETTY_MIN = 5, PETTY_FEN = 100;   // 疑似零碎扣款：同一对方一个月 5 次以上，且这个对方所有交易都不超过 1 元
@@ -125,9 +125,10 @@
 
   // ---------- 1. 要查的键 ----------
   function lookups(parsed) {
-    var fl = flatten(parsed), orders = {}, groups = {}, fulls = [], marks = {};
+    var fl = flatten(parsed), orders = {}, groups = {}, fulls = [], marks = {}, fp = [];
     fl.rows.forEach(function (it) {
       orders[it.key] = true;
+      fp.push({ key: it.key, app: it.app, time: it.r.time, fen: it.r.fen, cp: it.r.cp || '' });   // 没有单号表时的指纹兜底（1016-F）
       if (isAliRefundRow(it)) orders['alipay|' + it.r.no] = true;
       if (it.app === 'wechat' && isWxRefundType(it.r.kind)) { var mk = markLookKey('wechat', it.r.cp, it.r.fen); marks[mk] = { key: mk, app: 'wechat', prefix: 'RW' + markRest(it.r.cp, it.r.fen) }; }
       if (it.r.io !== 'income' && isFullStatus(it)) fulls.push({ key: fullRefundKey(it.key), app: it.app, no: it.r.no || '', cp: it.r.cp || '', fen: it.r.fen, time: it.r.time });
@@ -144,7 +145,7 @@
       }
     });
     return { orders: Object.keys(orders), groups: Object.keys(groups).map(function (k) { return groups[k]; }), fullRefunds: fulls,
-             markers: Object.keys(marks).map(function (k) { return marks[k]; }) };
+             markers: Object.keys(marks).map(function (k) { return marks[k]; }), rows: fp };
   }
 
   // ---------- 2. 定去向 ----------
@@ -176,7 +177,10 @@
       // 单号表去重
       var k = known[it.key];
       if (k && k.st === 1) { put(it, 'skip', 'ignored', '以前点过「不要了」'); return; }
-      if (k && k.st === 0 && k.rec) { put(it, 'skip', 'imported', '以前导入过'); it.recId = k.id; return; }
+      if (k && k.st === 0 && k.rec) { put(it, 'skip', 'imported', k.fp ? '以前导入过（没有单号表，按时间、金额、对方认出来的）' : '以前导入过'); it.recId = k.id; return; }
+      // 1016-F：已经在待处理池里（同一份文件导第二次）；没有单号表时只有日期和金额对得上的
+      if (k && k.pend) { put(it, 'skip', 'inpending', '已经在待处理里了'); return; }
+      if (k && k.fpLoose) { put(it, 'pending', 'fpmaybe', '没有单号表，账本里有一笔同一天、同金额的导入记录，可能导入过，请你确认'); return; }
       // 类型规则（用户的优先）
       var tr = typeRule(it);
       if (tr === 'skip') { put(it, 'skip', 'typerule', '按你定的规则跳过类型「' + r.kind + '」'); return; }
@@ -221,6 +225,7 @@
       refundedRec[id] = (refundedRec[id] || 0) + rf.r.fen;
       put(rf, 'refund', 'matched', '挂到以前导入的原单上');
       rf.refundTo = { record: id };
+      if (rec.time) rf.toTime = rec.time;
     }
     function noOrig(rf, why, msg) { put(rf, 'refund', why, msg); rf.mode = 'flow'; }
 
@@ -364,6 +369,10 @@
     var rm = receiptMonths(rows);
     rows.forEach(function (it) {
       if (it.bucket !== 'add') return;
+      var gk0 = inList(PETTY_TYPES, it.app, it.r.kind) ? groupKey(it.app, 'petty', monthOf(it))
+              : (it.r.io === 'income' && inList(RECEIPT_TYPES, it.app, it.r.kind) && rm[it.app + '|' + monthOf(it)]) ? groupKey(it.app, 'receipt', dayOf(it)) : null;
+      // 没有单号表、这个月（这一天）又已经有合并记录：分不清哪几笔加过了，进待处理，不往上加
+      if (gk0 && known[gk0] && known[gk0].fpMode) { put(it, 'pending', 'fpgroup', '没有单号表，这个月已经有一条合并记录，分不清这笔加过没有，请你确认'); return; }
       if (inList(PETTY_TYPES, it.app, it.r.kind)) joinGroup(it, 'petty', monthOf(it), false);
       else if (it.r.io === 'income' && inList(RECEIPT_TYPES, it.app, it.r.kind) && rm[it.app + '|' + monthOf(it)]) joinGroup(it, 'receipt', dayOf(it), true);
     });
@@ -403,6 +412,7 @@
         if (it.recId) o.recId = it.recId;
         if (it.fullOf) o.fullOf = it.fullOf;
         if (it.refundRec) o.refundRec = it.refundRec;
+        if (it.toTime) o.toTime = it.toTime;
         if (it.noMerge) o.noMerge = true;
         if (it.regIgnore) o.regIgnore = it.regIgnore;
         if (it.markerCands) o.markerCands = it.markerCands;

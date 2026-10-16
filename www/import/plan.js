@@ -29,7 +29,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-E';
+  var VERSION = '1016-F';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -159,6 +159,10 @@
       if (pendRows.indexOf(d) < 0 || d.group !== 'pending') return;
       if (d.cands.every(function (c) { return pickedRecords[c.record]; })) { d.group = 'add'; d.reason = '同组里别的账单和手记合并了，这笔作为新增'; d.autoNew = true; }
     });
+    // 退款挂到以前导入的那笔：写明是哪天的（1016-F）
+    rows.forEach(function (d) {
+      if (d.src === 'row' && d.group === 'refund' && d.refundTo && d.refundTo.record && d.item.toTime && !(E[d.key] && E[d.key].pick)) d.reason = '退款挂到 ' + md(d.item.toTime) + '那笔';
+    });
     // 原单勾掉了：挂在它上面的退款也不导入
     rows.forEach(function (d) {
       if (d.group !== 'refund' || !d.refundTo || !d.refundTo.row) return;
@@ -270,7 +274,7 @@
     });
     var blocking = files.filter(function (f) { return f.countOk === false; });
     var good = files.filter(function (f) { return !f.fatal; });
-    var canImport = !blocking.length && good.length > 0 && importN + mergeM > 0;
+    var canImport = !blocking.length && good.length > 0 && (importN + mergeM > 0 || counts.pending > 0 || counts.excluded > 0);   // 1016-F：只有待处理 / 勾掉的也能「导入」（存进待处理池、登记忽略）
 
     // ---- 要你定的几块 ----
     var sec = {};
@@ -410,7 +414,7 @@
     });
     GROUPS.forEach(function (g) { groups[g].sort(function (a, b) { return (b.time || '') < (a.time || '') ? -1 : (b.time || '') > (a.time || '') ? 1 : 0; }); });
 
-    return { version: VERSION, files: files, counts: counts, sums: sums, importN: importN, mergeM: mergeM, records: records, orders: orders,
+    return { version: VERSION, summaries: sumList, files: files, counts: counts, sums: sums, importN: importN, mergeM: mergeM, records: records, orders: orders,
              ignoreOrders: ignoreOrders, canImport: canImport, blocking: blocking.map(function (f) { return f.name; }), sections: sec, groups: groups,
              groupNames: GROUP_NAME, rows: rows };
   }

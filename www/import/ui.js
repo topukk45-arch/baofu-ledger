@@ -4,6 +4,7 @@
 //       → 进度 → 确认页。确认页上改的东西只改内存里的方案（plan.js），点「导入」这一版只提示「开发中」。
 // 页面元素和样式都在打开时由这里生成，index.html 里只有入口；用户数据一律 textContent，不拼进 innerHTML。
 // 只通过 window.JiwenImportStore 的只读函数拿账本数据，不碰账本内部。
+// 1016-F：点「导入」真的写进去（write.js 出写入清单 → JiwenImportStore.commit 一个事务写入，写前自动备份），写完显示结果页。
 // 1016-C：多笔合一、几笔抢一条手记、转账往来三块卡片；候选第一条标「最像」、其余收起；合并记录（分分捐等）明细里一行、点开看；
 //   套话不当标题；存储那行改成「可用存储空间」。
 (function () {
@@ -93,7 +94,8 @@
     var pg = el('div'); pg.id = 'impProg';
     var box = el('div', 'box'); var pt = el('div', 'imp-line', ''); pt.id = 'impProgText';
     var pb = el('div', 'bar'); var pi = el('i'); pi.id = 'impProgBar'; pb.appendChild(pi);
-    box.appendChild(pt); box.appendChild(pb); box.appendChild(btn('取消', 'imp-btn', function () { close(); }));
+    var pc = btn('取消', 'imp-btn', function () { close(); }); pc.id = 'impProgCancel';
+    box.appendChild(pt); box.appendChild(pb); box.appendChild(pc);
     pg.appendChild(box);
     [page, bar, file, sm, pg].forEach(function (x) { document.body.appendChild(x); });
     dom = { page: page, body: body, bar: bar, go: go, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub };
@@ -111,6 +113,7 @@
     renderPick();
   }
   function close() {
+    if (S && S.phase === 'writing') return;
     runId++;
     if (J()) try { J().cancel(); } catch (_) {}
     if (!dom) return;
@@ -124,6 +127,7 @@
   function canBack() { return isOpen(); }
   function back() {
     if (dom.sheetMask.style.display === 'flex') { closeSheet(); return; }
+    if (S && S.phase === 'writing') return;          // 写入中不让退出（写完或失败会自己回来）
     close();
   }
 
@@ -144,6 +148,7 @@
   // ---------- 进度 ----------
   function progress(text, done, total) {
     dom.prog.style.display = 'flex';
+    var pc = document.getElementById('impProgCancel'); if (pc) pc.style.display = S && S.phase === 'writing' ? 'none' : '';
     dom.progText.textContent = text;
     dom.progBar.style.width = total ? Math.round(done / total * 100) + '%' : '0';
   }
@@ -702,9 +707,74 @@
   function closeSheet() { if (dom) dom.sheetMask.style.display = 'none'; }
 
   // ---------- 底部按钮、复制 ----------
+  var BUCKET_LINE = [['add', '新增'], ['merge', '和手记合并'], ['neutral', '不计入'], ['refund', '退款'], ['pending', '待处理'],
+                     ['skip', '跳过'], ['error', '出错'], ['excluded', '你勾掉的']];
   function onImport() {
-    if (!S || !S.plan || !S.plan.canImport) return;
-    alertMsg('开发中，这一版不写入。\n\n算好的方案：导入 ' + S.plan.importN + ' 笔、合并 ' + S.plan.mergeM + ' 笔，实际新建 ' + S.plan.records + ' 条记录。', '导入（开发中）');
+    if (!S || !S.plan || !S.plan.canImport || S.phase !== 'confirm') return;
+    var p = S.plan, my = runId;
+    var batch = 'b' + Date.now().toString(36);
+    var now = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
+    var at = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+    var ws;
+    try {
+      ws = window.JiwenImportWrite.build({ parsed: S.parsed, matched: S.matched, info: S.info, manualById: S.manualById }, p,
+                                         { batch: batch, at: at, cpCats: S.edits.cpCats });
+    } catch (e) { alertMsg('整理要写的内容时出错了，什么都没写：' + (e && e.message || e)); return; }
+    S.phase = 'writing';
+    var t0 = Date.now(), slowTimer = null;
+    progress('准备写入…', 0, 1);
+    var onProgress = function (stage, done, total) {
+      if (my !== runId) return;
+      if (stage === 'backup') {
+        // 备份超过 2 秒才把这一段显示出来
+        slowTimer = setTimeout(function () { progress('备份导入前的账本…（大账本要多等一会儿）', 0, 1); }, 2000);
+      } else if (stage === 'build') { if (slowTimer) { clearTimeout(slowTimer); slowTimer = null; } progress('整理记录…', done, total); }
+      else if (stage === 'write') { if (slowTimer) { clearTimeout(slowTimer); slowTimer = null; } progress('写入账本…', 1, 2); }
+    };
+    store().commit(ws, { ver: S.info.ver, onProgress: onProgress }).then(function (r) {
+      if (slowTimer) clearTimeout(slowTimer);
+      if (my !== runId || !S) return;
+      dom.prog.style.display = 'none';
+      S.phase = 'done'; S.result = { ws: ws, r: r, ms: Date.now() - t0 };
+      renderResult();
+    }, function (e) {
+      if (slowTimer) clearTimeout(slowTimer);
+      if (my !== runId || !S) return;
+      dom.prog.style.display = 'none';
+      S.phase = 'confirm';
+      var code = e && (e.code || e.message);
+      if (code === 'stale') { alertMsg('账本在这期间有改动，方案已经不是最新的，重新算一遍。什么都没写。'); rerun(); return; }
+      if (code === 'nospace') { alertMsg('手机剩余空间放不下导入前的备份（大约要 ' + Math.ceil(e.need / 1048576) + ' MB，剩 ' + Math.floor(e.free / 1048576) + ' MB），这次没有导入，账本没动。'); return; }
+      if (code === 'quota') { alertMsg('存储空间满了，没写进去，账本没动。'); return; }
+      alertMsg('写入失败，账本没动：' + (code || e));
+    });
+  }
+  // ---------- 结果页 ----------
+  function renderResult() {
+    var b = dom.body, res = S.result, c = res.ws.counts; b.innerHTML = '';
+    dom.title.textContent = '导入完成';
+    dom.bar.style.display = 'none';
+    var card = el('div', 'imp-card'); card.id = 'impResult';
+    card.appendChild(el('h4', null, '已写进账本'));
+    var sum = 0;
+    BUCKET_LINE.forEach(function (x) {
+      var n = c[x[0]] || 0; sum += n;
+      if (!n && ['error', 'excluded', 'refund'].indexOf(x[0]) >= 0) return;
+      var l = el('div', 'imp-line imp-res-' + x[0], x[1] + ' ' + n + ' 笔'); l.dataset.group = x[0]; card.appendChild(l);
+    });
+    card.appendChild(el('div', 'imp-line imp-res-total', '合计 ' + sum + ' 笔，文件里共 ' + res.ws.total + ' 笔' + (sum === res.ws.total ? '' : '（对不上，请截图发给开发者）')));
+    if (res.r.added !== undefined) card.appendChild(el('div', 'imp-soft', '新建 ' + res.r.added + ' 条记录，改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）'));
+    if (c.pending) card.appendChild(el('div', 'imp-soft', '待处理的 ' + c.pending + ' 笔没进账本，存在待处理里，以后处理。'));
+    card.appendChild(el('div', 'imp-soft imp-res-batch', '批次号 ' + res.ws.batch + ' · 写入用时 ' + (res.ms / 1000).toFixed(1) + ' 秒'));
+    card.appendChild(el('div', 'imp-soft', '写之前自动备份了一份，在设置里「恢复到导入前（开发中）」可以一键还原。'));
+    var go = btn('回到账本', 'imp-btn gold', function () {
+      close();
+      var tb = document.querySelector('.tab-btn[data-tab="ledger"]'); if (tb) tb.click();
+    });
+    go.id = 'impBackToLedger'; go.style.marginTop = '12px'; go.style.width = '100%';
+    card.appendChild(go);
+    b.appendChild(card);
+    dom.page.scrollTop = 0;
   }
   function copyDev() {
     var text = Plan.devText(S.plan);
@@ -720,6 +790,6 @@
   }
 
   var UI = { open: open, close: close, canBack: canBack, back: back, isOpen: isOpen,
-             _state: function () { return S; }, _lastCopy: null };
+             _state: function () { return S; }, _replan: function () { replan(); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

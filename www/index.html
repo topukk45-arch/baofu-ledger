@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-E</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-F</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1468,6 +1468,7 @@
                     <input type="file" id="importFile" accept=".json" style="display:none">
                     <!-- 1015-A：账单导入还在开发，入口默认藏着；设置页底部版本号连点 5 次才出现（只在这台手机上） -->
                     <button class="set-item" id="devImportBtn" style="display:none"><span>导入（开发中）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="devRestoreBtn" style="display:none"><span>恢复到导入前（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
                 </div>
@@ -3540,6 +3541,140 @@
             if(!aid) throw impErr('noarchive');
             return { e, key, aid, name };
         }
+        // ===== 1016-F：写入（账单导入第一期 ⑥b）=====
+        // 导入前备份：现有备份格式（和「导出存档」一样的字段）+ _arch（存档设置原样，恢复时逐字节还原用）。
+        //   存在本机库里 imp_<账号>_<存档号>_bk_<时间>，最多留 3 份；不进备份、不进云备份，存档删了跟着删
+        const IMP_BK_MAX=3;
+        function impBkPrefix(id, aid){ return `imp_${id}_${aid}_bk_`; }
+        function impBkKeys(id, aid){ const p=impBkPrefix(id, aid); return [...__ledgerKeys].filter(k=>k.indexOf(p)===0).sort(); }
+        async function impMakeBackup(t, batch){
+            const store=loadStore(t.e.id), a=store.archives[t.name];
+            const ex=await impExportFields(t.e.id, t.name, true);
+            const arch={}; Object.keys(a).forEach(k=>{ arch[k] = k==='records' ? null : a[k]; });
+            return JSON.stringify({ app:'记问', kind:'导入前备份', user:nameOf(t.e.id), accountId:t.e.id, archive:t.name, aid:t.aid, batch,
+                cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], ...impArchFields(a), data:a.records, ...ex,
+                _arch:arch, exportedAt:new Date().toLocaleString() });
+        }
+        // 剩余空间：拿不到（浏览器不支持）就不拦
+        async function impFreeBytes(){
+            try{
+                if(!navigator.storage || !navigator.storage.estimate) return null;
+                const q=await navigator.storage.estimate();
+                return q && q.quota ? q.quota-(q.usage||0) : null;
+            }catch(_){ return null; }
+        }
+        // 单号表登记：同来源同单号覆盖（和 ordersRegister 一样），返回要写的 [键, 值]
+        async function impOrderPairs(e, aid, entries){
+            const byKey=new Map();
+            entries.forEach(x=>{ const k=impOrdKey(e.id, aid, x.app, x.mon); let a=byKey.get(k); if(!a) byKey.set(k, a=[]); a.push(x); });
+            const pairs=[];
+            for(const [k, xs] of byKey){
+                const raw=await impGetRaw(e, k);
+                const cur=raw===null ? [] : impBlkDecode(raw);
+                if(cur===null){ ledgerBackupCorrupted(k, raw); throw impErr('impdamaged', { keys:[k] }); }
+                const at=new Map(cur.map((x, i)=>[x.no, i]));
+                xs.forEach(x=>{
+                    const v={ no:x.no, id:x.id, batch:x.batch, st:x.st };
+                    if(at.has(x.no)) cur[at.get(x.no)]=v; else { at.set(x.no, cur.length); cur.push(v); }
+                });
+                pairs.push([k, JSON.stringify(impBlkEncode(cur))]);
+            }
+            return pairs;
+        }
+        const impYield=()=>new Promise(r=>setTimeout(r, 0));
+        // 按写入清单（import/write.js 的结果）改账本：一个事务，要么全写进去，要么一条都不写
+        async function impApplyWrite(t, ws, prog){
+            const user=t.e.id, store=loadStore(user), a=store.archives[t.name];
+            const recs=a.records, at=new Map();
+            recs.forEach((r, i)=>at.set(r.id, i));
+            // 新记录：先发编号（退款要挂到这批新建的原单上）
+            const idOf={}; ws.records.forEach(r=>{ idOf[r.tmp]=genId(); });
+            const res=ref=>!ref ? null : (ref.tmp ? idOf[ref.tmp] : ref.id);
+            const made=[], madeBy={};
+            for(let i=0;i<ws.records.length;i++){
+                const x=ws.records[i];
+                const r={ id:idOf[x.tmp], time:x.time, money:x.money, cat:x.cat||'未分类', remark:x.remark||'', type:x.type };
+                if(x.skip===true) r.skip=true; else if(x.flow===true) r.flow=true;
+                if(x.src && IMP_APPS.includes(x.src.app)){ r.src={ app:x.src.app }; if(x.src.sum) r.src.sum=x.src.sum; }
+                if(typeof x.batch==='string' && IMP_BATCH_RE.test(x.batch)) r.batch=x.batch;
+                if(Number.isInteger(x.cp)) r.cp=x.cp;
+                if(Number.isInteger(x.pm)) r.pm=x.pm;
+                if(typeof x.oc==='string' && x.oc) r.oc=x.oc.slice(0, 32);
+                if(x.refundOf) r.refundOf=res(x.refundOf);
+                made.push(r); madeBy[r.id]=r;
+                if(i%200===199){ prog && prog('build', i+1, ws.records.length); await impYield(); }
+            }
+            // 改以前的记录（合并进手记、往合并记录上加、旧退款挂到新原单），原值记进导入记录
+            const chg=[];
+            ws.changes.forEach(c=>{
+                const i=at.get(c.id);
+                if(i===undefined) throw impErr('gone', { id:c.id });
+                const old=recs[i], n=Object.assign({}, old), was={};
+                Object.keys(c.set).forEach(k=>{
+                    was[k]= (k in old) ? (old[k]!==null && typeof old[k]==='object' ? JSON.stringify(old[k]) : old[k]) : null;
+                    n[k]= k==='refundOf' ? res(c.set[k]) : c.set[k];
+                });
+                if(c.addFen){ was.money=old.money; n.money=round2(safeNum(old.money)+c.addFen/100); }
+                if(c.kind==='link'){
+                    const o=madeBy[n.refundOf];
+                    if(o){ was.cat=old.cat; was.skip=old.skip===true ? true : null; was.flow=old.flow===true ? true : null; n.cat=o.cat; setRecMode(n, recMode(o)); }
+                }
+                recs[i]=n;
+                chg.push({ id:c.id, was, nos:c.nos });
+            });
+            // 退款：分类、口径照原单
+            const byId=new Map(recs.map(r=>[r.id, r])); made.forEach(r=>byId.set(r.id, r));
+            made.forEach(r=>{ if(r.refundOf){ const o=byId.get(r.refundOf); if(o){ r.cat=o.cat; setRecMode(r, recMode(o)); } else delete r.refundOf; } });
+            made.forEach(r=>recs.push(r));
+            // 存档设置：名单、新分类、规则
+            if(ws.cps.length>(a.cps||[]).length) a.cps=ws.cps.slice();
+            if(ws.pms.length>(a.pms||[]).length) a.pms=ws.pms.slice();
+            ws.catsAdded.forEach(c=>{ if(!a.cats.includes(c)) a.cats.push(c); });
+            if(ws.rulesAdd.length){
+                const r0=a.importRules||{};
+                a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]).concat(ws.rulesAdd), type:(r0.type||[]) });
+            }
+            prog && prog('write', 0, 1);
+            // 单号表、待处理池、导入记录
+            const orders=ws.orders.map(x=>impCleanOrder({ app:x.app, no:x.no, time:x.time, id:res(x.ref)||'', batch:ws.batch, st:x.st })).filter(Boolean);
+            const pairs=await impOrderPairs(t.e, t.aid, orders);
+            if(ws.pending.length){
+                const cur=await impGetJson(t.e, impPendKey(t.e.id, t.aid));
+                const list=((cur && cur.items) || []).slice(), seen=new Set(list.map(x=>x.app+'|'+x.no));
+                ws.pending.forEach(x=>{ if(!seen.has(x.app+'|'+x.no)){ seen.add(x.app+'|'+x.no); list.push(x); } });
+                const clean=impCleanPending(list, x=>typeof x==='string' && x ? x : null);
+                pairs.push([impPendKey(t.e.id, t.aid), clean.length ? JSON.stringify({ v:1, items:clean }) : null]);
+            }
+            const curLog=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
+            const logs=((curLog && curLog.list) || []).slice();
+            logs.push(Object.assign({}, ws.log, { add:made.map(r=>r.id), chg }));
+            const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
+            pairs.push([impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:cleanLog })]);
+            if(window.__impFailAt==='beforeSave') throw impErr('test');
+            store.last=store.last || t.name;
+            await saveStoreDurable(store, user, ()=>pairs);
+            return { added:made.length, changed:chg.length, ids:made.map(r=>r.id) };
+        }
+        // 恢复到上一次导入前：原地替换（不重新编号），账本、单号表、待处理池、导入记录和导入前逐字节一样
+        async function impRestoreFrom(t, key){
+            const raw=await idbGet(key);
+            if(typeof raw!=='string') throw impErr('nobackup');
+            const bk=JSON.parse(raw);
+            if(!bk || bk.kind!=='导入前备份' || bk.aid!==t.aid || !bk._arch || !Array.isArray(bk.data)) throw impErr('badbackup');
+            const store=loadStore(t.e.id);
+            const a={}; Object.keys(bk._arch).forEach(k=>{ a[k] = k==='records' ? bk.data : bk._arch[k]; });
+            if(!('records' in a)) a.records=bk.data;
+            store.archives[t.name]=a;
+            // 导入数据：这个存档现有的全删（导入前备份不算），再照备份写回
+            const p=impArchPrefix(t.e.id, t.aid), bp=impBkPrefix(t.e.id, t.aid), pairs=new Map();
+            [...__ledgerKeys, ...t.e.extra.keys()].forEach(k=>{ if(k.indexOf(p)===0 && k.indexOf(bp)!==0) pairs.set(k, null); });
+            if(bk.orders) Object.keys(bk.orders).forEach(app=>Object.keys(bk.orders[app]).forEach(mon=>{ pairs.set(impOrdKey(t.e.id, t.aid, app, mon), JSON.stringify(bk.orders[app][mon])); }));
+            if(Array.isArray(bk.pending) && bk.pending.length) pairs.set(impPendKey(t.e.id, t.aid), JSON.stringify({ v:1, items:bk.pending }));
+            if(Array.isArray(bk.imports) && bk.imports.length) pairs.set(impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:bk.imports }));
+            pairs.set(key, null);        // 用过的这份删掉，再点就恢复到更早一次导入之前
+            await saveStoreDurable(store, t.e.id, ()=>[...pairs]);
+            return { records:bk.data.length, at:bk.exportedAt, batch:bk.batch||'' };
+        }
         window.JiwenImportStore={
             // 单号表：{ size, get(app, no), findPrefix(app, 开头, 最多几条) }；条目 { app, no, id, batch, st, mon }
             async ordersRead(archive){
@@ -3595,6 +3730,48 @@
                 return clean.length;
             },
             estimate(o, archive){ return impEstimate(o, archive); },
+            // ---- 1016-F：写入 ----
+            // ws：import/write.js 的写入清单；opts：{ ver（算方案时 archiveInfo().ver，变了就拒绝）, onProgress(阶段, 已做, 共) }
+            //   先在本机备份一份当前存档（放不下就不导入），再一个事务写进去；写失败什么都不改，刚做的备份也删掉
+            async commit(ws, opts){
+                opts=opts||{};
+                const t=impTarget(opts.archive), prog=opts.onProgress;
+                if(opts.ver!==undefined && opts.ver!==t.e.ver) throw impErr('stale');
+                const clock=()=>(window.performance && typeof performance.now==='function') ? performance.now() : Date.now();
+                const t0=clock(), ms={};
+                prog && prog('backup', 0, 1);
+                const bk=await impMakeBackup(t, ws.batch);
+                const free=await impFreeBytes(), need=Math.ceil(bk.length*2*1.2 + ws.records.length*400 + ws.orders.length*100);
+                if(free!==null && free<need) throw impErr('nospace', { need, free });
+                if(window.__impFailAt==='backup') throw impErr('test');
+                const bkKey=impBkPrefix(t.e.id, t.aid)+Date.now().toString(36);
+                const old=impBkKeys(t.e.id, t.aid), drop=old.slice(0, Math.max(0, old.length-(IMP_BK_MAX-1)));
+                await idbBatch([['put', bkKey, bk]].concat(drop.map(k=>['del', k])));
+                ms.backup=Math.round(clock()-t0);
+                let r;
+                try{ r=await impApplyWrite(t, ws, prog); }
+                catch(err){ try{ await idbBatch([['del', bkKey]]); }catch(_){} throw err; }
+                ms.total=Math.round(clock()-t0);
+                prog && prog('done', 1, 1);
+                if(t.e.id===currentUser && t.name===currentArchive){
+                    try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
+                    try{ odScheduleSync(); }catch(_){}
+                }
+                return Object.assign(r, { batch:ws.batch, ms, backupBytes:bk.length*2 });
+            },
+            // 本机的导入前备份（新的在后）：[{ key, at, batch, records }]（只读键名和开头，不整个解析）
+            backups(archive){
+                const t=impTarget(archive);
+                return impBkKeys(t.e.id, t.aid).map(k=>({ key:k, t:parseInt(k.slice(impBkPrefix(t.e.id, t.aid).length), 36) }));
+            },
+            async restoreLast(archive){
+                const t=impTarget(archive);
+                const ks=impBkKeys(t.e.id, t.aid);
+                if(!ks.length) throw impErr('nobackup');
+                const r=await impRestoreFrom(t, ks[ks.length-1]);
+                if(t.e.id===currentUser && t.name===currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
+                return r;
+            },
 
             // ---- 1016-B：导入确认页要的只读数据（不写任何东西）----
             // 存档的分类、规则、对方名单，是不是新用户（记录少于 30 条、分类还是默认那 7 个）
@@ -3604,7 +3781,7 @@
                 const cats=(a.cats||[]).slice(), rules=a.importRules||{};
                 const isDefault=cats.length===DEFAULT_CATS.length && DEFAULT_CATS.every(c=>cats.includes(c));
                 return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(),
-                         cps:(a.cps||[]).slice(), records:n, isNewUser: n<30 && isDefault };
+                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）
             async knownFor(lk, archive){
@@ -3616,7 +3793,7 @@
                     if(r.refundOf) refunded.set(r.refundOf, (refunded.get(r.refundOf)||0)+Math.round(safeNum(r.money)*100));
                 });
                 blocks.forEach(list=>list.forEach(x=>{ if(x.st===0) nOf.set(x.id, (nOf.get(x.id)||0)+1); }));
-                const info=id=>{ const r=byId.get(id); return r ? { type:r.type, fen:Math.round(safeNum(r.money)*100), refunded:refunded.get(id)||0, mode:recMode(r) } : null; };
+                const info=id=>{ const r=byId.get(id); return r ? { type:r.type, fen:Math.round(safeNum(r.money)*100), refunded:refunded.get(id)||0, mode:recMode(r), time:r.time, cat:r.cat } : null; };
                 const known={};
                 (lk && lk.orders || []).forEach(key=>{
                     const i=key.indexOf('|'); if(i<0) return;
@@ -3624,7 +3801,7 @@
                     if(ent) known[key]={ st:ent.st, id:ent.id, rec: ent.st===0 ? info(ent.id) : null };
                 });
                 (lk && lk.groups || []).forEach(g=>{
-                    const r=recs.find(x=>x.src && x.src.app===g.app && x.oc===g.oc && typeof x.time==='string' && x.time.indexOf(g.period)===0);
+                    const r=recs.find(x=>x.src && x.src.app===g.app && x.src.sum && x.oc===g.oc && typeof x.time==='string' && x.time.indexOf(g.period)===0);
                     if(r) known[g.key]={ rec:{ id:r.id, fen:Math.round(safeNum(r.money)*100), n:nOf.get(r.id)||1 } };
                 });
                 // 1016-C：已全额退款的原单，以前导入过退款没有。支付宝：单号表里有「原单号_…」；
@@ -3650,6 +3827,38 @@
                         key:m.app+'|'+x.no, day:x.no.slice(-8), used:!!T.get(m.app, 'RU'+x.no.slice(2)) }));
                     if(marks.length) known[m.key]={ marks };
                 });
+                // 1016-F：已经在待处理池里的（同一份文件导第二次），不再加一遍
+                const pend=await impGetJson(t.e, impPendKey(t.e.id, t.aid));
+                const inPend=new Set(((pend && pend.items) || []).map(x=>x.app+'|'+x.no));
+                (lk && lk.orders || []).forEach(key=>{ if(!known[key] && inPend.has(key)) known[key]={ pend:true }; });
+                // 1016-F：没有单号表（换了手机、只恢复了账本）：存档里导入过，单号表却是空的，或者找不到最后一批的批次号 → 按指纹认
+                const log=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
+                const logs=(log && Array.isArray(log.list)) ? log.list : [];
+                let fpMode=false;
+                if(logs.length){
+                    const lastB=logs[logs.length-1].b, bs=new Set();
+                    blocks.forEach(list=>list.forEach(x=>{ if(x.batch) bs.add(x.batch); }));
+                    fpMode = T.size===0 || !bs.has(lastB);
+                }
+                if(fpMode){
+                    // 一对一按数量认：同来源、同一分钟、同金额、同对方的已导入记录有几条，就最多认几笔；
+                    //   多出来的、只有日期和金额对得上的 → 进待处理，不新增
+                    const exact=new Map(), loose=new Set();
+                    recs.forEach(r=>{
+                        if(!r.src || !IMP_APPS.includes(r.src.app) || r.src.sum || typeof r.time!=='string') return;
+                        const f=Math.round(safeNum(r.money)*100), cp=Number.isInteger(r.cp) ? (cps[r.cp]||'') : '';
+                        const k=r.src.app+'|'+r.time.slice(0,16)+'|'+f+'|'+cp;
+                        let a=exact.get(k); if(!a) exact.set(k, a=[]); a.push(r);
+                        loose.add(r.src.app+'|'+r.time.slice(0,10)+'|'+f);
+                    });
+                    (lk && lk.rows || []).slice().sort((x, y)=>x.time<y.time ? -1 : x.time>y.time ? 1 : 0).forEach(x=>{
+                        if(known[x.key]) return;
+                        const a=exact.get(x.app+'|'+x.time.slice(0,16)+'|'+x.fen+'|'+x.cp);
+                        if(a && a.length){ const r=a.shift(); known[x.key]={ st:0, id:r.id, rec:info(r.id), fp:true }; return; }
+                        if(loose.has(x.app+'|'+x.time.slice(0,10)+'|'+x.fen)) known[x.key]={ fpLoose:true };
+                    });
+                    (lk && lk.groups || []).forEach(g=>{ if(known[g.key]) known[g.key].fpMode=true; });
+                }
                 return known;
             },
             // 按 match.ledgerQuery() 取手记和退款候选（见 match.js 开头）
@@ -5166,7 +5375,11 @@ ${detail}
                 // 不重建会丢：从备份还原后口径标记必须还在
                 if(r.skip===true) rec.skip=true; else if(r.flow===true) rec.flow=true;
                 // 【1015-B】账单导入带来的字段：合格的照搬，不合格的这个字段不要（记录照留）
-                if(r.src && typeof r.src==='object' && IMP_APPS.includes(r.src.app)) rec.src={ app:r.src.app };
+                if(r.src && typeof r.src==='object' && IMP_APPS.includes(r.src.app)){
+                    rec.src={ app:r.src.app };
+                    if(r.src.merged===true) rec.src.merged=true;                                   // 1016-F：本来是手记，合并了账单
+                    if(['petty','receipt','suspect'].includes(r.src.sum)) rec.src.sum=r.src.sum;   // 1016-F：分分捐 / 收款这类合并记录
+                }
                 if(typeof r.batch==='string' && IMP_BATCH_RE.test(r.batch)) rec.batch=r.batch;
                 if(Number.isInteger(r.cp) && r.cp>=0 && r.cp<cpsLen) rec.cp=r.cp;
                 if(Number.isInteger(r.pm) && r.pm>=0 && r.pm<pmsLen) rec.pm=r.pm;
@@ -5351,7 +5564,7 @@ ${detail}
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = devImportOn() ? '' : 'none'; }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = devImportOn() ? '' : 'none'; }
         $('setBuild').textContent=$('loginBuild').textContent;
         renderDevImport();
         // 2 秒内连点 5 次版本号：开 / 关
@@ -5389,7 +5602,7 @@ ${detail}
                 s.onload=()=>resolve(); s.onerror=()=>{ s.remove(); reject(new Error('导入模块没加载上')); };
                 document.head.appendChild(s);
             });
-            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/ui.js')).then(()=>{
+            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/write.js')).then(()=>one('import/ui.js')).then(()=>{
                 if(!window.JiwenImportUI) throw new Error('导入模块不完整');
                 return window.JiwenImportUI;
             });
@@ -5419,6 +5632,21 @@ ${detail}
         // 1016-B：开发入口改成真的导入页（选文件 → 确认页）；通路自检挪进导入页里
         $('devImportBtn').addEventListener('click', () => {
             loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
+        });
+        // 1016-F：恢复到上一次导入前（导入前自动备份的那份；这一版还没有撤销）
+        $('devRestoreBtn').addEventListener('click', () => {
+            let list=[];
+            try{ list=window.JiwenImportStore.backups(); }catch(_){}
+            if(!list.length){ customAlert('这个存档还没有导入前的备份（每次导入前会自动备份一份，最多留 3 份）。', '恢复到导入前'); return; }
+            const last=list[list.length-1], when=new Date(last.t).toLocaleString();
+            customConfirm(`恢复到 ${when} 那次导入之前的样子：账本、单号表、待处理一起还原。\n\n那次导入之后的所有修改（包括手记）都会没有。确定吗？`, async () => {
+                try{
+                    const r=await window.JiwenImportStore.restoreLast();
+                    customAlert(`已恢复，现在有 ${r.records} 条记录。` + (list.length>1 ? `\n\n还有 ${list.length-1} 份更早的导入前备份，再点一次会恢复到更早那次导入之前。` : ''), '恢复到导入前');
+                }catch(err){
+                    customAlert(err && err.message==='quota' ? '存储空间不够，没有恢复，账本没动。' : '恢复失败，账本没动：' + (err && (err.code || err.message) || err), '恢复到导入前');
+                }
+            }, '恢复到导入前');
         });
         function openDevImportCheck(){ $('devImportMask').style.display='flex'; runDevImportCheck(); }
         $('devImportRerun').addEventListener('click', runDevImportCheck);

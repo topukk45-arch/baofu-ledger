@@ -112,7 +112,7 @@ const before = await t.snapshot();
 {
   await t.openImport();
   ok(t.$('impPage').style.display === 'block' && t.$('impArchive').textContent.includes('默认存档'), '1 开发入口打开导入页，写明导入到哪个存档');
-  ok(t.log.filter(p => p.startsWith('import/')).join(',') === 'import/import.js,import/plan.js,import/ui.js', '1 打开时才载入导入页的三个文件：' + t.log.filter(p => p.startsWith('import/')).join(','));
+  ok(t.log.filter(p => p.startsWith('import/')).join(',') === 'import/import.js,import/plan.js,import/write.js,import/ui.js', '1 打开时才载入导入页的四个文件：' + t.log.filter(p => p.startsWith('import/')).join(','));
   await t.pick(FILES);
   const S = t.S(), want = direct(FILES);
   ok(S && S.phase === 'confirm' && t.$('impProg').style.display === 'none', '1 跑完进度，打开确认页');
@@ -176,16 +176,13 @@ const before = await t.snapshot();
   ok(t.S().plan.mergeM === M0 + 1 && t.S().plan.groups.add.filter(d => d.cat === '交通出行').length === 4, '2 重算以后，之前的改动照样套回去');
 }
 
-// ===== 3. 点导入：只提示开发中，什么都不改 =====
+// ===== 3. 不点导入、直接取消：什么都不改（1016-F 起点导入会真写，见 z-import-write）=====
 {
-  t.$('impGo').click();
-  ok(t.$('askMask').style.display === 'flex' && t.$('askMsg').textContent.includes('开发中，这一版不写入'), '3 点导入：弹「开发中，这一版不写入」');
-  t.$('askOk').click();
   t.$('impCancel').click();
   ok(t.$('impPage').style.display === 'none' && t.$('impBar').style.display === 'none', '3 取消：导入页关掉');
   await t.idle();
   const after = await t.snapshot();
-  ok(after === before, '3 账本库、单号表、localStorage、导出的备份和打开导入前逐字节一样');
+  ok(after === before, '3 只看不导：账本库、单号表、localStorage、导出的备份和打开导入前逐字节一样');
   ok(!t.errs.length, '1-3 无报错 ' + t.errs.join('|'));
 }
 

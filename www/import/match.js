@@ -38,7 +38,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-E';
+  var VERSION = '1016-F';
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
   var BUCKETS = ['add', 'merge', 'skip', 'neutral', 'refund', 'pending', 'error'];
 
@@ -307,7 +307,7 @@
         var exact = cs.filter(function (x) { return x.fen === r.fen && !(x.refunded > 0) && !claimedRec[x.id]; });
         if (exact.length === 1) {
           claimedRec[exact[0].id] = true;
-          it.why = 'matchedledger'; it.mode = 'normal'; it.refundTo = { record: exact[0].id }; it.msg = '挂到以前导入的原单上';
+          it.why = 'matchedledger'; it.mode = 'normal'; it.refundTo = { record: exact[0].id }; it.msg = '挂到以前导入的原单上'; it.toTime = exact[0].time;
           return;
         }
         if (exact.length > 1) {

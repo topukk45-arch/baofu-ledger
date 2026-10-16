@@ -21,7 +21,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-E';
+  var VERSION = '1016-F';
   // 每处理这么多个字符 / 字节报一次进度
   var STEP = 1 << 16;
 
