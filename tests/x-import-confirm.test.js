@@ -297,6 +297,7 @@ const before = await t.snapshot();
   ok(t.$('impTransfers').querySelectorAll('.imp-tr-cb:checked').length === 4 && f0.expense.unreadable === 0 && f0.income.unreadable === 0
      && f0.expense.parts.find(x => x.key === 'neutral').fen === 50000, '7 一键都标成不计入：勾上 4 笔，差额照样 0 分');
   ok(p2.rows.find(d => d.key === keyOf(shop)).mode === 'normal', '7 长名带 * 的商户没被标成不计入');
+  ok([...t.$('impTransfers').querySelectorAll('.imp-switch')].length === 4 && [...t.$('impTransfers').querySelectorAll('.imp-switch')].every(x => x.classList.contains('on')), '7 行尾是开关，都打开了（1016-H）');
   ok([...t.$('impTransfers').querySelectorAll('.imp-tr-state')].every(x => x.textContent === '不计入') && t.chip('neutral') === p2.counts.neutral && p2.counts.neutral >= 4, '7 勾上的行尾写「不计入」，顶上「不计入」的笔数跟着变（1016-G）');
   ok(!(t.$('impCpGroups') && /某亲戚/.test(t.$('impCpGroups').textContent)), '7 转账往来里的人不再出现在按对方选分类里（1016-G）');
   // 明细：分分捐一行、套话显示对方

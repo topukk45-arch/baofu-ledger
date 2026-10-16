@@ -456,6 +456,8 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     ok(f.concat([other]).every(x => r.item(x).bucket === 'pending' && r.item(x).why === 'multisum'), '16-2 5 笔都留在待处理，手记没被隔天那笔先拿走');
     const pa = r.plan({ sums: { [g.id]: g.options.findIndex(o => o.kind === 'samecp') } });
     ok(f.every(x => rowOf(pa, r.key(x)).group === 'merge') && rowOf(pa, r.key(other)).group === 'add' && noReuse(pa) && diffOk(pa), '16-2 选「4 笔加起来」：4 笔合并，那笔 4 元新增');
+    const ps = r.plan().sections.sums.find(x => x.id === g.id);
+    ok(ps.options.some(o => /^这笔 4\.00 元正好是你记的那条/.test(o.text)) && ps.options.some(o => /^这 4 笔加起来正好是你记的 4\.00 元/.test(o.text)), '16-H 只有 1 笔的凑法写「这笔 4.00 元正好是你记的那条」，不说「1 笔加起来」');
     const pb = r.plan({ sums: { [g.id]: g.options.findIndex(o => o.kind === 'single') } });
     ok(rowOf(pb, r.key(other)).group === 'merge' && f.every(x => rowOf(pb, r.key(x)).group === 'add') && noReuse(pb) && diffOk(pb), '16-2 选「那一笔 4 元」：它合并，4 笔新增');
   }
@@ -470,6 +472,18 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     const r = run([{ app: 'wechat', txns: f }], hand);
     const g = r.matched.multiSums.find(x => x.options.some(o => o.record === 'g4'));
     ok(g && g.options.length === 1 && g.suggest === 0, '16-2 没有撞的：照旧一种凑法、默认合并（备注对不上不影响）');
+  }
+  // 1016-H：待你确认的不进「按对方选分类」，选成新增以后才进
+  {
+    const four = [1520, 1580].map((f, i) => wx({ time: T(7, 2, 9 + i), cp: ['某虚构甲摊', '某虚构乙摊'][i], fen: f }));
+    const r = run([{ app: 'wechat', txns: four }], [man('m16', 7, 2, 1600)]);
+    const p0 = r.plan();
+    ok(four.every(x => rowOf(p0, r.key(x)).group === 'pending') && !p0.sections.cpGroups.some(g => /某虚构.摊/.test(g.cp)), '16-H 待你确认的行不进按对方选分类');
+    const none = {}; four.forEach(x => { none[r.key(x)] = { pick: 'new' }; });
+    const p1 = r.plan({ rows: none });
+    ok(p1.sections.cpGroups.filter(g => /某虚构.摊/.test(g.cp)).length === 2, '16-H 点了「都不是」变成新增：进按对方选分类');
+    const p2 = r.plan({ rows: { [r.key(four[0])]: { pick: { record: 'm16' } } } });
+    ok(p2.sections.cpGroups.some(g => g.cp === '某虚构乙摊') && !p2.sections.cpGroups.some(g => g.cp === '某虚构甲摊'), '16-H 同组另一笔合并了、这笔被自动作为新增：进分组');
   }
   // 4. 部分付款：账单不到手记的三分之一不当候选
   {

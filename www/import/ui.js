@@ -65,6 +65,9 @@
     '.imp-sub-row{display:flex;align-items:center;gap:8px;padding:4px 0 4px 8px;font-size:12.5px;}',
     '.imp-sub-row .grow{flex:1 1 140px;min-width:0;}',
     '.imp-best{display:inline-block;font-size:11px;background:var(--c-primary);color:var(--c-on-primary);border-radius:8px;padding:0 5px;margin-right:4px;}',
+    '.imp-switch{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;border:1px solid var(--c-border-mid);border-radius:14px;padding:3px 10px 3px 4px;font-size:12px;background:var(--c-surface);color:var(--c-text);}',
+    '.imp-switch i{display:inline-block;width:14px;height:14px;border-radius:50%;background:var(--c-border-mid);}',
+    '.imp-switch.on{background:var(--c-primary);border-color:var(--c-primary);color:var(--c-on-primary);}.imp-switch.on i{background:var(--c-on-primary);}',
     '.imp-members{padding:0 10px 6px 18px;border-bottom:1px solid var(--c-border);}',
     '#impProg{position:fixed;inset:0;z-index:996;background:rgba(0,0,0,.3);display:none;align-items:center;justify-content:center;}',
     '#impProg .box{background:var(--c-surface-2);border-radius:12px;padding:18px;width:80%;max-width:320px;text-align:center;}',
@@ -474,9 +477,12 @@
         t.keys.forEach(function (k) {
           var d = rowByKey(k); if (!d) return;
           var r = el('label', 'imp-sub-row'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = d.mode === 'skip'; cb.className = 'imp-tr-cb'; cb.dataset.key = k;
+          cb.style.position = 'absolute'; cb.style.opacity = '0'; cb.style.width = '1px'; cb.style.height = '1px';   // 1016-H：用右边的开关代替，点整行都能切换
           cb.addEventListener('change', function () { var e = S.edits.rows[k] || (S.edits.rows[k] = {}); if (cb.checked) e.mode = 'skip'; else e.mode = 'normal'; replan(); });
           r.appendChild(cb); r.appendChild(el('span', 'grow', fmtTime(d.time) + ' · ' + (d.cp || '—') + ' · ' + (d.type === 'expense' ? '转出 ' : '转入 ') + yuan(d.fen)));
-          r.appendChild(el('span', 'imp-tr-state', cb.checked ? '不计入' : '计入'));
+          var sw = el('span', 'imp-switch imp-tr-state' + (cb.checked ? ' on' : ''));
+          sw.appendChild(el('i')); sw.appendChild(document.createTextNode(cb.checked ? '不计入' : '计入'));
+          r.style.cursor = 'pointer'; r.appendChild(sw);
           box.appendChild(r);
         });
         var all = btn(t.allSkip ? '都恢复计入' : '这几笔都标成不计入', t.allSkip ? 'imp-btn' : 'imp-btn gold', function () {

@@ -29,7 +29,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-G';
+  var VERSION = '1016-H';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -223,7 +223,8 @@
     var cpg = {};
     rows.forEach(function (d) {
       if (d.src !== 'row' || d.catFrom !== 'rec' || d.cat !== '未分类') return;
-      if (['add', 'pending', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;     // 不计入的、转账往来里的不用选分类
+      // 1016-H：待你确认的不进，等选成新增（「都不是」或被自动作为新增）再进；不计入的、转账往来里的也不用选
+      if (['add', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;
       var k = clean(d.cp) || '（没有交易对方）';
       var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [] });
       g.n += d.units; g.fen += d.fen; g.min = Math.min(g.min, d.fen); g.max = Math.max(g.max, d.fen); g.keys.push(d.key);
@@ -347,7 +348,8 @@
                  var m = manualById[o.record];
                  return { record: o.record, fen: o.fen, kind: o.kind, keys: o.bills.map(function (b) { var x = byKeyRef[b.file + ':' + b.row]; return x ? x.key : null; }),
                           manual: m ? { time: m.time, cat: m.cat, fen: m.fen } : null,
-                          text: '这 ' + o.bills.length + ' 笔加起来正好是你记的 ' + yuan(o.fen) + ' 元' + (m ? '（' + md(m.time) + ' ' + (m.cat || '未分类') + '）' : '') };
+                          text: (o.bills.length === 1 ? '这笔 ' + yuan(o.fen) + ' 元正好是你记的那条' : '这 ' + o.bills.length + ' 笔加起来正好是你记的 ' + yuan(o.fen) + ' 元')
+                                + (m ? '（' + md(m.time) + ' ' + (m.cat || '未分类') + (o.bills.length === 1 ? ' · ' + yuan(m.fen) : '') + '）' : '') };
                }) };
     });
     // ---- 转账往来：只认交易类型；相邻两笔隔不到 3 天串成一段；一段里有转出也有转入才列 ----

@@ -38,7 +38,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-G';
+  var VERSION = '1016-H';
   var PARTIAL_MAX = 3;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
   var BUCKETS = ['add', 'merge', 'skip', 'neutral', 'refund', 'pending', 'error'];
