@@ -97,6 +97,7 @@ async function snap() {
   const ids = new Map(), bs = new Map();
   const norm = s => s.replace(/r\d{23}/g, m => { if (!ids.has(m)) ids.set(m, '<记录' + (ids.size + 1) + '>'); return ids.get(m); })
     .replace(/("(?:batch|b)": ?")(b[0-9a-z]+)"/g, (m0, a, b) => { if (!bs.has(b)) bs.set(b, '<批次' + (bs.size + 1) + '>'); return a + bs.get(b) + '"'; })
+    .replace(/("bs": ?\[)([^\]]*)\]/g, (m0, a, list) => a + list.replace(/"(b[0-9a-z]+)"/g, (m1, b) => { if (!bs.has(b)) bs.set(b, '<批次' + (bs.size + 1) + '>'); return '"' + bs.get(b) + '"'; }) + ']')
     .replace(/"accountId": ?"u\d+"/g, '"accountId":"<编号>"').replace(/"exportedAt": ?"[^"]*"/g, '"exportedAt":"<时间>"').replace(/"at": ?"[^"]*"/g, '"at":"<时间>"');
   Object.keys(out).forEach(k => { out[k] = norm(out[k]); });
   return out;
