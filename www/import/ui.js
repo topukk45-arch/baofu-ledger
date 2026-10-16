@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-S：选文件页有「微信怎么导出」「支付宝怎么导出」两页文字教程（截图位置先占位），返回键回到选文件。
 // 1016-Q：确认页写「这段时间漏记了 N 笔，共 x 元」；底部「只对账」进勾选清单，「补进 K 笔」只写勾选的（write.js 的 onlyKeys）。
 // 1016-O：再导入时原来待处理的用新文件重新判断，有了结论的确认页提示「原来待处理的 N 笔有结论了」。
 // 1016-N：openPending() 是待处理页（合并 / 挂退款 / 作为新增 / 不要了 / 全部不要了、候选失效提示），入口在结果页和导入记录页。
@@ -138,7 +139,8 @@
   function back() {
     if (dom.sheetMask.style.display === 'flex') { closeSheet(); return; }
     if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;   // 写入 / 撤销中不让退出（写完或失败会自己回来）
-    if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }   // 只对账清单 → 回到确认页
+    if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }
+    if (S && S.phase === 'guide') { S.phase = 'pick'; renderPick(); return; }          // 教程 → 回到选文件   // 只对账清单 → 回到确认页
     close();
   }
 
@@ -147,13 +149,61 @@
     var b = dom.body; b.innerHTML = '';
     var c = el('div', 'imp-card');
     c.appendChild(el('h4', null, '导入微信 / 支付宝账单（开发中）'));
-    c.appendChild(el('div', 'imp-soft', '先在微信或支付宝里导出账单（选「用于个人对账」），把压缩包解压出来，再选里面的 csv / xlsx 文件。可以一次选好几个。这一版只看导入方案，不会写进账本。'));
+    c.appendChild(el('div', 'imp-soft', '先在微信或支付宝里导出账单（选「用于个人对账」），把压缩包解压出来，再选里面的 csv / xlsx 文件。可以一次选好几个。写进账本前会先给你看导入方案，导错了能撤销。'));
     var row = el('div', 'imp-chips'); row.style.marginTop = '12px';
     var pick = btn('选账单文件', 'imp-btn gold', function () { dom.file.click(); }); pick.id = 'impPick';
     row.appendChild(pick);
+    var gw = btn('微信怎么导出', 'imp-btn', function () { renderGuide('wechat'); }); gw.id = 'impGuideWx'; row.appendChild(gw);
+    var ga = btn('支付宝怎么导出', 'imp-btn', function () { renderGuide('alipay'); }); ga.id = 'impGuideAli'; row.appendChild(ga);
     if (typeof window.openDevImportCheck === 'function') { var chk = btn('通路自检', 'imp-btn', function () { window.openDevImportCheck(); }); chk.id = 'impSelfTest'; row.appendChild(chk); }
     c.appendChild(row);
     b.appendChild(c);
+  }
+
+  // ---------- 1016-S：导出教程（先写文字步骤，图的位置用「此处放截图：…」占位）----------
+  // 两家 App 改版会改菜单名，文案里写明「按你手机上的版本可能略有不同」
+  var GUIDE = {
+    wechat: { title: '微信账单怎么导出', steps: [
+      ['打开微信，点右下角「我」→「服务」（有的版本叫「支付」）→「钱包」→「账单」。', '微信「我 → 服务 → 钱包」页面'],
+      ['在账单页右上角点「…」（或「常见问题」），选「下载账单」。', '账单页右上角的菜单'],
+      ['用途选「用于个人对账」，不要选「用于证明材料」（那种是 PDF，记问读不了）。', '「用于个人对账」选项'],
+      ['选账单的时间范围（一次最多几个月，按页面上写的来），填上你的邮箱，按提示验证身份。', '选时间范围和填邮箱'],
+      ['提交以后，「微信支付」会发一条消息，里面写着解压密码；记下来。', '「微信支付」消息里的解压密码'],
+      ['等邮件：一般几分钟到一小时，邮箱里会收到一个压缩包（.zip）。', '邮箱里收到的账单邮件'],
+      ['在手机上把压缩包下载下来，用「文件管理」解压，输入刚才的解压密码，得到一个 .xlsx 文件。', '文件管理里解压、输密码'],
+      ['回到记问，点「选账单文件」，选这个 .xlsx 文件。']
+    ] },
+    alipay: { title: '支付宝账单怎么导出', steps: [
+      ['打开支付宝，点右下角「我的」→「账单」。', '支付宝「我的 → 账单」'],
+      ['在账单页右上角点「…」，选「开具交易流水证明」。', '账单页右上角的菜单'],
+      ['用途选「用于个人对账」，不要选「用于证明材料」（那种是 PDF，记问读不了）。', '「用于个人对账」选项'],
+      ['选账单的时间范围，填上你的邮箱，提交。', '选时间范围和填邮箱'],
+      ['解压密码会显示在提交成功的页面上（支付宝消息里也有），记下来。', '提交成功页面上的解压密码'],
+      ['等邮件：邮箱里会收到一个压缩包（.zip）。', '邮箱里收到的账单邮件'],
+      ['在手机上把压缩包下载下来，用「文件管理」解压，输入解压密码，得到一个 .csv 文件。', '文件管理里解压、输密码'],
+      ['回到记问，点「选账单文件」，选这个 .csv 文件。']
+    ] }
+  };
+  function renderGuide(app) {
+    var g = GUIDE[app]; if (!g || !S) return;
+    S.phase = 'guide';
+    var b = dom.body; b.innerHTML = '';
+    dom.title.textContent = g.title;
+    var c = el('div', 'imp-card'); c.id = 'impGuide'; c.dataset.app = app;
+    c.appendChild(el('h4', null, g.title));
+    var ol = el('ol'); ol.style.paddingLeft = '20px';
+    g.steps.forEach(function (x) {
+      var li = el('li', 'imp-line'); li.style.marginBottom = '8px';
+      li.appendChild(el('div', null, x[0]));
+      if (x[1]) li.appendChild(el('div', 'imp-soft imp-shot', '此处放截图：' + x[1]));
+      ol.appendChild(li);
+    });
+    c.appendChild(ol);
+    c.appendChild(el('div', 'imp-soft', '提醒：导出的文件别用 Excel 打开再另存，会改编码，还会把长订单号变成科学计数法，记问就认不准了。菜单名按你手机上的版本可能略有不同。'));
+    var bk = btn('‹ 回去选文件', 'imp-btn gold', function () { S.phase = 'pick'; renderPick(); }); bk.id = 'impGuideBack'; bk.style.marginTop = '10px';
+    c.appendChild(bk);
+    b.appendChild(c);
+    dom.page.scrollTop = 0;
   }
 
   // ---------- 进度 ----------
