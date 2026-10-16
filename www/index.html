@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z4</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z5</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1474,6 +1474,7 @@
                     <button class="set-item" id="devImportBtn" style="display:none"><span>导入（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devRestoreBtn" style="display:none"><span>恢复到导入前（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devLogsBtn" style="display:none"><span>导入记录（开发中）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="devRulesBtn" style="display:none"><span>管理导入规则（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
                 </div>
@@ -4015,6 +4016,17 @@
                     .map(r=>{ const f=Math.round(safeNum(r.money)*100); return { id:r.id, time:r.time, fen:f, left:f-(refunded.get(r.id)||0), cat:r.cat||'', remark:(r.remark||'').split('\n')[0].slice(0, 30), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '' }; })
                     .filter(x=>x.left>=fen).sort((a, b)=>a.time<b.time ? 1 : a.time>b.time ? -1 : 0).slice(0, 50);
             },
+            // ---- 第二期：管理导入规则。rules：{ cat:[{kw,cat}], type:[{app,type|status,as}], map:[{from,cat}] }，洗过再存（同导入备份）；
+            //   只改存档设置里的 importRules，不动记录、不动导入记录（以后撤销某次导入时，规则被你改过的那条就不删）
+            async rulesSave(rules, archive){
+                const t=impTarget(archive);
+                const user=t.e.id, store=loadStore(user), a=store.archives[t.name];
+                const clean=impCleanRules(rules, a.cats||[]);
+                if(clean) a.importRules=clean; else delete a.importRules;
+                await saveStoreDurable(store, user, ()=>[]);
+                if(t.e.id===currentUser && t.name===currentArchive){ try{ odScheduleSync(); }catch(_){} }
+                return clean || { cat:[], type:[] };
+            },
             // ---- 1016-N：待处理（第一期 ⑧）----
             // 打开待处理页时读池子，顺便看一遍候选还在不在（import/pending.js 的 check）
             async pendingCheck(archive){
@@ -5978,7 +5990,7 @@ ${detail}
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = devImportOn() ? '' : 'none'; }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = devImportOn() ? '' : 'none'; }
         $('setBuild').textContent=$('loginBuild').textContent;
         renderDevImport();
         // 2 秒内连点 5 次版本号：开 / 关
@@ -6090,6 +6102,11 @@ ${detail}
             try{ if(typeof pl.addListener==='function') pl.addListener('fileOpened', ()=>{ impTakeOpenedFile(); }); }catch(_){}
             setTimeout(impTakeOpenedFile, 0);
         })();
+        // 第二期（1016-Z5）：「设置 → 管理导入规则」：你的分类规则、分类对照、类型规则，能看、改、删、加（导入页那一层里打开）
+        $('devRulesBtn').addEventListener('click', () => {
+            if(!devImportOn()) return;
+            loadImportUI().then(ui=>ui.openRules()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '管理导入规则'));
+        });
         // 1016-L：「设置 → 导入记录」最近 10 次，每次右侧「撤销」（导入页那一层里打开，返回键照样一层层关）
         $('devLogsBtn').addEventListener('click', () => {
             if(!devImportOn()) return;

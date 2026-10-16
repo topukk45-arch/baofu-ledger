@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 第二期（1016-Z5）：openRules() 是「设置 → 管理导入规则」（分类规则、分类对照、类型规则：看、改、删、加分类规则）。
 // 1016-Z4（1.1）：汇总里写零钱提现的服务费单独记成支出。
 // 1016-Z3（1.1）：openWith(文件) 是「用记问打开」（安卓文件关联）进来的，直接拿这个文件算方案。
 // 1016-Z2（1.1）：收入行详情里「当作退款，挂到某一笔」（这一批的支出或账本里的支出，JiwenImportStore.refundTargets 查），没见过的交易类型多一个「当退款挂到原单」。
@@ -1104,6 +1105,82 @@
     });
     dom.body.appendChild(c);
   }
+  // ---------- 第二期：管理导入规则 ----------
+  // 你的分类规则（关键词 → 分类，关键词越长越先用）、分类对照（推荐分类 → 你的分类）、类型规则（没见过的交易类型 / 状态怎么处理）。
+  // 每改一下就存一次（只改存档设置里的规则，不动已经入账的记录）。内置词表不在这里（看不到、改不了）。
+  var TYPE_AS_NAME = { normal: '照收支导入', transfer: '当转账（不计入）', refund: '当退款挂到原单', skip: '跳过', import: '导入' };
+  function openRules(notice) {
+    build();
+    runId++;
+    S = { phase: 'rules', view: {} };
+    var info; try { info = store().archiveInfo(); } catch (e) { alertMsg('读不出存档：' + (e && (e.code || e.message) || e)); return; }
+    S.info = info;
+    dom.archive.textContent = '存档「' + info.name + '」';
+    dom.title.textContent = '管理导入规则';
+    dom.page.style.display = 'block'; dom.bar.style.display = 'none'; dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none';
+    var b = dom.body; b.innerHTML = '';
+    if (notice) { var nt = el('div', 'imp-card imp-line imp-ok', notice); nt.id = 'impRulesNotice'; b.appendChild(nt); }
+    var rules = { cat: (info.catRules || []).slice(), type: (info.typeRules || []).slice(), map: (info.catMaps || []).slice() };
+    var catSel = function (val, fn, cls) {
+      var se = el('select', cls || '');
+      info.cats.filter(function (c) { return c !== '未分类'; }).forEach(function (c) { var o = el('option', null, c); o.value = c; se.appendChild(o); });
+      if (val) se.value = val;
+      se.addEventListener('change', function () { fn(se.value); });
+      return se;
+    };
+    var save = function (next, msg) {
+      store().rulesSave(next).then(function () { openRules(msg); }, function (e) { alertMsg('没存上：' + (e && (e.code || e.message) || e), '管理导入规则'); });
+    };
+    // 分类规则
+    var c1 = el('div', 'imp-card'); c1.id = 'impRulesCat';
+    c1.appendChild(el('h4', null, '分类规则（' + rules.cat.length + '）'));
+    c1.appendChild(el('div', 'imp-soft', '交易对方里有这个词，就归到这个分类。导入时你选过的、从合并里学到的都在这里；只管以后的导入。'));
+    rules.cat.forEach(function (r, i) {
+      var row = el('div', 'imp-row-opt imp-rule-row'); row.dataset.kw = r.kw;
+      row.appendChild(el('span', 'grow', '「' + r.kw + '」→'));
+      row.appendChild(catSel(r.cat, function (v) { var n = rules.cat.slice(); n[i] = { kw: r.kw, cat: v }; save(Object.assign({}, rules, { cat: n }), '已改：「' + r.kw + '」→ ' + v); }, 'imp-rule-cat'));
+      row.appendChild(btn('删除', 'imp-btn imp-rule-del', function () { save(Object.assign({}, rules, { cat: rules.cat.filter(function (_, k) { return k !== i; }) }), '已删：「' + r.kw + '」'); }));
+      c1.appendChild(row);
+    });
+    var add = el('div', 'imp-row-opt'); add.id = 'impRuleAdd';
+    var kw = el('input'); kw.type = 'text'; kw.placeholder = '交易对方里的词'; kw.maxLength = 32; kw.id = 'impRuleKw'; kw.style.flex = '1 1 8em';
+    var ac = catSel(null, function () {}, 'imp-rule-newcat'); ac.id = 'impRuleNewCat';
+    add.appendChild(kw); add.appendChild(ac);
+    var ab = btn('添加', 'imp-btn gold', function () {
+      var k = kw.value.trim();
+      if (!k) { alertMsg('先写一个词。', '管理导入规则'); return; }
+      if (rules.cat.some(function (r) { return r.kw === k; })) { alertMsg('「' + k + '」已经有规则了，在上面改它的分类就行。', '管理导入规则'); return; }
+      save(Object.assign({}, rules, { cat: rules.cat.concat([{ kw: k, cat: ac.value }]) }), '已加：「' + k + '」→ ' + ac.value);
+    }); ab.id = 'impRuleAddBtn';
+    add.appendChild(ab); c1.appendChild(add);
+    b.appendChild(c1);
+    // 分类对照
+    var c2 = el('div', 'imp-card'); c2.id = 'impRulesMap';
+    c2.appendChild(el('h4', null, '分类对照（' + rules.map.length + '）'));
+    c2.appendChild(el('div', 'imp-soft', '推荐的分类在你的存档里没有时，归到哪个分类（导入时在「新建分类」里选过「并到」的）。'));
+    if (!rules.map.length) c2.appendChild(el('div', 'imp-soft', '还没有。'));
+    rules.map.forEach(function (m, i) {
+      var row = el('div', 'imp-row-opt imp-map-row'); row.dataset.from = m.from;
+      row.appendChild(el('span', 'grow', '推荐「' + m.from + '」→'));
+      row.appendChild(catSel(m.cat, function (v) { var n = rules.map.slice(); n[i] = { from: m.from, cat: v }; save(Object.assign({}, rules, { map: n }), '已改：推荐「' + m.from + '」→ ' + v); }, 'imp-map-cat'));
+      row.appendChild(btn('删除', 'imp-btn imp-map-del', function () { save(Object.assign({}, rules, { map: rules.map.filter(function (_, k) { return k !== i; }) }), '已删：推荐「' + m.from + '」的对照'); }));
+      c2.appendChild(row);
+    });
+    b.appendChild(c2);
+    // 类型规则
+    var c3 = el('div', 'imp-card'); c3.id = 'impRulesType';
+    c3.appendChild(el('h4', null, '交易类型 / 状态规则（' + rules.type.length + '）'));
+    if (!rules.type.length) c3.appendChild(el('div', 'imp-soft', '还没有。导入时「没见过的交易类型 / 状态」选过处理方式的会记在这里。'));
+    rules.type.forEach(function (r, i) {
+      var row = el('div', 'imp-row-opt imp-type-row');
+      row.appendChild(el('span', 'grow', (APP[r.app] || r.app) + ' · ' + (r.type !== undefined ? '类型「' + r.type + '」' : '状态「' + r.status + '」') + ' → ' + (TYPE_AS_NAME[r.as] || r.as)));
+      row.appendChild(btn('删除', 'imp-btn imp-type-del', function () { save(Object.assign({}, rules, { type: rules.type.filter(function (_, k) { return k !== i; }) }), '已删这条类型规则，下次遇到会再问'); }));
+      c3.appendChild(row);
+    });
+    b.appendChild(c3);
+    dom.page.scrollTop = 0;
+  }
+
   // ---------- 1016-N：待处理页（⑧）----------
   // 池子里的每一笔：和某条手记合并 / 挂到某笔原单 / 作为新增（选分类）/ 不要了；顶上「全部不要了」。
   // 候选手记被删了、已经和别的账单合并了的，标出来，全都不在时提示「原候选已不在，建议作为新增入账」。
@@ -1234,7 +1311,7 @@
     try { var ta = el('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand && document.execCommand('copy'); ta.remove(); } catch (_) {}
   }
 
-  var UI = { open: open, openWith: openWith, openLogs: openLogs, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  var UI = { open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();
