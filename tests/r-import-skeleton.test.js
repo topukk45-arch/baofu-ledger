@@ -189,7 +189,7 @@ async function openEntry(t) {
   ok(t.$('devImportMask').style.display === 'flex', '自检弹窗打开');
   await until(() => !outText(t).startsWith('正在'));
 }
-const UI_FILES = 'import/import.js,import/plan.js,import/write.js,import/undo.js,import/route.js,import/pending.js,import/ui.js';   // 1016-F 加 write.js，1016-K 加 undo.js，1016-N 加 route.js、pending.js（route.js 是纯计算，待处理页「不要了」要用它算退款记号）
+const UI_FILES = 'import/import.js,import/plan.js,import/write.js,import/undo.js,import/route.js,import/pending.js,import/vendor/tiny-inflate.js,import/unzip.js,import/ui.js';   // 1016-F 加 write.js，1016-K 加 undo.js，1016-N 加 route.js、pending.js（route.js 是纯计算，待处理页「不要了」要用它算退款记号），1016-Z8 加解压压缩包要的 tiny-inflate.js、unzip.js
 
 // ===== 5. 兜底①：没有 Worker（jsdom 本来就没有）→ 主线程算，结果一样 =====
 {
@@ -200,8 +200,8 @@ const UI_FILES = 'import/import.js,import/plan.js,import/write.js,import/undo.js
   ok(outText(t).includes('主线程') && outText(t).includes('不支持后台线程'), '5 说明是在主线程算的、为什么');
   ok(outText(t).includes('文本：12 行') && outText(t).includes('字节：12 行'), '5 文本和字节都数出 12 行');
   ok(outText(t).includes('GBK 解码：正常（读出 2 笔支付宝账单，第一笔对方「青禾便利」）'), '5 自检里 GBK 解码正常：' + outText(t).split('\n').find(l => l.startsWith('GBK')));
-  const FALLBACK = UI_FILES + ',import/core.js,import/merchants.js,import/vendor/tiny-inflate.js,import/parse.js,import/classify.js,import/match.js';   // route.js 导入页已经载入过，兜底不再载一遍
-  ok(importReqs(t).join(',') === FALLBACK, '5 加载了导入页的七个文件和兜底要的几个文件：' + importReqs(t).join(','));
+  const FALLBACK = UI_FILES + ',import/core.js,import/merchants.js,import/parse.js,import/classify.js,import/match.js';   // route.js 导入页已经载入过，兜底不再载一遍
+  ok(importReqs(t).join(',') === FALLBACK, '5 加载了导入页的九个文件和兜底要的几个文件：' + importReqs(t).join(','));
   ok(t.w.JiwenImport.state().mode === 'main', '5 state 是 main');
   t.$('devImportClose').click();
   ok(t.$('devImportMask').style.display === 'none', '5 关闭');
@@ -224,7 +224,7 @@ let FW6;
   const ps = FW6.created[0].received.find(m => m.cmd === 'parse');
   ok(ps && Object.prototype.toString.call(ps.data.files[0].data) === '[object ArrayBuffer]', '6 解析的文件字节交给了线程');
   ok(outText(t).includes('内置词表：' + require(path.join(IMP, 'merchants.js')).items.length + ' 条'), '6 线程里载入了词表');
-  ok(importReqs(t).join(',') === UI_FILES, '6 主页面只加载了导入页的七个文件（计算部分只在线程里）：' + importReqs(t).join(','));
+  ok(importReqs(t).join(',') === UI_FILES, '6 主页面只加载了导入页的九个文件（计算部分只在线程里）：' + importReqs(t).join(','));
   ok(t.w.JiwenImportCore === undefined, '6 主线程没加载计算部分');
   ok(FW6.created.length === 1 && FW6.created[0].url === 'https://localhost/import/worker.js', '6 线程地址是 https://localhost/import/worker.js（和安卓上一样）');
   const sent = FW6.created[0].received.filter(m => m.cmd === 'countLines');

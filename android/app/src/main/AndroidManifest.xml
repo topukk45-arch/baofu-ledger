@@ -23,7 +23,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- 1016-Z3「用记问打开」：在文件管理、微信里对 csv / xlsx 账单选「用其他应用打开」或「分享」到记问（OpenFilePlugin 接）。
+            <!-- 1016-Z3「用记问打开」：在文件管理、微信里对 csv / xlsx 账单（1016-Z8 起还有 zip 压缩包）选「用其他应用打开」或「分享」到记问（OpenFilePlugin 接）。
                  导入功能没打开（开发开关）时，网页层只提示「导入功能还在测试中」 -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
@@ -33,6 +33,7 @@
                 <data android:mimeType="text/comma-separated-values" />
                 <data android:mimeType="application/csv" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/zip" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
@@ -41,6 +42,7 @@
                 <data android:mimeType="text/comma-separated-values" />
                 <data android:mimeType="application/csv" />
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+                <data android:mimeType="application/zip" />
             </intent-filter>
 
         </activity>

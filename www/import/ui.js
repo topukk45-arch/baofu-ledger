@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 第三期（1016-Z8）：选的文件是账单压缩包时在 App 里解开（unzip.js；有密码问一句，密码不对再问，取消就不导它）。
 // 第二期（1016-Z5）：openRules() 是「设置 → 管理导入规则」（分类规则、分类对照、类型规则：看、改、删、加分类规则）。
 // 1016-Z4（1.1）：汇总里写零钱提现的服务费单独记成支出。
 // 1016-Z3（1.1）：openWith(文件) 是「用记问打开」（安卓文件关联）进来的，直接拿这个文件算方案。
@@ -108,7 +109,7 @@
     var go = btn('导入', 'imp-btn gold', function () { if (S && S.view && S.view.recon) onImport(reconKeys()); else onImport(); }); go.id = 'impGo';
     var rc = btn('只对账', 'imp-btn', function () { toggleRecon(); }); rc.id = 'impRecon';
     bar.appendChild(cancel); bar.appendChild(rc); bar.appendChild(go);
-    var file = el('input'); file.type = 'file'; file.id = 'impFile'; file.multiple = true; file.accept = '.csv,.xlsx,text/csv'; file.style.display = 'none';
+    var file = el('input'); file.type = 'file'; file.id = 'impFile'; file.multiple = true; file.accept = '.csv,.xlsx,.zip,text/csv,application/zip'; file.style.display = 'none';
     file.addEventListener('change', function () { var fs = [].slice.call(file.files || []); file.value = ''; if (fs.length) start(fs); });
     var sm = el('div'); sm.id = 'impSheetMask'; var sh = el('div'); sh.id = 'impSheet'; sm.appendChild(sh);
     sm.addEventListener('click', function (e) { if (e.target === sm) closeSheet(); });
@@ -166,7 +167,7 @@
     var b = dom.body; b.innerHTML = '';
     var c = el('div', 'imp-card');
     c.appendChild(el('h4', null, '导入微信 / 支付宝账单（开发中）'));
-    c.appendChild(el('div', 'imp-soft', '先在微信或支付宝里导出账单（选「用于个人对账」），把压缩包解压出来，再选里面的 csv / xlsx 文件。可以一次选好几个。写进账本前会先给你看导入方案，导错了能撤销。'));
+    c.appendChild(el('div', 'imp-soft', '先在微信或支付宝里导出账单（选「用于个人对账」），邮件里的压缩包可以直接选（会问解压密码），也可以先解压再选里面的 csv / xlsx 文件。可以一次选好几个。写进账本前会先给你看导入方案，导错了能撤销。'));
     var row = el('div', 'imp-chips'); row.style.marginTop = '12px';
     var pick = btn('选账单文件', 'imp-btn gold', function () { dom.file.click(); }); pick.id = 'impPick';
     row.appendChild(pick);
@@ -187,8 +188,8 @@
       ['选账单的时间范围（一次最多几个月，按页面上写的来），填上你的邮箱，按提示验证身份。', '选时间范围和填邮箱'],
       ['提交以后，「微信支付」会发一条消息，里面写着解压密码；记下来。', '「微信支付」消息里的解压密码'],
       ['等邮件：一般几分钟到一小时，邮箱里会收到一个压缩包（.zip）。', '邮箱里收到的账单邮件'],
-      ['在手机上把压缩包下载下来，用「文件管理」解压，输入刚才的解压密码，得到一个 .xlsx 文件。', '文件管理里解压、输密码'],
-      ['回到记问，点「选账单文件」，选这个 .xlsx 文件。']
+      ['把压缩包下载到手机上。可以直接在记问里选这个压缩包（会问解压密码），也可以先用「文件管理」解压，得到一个 .xlsx 文件。', '文件管理里解压、输密码'],
+      ['回到记问，点「选账单文件」，选这个压缩包或 .xlsx 文件。']
     ] },
     alipay: { title: '支付宝账单怎么导出', steps: [
       ['打开支付宝，点右下角「我的」→「账单」。', '支付宝「我的 → 账单」'],
@@ -197,8 +198,8 @@
       ['选账单的时间范围，填上你的邮箱，提交。', '选时间范围和填邮箱'],
       ['解压密码会显示在提交成功的页面上（支付宝消息里也有），记下来。', '提交成功页面上的解压密码'],
       ['等邮件：邮箱里会收到一个压缩包（.zip）。', '邮箱里收到的账单邮件'],
-      ['在手机上把压缩包下载下来，用「文件管理」解压，输入解压密码，得到一个 .csv 文件。', '文件管理里解压、输密码'],
-      ['回到记问，点「选账单文件」，选这个 .csv 文件。']
+      ['把压缩包下载到手机上。可以直接在记问里选这个压缩包（会问解压密码），也可以先用「文件管理」解压，得到一个 .csv 文件。', '文件管理里解压、输密码'],
+      ['回到记问，点「选账单文件」，选这个压缩包或 .csv 文件。']
     ] }
   };
   function renderGuide(app) {
@@ -252,6 +253,9 @@
     var alive = function () { return my === runId && S; };
     readAll(files).then(function (fs) {
       if (!alive()) return;
+      return unzipAll(fs, alive);
+    }).then(function (fs) {
+      if (!alive() || !fs) return;
       return J().run('parse', { files: fs }, { onProgress: function (d, t) { if (alive()) progress('读文件…', d, t); } }).then(function (r) {
         if (!alive()) return;
         S.parsed = r.result;
@@ -271,6 +275,48 @@
       dom.prog.style.display = 'none';
       alertMsg('导入出错了：' + (e && e.message || e));
       S.phase = 'pick'; renderPick();
+    });
+  }
+  // ---------- 第三期（1016-Z8）：账单压缩包在 App 里解开（带密码的问一句密码）----------
+  // 选的文件是 .zip（不是 xlsx 本身）：没密码直接解；有密码就问，密码不对再问，点取消就不导这个压缩包；解出里面的 .csv / .xlsx 接着照常算。
+  // 解压在这一侧算（纯 JS，unzip.js），解出来的字节再交给后台线程解析。密码只用这一次，不保存。
+  function askPassword(name, again) {
+    return new Promise(function (resolve) {
+      if (typeof window.customPrompt !== 'function') { resolve(null); return; }
+      window.customPrompt((again ? '密码不对，再试一次。\n\n' : '') + '「' + name + '」有密码。\n微信：密码在「微信支付」发给你的消息里；支付宝：在导出成功的页面上（支付宝消息里也有）。',
+        '', function (v) { resolve(v); }, '压缩包密码', null, { placeholder: '解压密码', onCancel: function () { resolve(null); } });
+    });
+  }
+  function unzipAll(fs, alive) {
+    var U = window.JiwenImportUnzip;
+    if (!U) return Promise.resolve(fs);
+    var out = [];
+    return fs.reduce(function (p, f) {
+      return p.then(function () {
+        if (!alive()) return;
+        var u8 = new Uint8Array(f.data), info = U.inspect(u8);
+        if (info.kind !== 'zip') { out.push(f); return; }
+        var tryPw = function (pw) {
+          var r = U.extract(u8, pw);
+          if (r.ok) { r.files.forEach(function (x) { out.push({ name: x.name, data: x.data.buffer.slice(x.data.byteOffset, x.data.byteOffset + x.data.byteLength) }); }); return; }
+          if (r.why === 'password') {
+            dom.prog.style.display = 'none';
+            return askPassword(f.name, pw !== '').then(function (v) {
+              if (v === null || !alive()) { S && (S.skippedZip = (S.skippedZip || []).concat([f.name])); return; }
+              progress('解压…', 0, 1);
+              return tryPw(v);
+            });
+          }
+          out.push(f);   // 解不开（坏了、不认识的压缩方式、里面没有账单）：原样交给解析，它会说「这是一个压缩包」
+        };
+        if (info.encrypted) { dom.prog.style.display = 'none'; return askPassword(f.name, false).then(function (v) { if (v === null || !alive()) { S && (S.skippedZip = (S.skippedZip || []).concat([f.name])); return; } progress('解压…', 0, 1); return tryPw(v); }); }
+        return tryPw('');
+      });
+    }, Promise.resolve()).then(function () {
+      if (!alive()) return null;
+      if (!out.length) { dom.prog.style.display = 'none'; S.phase = 'pick'; renderPick(); return null; }
+      progress('读文件…', 0, 1);
+      return out;
     });
   }
   // 从 route 起算一遍（类型 / 状态选择变了也走这里，parse 的结果和单号表不重查）
