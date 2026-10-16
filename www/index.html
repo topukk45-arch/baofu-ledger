@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z2</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z3</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -4998,7 +4998,9 @@
                     else {
                         await login(id);
                         // 1016-R：新账号进去以后问一次「怎么开始？」（开发开关开着才问；只在新建账号这一次，可以跳过）
-                        if(currentUser===id && devImportOn()) customConfirm('怎么开始？\n\n可以从零开始一笔笔记，也可以先把微信、支付宝的账单导进来，第一次打开就有几个月的统计可看。', ()=>{
+                        // 是「用记问打开」账单文件进来的，已经在导入了，就不问
+                        const viaFile=window.__impOpenedNow; window.__impOpenedNow=false;
+                        if(currentUser===id && devImportOn() && !viaFile) customConfirm('怎么开始？\n\n可以从零开始一笔笔记，也可以先把微信、支付宝的账单导进来，第一次打开就有几个月的统计可看。', ()=>{
                             loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
                         }, '怎么开始', { okText:'导入微信、支付宝账单', cancelText:'从零开始记' });
                     }
@@ -5055,6 +5057,8 @@
             // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
             // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
             trackBusy(runTimeRepairOnce(id));
+            // 1016-Z3：没进账号时「用记问打开」过来的账单文件，进了账号再接着处理
+            if(window.__impOpened){ const f=window.__impOpened; window.__impOpened=null; window.__impOpenedNow=true; setTimeout(()=>impOpenFile(f), 0); }
         }
 
         logoutBtn.addEventListener('click', () => {
@@ -6061,6 +6065,31 @@ ${detail}
                 }
             }, '恢复到导入前');
         });
+        // 1016-Z3：「用记问打开」账单文件（安卓：文件管理 / 微信里「用其他应用打开」或「分享」，原生插件 OpenFile 接住、读成字节）。
+        //   开发开关没开：只提示「导入功能还在测试中」，不进导入；开着：直接拿这个文件进导入页。还没进账号就先记着，进了账号再接着
+        async function impTakeOpenedFile(){
+            const cap=window.Capacitor, pl=cap && cap.Plugins && cap.Plugins.OpenFile;
+            if(!pl || typeof pl.getPending!=='function') return;
+            let r=null; try{ r=await pl.getPending(); }catch(_){ return; }
+            const f=r && r.file; if(!f) return;
+            if(!currentUser){ window.__impOpened=f; return; }
+            impOpenFile(f);
+        }
+        function impOpenFile(f){
+            if(!devImportOn()){ customAlert('导入功能还在测试中，暂时不能用记问打开账单文件。', '用记问打开'); return; }
+            if(f.error){ customAlert(f.error==='too_big' ? '这个文件太大了（超过 8MB），读不了。' : '这个文件读不出来，换个方式选文件试试（导入页里点「选账单文件」）。', '用记问打开'); return; }
+            let bytes;
+            try{ const bin=atob(f.data||''); bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); }
+            catch(_){ customAlert('这个文件读不出来。', '用记问打开'); return; }
+            const file=new File([bytes], f.name || '账单文件');
+            loadImportUI().then(ui=>ui.openWith([file])).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
+        }
+        (function bindOpenFile(){
+            const cap=window.Capacitor, pl=cap && cap.Plugins && cap.Plugins.OpenFile;
+            if(!pl) return;
+            try{ if(typeof pl.addListener==='function') pl.addListener('fileOpened', ()=>{ impTakeOpenedFile(); }); }catch(_){}
+            setTimeout(impTakeOpenedFile, 0);
+        })();
         // 1016-L：「设置 → 导入记录」最近 10 次，每次右侧「撤销」（导入页那一层里打开，返回键照样一层层关）
         $('devLogsBtn').addEventListener('click', () => {
             if(!devImportOn()) return;

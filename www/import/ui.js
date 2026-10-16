@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-Z3（1.1）：openWith(文件) 是「用记问打开」（安卓文件关联）进来的，直接拿这个文件算方案。
 // 1016-Z2（1.1）：收入行详情里「当作退款，挂到某一笔」（这一批的支出或账本里的支出，JiwenImportStore.refundTargets 查），没见过的交易类型多一个「当退款挂到原单」。
 // 1016-Z1（1.1）：按对方归组那张卡每组带一句规律说明「某某 · 5 笔 · 共 53 元 · 工作日中午 12 点左右 · 每笔 12–14 元 → 选个分类」。
 // 1016-Z（1.1）：确认页「金额要你看一眼」：比这个分类平时高很多的、单笔特别大的列出来，点开改（参考值在 plan.js 的 AMOUNT，待真实数据调）。
@@ -129,6 +130,13 @@
     dom.title.textContent = '导入账单';
     dom.page.style.display = 'block'; dom.bar.style.display = 'none';
     renderPick();
+  }
+  // 1016-Z3：「用记问打开」：带着文件直接进导入页（正在写入 / 撤销时不打断）
+  function openWith(files) {
+    if (S && (S.phase === 'writing' || S.phase === 'undoing')) { alertMsg('正在写入，等写完再打开这个文件。'); return; }
+    if (isOpen()) close();
+    open();
+    start(files);
   }
   function close() {
     if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;
@@ -1224,7 +1232,7 @@
     try { var ta = el('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand && document.execCommand('copy'); ta.remove(); } catch (_) {}
   }
 
-  var UI = { open: open, openLogs: openLogs, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  var UI = { open: open, openWith: openWith, openLogs: openLogs, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

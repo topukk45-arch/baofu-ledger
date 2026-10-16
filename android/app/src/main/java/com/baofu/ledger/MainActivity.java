@@ -18,6 +18,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // 必须在 super.onCreate() 之前注册：让「云备份」设置里的 OneDrive 直连功能可用
         registerPlugin(OneDriveLinkPlugin.class);
+        // 1016-Z3：「用记问打开」账单文件（csv / xlsx）
+        registerPlugin(OpenFilePlugin.class);
         super.onCreate(savedInstanceState);
 
         // 1) 窗口根视图（decorView）背景：兜住一切层级最底下的露出
