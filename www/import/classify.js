@@ -10,6 +10,10 @@
 //   alipay  支付宝分类对照 —— 把握中
 //   none    都没有：未分类
 // 内置词表和支付宝对照的目标分类都用支付宝那套名字（want），落地时按同义表对到存档已有的分类（cat）。
+// 1016-C：
+//   平台名（淘宝、天猫、京东、拼多多、抖音商城、唯品会）在对方里只算「低」，先看商品说明里有没有更具体的词，再看支付宝分类，最后才用平台；
+//   只在商品说明里找到的（低）按清洗后的对方投票：同一个对方票数最多的唯一一个分类给这个对方的所有这种行，打平就都不推荐，
+//   免得同一个对方的几笔有的推成「游戏」、有的未分类。
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module && module.exports) module.exports = api;
@@ -17,7 +21,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-A';
+  var VERSION = '1016-C';
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -69,6 +73,15 @@
     return null;
   }
 
+  var PLATFORMS = ['淘宝', '天猫', '京东', '拼多多', '抖音商城', '唯品会'];
+  function isPlatform(word) { return PLATFORMS.some(function (p) { return String(word).indexOf(p) >= 0; }); }
+  // 分分捐这类合并记录的默认分类：存档里有公益类的就用它，没有用「其他」，再没有「未分类」
+  function pettyCat(cats) {
+    cats = Array.isArray(cats) ? cats : [];
+    for (var i = 0; i < cats.length; i++) if (/公益|慈善|捐/.test(cats[i])) return cats[i];
+    return land('其他', cats) || '未分类';
+  }
+
   // ---------- 内置词表：长词优先 ----------
   function builtinIndex(merchants) {
     var items = (merchants && merchants.items || []).filter(function (x) { return Array.isArray(x) && x[0] && x[1]; });
@@ -94,6 +107,7 @@
       .slice().sort(function (a, b) { return b.kw.length - a.kw.length; });
     var learned = ctx.learned instanceof Map ? ctx.learned : new Map();
     var words = builtinIndex(ctx.merchants);
+    var nonPlat = words.filter(function (x) { return !isPlatform(x[0]); });
     // 两家互借：清洗后的对方 → 支付宝分类（取次数最多的，打平不借）
     var borrow = new Map();
     (ctx.borrowRows || []).forEach(function (r) {
@@ -123,12 +137,27 @@
       }
       // 4. 内置词表：对方里找到算中，只在商品说明里找到算低
       var hit = findIn(words, cc) || findIn(words, cp);
-      if (hit) return { want: hit[1], layer: 'builtin', conf: 'mid', reason: '内置：' + hit[0] + ' → ' + hit[1] };
-      var hd = findIn(words, r.desc || '');
-      if (hd) return { want: hd[1], layer: 'builtin', conf: 'low', reason: '内置（商品说明里的「' + hd[0] + '」）→ ' + hd[1] };
+      var hd = findIn(nonPlat, r.desc || '');
+      var aw = r.app === 'alipay' ? aliWant(r.kind) : null;
+      if (hit && !isPlatform(hit[0])) return { want: hit[1], layer: 'builtin', conf: 'mid', reason: '内置：' + hit[0] + ' → ' + hit[1] };
+      if (hd) return { want: hd[1], layer: 'builtin', conf: 'low', reason: '内置（商品说明里的「' + hd[0] + '」）→ ' + hd[1], descOnly: true, cc: cc };
       // 5. 支付宝分类对照
-      if (r.app === 'alipay') { var aw = aliWant(r.kind); if (aw) return { want: aw, layer: 'alipay', conf: 'mid', reason: '支付宝分类：' + aw }; }
+      if (aw) return { want: aw, layer: 'alipay', conf: 'mid', reason: '支付宝分类：' + aw };
+      // 平台名：最后才用，把握低
+      if (hit) return { want: hit[1], layer: 'builtin', conf: 'low', reason: '内置（平台「' + hit[0] + '」，卖什么的都有）→ ' + hit[1] };
       return { cat: '未分类', layer: 'none', conf: null, reason: '没找到依据' };
+    });
+
+    // 只在商品说明里找到的：同一个对方投票，唯一最多的给这个对方所有这种行（还有没推出来的行），打平都不推荐
+    var votes = new Map();
+    raw.forEach(function (x) { if (x.descOnly && x.cc) { var v = votes.get(x.cc); if (!v) votes.set(x.cc, v = {}); v[x.want] = (v[x.want] || 0) + 1; } });
+    var winner = new Map(); votes.forEach(function (v, k) { winner.set(k, majority(v)); });
+    raw.forEach(function (x, i) {
+      var cc = x.descOnly ? x.cc : (x.layer === 'none' ? cleanCp(rows[i].cp || '') : null);
+      if (!cc || !winner.has(cc)) return;
+      var w = winner.get(cc);
+      if (!w) { raw[i] = { cat: '未分类', layer: 'none', conf: null, reason: '「' + cc + '」几笔的商品说明各指向不同分类，不推荐' }; return; }
+      if (x.layer === 'none' || x.want !== w) raw[i] = { want: w, layer: 'builtin', conf: 'low', reason: '内置（「' + cc + '」其他几笔的商品说明）→ ' + w };
     });
 
     // 落到存档的分类；落不下的数一数，决定建不建
@@ -158,5 +187,6 @@
     return { recs: recs, newCats: newCats };
   }
 
-  return { VERSION: VERSION, cleanCp: cleanCp, classify: classify, land: land, aliWant: aliWant, NEW_CAT_MIN: NEW_CAT_MIN };
+  return { VERSION: VERSION, cleanCp: cleanCp, classify: classify, land: land, aliWant: aliWant, pettyCat: pettyCat, isPlatform: isPlatform,
+           PLATFORMS: PLATFORMS, NEW_CAT_MIN: NEW_CAT_MIN };
 });

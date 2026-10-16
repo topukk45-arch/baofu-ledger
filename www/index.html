@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-B</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-C</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3626,6 +3626,20 @@
                 (lk && lk.groups || []).forEach(g=>{
                     const r=recs.find(x=>x.src && x.src.app===g.app && x.oc===g.oc && typeof x.time==='string' && x.time.indexOf(g.period)===0);
                     if(r) known[g.key]={ rec:{ id:r.id, fen:Math.round(safeNum(r.money)*100), n:nOf.get(r.id)||1 } };
+                });
+                // 1016-C：已全额退款的原单，以前导入过退款没有。支付宝：单号表里有「原单号_…」；微信：账本里有同对方、同金额、时间在后的退款记录
+                const cps=(ledgerAssembleArchive(t.e, t.aid).cps)||[];
+                (lk && lk.fullRefunds || []).forEach(f=>{
+                    if(f.app==='alipay' && f.no){
+                        const hit=T.findPrefix('alipay', f.no+'_', 1)[0];
+                        if(hit) known[f.key]={ found:true, id: hit.st===0 ? hit.id : null };
+                        return;
+                    }
+                    if(f.app==='wechat'){
+                        const r=recs.find(x=>x.src && x.src.app==='wechat' && x.type==='income' && typeof x.oc==='string' && /-退款$/.test(x.oc)
+                            && Math.round(safeNum(x.money)*100)===f.fen && typeof x.time==='string' && x.time>=f.time && cps[x.cp]===f.cp);
+                        if(r) known[f.key]={ found:true, id:r.id };
+                    }
                 });
                 return known;
             },

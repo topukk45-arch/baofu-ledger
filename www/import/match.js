@@ -20,6 +20,17 @@
 //     部分付款（同一天、账单比手记少、推荐的分类和手记一样）、差 4–7 天金额相同。都没有 → 新增（漏记）。
 //   「不计入」的行只做第一轮精确配对，而且只和手记里同样「不计入」的配；配不上照常导入，不进待处理。
 // 新增的桶：merge（合并）。按净额配上的，那几条退款行改进「跳过」（已按净额并进手记），照样登记单号。
+//
+// 1016-C（真机试用后的修改）：
+//   多笔合一：第一轮配剩下的账单，先看几笔加起来是不是正好等于同一天的一条手记（按分精确相等，先于金额相近 / 部分付款）：
+//     a. 同一天、同一对方（清洗后）的全部剩下的账单，笔数不限；
+//     b. 同一天、2–3 笔不同对方的账单，推荐分类一样（未分类不算）或者都在 1 小时内。
+//     命中的进待处理（why 'multisum'），手记留住；整组的说明放在 multiSums 里：只有一种凑法的带默认建议，几种凑法的不带默认。
+//   转账、红包、扫码付给个人：只做精确配对（不做金额相近、部分付款、多笔合一）。个人 = 微信「转账」「扫二维码付款」各种「微信红包」、
+//     支付宝「转账红包」，或者对方名带 *、清洗后不超过 5 个字、除了 * 只有汉字（像「*小玲」「张*」）。
+//   候选排序：日期只用来筛；候选按时间差（分钟）再按金额差排，第一条是「最像」的。
+//   全额退款（④ 里两条都跳过的那对）：不参与配对；原单上记下 3 天内同金额的手记（hintCands），
+//     确认页在所有配对（含你在确认页上选的合并）做完以后，这些手记没被别的账单合并掉的，才挂一句弱提醒，不占手记名额。
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module && module.exports) module.exports = api;
@@ -27,7 +38,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-A';
+  var VERSION = '1016-C';
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
   var BUCKETS = ['add', 'merge', 'skip', 'neutral', 'refund', 'pending', 'error'];
 
@@ -51,6 +62,17 @@
     return null;
   }
   function rowOf(parsed, it) { return parsed.files[it.file].rows[it.row]; }
+  // 'YYYY-MM-DDTHH:mm' → 分钟数（只用来比远近）
+  function minOf(t) { var h = +(t.slice(11, 13) || 0), mi = +(t.slice(14, 16) || 0); return dayNo(t) * 1440 + (isFinite(h) ? h : 0) * 60 + (isFinite(mi) ? mi : 0); }
+  // 转账、红包、扫码付给个人（1016-C）
+  var PERSON_KINDS = { wechat: ['转账', '扫二维码付款'], alipay: ['转账红包'] };
+  function isPersonal(app, row, cleanCp) {
+    var kind = row.kind || '';
+    if ((PERSON_KINDS[app] || []).indexOf(kind) >= 0) return true;
+    if (app === 'wechat' && /^微信红包/.test(kind)) return true;
+    var c = cleanCp(row.cp || '');
+    return c.indexOf('*') >= 0 && c.length <= 5 && /^[\u4e00-\u9fa5*]+$/.test(c);
+  }
 
   // ---------- 1. 要从账本里取什么 ----------
   function ledgerQuery(routed, parsed) {
@@ -58,7 +80,7 @@
     (routed && routed.items || []).forEach(function (it) {
       if (it.src !== 'row') return;
       var r = rowOf(parsed, it), d = dayNo(r.time);
-      if (it.bucket === 'add' || it.bucket === 'neutral') { if (d < lo) lo = d; if (d > hi) hi = d; }
+      if (it.bucket === 'add' || it.bucket === 'neutral' || it.why === 'fullrefund') { if (d < lo) lo = d; if (d > hi) hi = d; }
       if (it.flags && it.flags.indexOf('needLedger') >= 0) refunds.push({ cp: r.cp, before: r.time, minFen: r.fen, from: dayStr(d - REFUND_BACK_DAYS) });
     });
     return { manual: lo === Infinity ? null : { from: dayStr(lo - PEND_DAYS), to: dayStr(hi + PEND_DAYS) }, refunds: refunds };
@@ -121,7 +143,8 @@
       if (type !== 'income' && type !== 'expense') return;
       var rf = refundsOf.get(it), net = r.fen;
       if (rf) rf.forEach(function (x) { net -= rowOf(parsed, x).fen; });
-      bills.push({ i: bills.length, it: it, r: r, type: type, fen: r.fen, net: net, day: dayNo(r.time), neutral: neutral, done: false });
+      bills.push({ i: bills.length, it: it, r: r, type: type, fen: r.fen, net: net, day: dayNo(r.time), neutral: neutral, done: false,
+                   personal: isPersonal(parsed.files[it.file].app, r, C.cleanCp) });
     });
 
     // ---------- 第一轮：精确配对，按天数一层一层，按组配 ----------
@@ -222,17 +245,22 @@
       { cats: cats, rules: ctx.rules, learned: learned, borrowRows: aliRows, merchants: ctx.merchants, isNewUser: !!ctx.isNewUser });
     toClass.forEach(function (it, i) { it.rec = cl.recs[i]; });
 
+    // ---------- 第二轮（1016-C）：多笔合一，先于金额相近 / 部分付款 ----------
+    var multiSums = multiSum(bills.filter(function (b) { return !b.done && !b.neutral && !b.personal; }), idx, free, function (m) { mstate.set(m.id, 'reserved'); });
+
     // ---------- 第二轮：拿不准的进待处理（只有普通行；不计入的配不上照常导入）----------
     bills.forEach(function (b) {
       if (b.done || b.neutral) return;
       var it = b.it, kinds = [], cands = [], seen = new Set();
-      var push = function (kind, m) { if (seen.has(m.id)) return; seen.add(m.id); cands.push({ record: m.id }); if (kinds.indexOf(kind) < 0) kinds.push(kind); };
-      // 金额相近：3 天内，差额不超过 5 元和 20% 中较小的那个，高低都算
+      var push = function (kind, m) { if (seen.has(m.id)) return; seen.add(m.id); cands.push({ record: m.id, m: m }); if (kinds.indexOf(kind) < 0) kinds.push(kind); };
       var tol = Math.min(NEAR_FEN, Math.floor(b.fen * NEAR_RATE));
-      if (tol > 0) scan(b.type, b.day, -EXACT_DAYS, EXACT_DAYS, b.fen - tol, b.fen + tol, function (m) { if (free(m) && m.fen !== b.fen && m.fen !== b.net) push('near', m); });
-      // 部分付款：同一天，账单比手记少，推荐的分类和手记一样（推不出分类的不参与）
-      var rc = it.rec && it.rec.layer !== 'none' ? it.rec.cat : null;
-      if (rc && rc !== '未分类') scan(b.type, b.day, 0, 0, b.fen + tol + 1, Infinity, function (m) { if (free(m) && m.cat === rc) push('partial', m); });
+      if (!b.personal) {
+        // 金额相近：3 天内，差额不超过 5 元和 20% 中较小的那个，高低都算
+        if (tol > 0) scan(b.type, b.day, -EXACT_DAYS, EXACT_DAYS, b.fen - tol, b.fen + tol, function (m) { if (free(m) && m.fen !== b.fen && m.fen !== b.net) push('near', m); });
+        // 部分付款：同一天，账单比手记少，推荐的分类和手记一样（推不出分类的不参与）
+        var rc = it.rec && it.rec.layer !== 'none' ? it.rec.cat : null;
+        if (rc && rc !== '未分类') scan(b.type, b.day, 0, 0, b.fen + tol + 1, Infinity, function (m) { if (free(m) && m.cat === rc) push('partial', m); });
+      }
       // 差 4–7 天、金额相同（或等于净额）
       var amts = b.net !== b.fen && b.net > 0 ? [b.fen, b.net] : [b.fen];
       amts.forEach(function (fen) {
@@ -240,10 +268,25 @@
         scan(b.type, b.day, EXACT_DAYS + 1, PEND_DAYS, fen, fen, function (m) { if (free(m)) push('days', m); });
       });
       if (cands.length) {
-        it.bucket = 'pending'; it.cands = cands; it.why = kinds.length === 1 ? kinds[0] : 'mixed';
+        it.bucket = 'pending'; it.why = kinds.length === 1 ? kinds[0] : 'mixed';
+        it.cands = sortCands(b, cands);
         it.msg = { near: '有一条手记金额差不多（可能是立减、红包），请你确认', partial: '可能只付了一部分，其余用的别的方式，请你确认',
                    days: '有一条手记金额一样，但差了 4 到 7 天（可能是先用后付），请你确认', mixed: '有几条手记都可能是它，请你确认' }[it.why];
       } else it.flags.push('missing');     // 漏记
+    });
+    // 第一轮里分不清的那几组：候选也按远近排
+    var mById = new Map(); manual.forEach(function (m) { mById.set(m.id, m); });
+    bills.forEach(function (b) {
+      if (b.it.bucket === 'pending' && b.it.why === 'ambiguous') b.it.cands = sortCands(b, b.it.cands.map(function (c) { return { record: c.record, m: mById.get(c.record) }; }));
+    });
+
+    // ---------- 全额退款的原单：3 天内同金额的手记，留给确认页做弱提醒（不占名额）----------
+    rowItems.forEach(function (it) {
+      if (it.why !== 'fullrefund' || it.bucket !== 'skip' || it.io !== 'expense') return;
+      var r = rowOf(parsed, it), hs = [];
+      scan('expense', dayNo(r.time), -EXACT_DAYS, EXACT_DAYS, r.fen, r.fen, function (m) { if (m.mode !== 'skip') hs.push(m); });
+      if (hs.length) it.hintCands = hs.sort(function (x, y) { return Math.abs(minOf(x.time) - minOf(r.time)) - Math.abs(minOf(y.time) - minOf(r.time)) || (x.id < y.id ? -1 : 1); })
+        .map(function (m) { return { record: m.id, time: m.time, cat: m.cat, fen: m.fen }; });
     });
 
     // ---------- ④ 留下的「本批没配上」的微信退款：在账本里找候选 ----------
@@ -269,8 +312,87 @@
     var used = 0; mstate.forEach(function (v) { if (v === 'used') used++; });
     stats.merged = merges.length; stats.manualUsed = used;
     return { version: VERSION, items: items, summaries: routed.summaries || [], suspects: routed.suspects || [],
-             newCats: cl.newCats, learned: learnedRules, counts: counts, perFile: perFile, stats: stats };
+             newCats: cl.newCats, learned: learnedRules, multiSums: multiSums, counts: counts, perFile: perFile, stats: stats };
   }
 
-  return { VERSION: VERSION, ledgerQuery: ledgerQuery, match: match, EXACT_DAYS: EXACT_DAYS, PEND_DAYS: PEND_DAYS, REFUND_BACK_DAYS: REFUND_BACK_DAYS };
+  // 候选排序：时间差（分钟）小的在前，再看金额差；第一条就是「最像」的
+  function sortCands(b, cands) {
+    var t = minOf(b.r.time);
+    return cands.slice().sort(function (x, y) {
+      return Math.abs(minOf(x.m.time) - t) - Math.abs(minOf(y.m.time) - t) || Math.abs(x.m.fen - b.fen) - Math.abs(y.m.fen - b.fen) || (x.record < y.record ? -1 : x.record > y.record ? 1 : 0);
+    }).map(function (c) { return { record: c.record }; });
+  }
+
+  // ---------- 多笔合一（1016-C）----------
+  //   bills：第一轮配剩下的普通账单（不含个人转账）；同一天、同收支的手记里找金额正好等于几笔之和的。
+  //   返回 [{ id, options: [{ record, bills: [账单在 items 里的引用], kind: 'samecp' | 'combo' }], suggest: 0 | null }]
+  var COMBO_DAY_MAX = 120, HOUR = 60;   // 一天里剩下的账单超过 120 笔就不试 2–3 笔的凑法（只看同一对方的）
+  function multiSum(bills, idx, free, reserve) {
+    var C = classifier(), byDay = new Map();
+    bills.forEach(function (b) { var k = b.type + '|' + b.day, a = byDay.get(k); if (!a) byDay.set(k, a = []); a.push(b); });
+    var combos = [];
+    byDay.forEach(function (list) {
+      var type = list[0].type, day = list[0].day, ms = (idx[type] && idx[type].get(day) || []).filter(function (m) { return free(m) && m.mode !== 'skip'; });
+      if (!ms.length || list.length < 2) return;
+      var byFen = new Map(); ms.forEach(function (m) { var a = byFen.get(m.fen); if (!a) byFen.set(m.fen, a = []); a.push(m); });
+      function hit(bs, kind) { var sum = bs.reduce(function (s, b) { return s + b.fen; }, 0), m = byFen.get(sum); if (m) m.forEach(function (x) { combos.push({ m: x, bs: bs, kind: kind }); }); }
+      // a. 同一对方的全部
+      var byCp = new Map();
+      list.forEach(function (b) { var c = C.cleanCp(b.r.cp || ''); if (!c) return; var a = byCp.get(c); if (!a) byCp.set(c, a = []); a.push(b); b.ccp = c; });
+      byCp.forEach(function (a) { if (a.length >= 2) hit(a, 'samecp'); });
+      // b. 2–3 笔不同对方：推荐分类一样（未分类不算），或者都在 1 小时内
+      if (list.length > COMBO_DAY_MAX) return;
+      var catOf = function (b) { var r = b.it.rec; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; };
+      var ok = function (bs) {
+        for (var i = 0; i < bs.length; i++) for (var j = i + 1; j < bs.length; j++) if (!bs[i].ccp || bs[i].ccp === bs[j].ccp) return false;
+        var c0 = catOf(bs[0]); if (c0 && bs.every(function (b) { return catOf(b) === c0; })) return true;
+        var ts = bs.map(function (b) { return minOf(b.r.time); });
+        return Math.max.apply(null, ts) - Math.min.apply(null, ts) <= HOUR;
+      };
+      var fenSet = new Set(ms.map(function (m) { return m.fen; }));
+      var maxM = Math.max.apply(null, ms.map(function (m) { return m.fen; }));
+      var sorted = list.slice().sort(function (x, y) { return x.fen - y.fen || x.i - y.i; });
+      for (var i = 0; i < sorted.length; i++) {
+        for (var j = i + 1; j < sorted.length; j++) {
+          var s2 = sorted[i].fen + sorted[j].fen; if (s2 > maxM) break;
+          if (fenSet.has(s2) && ok([sorted[i], sorted[j]])) hit([sorted[i], sorted[j]], 'combo');
+          for (var k = j + 1; k < sorted.length; k++) {
+            var s3 = s2 + sorted[k].fen; if (s3 > maxM) break;
+            if (fenSet.has(s3) && ok([sorted[i], sorted[j], sorted[k]])) hit([sorted[i], sorted[j], sorted[k]], 'combo');
+          }
+        }
+      }
+    });
+    if (!combos.length) return [];
+    // 有共同账单或共同手记的凑法连成一组
+    var parent = combos.map(function (_, i) { return i; });
+    var find = function (x) { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    var owner = new Map();
+    combos.forEach(function (c, i) {
+      ['m' + c.m.id].concat(c.bs.map(function (b) { return 'b' + b.i; })).forEach(function (k) {
+        if (owner.has(k)) { var a = find(i), b = find(owner.get(k)); if (a !== b) parent[a] = b; } else owner.set(k, i);
+      });
+    });
+    var groups = new Map();
+    combos.forEach(function (c, i) { var r = find(i), g = groups.get(r); if (!g) groups.set(r, g = []); g.push(c); });
+    var out = [];
+    groups.forEach(function (cs) {
+      var id = 'S' + out.length, bs = [];
+      cs.forEach(function (c) { reserve(c.m); c.bs.forEach(function (b) { if (bs.indexOf(b) < 0) bs.push(b); }); });
+      var one = cs.length === 1;
+      bs.forEach(function (b) {
+        b.done = true;
+        var it = b.it; it.bucket = 'pending'; it.why = 'multisum'; it.msum = id;
+        it.cands = cs.filter(function (c) { return c.bs.indexOf(b) >= 0; }).map(function (c) { return { record: c.m.id }; });
+        it.msg = one ? '这 ' + cs[0].bs.length + ' 笔加起来正好是你记的 ' + (cs[0].m.fen / 100).toFixed(2) + ' 元，合并'
+                     : '这几笔加起来正好等于你记的某一条，有 ' + cs.length + ' 种凑法，请你选';
+      });
+      out.push({ id: id, suggest: one ? 0 : null, options: cs.map(function (c) {
+        return { record: c.m.id, fen: c.m.fen, kind: c.kind, bills: c.bs.slice().sort(function (x, y) { return x.i - y.i; }).map(function (b) { return { file: b.it.file, row: b.it.row }; }) };
+      }) });
+    });
+    return out;
+  }
+
+  return { VERSION: VERSION, ledgerQuery: ledgerQuery, match: match, isPersonal: isPersonal, EXACT_DAYS: EXACT_DAYS, PEND_DAYS: PEND_DAYS, REFUND_BACK_DAYS: REFUND_BACK_DAYS };
 });

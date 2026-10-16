@@ -50,7 +50,7 @@ const grp = wx({ time: T(3, 6), cp: '某同学', kind: '群收款', io: 'income'
 const wd = wx({ time: T(3, 7), cp: '零钱', kind: '零钱提现', io: 'neutral', fen: 20000, desc: '提现' });
 const near = wx({ time: T(3, 8), cp: '某餐厅', fen: 2800 });
 const odd = wx({ time: T(3, 9), cp: '某某', desc: '/', fen: 5000 });
-const ref1 = wx({ time: T(3, 10), cp: '某超市', fen: 5000, status: '已全额退款' }), ref2 = wx({ time: T(3, 11), cp: '某超市', kind: '某超市-退款', io: 'income', fen: 5000, status: '已全额退款', no: '5030000000' + String(++seq).padStart(19, '0') });
+const ref1 = wx({ time: T(3, 10), cp: '某超市', fen: 5000, status: '已退款¥10.00' }), ref2 = wx({ time: T(3, 11), cp: '某超市', kind: '某超市-退款', io: 'income', fen: 1000, status: '已退款¥10.00', no: '5030000000' + String(++seq).padStart(19, '0') });
 const rail = [1, 2, 3, 4].map(i => ali({ time: T(3, 10 + i), cp: '某铁路' + i, kind: '交通出行', fen: 20000 + i }));
 const closed = ali({ time: T(3, 20), status: '交易关闭', fen: 999 });
 const manual = [man('m1', 3, 1, 1500), man('m2', 3, 2, 1500), man('m3', 3, 4, 1500), man('m4', 3, 5, 1500), man('m5', 3, 8, 3000), man('m6', 3, 7, 20000, { cat: '其他' })];
@@ -65,7 +65,7 @@ const p = r.plan();
   ok(unitsOk(p, r.parsed), '1 各组笔数之和 = 文件笔数');
   const w = p.files[0].diff.expense;
   ok(w.parts.find(x => x.key === 'merge').fen === 6000 && w.parts.find(x => x.key === 'pending').fen === 2800, '1 微信支出里：和手记合并 60.00、待你确认 28.00');
-  ok(p.files[0].diff.income.parts.find(x => x.key === 'refund').fen === 5000, '1 微信收入里：退款 50.00');
+  ok(p.files[0].diff.income.parts.find(x => x.key === 'refund').fen === 1000, '1 微信收入里：退款 10.00（部分退款，1016-C 起全额退款两条都跳过）');
   ok(p.files[2].fatal && p.files[2].fatal.header.join(',') === '交易时间,收/支,金额,说明', '1 认不出的文件：带上读到的表头');
   ok(p.canImport === true && p.blocking.length === 0, '1 有认不出的文件也能导入其它的（那一份不导入）');
   ok(p.sections.unknownTypes.length === 1 && p.sections.unknownTypes[0].type === '群收款', '1 没见过的交易类型：群收款');

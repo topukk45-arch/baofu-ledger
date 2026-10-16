@@ -39,8 +39,8 @@ const grp = wx({ time: T(3, 6), cp: '某同学', kind: '群收款', io: 'income'
 const wd = wx({ time: T(3, 7), cp: '零钱', kind: '零钱提现', io: 'neutral', fen: 20000, desc: '提现' });
 const near = wx({ time: T(3, 8), cp: '某餐厅', fen: 2800 });
 const odd = wx({ time: T(3, 9), cp: '某某', desc: '/', fen: 5000 });
-const ref1 = wx({ time: T(3, 10), cp: '某超市', fen: 5000, status: '已全额退款' });
-const ref2 = wx({ time: T(3, 11), cp: '某超市', kind: '某超市-退款', io: 'income', fen: 5000, status: '已全额退款', no: '5030000000' + String(++seq).padStart(19, '0') });
+const ref1 = wx({ time: T(3, 10), cp: '某超市', fen: 5000, status: '已退款¥10.00' });
+const ref2 = wx({ time: T(3, 11), cp: '某超市', kind: '某超市-退款', io: 'income', fen: 1000, status: '已退款¥10.00', no: '5030000000' + String(++seq).padStart(19, '0') });
 const rail = [1, 2, 3, 4].map(i => ali({ time: T(3, 10 + i), cp: '某铁路' + i, kind: '交通出行', fen: 20000 + i }));
 const closed = ali({ time: T(3, 20), status: '交易关闭', fen: 999 });
 const WX_BYTES = B.bill('wechat', bf.concat([grp, wd, near, odd, ref1, ref2]), { range: RANGE }).bytes;
@@ -125,7 +125,7 @@ const before = await t.snapshot();
   cards[0].querySelector('.imp-diff-toggle').click();
   const dl = t.d.querySelector('#impFiles .imp-card .imp-diff-expense').textContent;
   ok(dl.startsWith('账单支出 ') && dl.includes('和手记合并 60.00') && dl.includes('待你确认 28.00') && dl.endsWith('合计差 0.00'), '1 差额拆开：' + dl);
-  ok(t.d.querySelector('#impFiles .imp-diff-income').textContent.includes('退款 50.00'), '1 收入那边拆出退款');
+  ok(t.d.querySelector('#impFiles .imp-diff-income').textContent.includes('退款 10.00'), '1 收入那边拆出退款');
   ok(cards[2].textContent.includes('认不出这个文件') && cards[2].textContent.includes('读到的表头：交易时间，收/支，金额，说明'), '1 认不出的文件：显示读到的表头');
   cards[2].querySelector('.imp-copy').click(); await until(() => t.UI()._lastCopy);
   const cp = t.UI()._lastCopy;
@@ -253,6 +253,106 @@ const before = await t.snapshot();
   ok(rows() === total && !t.d.querySelector('.imp-more[data-group="add"]'), '6 再点：全部显示，按钮没了');
   t.$('impCancel').click();
   ok(!t.errs.length && !t.jsErr.length, '5-6 无报错 ' + t.errs.concat(t.jsErr).join('|'));
+}
+
+// ===== 7. 1016-C：多笔合一、几笔抢一条手记、转账往来、合并记录一行、最像、套话、全额退款提醒、存储文案 =====
+{
+  const R7 = [rec('g4', 1, 4, { cat: '其他' }), rec('m16', 25, 16), rec('b20', 5, 19.5, { time: '2026-03-05T19:09' }), rec('f20', 9, 19.8, { time: '2026-03-09T12:00' }),
+              rec('m50', 14, 50, { cat: '其他' })];
+  const seed = SEED(); seed['store_' + ID] = JSON.stringify({ archives: { '默认存档': { cats: CATS, records: R7 } }, last: '默认存档', accountName: '小明' });
+  const game = [9, 10, 11, 12].map(h => wx({ time: T(3, 1, h), cp: '某虚构游戏', desc: '游戏充值', fen: 100 }));
+  const four = [1520, 1580, 1630, 1660].map((f, i) => wx({ time: T(3, 25, 9 + i), cp: '虚构小店' + i, fen: f }));
+  const noodle = wx({ time: T(3, 5, 19, 8), cp: '某虚构面馆', fen: 1980 });
+  const gift = [[20, 'expense', '某亲戚甲', 20000], [20, 'income', '某亲戚甲', 20000], [21, 'income', '某亲戚乙', 50000], [22, 'expense', '某亲戚乙', 30000]]
+    .map(([d, io, cp, fen], i) => wx({ time: T(3, d, 9 + i), kind: '转账', cp, io, fen, desc: '转账备注:微信转账' }));
+  const shop = wx({ time: T(3, 21, 15), cp: '虚构*数码科技旗舰店', fen: 9900 });
+  const petty = Array.from({ length: 25 }, (_, i) => wx({ time: T(3, 1 + i, 6), kind: '分分捐', cp: '某虚构公益', desc: '/', fen: 1 }));
+  const fo = wx({ time: T(3, 15, 12), cp: '某虚构饭店', fen: 5000, status: '已全额退款' });
+  const fr = wx({ time: T(3, 15, 14), cp: '某虚构饭店', kind: '某虚构饭店-退款', io: 'income', fen: 5000, status: '已全额退款', no: '5030000000' + String(++seq).padStart(19, '0') });
+  const bytes = B.bill('wechat', game.concat(four, [noodle], gift, [shop], petty, [fo, fr]), { range: RANGE }).bytes;
+  const t = await boot({ seed });
+  Object.defineProperty(t.w.navigator, 'storage', { configurable: true, value: { estimate: async () => ({ quota: 2048 * 1048576, usage: 0 }) } });
+  await t.openImport();
+  await t.pick([['微信账单.csv', bytes]]);
+  const S = t.S(), keyOf = x => S.matched.items.find(it => it.src === 'row' && S.parsed.files[0].rows[it.row].no === x.no).key;
+  // 多笔合一：一键合并
+  const sumCard = t.$('impSums');
+  ok(sumCard && sumCard.textContent.includes('这 4 笔加起来正好是你记的 4.00 元'), '7 多笔合一的卡片：这 4 笔加起来正好是你记的 4.00 元');
+  const merge0 = t.S().plan.mergeM;
+  sumCard.querySelector('.imp-sum-pick').click();
+  ok(t.S().plan.mergeM === merge0 + 4 && t.$('impSums').textContent.includes('已合并') && t.go().includes('合并 ' + (merge0 + 4) + ' 笔'), '7 一键合并：底部按钮上合并 +4');
+  t.$('impSums').querySelector('.imp-sum-undo').click();
+  ok(t.S().plan.mergeM === merge0, '7 撤回');
+  // 几笔抢一条手记
+  const pgc = t.$('impPendGroups');
+  ok(pgc && pgc.textContent.includes('你记的 16.00 元，可能是下面 4 笔中的一笔'), '7 按手记归组：你记的 16.00 元，可能是下面 4 笔中的一笔');
+  pgc.querySelector('.imp-sub-row[data-key="' + keyOf(four[1]) + '"] .imp-pg-pick').click();
+  const p1 = t.S().plan, grp = k => p1.rows.find(d => d.key === k).group;
+  ok(grp(keyOf(four[1])) === 'merge' && [0, 2, 3].every(i => grp(keyOf(four[i])) === 'add'), '7 选这一笔：合并，其余自动新增');
+  t.$('impPendGroups').querySelector('.imp-pg-undo').click();
+  t.$('impPendGroups').querySelector('.imp-pg-none').click();
+  ok(four.every(x => t.S().plan.rows.find(d => d.key === keyOf(x)).group === 'add'), '7 都不是：全部新增');
+  // 转账往来：一键不计入
+  const tc = t.$('impTransfers');
+  ok(tc && tc.querySelectorAll('.imp-tr-cb').length === 4 && !tc.textContent.includes('数码科技'), '7 转账往来：4 笔，长名带 * 的商户不在里面');
+  tc.querySelector('.imp-tr-all').click();
+  const p2 = t.S().plan, f0 = p2.files[0].diff;
+  ok(t.$('impTransfers').querySelectorAll('.imp-tr-cb:checked').length === 4 && f0.expense.unreadable === 0 && f0.income.unreadable === 0
+     && f0.expense.parts.find(x => x.key === 'neutral').fen === 50000, '7 一键都标成不计入：勾上 4 笔，差额照样 0 分');
+  ok(p2.rows.find(d => d.key === keyOf(shop)).mode === 'normal', '7 长名带 * 的商户没被标成不计入');
+  // 明细：分分捐一行、套话显示对方
+  t.$('impDetailsToggle').click();
+  t.d.querySelector('.imp-gh[data-group="add"]').click();
+  const sr = t.d.querySelector('.imp-sum-row');
+  ok(sr && sr.textContent.includes('分分捐 · 3 月 · 25 笔 · 0.25 元') && t.d.querySelectorAll('.imp-list[data-group="add"] .al-row').length < 25, '7 分分捐在明细里一行');
+  sr.click();
+  ok(t.d.querySelectorAll('.imp-members .imp-sub-row').length === 25, '7 点开看 25 笔');
+  const giftRow = t.d.querySelector('.al-row[data-key="' + keyOf(gift[0]) + '"]');
+  ok(giftRow && giftRow.querySelector('.al-remark').textContent === '某亲戚甲', '7 「转账备注:微信转账」不当标题，显示交易对方');
+  // 候选：最像排第一，其他收起
+  t.d.querySelector('.imp-gh[data-group="pending"]').click();
+  t.d.querySelector('.al-row[data-key="' + keyOf(noodle) + '"]').click();
+  const sh = t.$('impSheet');
+  ok(sh.querySelector('.imp-best') && sh.querySelectorAll('.imp-pick').length === 1 && sh.querySelector('.imp-more-cands').textContent.includes('其他 1 条'), '7 候选第一条标「最像」，其余收起');
+  ok(sh.querySelector('.imp-row-opt').textContent.includes('19.50'), '7 最像的是 19:09 的 19.50（不是 4 天外的 19.80）');
+  sh.querySelector('.imp-more-cands').click();
+  ok(t.$('impSheet').querySelectorAll('.imp-pick').length === 2, '7 点开「其他 1 条」');
+  t.UI().back();
+  // 全额退款：两条都跳过，弱提醒
+  const hc = t.$('impRefundHints');
+  ok(hc && hc.textContent.includes('这笔 50.00 元已全额退款；你 3 月 14 日记的「其他 · 50.00」如果就是它'), '7 全额退款提醒，用手记的真实日期');
+  ok(t.S().plan.rows.find(d => d.key === keyOf(fo)).group === 'skip', '7 全额退款的原单跳过');
+  // 存储文案
+  await until(() => t.$('impStorage').textContent.includes('可用存储空间'));
+  ok(t.$('impStorage').textContent.includes('可用存储空间约 2048 MB') && !t.$('impStorage').textContent.includes('手机上还能用'), '7 存储那行写「可用存储空间约 x MB」（是配额，不是手机剩余空间）');
+  t.$('impCancel').click();
+  ok(!t.errs.length && !t.jsErr.length, '7 无报错 ' + t.errs.concat(t.jsErr).join('|'));
+}
+
+// ===== 8. 1016-C：主页面查「已全额退款的原单，以前导入过退款没有」=====
+{
+  const R8 = [rec('m1', 1, 15),
+    { id: 'wr', time: '2026-03-12T09:00', money: 50, type: 'income', cat: '其他', remark: '', src: { app: 'wechat' }, cp: 0, oc: '某虚构饭店-退款' },
+    { id: 'ar', time: '2026-03-12T09:00', money: 30, type: 'income', cat: '其他', remark: '', src: { app: 'alipay' }, cp: 1, oc: '日用百货' }];
+  const seed = SEED(); seed['store_' + ID] = JSON.stringify({ archives: { '默认存档': { cats: CATS, records: R8, cps: ['某虚构饭店', '虚构商户'] } }, last: '默认存档', accountName: '小明' });
+  const t = await boot({ seed });
+  const st = t.w.JiwenImportStore;
+  const aNo = ano(), aNo2 = ano();
+  await st.ordersRegister(undefined, [{ app: 'alipay', no: aNo + '_R1', time: '2026-03-12T09:00', id: 'ar', st: 0 }]);
+  const wo = wx({ time: T(3, 10), cp: '某虚构饭店', fen: 5000, status: '已全额退款' });
+  const wo2 = wx({ time: T(3, 13), cp: '某虚构饭店', fen: 5000, status: '已全额退款' });      // 时间在那条退款之后：不算
+  const ao = ali({ time: T(3, 10), no: aNo, fen: 3000, status: '退款成功', io: 'neutral' });
+  const ao2 = ali({ time: T(3, 10, 13), no: aNo2, fen: 3000, status: '退款成功', io: 'neutral' });
+  const parsed = P.parseFiles([{ name: 'w', data: B.ab(B.bill('wechat', [wo, wo2], { range: RANGE }).bytes) }, { name: 'a', data: B.ab(B.bill('alipay', [ao, ao2], { range: RANGE }).bytes) }]);
+  const lk = R.lookups(parsed);
+  const known = await st.knownFor(lk);
+  const kOf = (fi, x) => R.fullRefundKey(R.orderKey(fi ? 'alipay' : 'wechat', parsed.files[fi].rows.find(r => r.no === x.no)));
+  ok(known[kOf(0, wo)] && known[kOf(0, wo)].found && known[kOf(0, wo)].id === 'wr' && !known[kOf(0, wo2)], '8 微信：账本里有同对方、同金额、时间在后的退款记录 → 找到了');
+  ok(known[kOf(1, ao)] && known[kOf(1, ao)].found && known[kOf(1, ao)].id === 'ar' && !known[kOf(1, ao2)], '8 支付宝：单号表里有「原单号_…」→ 找到了');
+  const res = R.route(parsed, { known, rules: [] });
+  const b = (fi, x) => res.items.find(it => it.file === fi && it.src === 'row' && parsed.files[fi].rows[it.row].no === x.no);
+  ok(b(0, wo).why === 'fullrefundold' && b(0, wo2).why === 'fullnorefund' && b(1, ao).why === 'fullrefundold' && b(1, ao2).why === 'fullnorefund', '8 找到的跳过，找不到的进待处理');
+  ok(!t.errs.length && !t.jsErr.length, '8 无报错 ' + t.errs.concat(t.jsErr).join('|'));
 }
 
 console.log(`\n${pass} 通过，${fail} 失败`);

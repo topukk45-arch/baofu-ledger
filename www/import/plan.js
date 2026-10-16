@@ -10,6 +10,18 @@
 //   receipt    收款按天合并（默认 true）
 //   petty[键]  疑似零碎扣款合不合并（默认 false）
 //   没见过的交易类型 / 状态怎么处理会牵连别的行，不在这里：由确认页带着临时规则重跑 route、match。
+//   sums[多笔合一的组 id] = 第几种凑法（数字）| 'none'    （1016-C）不改就一直待处理
+//
+// 1016-C：
+//   待处理按手记 / 按账单归组（sections.pendGroups）：一组里一条手记被选走了，同组里只能配它的账单自动改成新增；
+//     几条手记都被选完了，剩下的账单也自动新增。「都不是」= 这一组每笔都选「作为新增」。
+//   多笔合一（sections.sums）：确认后这几笔都合并到那条手记（手记金额不变），同组没用上的账单自动新增。
+//   转账往来（sections.transfers）：只认交易类型（微信转账、各种微信红包，支付宝转账红包），相邻两笔隔不到 3 天串成一段，
+//     一段里有转出也有转入才列出来；「都标成不计入」就是把这几笔的 mode 改成 'skip'，汇总和差额跟着变，合计照旧差 0 分。
+//   合并记录（分分捐、收款按天、勾上的零碎扣款）在明细里显示成一行（groups 里的 { summary: true }），点开看每一笔；
+//     分分捐默认分类：存档里有公益类分类就用它，没有用「其他」。合并记录不进「按对方选分类」，不计入的行也不进。
+//   全额退款的弱提醒（sections.refundHints）：所有配对做完以后，3 天内同金额的手记没被别的账单合并掉，才挂一句，不算待处理。
+//   套话（「收款方备注:二维码收款」这类）不当标题、不写进备注：每行的 title / note 见 cleanDesc。
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module && module.exports) module.exports = api;
@@ -17,7 +29,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-B';
+  var VERSION = '1016-C';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -36,12 +48,30 @@
     var neg = fen < 0, a = Math.abs(fen), y = Math.floor(a / 100), f = a % 100;
     return (neg ? '-' : '') + String(y).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + (f < 10 ? '0' : '') + f;
   }
+  // 商品说明里的套话：「某某备注:」后面是二维码收款、微信转账这种，当没写；是付款人自己写的话，去掉前缀留下那句话
+  var BOILER = ['二维码收款', '微信转账', '转账', '收款', '红包', '微信红包', '付款', '扫码付款', '转账给你', '/', '无', '-'];
+  function cleanDesc(desc) {
+    var s = String(desc == null ? '' : desc).trim();
+    var m = /^[^:：]{0,8}备注[:：]\s*([\s\S]*)$/.exec(s);
+    if (m) s = m[1].trim();
+    return BOILER.indexOf(s) >= 0 ? '' : s;
+  }
+  function pettyCat(cats) {
+    for (var i = 0; i < cats.length; i++) if (/公益|慈善|捐/.test(cats[i])) return cats[i];
+    if (cats.indexOf('其他') >= 0) return '其他';
+    if (cats.indexOf('其它') >= 0) return '其它';
+    return '未分类';
+  }
+  function isTransferKind(app, kind) { kind = kind || ''; return app === 'wechat' ? (kind === '转账' || /微信红包/.test(kind)) : app === 'alipay' && kind === '转账红包'; }
+  function minOf(t) { var d = Date.UTC(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) / 60000; return d + (+t.slice(11, 13) || 0) * 60 + (+t.slice(14, 16) || 0); }
+  function md(t) { return (+t.slice(5, 7)) + ' 月 ' + (+t.slice(8, 10)) + ' 日'; }
+  var TRANSFER_GAP = 3 * 1440;
   function refundish(it) { return it.why === 'refundcands' || !!(it.cands && it.cands[0] && it.cands[0].row); }
 
   // input = { parsed, matched, info: { cats, isNewUser }, manualById: { id: { time, fen, cat, type, mode } }, overlaps: [{ app, from, to }] }
   function plan(input, edits) {
     edits = edits || {};
-    var E = edits.rows || {}, cpCats = edits.cpCats || {}, ncE = edits.newCats || {}, pettyE = edits.petty || {};
+    var E = edits.rows || {}, cpCats = edits.cpCats || {}, ncE = edits.newCats || {}, pettyE = edits.petty || {}, sumsE = edits.sums || {};
     var receiptOn = edits.receipt !== false;
     var parsed = input.parsed, matched = input.matched, info = input.info || {}, manualById = input.manualById || {};
     var clean = cleaner();
@@ -68,7 +98,7 @@
         d = { key: it.key, file: it.file, row: it.row, src: 'row', app: f.app, units: it.units, bucket0: it.bucket, group: it.bucket,
               time: r.time, sec: r.sec, fen: r.fen, pio: r.io, cp: r.cp, desc: r.desc, remark: r.remark, kind: r.kind, status: r.status,
               mode: it.mode || 'normal', reason: it.msg || '', why: it.why, tags: [], cands: it.cands || null, into: it.into || null,
-              refundTo: it.refundTo || null, item: it };
+              refundTo: it.refundTo || null, item: it, title: cleanDesc(r.desc) || r.cp || '', note: cleanDesc(r.desc) };
         if (r.joined) d.tags.push('joined');
         if (r.noNote) d.tags.push('noNote');
         if (it.flags && it.flags.indexOf('neutralVsNormal') >= 0) d.tags.push('neutralVsNormal');
@@ -87,25 +117,47 @@
 
     // ---- 套上改动 ----
     var pickedRecords = {};
+    rows.forEach(function (d) { if (d.src === 'row' && d.group === 'merge' && !(E[d.key] || {}).split) pickedRecords[d.into] = d.key; });
+    // 多笔合一：确认了某种凑法 → 这几笔合并到那条手记；同组没用上的、选了「都不是」的 → 新增
+    var msums = matched.multiSums || [], byKeyRef = {};
+    rows.forEach(function (d) { if (d.src === 'row') byKeyRef[d.file + ':' + d.row] = d; });
+    msums.forEach(function (g) {
+      var e = sumsE[g.id];
+      if (e === undefined || e === null) return;
+      var opt = typeof e === 'number' ? g.options[e] : null;
+      if (opt && pickedRecords[opt.record]) opt = null;
+      var inOpt = {};
+      if (opt) opt.bills.forEach(function (b) { inOpt[b.file + ':' + b.row] = true; });
+      rows.forEach(function (d) {
+        if (d.src !== 'row' || d.item.msum !== g.id || d.group !== 'pending') return;
+        if (opt && inOpt[d.file + ':' + d.row]) { d.group = 'merge'; d.into = opt.record; d.viaSum = g.id; d.reason = '这几笔加起来正好是这条手记，合并'; pickedRecords[opt.record] = d.key; }
+        else if (opt || e === 'none') { d.group = 'add'; d.reason = e === 'none' ? '多笔合一选了「都不是」，作为新增' : '同组里别的几笔合并了，这笔作为新增'; d.autoNew = true; }
+      });
+    });
     rows.forEach(function (d) {
       if (d.src !== 'row') return;
       var e = E[d.key] || {};
       var it = d.item;
-      if (d.group === 'merge') {
+      if (d.group === 'merge' && !d.viaSum) {
         if (e.split) { d.group = 'add'; d.into = null; d.reason = '拆开了，改为新增'; d.splitFrom = it.into; }
-        else pickedRecords[d.into] = d.key;
       }
-      if (d.group === 'pending' && e.pick) {
+      if (d.group === 'pending' && e.pick && !(it.msum && e.pick.record)) {
         if (e.pick === 'drop') { d.group = 'excluded'; d.reason = '待你确认里选了「不要了」'; }
         else if (e.pick === 'new') {
           if (refundish(it)) { d.group = 'refund'; d.mode = 'flow'; d.reason = '不挂原单，按只算结余导入'; }
           else { d.group = 'add'; d.reason = '待你确认里选了「作为新增」'; }
         } else if (e.pick.record && !refundish(it)) {
-          if (!pickedRecords[e.pick.record]) { d.group = 'merge'; d.into = e.pick.record; d.reason = '待你确认里选了和这条手记合并'; pickedRecords[e.pick.record] = d.key; }
+          if (!pickedRecords[e.pick.record] && (it.cands || []).some(function (c) { return c.record === e.pick.record; })) { d.group = 'merge'; d.into = e.pick.record; d.reason = '待你确认里选了和这条手记合并'; pickedRecords[e.pick.record] = d.key; }
         } else if (e.pick.record || e.pick.row) { d.group = 'refund'; d.refundTo = e.pick; d.reason = '待你确认里选了挂到这笔原单'; }
       }
       if (e.exclude && (d.group === 'add' || d.group === 'neutral' || d.group === 'refund')) { d.group = 'excluded'; d.reason = '你勾掉了'; }
       if (e.mode && (d.group === 'add' || d.group === 'neutral')) d.mode = e.mode;
+    });
+    // 按手记 / 按账单归组：只能配手记的待处理账单，候选手记都被选走了 → 自动新增（同组里另一笔合并了）
+    var pendRows = rows.filter(function (d) { return d.src === 'row' && d.bucket0 === 'pending' && !d.item.msum && d.cands && d.cands.length && !refundish(d.item); });
+    rows.forEach(function (d) {
+      if (pendRows.indexOf(d) < 0 || d.group !== 'pending') return;
+      if (d.cands.every(function (c) { return pickedRecords[c.record]; })) { d.group = 'add'; d.reason = '同组里别的账单和手记合并了，这笔作为新增'; d.autoNew = true; }
     });
     // 原单勾掉了：挂在它上面的退款也不导入
     rows.forEach(function (d) {
@@ -124,11 +176,34 @@
       if (d.splitFrom) { var sm = manualById[d.splitFrom]; d.cat = sm ? sm.cat : '未分类'; d.catFrom = 'split'; return; }
       d.cat = recCat(it.rec); d.catFrom = 'rec'; d.rec = it.rec || null;
     });
+    // 合并记录（分分捐、收款按天、勾上的零碎扣款）：分分捐默认落公益类 / 其他；都不进「按对方选分类」
+    var inGroup = {}, sumList = [];
+    (matched.summaries || []).forEach(function (g) {
+      if (g.kind === 'receipt' && !receiptOn) return;
+      var o = { id: g.id, kind: g.kind, app: g.app, period: g.period, appendTo: g.appendTo || null, label: g.kind === 'petty' ? g.oc : '收款汇总', refs: g.items };
+      sumList.push(o); g.items.forEach(function (r) { inGroup[r.file + ':' + r.row] = o; });
+    });
+    var pettyIn = (matched.suspects || []).map(function (x) { return x.app + '|' + x.cp + '|' + x.month; });
+    (matched.suspects || []).forEach(function (x, i) {
+      if (!pettyE[pettyIn[i]]) return;
+      var o = { id: 'Z' + i, kind: 'suspect', app: x.app, period: x.month, appendTo: null, label: clean(x.cp), refs: [] };
+      x.items.forEach(function (r) { if (!inGroup[r.file + ':' + r.row]) { inGroup[r.file + ':' + r.row] = o; o.refs.push(r); } });
+      if (o.refs.length) sumList.push(o);
+    });
+    var pCat = pettyCat(cats);
+    rows.forEach(function (d) {
+      if (d.src !== 'row') return;
+      var g = inGroup[d.file + ':' + d.row];
+      if (!g || (d.group !== 'add' && d.group !== 'neutral')) return;
+      d.summary = g.id;
+      if (g.kind === 'petty' && d.catFrom === 'rec') { d.cat = pCat; d.catFrom = 'summary'; }
+      else if (d.catFrom === 'rec') d.catFrom = 'summaryRec';
+    });
     // 未分类按对方归组，一组选一次
     var cpg = {};
     rows.forEach(function (d) {
       if (d.src !== 'row' || d.catFrom !== 'rec' || d.cat !== '未分类') return;
-      if (['add', 'neutral', 'pending', 'refund'].indexOf(d.group) < 0) return;
+      if (['add', 'pending', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip') return;     // 不计入的不用选分类
       var k = clean(d.cp) || '（没有交易对方）';
       var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [] });
       g.n += d.units; g.fen += d.fen; g.min = Math.min(g.min, d.fen); g.max = Math.max(g.max, d.fen); g.keys.push(d.key);
@@ -158,7 +233,7 @@
       d.canCat = (g === 'add' || g === 'neutral' || g === 'pending') && d.catFrom !== 'orig';
       d.canMode = g === 'add' || g === 'neutral';
       d.canSplit = g === 'merge' && d.bucket0 === 'merge';
-      d.canPick = d.bucket0 === 'pending';
+      d.canPick = d.bucket0 === 'pending' && !d.autoNew && !(d.item.msum && sumsE[d.item.msum] !== undefined && sumsE[d.item.msum] !== null);
       d.canRestore = g === 'excluded' && !!(E[d.key] && (E[d.key].exclude || E[d.key].pick === 'drop'));
     });
 
@@ -181,7 +256,7 @@
           if (d.file !== fi || d.pio !== io || d.fen === null) return;
           var k;
           if (d.group === 'add' || d.group === 'neutral') k = d.mode === 'skip' ? 'neutral' : d.mode === 'flow' ? 'newFlow' : 'newNormal';
-          else if (d.group === 'merge') { k = 'merge'; var m = manualById[d.into]; if (m) mergeDelta += m.fen - d.fen; }
+          else if (d.group === 'merge') { k = 'merge'; var m = manualById[d.into]; if (m && !d.viaSum) mergeDelta += m.fen - d.fen; }
           else k = d.group;
           parts[k].n += d.units; parts[k].fen += d.fen;
         });
@@ -220,17 +295,74 @@
     rows.forEach(function (d) { d.tags.forEach(function (t) { if (notes[t] && d.key) notes[t].push(d.key); }); });
     sec.notes = notes;
 
+    // ---- 待处理按手记 / 按账单归组（1016-C）----
+    var pg = [], seenP = {};
+    pendRows.forEach(function (d) {
+      if (seenP[d.key]) return;
+      // 连通块：账单 ↔ 候选手记
+      var B = [], M = [], qb = [d]; seenP[d.key] = true;
+      while (qb.length) {
+        var x = qb.shift(); B.push(x);
+        x.cands.forEach(function (c) {
+          if (M.indexOf(c.record) < 0) M.push(c.record);
+          pendRows.forEach(function (y) { if (!seenP[y.key] && y.cands.some(function (cc) { return cc.record === c.record; })) { seenP[y.key] = true; qb.push(y); } });
+        });
+      }
+      B.sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; });
+      var kind = B.length === 1 ? 'byBill' : M.length === 1 ? 'byManual' : 'many';
+      var open = B.filter(function (b) { return b.group === 'pending'; }).length;
+      var used = M.filter(function (id) { return pickedRecords[id]; });
+      pg.push({ id: 'P:' + B[0].key, kind: kind, keys: B.map(function (b) { return b.key; }), records: M, used: used, open: open,
+                fen: kind === 'byManual' && manualById[M[0]] ? manualById[M[0]].fen : null,
+                text: kind === 'byManual' ? '你记的 ' + (manualById[M[0]] ? yuan(manualById[M[0]].fen) : '') + ' 元，可能是下面 ' + B.length + ' 笔中的一笔'
+                    : kind === 'byBill' ? null : B.length + ' 笔账单、' + M.length + ' 条手记互相都可能是，一笔一笔选；手记选完了，剩下的自动作为新增' });
+    });
+    sec.pendGroups = pg;
+    // ---- 多笔合一 ----
+    sec.sums = msums.map(function (g) {
+      var e = sumsE[g.id];
+      return { id: g.id, suggest: g.suggest, chosen: e === undefined ? null : e,
+               keys: rows.filter(function (d) { return d.src === 'row' && d.item.msum === g.id; }).map(function (d) { return d.key; }),
+               options: g.options.map(function (o) {
+                 var m = manualById[o.record];
+                 return { record: o.record, fen: o.fen, kind: o.kind, keys: o.bills.map(function (b) { var x = byKeyRef[b.file + ':' + b.row]; return x ? x.key : null; }),
+                          manual: m ? { time: m.time, cat: m.cat, fen: m.fen } : null,
+                          text: '这 ' + o.bills.length + ' 笔加起来正好是你记的 ' + yuan(o.fen) + ' 元' + (m ? '（' + md(m.time) + ' ' + (m.cat || '未分类') + '）' : '') };
+               }) };
+    });
+    // ---- 转账往来：只认交易类型；相邻两笔隔不到 3 天串成一段；一段里有转出也有转入才列 ----
+    var tr = rows.filter(function (d) { return d.src === 'row' && (d.group === 'add' || d.group === 'neutral') && !d.summary && isTransferKind(d.app, d.kind) && (d.type === 'income' || d.type === 'expense'); })
+      .sort(function (a, b) { return minOf(a.time) - minOf(b.time) || (a.key < b.key ? -1 : 1); });
+    var periods = [], cur = null;
+    tr.forEach(function (d) {
+      if (!cur || minOf(d.time) - minOf(cur.last.time) >= TRANSFER_GAP) periods.push(cur = { rows: [] });
+      cur.rows.push(d); cur.last = d;
+    });
+    sec.transfers = periods.filter(function (p) {
+      return p.rows.length >= 2 && p.rows.some(function (d) { return d.type === 'income'; }) && p.rows.some(function (d) { return d.type === 'expense'; });
+    }).map(function (p, i) {
+      var people = {}, out = 0, inn = 0;
+      p.rows.forEach(function (d) {
+        var k = clean(d.cp) || '（没有交易对方）', x = people[k] || (people[k] = { cp: k, n: 0, out: 0, in: 0 });
+        x.n++; if (d.type === 'income') { x.in += d.fen; inn += d.fen; } else { x.out += d.fen; out += d.fen; }
+      });
+      var ps = Object.keys(people).map(function (k) { var x = people[k]; x.net = x.in - x.out; return x; }).sort(function (a, b) { return (b.in + b.out) - (a.in + a.out) || (a.cp < b.cp ? -1 : 1); });
+      return { id: 'T' + i, from: p.rows[0].time.slice(0, 10), to: p.rows[p.rows.length - 1].time.slice(0, 10), n: p.rows.length, out: out, in: inn, net: inn - out,
+               people: ps, keys: p.rows.map(function (d) { return d.key; }),
+               skipped: p.rows.filter(function (d) { return d.mode === 'skip'; }).map(function (d) { return d.key; }),
+               allSkip: p.rows.every(function (d) { return d.mode === 'skip'; }) };
+    });
+    // ---- 全额退款的弱提醒：所有配对做完以后，手记没被别的账单合并掉才挂 ----
+    sec.refundHints = [];
+    rows.forEach(function (d) {
+      if (d.src !== 'row' || d.why !== 'fullrefund' || !d.item.hintCands) return;
+      var h = d.item.hintCands.filter(function (c) { return !pickedRecords[c.record]; })[0];
+      if (!h) return;
+      sec.refundHints.push({ key: d.key, record: h.record, fen: d.fen,
+        text: '这笔 ' + yuan(d.fen) + ' 元已全额退款；你 ' + md(h.time) + '记的「' + (h.cat || '未分类') + ' · ' + yuan(h.fen) + '」如果就是它，那条手记可能要删掉或改成退款' });
+    });
+
     // ---- 要新建几条记录（分分捐、收款按天合并、勾上的零碎扣款合成一条）----
-    var inGroup = {};
-    (matched.summaries || []).forEach(function (g) {
-      if (g.kind === 'receipt' && !receiptOn) return;
-      g.items.forEach(function (r) { inGroup[r.file + ':' + r.row] = g; });
-    });
-    sec.petty.forEach(function (p, i) {
-      if (!p.on) return;
-      var x = matched.suspects[i];
-      x.items.forEach(function (r) { if (!inGroup[r.file + ':' + r.row]) inGroup[r.file + ':' + r.row] = { id: 'S' + i, appendTo: null }; });
-    });
     var records = 0, seenG = {};
     rows.forEach(function (d) {
       if (d.src !== 'row' || (d.group !== 'add' && d.group !== 'neutral' && d.group !== 'refund')) return;
@@ -248,7 +380,25 @@
     // ---- 明细分组（按时间倒序，和账单列表一样）----
     var groups = {};
     GROUPS.forEach(function (g) { groups[g] = []; });
-    rows.forEach(function (d) { groups[d.group].push(d); });
+    var sumRow = {};
+    rows.forEach(function (d) {
+      if (d.summary && (d.group === 'add' || d.group === 'neutral')) {
+        var g = sumRow[d.summary];
+        if (!g) {
+          var sg = sumList.filter(function (x) { return x.id === d.summary; })[0];
+          g = sumRow[d.summary] = { summary: true, id: d.summary, kind: sg.kind, app: sg.app, label: sg.label, period: sg.period, group: d.group, units: 0, fen: 0, time: '', members: [], cat: d.cat, appendTo: sg.appendTo, tags: [] };
+          groups[d.group].push(g);
+        }
+        g.units += d.units; g.fen += d.fen; g.members.push(d); if (d.time > g.time) g.time = d.time;
+        return;
+      }
+      groups[d.group].push(d);
+    });
+    Object.keys(sumRow).forEach(function (k) {
+      var g = sumRow[k], per = g.kind === 'receipt' ? (+g.period.slice(5, 7)) + ' 月 ' + (+g.period.slice(8, 10)) + ' 日' : (+g.period.slice(5, 7)) + ' 月';
+      g.title = g.label + ' · ' + per + ' · ' + g.units + ' 笔 · ' + yuan(g.fen) + ' 元';
+      g.members.sort(function (a, b) { return b.time < a.time ? -1 : b.time > a.time ? 1 : 0; });
+    });
     GROUPS.forEach(function (g) { groups[g].sort(function (a, b) { return (b.time || '') < (a.time || '') ? -1 : (b.time || '') > (a.time || '') ? 1 : 0; }); });
 
     return { version: VERSION, files: files, counts: counts, sums: sums, importN: importN, mergeM: mergeM, records: records, orders: orders,
@@ -269,5 +419,6 @@
     return out.join('\n');
   }
 
-  return { VERSION: VERSION, plan: plan, devText: devText, yuan: yuan, GROUPS: GROUPS, GROUP_NAME: GROUP_NAME };
+  return { VERSION: VERSION, plan: plan, devText: devText, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
+           GROUPS: GROUPS, GROUP_NAME: GROUP_NAME };
 });

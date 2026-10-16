@@ -16,13 +16,18 @@ const T = (mo, d, h, mi, s) => ({ y: 2026, mo, d, h, mi, s: s || 0 });
 const RANGE = { from: '2026-01-01 00:00:00', to: '2026-12-31 23:59:59' };
 const parse = (...bills) => P.parseFiles(bills.map((b, i) => ({ name: b.name || '账单' + (i + 1), data: B.ab(B.bill(b.app, b.txns, Object.assign({ range: RANGE }, b.opts || {})).bytes) })));
 // 假的主页面：table = { 单号键: { st, id } }，ledger = { 记录 id: { type, fen, refunded, mode } }，groups = { 分组键: { id, fen, n } }
-function knownFor(parsed, table, ledger, groups) {
+// 1016-C：已全额退款的原单查以前的退款——支付宝按「原单号_」开头查假单号表，微信在 oldRefunds（假账本里的退款记录 { cp, fen, time, id }）里找
+function knownFor(parsed, table, ledger, groups, oldRefunds) {
   const lk = R.lookups(parsed), known = {};
+  (lk.fullRefunds || []).forEach(f => {
+    if (f.app === 'alipay') { const k = Object.keys(table || {}).find(x => x.startsWith('alipay|' + f.no + '_')); if (k) known[f.key] = { found: true, id: table[k].id }; }
+    else { const r = (oldRefunds || []).find(x => x.cp === f.cp && x.fen === f.fen && x.time >= f.time); if (r) known[f.key] = { found: true, id: r.id }; }
+  });
   lk.orders.forEach(k => { const e = table && table[k]; if (e) known[k] = { st: e.st, id: e.id, rec: e.st === 0 && ledger && ledger[e.id] ? ledger[e.id] : null }; });
   lk.groups.forEach(g => { const rec = groups && groups[g.key]; if (rec) known[g.key] = { rec }; });
   return known;
 }
-const run = (parsed, opts) => R.route(parsed, Object.assign({ known: knownFor(parsed, opts && opts.table, opts && opts.ledger, opts && opts.groups), rules: opts && opts.rules }));
+const run = (parsed, opts) => R.route(parsed, Object.assign({ known: knownFor(parsed, opts && opts.table, opts && opts.ledger, opts && opts.groups, opts && opts.oldRefunds), rules: opts && opts.rules }));
 // 按单号找某一行的去向
 function by(parsed, res) {
   const m = {};
@@ -45,14 +50,20 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
   for (const [app, txns, opts] of [['alipay', S.alipay, { noPad: true }], ['alipay', S.alipay, { noPad: true, timeFmt: S.excelTime }], ['wechat', S.wechat, {}], ['wechat', S.wechat, { format: 'xlsx' }]]) {
     const parsed = parse({ app, txns, opts: Object.assign({ range: S.range }, opts) });
     const res = run(parsed), m = by(parsed, res);
-    const pairs = S.pairs[app];
+    const pairs = S.pairs[app], full = S.full[app];
     Object.keys(pairs).forEach(rk => {
-      const it = m[rk];
+      const it = m[rk], tag = `${app}${opts.format ? ' xlsx' : ''}${opts.timeFmt ? '（Excel 时间）' : ''}`;
+      if (full.includes(rk)) {
+        ok(it && it.bucket === 'skip' && it.why === 'fullrefund' && !it.refundTo && refNo(parsed, it.fullOf) === pairs[rk] && m[pairs[rk]].bucket === 'skip' && m[pairs[rk]].why === 'fullrefund',
+          `1 ${tag}：全额退款 ${rk.slice(0, 12)}… 和原单 ${pairs[rk].slice(0, 12)}… 两条都跳过`);
+        return;
+      }
       ok(it && it.bucket === 'refund' && it.why === 'matched' && it.refundTo && refNo(parsed, it.refundTo.row) === pairs[rk] && it.io === 'income',
-        `1 ${app}${opts.format ? ' xlsx' : ''}${opts.timeFmt ? '（Excel 时间）' : ''}：退款 ${rk.slice(0, 12)}… 挂到原单 ${pairs[rk].slice(0, 12)}…`);
+        `1 ${tag}：部分退款 ${rk.slice(0, 12)}… 挂到原单 ${pairs[rk].slice(0, 12)}…`);
       ok(m[pairs[rk]].bucket === 'add', `1 ${app}：原单照常新增`);
     });
-    ok(conserved(res) && res.counts.refund === Object.keys(pairs).length, `1 ${app}：守恒，退款 ${res.counts.refund} 笔`);
+    const nPart = Object.keys(pairs).length - full.length;
+    ok(conserved(res) && res.counts.refund === nPart && res.counts.skip === full.length * 2, `1 ${app}：守恒，退款 ${res.counts.refund} 笔、跳过 ${res.counts.skip} 笔`);
   }
 }
 
@@ -63,11 +74,11 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
     const no = ano(); tx.push(ali({ time: T(3, 1 + i % 28, 10, i), no, status: '交易关闭', fen: 500 + i }));
     tx.push(ali({ time: T(3, 1 + i % 28, 11, i), no: no + '_R' + i, status: '退款成功', io: 'neutral', fen: 500 + i, desc: '退款-虚构商品' })); expect.closed.push(no);
   }
-  for (let i = 0; i < 5; i++) {           // 交易成功以后部分或全额退：挂到原单
+  for (let i = 0; i < 5; i++) {           // 交易成功以后退款：部分退的挂到原单，全额退的两条都跳过（1016-C）
     const no = ano(); tx.push(ali({ time: T(4, 1 + i, 9, 0), no, fen: 10000 }));
     tx.push(ali({ time: T(4, 2 + i, 9, 0), no: no + '_M' + i, status: '退款成功', io: 'neutral', fen: i < 3 ? 10000 : 2500 })); expect.ok.push(no);
   }
-  for (let i = 0; i < 11; i++) {          // 退款成功、没有单独的退款行：跳过
+  for (let i = 0; i < 11; i++) {          // 退款成功、没有单独的退款行：以前导入过退款的跳过，找不到的进待处理（1016-C）
     const no = ano(); tx.push(ali({ time: T(5, 1 + i, 9, 0), no, status: '退款成功', io: 'neutral', fen: 300 })); expect.refunded.push(no);
   }
   for (let i = 0; i < 3; i++) {           // 原单是「退款成功、不计收支」，又有退款行：两条都跳过
@@ -75,14 +86,20 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
     tx.push(ali({ time: T(6, 2 + i, 9, 0), no: no + '_X' + i, status: '退款成功', io: 'neutral', fen: 800 })); expect.rpair.push(no);
   }
   const parsed = parse({ app: 'alipay', txns: tx });
-  const res = run(parsed), m = by(parsed, res);
+  // 前 6 笔的退款以前导入过：假单号表里有「原单号_…」
+  const table2 = {}; expect.refunded.slice(0, 6).forEach((no, i) => { table2['alipay|' + no + '_Q' + i] = { st: 0, id: 'old' + i }; });
+  const res = run(parsed, { table: table2 }), m = by(parsed, res);
   ok(expect.closed.every(no => m[no].bucket === 'skip' && m[no].why === 'status' && Object.values(m).some(x => x.r.no === no && x.r.noRest && x.bucket === 'skip' && x.why === 'closedpair')),
     '2 交易关闭以后全退 22 笔：原单按状态跳过，退款行也找到了原单、一起跳过（原单虽然跳过了，照样找得到）');
-  ok(expect.ok.every(no => m[no].bucket === 'add' && Object.values(m).some(x => x.r.no === no && x.r.noRest && x.bucket === 'refund' && refNo(parsed, x.refundTo.row) === no)),
-    '2 交易成功以后部分 / 全额退 5 笔：退款挂到原单');
-  ok(expect.refunded.every(no => m[no].bucket === 'skip' && m[no].why === 'refunded'), '2 退款成功、没有退款行的 11 笔：跳过');
+  ok(expect.ok.slice(3).every(no => m[no].bucket === 'add' && Object.values(m).some(x => x.r.no === no && x.r.noRest && x.bucket === 'refund' && refNo(parsed, x.refundTo.row) === no)),
+    '2 交易成功以后部分退 2 笔：退款挂到原单');
+  ok(expect.ok.slice(0, 3).every(no => m[no].bucket === 'skip' && m[no].why === 'fullrefund' && Object.values(m).some(x => x.r.no === no && x.r.noRest && x.bucket === 'skip' && x.why === 'fullrefund')),
+    '2 交易成功以后全额退 3 笔：原单和退款两条都跳过');
+  ok(expect.refunded.slice(0, 6).every(no => m[no].bucket === 'skip' && m[no].why === 'fullrefundold'), '2 退款成功、没有退款行、单号表里有退款的 6 笔：跳过');
+  ok(expect.refunded.slice(6).every(no => m[no].bucket === 'pending' && m[no].why === 'fullnorefund' && m[no].msg === '这笔已全额退款，退款不在这次的文件里'), '2 退款成功、没有退款行、哪都找不到退款的 5 笔：进待处理');
+  ok(R.lookups(parsed).fullRefunds.filter(f => f.app === 'alipay').length === 11 + 3, '2 lookups 带上了要查退款的原单（11 笔没退款行的 + 3 笔原单退款成功又有退款行的）');
   ok(expect.rpair.every(no => m[no].why === 'refunded' && Object.values(m).some(x => x.r.no === no && x.r.noRest && x.why === 'refundedpair')), '2 原单退款成功、又有退款行：两条都跳过');
-  ok(res.counts.skip === 44 + 11 + 6 && res.counts.refund === 5 && res.counts.add === 5 && conserved(res), '2 各桶笔数：跳过 61、退款 5、新增 5，守恒：' + JSON.stringify(res.counts));
+  ok(res.counts.skip === 44 + 6 + 6 + 6 && res.counts.refund === 2 && res.counts.add === 2 && res.counts.pending === 5 && conserved(res), '2 各桶笔数：跳过 62、退款 2、新增 2、待处理 5，守恒：' + JSON.stringify(res.counts));
   ok(R.lookups(parsed).orders.includes('alipay|' + expect.ok[0]), '2 lookups 里带上了退款行要找的原单键');
 }
 
@@ -130,9 +147,10 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
   const parsed = parse({ app: 'wechat', txns: tx, opts: { format: 'xlsx' } });
   const res = run(parsed), m = by(parsed, res);
   const refunds = Object.values(m).filter(x => /-退款$/.test(x.r.kind));
-  const matched = refunds.filter(x => x.refundTo && x.refundTo.row);
+  const matched = refunds.filter(x => (x.refundTo && x.refundTo.row) || x.fullOf);
   ok(refunds.length === 9 && matched.length === 8, '4 9 笔退款里 8 笔唯一配上：' + matched.length);
-  Object.keys(E).forEach(name => ok(E[name].r.every(no => m[no].refundTo && refNo(parsed, m[no].refundTo.row) === E[name].o), '4 「' + name + '」的退款挂到对的原单'));
+  Object.keys(E).forEach(name => ok(E[name].r.every(no => { const t = m[no].refundTo ? m[no].refundTo.row : m[no].fullOf; return t && refNo(parsed, t) === E[name].o; }), '4 「' + name + '」的退款配到对的原单'));
+  ok(m[E.bbq.o].bucket === 'skip' && m[E.bbq.o].why === 'fullrefund' && m[E.bbq.r[0]].bucket === 'skip' && m[E.bbq.r[0]].msg === '全额退款，等于没发生', '4 全额退款（已全额退款 50 元，退款 50 元）：原单和退款两条都跳过');
   ok(m[E.meituan.r[0]].bucket === 'refund' && m[E.meituan.o].bucket === 'add', '4 部分退款（¥0.90）：退款挂上，原单照常新增（状态「已退款¥0.90」不当关闭）');
   ok(m[E.paren.r[0]].bucket === 'refund', '4 「已退款(¥5.00)」带括号的写法也认');
   ok(m[E.cum.r[0]].multi === 'cumulative' && m[E.last.r[1]].multi === 'last', '4 多次退款：一笔按「累计」对上，一笔按「最后一次」对上');
@@ -191,7 +209,8 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
   ok(['closed', 'wait', 'fail', 'undo'].every(k => m[nos[k]].bucket === 'skip' && m[nos[k]].why === 'status'), '6 交易关闭、等待付款、失败、已撤销：跳过');
   ok(m[nos.newst].bucket === 'skip' && m[nos.newst].why === 'statusrule', '6 没见过的状态有规则（跳过）：照规则');
   ok(m[nos.newst2].bucket === 'add' && m[nos.newst2].flags.includes('otherStatus'), '6 没见过的状态没规则：照常新增、标「其他状态」');
-  ok(m[nos.wxrefunded].bucket === 'add' && !m[nos.wxrefunded].flags.length && m[nos.wxback].bucket === 'add', '6 微信「已全额退款」「对方已退还」的原单照常导入，不当关闭');
+  ok(m[nos.wxrefunded].bucket === 'pending' && m[nos.wxrefunded].why === 'fullnorefund' && m[nos.wxback].bucket === 'pending' && m[nos.wxback].why === 'fullnorefund',
+    '6 微信「已全额退款」「对方已退还」、本批没有退款行、账本里也没有：进待处理（不当关闭，也不自动新增）');
   ok(m[nos.neutral].bucket === 'neutral' && m[nos.neutral].mode === 'skip' && m[nos.wxslash].bucket === 'neutral', '6 不计收支、微信「/」：不计入');
   ok(m[nos.imported].bucket === 'skip' && m[nos.imported].why === 'imported', '6 以前导入过、记录还在：跳过');
   ok(m[nos.ignored].bucket === 'skip' && m[nos.ignored].why === 'ignored', '6 点过「不要了」：跳过');
@@ -311,6 +330,36 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
     if (!good) { bad++; if (notes.length < 3) notes.push(`#${k} ${app} n=${tx.length} perFile=${JSON.stringify(res.perFile)} over=${over}`); }
   }
   ok(bad === 0, '9 400 份随机账单：每笔只进一个桶、各桶之和 = 文件笔数、退款不超过原单、两次结果一样 ' + notes.join(' | '));
+}
+
+// ===== 11. 1016-C：自己账户之间挪钱一律不计入；已全额退款、退款以前导入过 =====
+{
+  const nos = {};
+  const mk = (name, o) => { const t = wx(Object.assign({ no: wno() }, o)); nos[name] = t.no; return t; };
+  const tx = [
+    mk('card', { time: T(3, 5, 0, 3), kind: '信用卡还款', cp: '虚构银行', fen: 220379, io: 'expense', status: '支付成功' }),   // 账单写的是「支出」也不计入
+    mk('cardslash', { time: T(3, 5, 0, 4), kind: '信用卡还款', cp: '虚构银行', fen: 10000, io: 'neutral', status: '支付成功' }),
+    mk('lqt', { time: T(3, 6, 9, 0), kind: '零钱通转入-来自零钱', cp: '零钱通', fen: 5000, io: 'expense' }),
+    mk('lct', { time: T(3, 6, 9, 1), kind: '理财通-买入', cp: '理财通', fen: 5000, io: 'expense' }),
+    mk('cash', { time: T(3, 6, 9, 2), kind: '零钱提现', cp: '虚构银行', fen: 5000, io: 'income' }),
+    mk('topup', { time: T(3, 6, 9, 3), kind: '零钱充值', cp: '虚构银行', fen: 5000, io: 'income' }),
+    mk('ruled', { time: T(3, 6, 9, 4), kind: '零钱充值', cp: '另一虚构银行', fen: 6000, io: 'income' }),
+    mk('oldfull', { time: T(3, 7, 9, 0), cp: '某虚构饭店', fen: 5000, status: '已全额退款' }),     // 退款上个月导入过
+    mk('nofull', { time: T(3, 8, 9, 0), cp: '某虚构饭店', fen: 5000, status: '已全额退款' }),      // 退款哪都找不到
+  ];
+  const parsed = parse({ app: 'wechat', txns: tx });
+  const rules = [{ app: 'wechat', type: '零钱充值', as: 'normal' }];
+  const lk = R.lookups(parsed);
+  ok(lk.fullRefunds.length === 2 && lk.fullRefunds.every(f => f.key === R.fullRefundKey(R.orderKey('wechat', parsed.files[0].rows.find(r => r.no === f.no))) && f.fen === 5000 && f.cp === '某虚构饭店'),
+    '11 lookups 带上已全额退款的原单（键、对方、金额、时间）');
+  const noRule = run(parsed, { oldRefunds: [{ cp: '某虚构饭店', fen: 5000, time: '2026-03-07T09:30', id: 'oldR' }] }), m0 = by(parsed, noRule);
+  ok(['card', 'cardslash', 'lqt', 'lct', 'cash', 'topup', 'ruled'].every(k => m0[nos[k]].bucket === 'neutral' && m0[nos[k]].mode === 'skip' && m0[nos[k]].why === 'ownmove'),
+    '11 信用卡还款（不管写的收 / 支）、零钱通、理财通、零钱提现、零钱充值：一律不计入');
+  const res = run(parsed, { rules, oldRefunds: [{ cp: '某虚构饭店', fen: 5000, time: '2026-03-07T09:30', id: 'oldR' }] }), m = by(parsed, res);
+  ok(m[nos.ruled].bucket === 'add', '11 用户把类型定成「正常收支」的照规则');
+  ok(m[nos.oldfull].bucket === 'skip' && m[nos.oldfull].why === 'fullrefundold' && m[nos.oldfull].refundRec === 'oldR', '11 已全额退款、退款以前导入过：跳过，记下那条退款记录');
+  ok(m[nos.nofull].bucket === 'pending' && m[nos.nofull].why === 'fullnorefund', '11 已全额退款、退款时间早于原单的不算：进待处理');
+  ok(conserved(res), '11 守恒');
 }
 
 // ===== 10. 在后台线程里跑 =====
