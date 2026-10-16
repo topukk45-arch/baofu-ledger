@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-U';
+  var VERSION = '1016-X';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -144,6 +144,8 @@
       var ci = cpIdx(rowOf(d).cp);
       if (ci !== undefined && c.set.cp === undefined) c.set.cp = ci;
       c.set.batch = batch;
+      // 1.1（1016-X）：金额相近自动合并的，确认页选了「改成实付」：手记金额改成账单的（原值记进导入记录，撤销时还原）
+      if (d.why === 'near' && d.item && d.into === d.item.into && p.sections && p.sections.nearMerged && p.sections.nearMerged.pay) c.set.money = money(d.fen);
       c.nos.push(noOf(d.key));
       order(d.key, d.time, 0, { id: d.into });
     });

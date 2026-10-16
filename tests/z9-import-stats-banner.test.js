@@ -18,10 +18,10 @@ const wno = () => '4200000000' + String(++seq).padStart(19, '0');
 const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户', desc: '虚构商品', io: 'expense', fen: 1000, pm: '零钱', status: '支付成功', mno: '', no: wno() }, o));
 const bill = txns => B.bill('wechat', txns, { range: RANGE }).bytes;
 const p2 = n => String(n).padStart(2, '0');
-const man = (id, mo, d, money) => ({ id, time: `2026-${p2(mo)}-${p2(d)}T08:30`, money, type: 'expense', cat: '吃饭', remark: '手记' });
+const man = (id, mo, d, money, cat) => ({ id, time: `2026-${p2(mo)}-${p2(d)}T08:30`, money, type: 'expense', cat: cat || '吃饭', remark: '手记' });
 
 (async () => {
-  const RECS = [man('m1', 10, 5, 30), man('m2', 10, 1, 50), man('m3', 12, 3, 9)];
+  const RECS = [man('m1', 10, 5, 30, '购物'), man('m2', 10, 1, 50), man('m3', 12, 3, 9)];   // 1.1 起金额相近、分类对得上的会自动合并；这里要的是「待你确认」，分类故意不一样
   const t = await A.boot({ html, www: WWW, seed: A.seedOf(RECS) });
   const { $, d } = t;
   await t.importFiles([['微信.csv', bill([wx({ time: T(10, 5, 12, 10), cp: '某虚构面馆', fen: 2950 }), wx({ time: T(10, 6), cp: '某虚构饭店', fen: 5000 })])]]);

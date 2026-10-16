@@ -29,7 +29,7 @@ const ali = o => B.txn(Object.assign({ kind: '日用百货', cp: '虚构商户',
 const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户', desc: '虚构商品', io: 'expense', fen: 1000, pm: '零钱', status: '支付成功', mno: '', no: wno() }, o));
 const rec = (id, d, money, o) => Object.assign({ id, time: `2026-03-${String(d).padStart(2, '0')}T08:30`, money, type: 'expense', cat: '吃饭', remark: '手记' }, o || {});
 // 账本里的手记（虚构）
-const RECS = [rec('m1', 1, 15), rec('m2', 2, 15), rec('m3', 4, 15), rec('m4', 5, 15), rec('m5', 8, 30), rec('m6', 7, 200, { cat: '其他' })];
+const RECS = [rec('m1', 1, 15), rec('m2', 2, 15), rec('m3', 4, 15), rec('m4', 5, 15), rec('m5', 8, 30, { cat: '购物' }), rec('m6', 7, 200, { cat: '其他' })];   // 1.1 起金额相近、分类对得上的会自动合并；这里要的是「待你确认」，分类故意不一样
 const SEED = () => ({ accounts: JSON.stringify([{ id: ID, name: '小明' }]), accounts_v: '1', app_logged_in_user: ID, app_dev_import: '1',
   ['store_' + ID]: JSON.stringify({ archives: { '默认存档': { cats: CATS, records: RECS } }, last: '默认存档', accountName: '小明' }), ['app_time_repaired_' + ID]: '1' });
 

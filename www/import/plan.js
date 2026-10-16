@@ -11,6 +11,7 @@
 //   petty[键]  疑似零碎扣款合不合并（默认 false）
 //   没见过的交易类型 / 状态怎么处理会牵连别的行，不在这里：由确认页带着临时规则重跑 route、match。
 //   sums[多笔合一的组 id] = 第几种凑法（数字）| 'none'    （1016-C）不改就一直待处理
+//   nearPay    （1.1，1016-X）金额相近、分类对得上自动合并的那几条手记，一键改成实付金额（默认 false：手记金额不动）
 //
 // 1016-C：
 //   待处理按手记 / 按账单归组（sections.pendGroups）：一组里一条手记被选走了，同组里只能配它的账单自动改成新增；
@@ -29,7 +30,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Q';
+  var VERSION = '1016-X';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -279,7 +280,7 @@
           if (d.file !== fi || d.pio !== io || d.fen === null) return;
           var k;
           if (d.group === 'add' || d.group === 'neutral') k = d.mode === 'skip' ? 'neutral' : d.mode === 'flow' ? 'newFlow' : 'newNormal';
-          else if (d.group === 'merge') { k = 'merge'; var m = manualById[d.into]; if (m && !d.viaSum) mergeDelta += m.fen - d.fen; }
+          else if (d.group === 'merge') { k = 'merge'; var m = manualById[d.into]; if (m && !d.viaSum && !(edits.nearPay && d.why === 'near' && d.into === d.item.into)) mergeDelta += m.fen - d.fen; }
           else k = d.group;
           parts[k].n += d.units; parts[k].fen += d.fen;
         });
@@ -312,6 +313,10 @@
     var rc = (matched.summaries || []).filter(function (g) { return g.kind === 'receipt'; });
     sec.receipt = rc.length ? { on: receiptOn, days: rc.length, n: rc.reduce(function (s, g) { return s + g.count; }, 0), fen: rc.reduce(function (s, g) { return s + g.fen; }, 0) } : null;
     sec.petty = (matched.suspects || []).map(function (x) { var k = x.app + '|' + x.cp + '|' + x.month; return { key: k, app: x.app, cp: x.cp, month: x.month, n: x.count, fen: x.fen, on: !!pettyE[k] }; });
+    // 1.1（1016-X）：金额相近、分类对得上自动合并的（多半是立减、红包）：手记比实付多多少；确认页可一键改成实付
+    var nm = rows.filter(function (d) { return d.src === 'row' && d.group === 'merge' && d.why === 'near' && d.into === d.item.into && manualById[d.into]; });
+    sec.nearMerged = nm.length ? { n: nm.length, fen: nm.reduce(function (s0, d) { return s0 + (manualById[d.into].fen - d.fen); }, 0), pay: !!edits.nearPay,
+                                   keys: nm.map(function (d) { return d.key; }) } : null;
     sec.newCats = newCatsIn.map(function (c) { var p = ncPlan[c.name]; return { name: c.name, count: c.count, on: p.on, into: p.into, picked: p.picked, defaultOn: !!c.defaultOn }; });
     sec.cpGroups = Object.keys(cpg).map(function (k) {
       var g = cpg[k], hb = null, hn = 0;

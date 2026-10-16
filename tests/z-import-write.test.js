@@ -106,7 +106,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 (async () => {
 // ===== 1. 真写一遍：和确认页对得上，合计守恒 =====
-const RECS = [rec('m1', 1, 15), rec('m2', 2, 15), rec('m3', 4, 15), rec('m4', 5, 15, { remark: '豆浆油条', cat: '吃饭' }), rec('m5', 8, 30), rec('m6', 7, 200, { cat: '其他' })];
+const RECS = [rec('m1', 1, 15), rec('m2', 2, 15), rec('m3', 4, 15), rec('m4', 5, 15, { remark: '豆浆油条', cat: '吃饭' }), rec('m5', 8, 30, { cat: '购物' }), rec('m6', 7, 200, { cat: '其他' })];   // 1.1 起金额相近、分类对得上的会自动合并；这里要的是「待你确认」，分类故意不一样
 const bf = [1, 2, 3, 4, 5].map(d => wx({ time: T(3, d, 7, 40), cp: '青禾便利', desc: '早餐', fen: 1500 }));
 const near = wx({ time: T(3, 8), cp: '某餐厅', fen: 2800 });
 const wd = wx({ time: T(3, 7), cp: '零钱', kind: '零钱提现', io: 'neutral', fen: 20000, desc: '提现' });

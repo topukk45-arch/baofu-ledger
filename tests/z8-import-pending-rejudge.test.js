@@ -23,7 +23,7 @@ const p2 = n => String(n).padStart(2, '0');
 const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-${p2(d)}T08:30`, money, type: 'expense', cat: '吃饭', remark: '手记' }, o || {});
 
 (async () => {
-  const RECS = [man('m1', 10, 5, 30, { remark: '面条' }), man('m2', 10, 1, 50, { remark: '聚餐' })];
+  const RECS = [man('m1', 10, 5, 30, { remark: '面条', cat: '购物' }), man('m2', 10, 1, 50, { remark: '聚餐' })];   // 1.1 起金额相近、分类对得上的会自动合并；这里要的是「待你确认」，分类故意不一样
   const t = await A.boot({ html, www: WWW, seed: A.seedOf(RECS) });
   const { $ } = t;
   const near = wx({ time: T(10, 5, 12, 10), cp: '某虚构面馆', fen: 2950 });

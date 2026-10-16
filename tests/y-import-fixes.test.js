@@ -117,7 +117,7 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   const one = wx({ time: T(7, 20, 12), cp: '虚构餐厅', fen: 3000 });
   // 2 笔 × 2 条：互相都可能
   const xx = [wx({ time: T(8, 5, 9), cp: '虚构甲', fen: 5000 }), wx({ time: T(8, 5, 10), cp: '虚构乙', fen: 5100 })];
-  const manual = [man('m16', 7, 2, 1600), man('a1', 7, 20, 2900), man('a2', 7, 21, 3100), man('a3', 7, 19, 2950),
+  const manual = [man('m16', 7, 2, 1600), man('a1', 7, 20, 2900, { cat: '购物' }), man('a2', 7, 21, 3100, { cat: '购物' }), man('a3', 7, 19, 2950, { cat: '购物' }),   // 1.1：分类故意不一样，不让金额相近自动合并
                   man('x1', 8, 5, 4900, { hm: '09:00' }), man('x2', 8, 6, 5050, { hm: '10:00' })];
   const r = run([{ app: 'wechat', txns: four.concat([one], xx) }], manual);
   const p = r.plan(), pg = p.sections.pendGroups;

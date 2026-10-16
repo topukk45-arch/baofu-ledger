@@ -145,7 +145,7 @@ function norm(dump) {
 
 (async () => {
   // ===== 1. 分分捐追加、跨月搬回、依赖、新建分类、对照、勾掉、待处理、退款 → 倒序撤完逐字节一致 =====
-  const RECS = [man('m1', 9, 30, 15, { remark: '豆浆油条' }), man('m2', 10, 3, 22), man('m5', 10, 8, 30), man('m6', 11, 2, 18)];
+  const RECS = [man('m1', 9, 30, 15, { remark: '豆浆油条' }), man('m2', 10, 3, 22), man('m5', 10, 8, 30, { cat: '购物' }), man('m6', 11, 2, 18)];   // 1.1 起金额相近、分类对得上的会自动合并；这里要的是「待你确认」，分类故意不一样
   const pettyA = [];
   for (let d = 1; d <= 15; d++) pettyA.push(wx({ time: T(10, d, 6), kind: '分分捐', cp: '某虚构公益', desc: '/', fen: 1 }));
   const pettyB = pettyA.concat([...Array(16)].map((_, i) => wx({ time: T(10, 16 + i, 6), kind: '分分捐', cp: '某虚构公益', desc: '/', fen: 1 })));

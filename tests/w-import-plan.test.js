@@ -53,7 +53,8 @@ const odd = wx({ time: T(3, 9), cp: '某某', desc: '/', fen: 5000 });
 const ref1 = wx({ time: T(3, 10), cp: '某超市', fen: 5000, status: '已退款¥10.00' }), ref2 = wx({ time: T(3, 11), cp: '某超市', kind: '某超市-退款', io: 'income', fen: 1000, status: '已退款¥10.00', no: '5030000000' + String(++seq).padStart(19, '0') });
 const rail = [1, 2, 3, 4].map(i => ali({ time: T(3, 10 + i), cp: '某铁路' + i, kind: '交通出行', fen: 20000 + i }));
 const closed = ali({ time: T(3, 20), status: '交易关闭', fen: 999 });
-const manual = [man('m1', 3, 1, 1500), man('m2', 3, 2, 1500), man('m3', 3, 4, 1500), man('m4', 3, 5, 1500), man('m5', 3, 8, 3000), man('m6', 3, 7, 20000, { cat: '其他' })];
+const manual = [man('m1', 3, 1, 1500), man('m2', 3, 2, 1500), man('m3', 3, 4, 1500), man('m4', 3, 5, 1500), man('m5', 3, 8, 3000, { cat: '购物' }),   // 1.1 起金额相近、分类对得上的自动合并；这里测待你确认，分类故意不一样
+                 man('m6', 3, 7, 20000, { cat: '其他' })];
 const r = run([{ app: 'wechat', txns: bf.concat([grp, wd, near, odd, ref1, ref2]) }, { app: 'alipay', txns: rail.concat([closed]) },
                { name: '坏的.csv', raw: B.ab(new Uint8Array(Buffer.from('交易时间,收/支,金额,说明\r\n2026-03-01 08:00:00,支出,1.00,虚构\r\n'))) }], manual);
 const p = r.plan();

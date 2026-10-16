@@ -38,7 +38,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-O';
+  var VERSION = '1016-X';
   var PARTIAL_MAX = 3;
   var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
@@ -264,6 +264,35 @@
     multiSum.skipped = [];
     var multiSums = pre.concat(multiSum(bills.filter(function (b) { return !b.done && !b.neutral && !b.personal; }), idx, free,
       function (m) { mstate.set(m.id, 'reserved'); reservedBy[m.id] = 'multisum'; }, pre.length));
+
+    // ---------- 1.1（1016-X）：金额相近 + 分类对得上 → 默认当作已记过 ----------
+    //   只认「账单不高于手记」（立减、红包抵扣：实付比你记的少），3 天内，差额不超过 5 元和 20% 中较小的那个，
+    //   账单推荐的分类（推不出、未分类的不算）和手记的分类一样。账单比手记高的仍进待处理。
+    //   为了不抢错：这笔账单只有这一条手记符合、这条手记也只被这一笔账单看中，才合并；不然照旧进待处理。
+    //   合并时手记金额不改（确认页可一键改成实付）；差额进结果页「N 笔手记比实付多 x 元，多半是立减」
+    var nearOk = new Map(), nearBy = new Map();
+    bills.forEach(function (b) {
+      if (b.done || b.neutral || b.personal) return;
+      var rc = b.it.rec && b.it.rec.layer !== 'none' ? b.it.rec.cat : null;
+      if (!rc || rc === '未分类') return;
+      var tol = Math.min(NEAR_FEN, Math.floor(b.fen * NEAR_RATE)), hits = [];
+      if (tol <= 0) return;
+      scan(b.type, b.day, -EXACT_DAYS, EXACT_DAYS, b.fen + 1, b.fen + tol, function (m) { if (free(m) && m.cat === rc) hits.push(m); });
+      if (hits.length !== 1) return;
+      nearOk.set(b, hits[0]);
+      nearBy.set(hits[0].id, (nearBy.get(hits[0].id) || 0) + 1);
+    });
+    var nearMerged = [];
+    nearOk.forEach(function (m, b) {
+      if (nearBy.get(m.id) !== 1 || !free(m)) return;
+      var it = b.it;
+      mstate.set(m.id, 'used'); usedBy[m.id] = b; b.done = true;
+      it.bucket = 'merge'; it.why = 'near'; it.into = m.id; it.via = 'near'; it.days = Math.abs(dayNo(m.time) - b.day);
+      it.was = { time: m.time }; it.cat = m.cat; it.nearFen = m.fen - b.fen;
+      it.msg = '金额差 ' + ((m.fen - b.fen) / 100).toFixed(2) + ' 元、分类一样，当作你记过的那条（多半是立减、红包）';
+      nearMerged.push(it);
+    });
+    stats.nearMerged = nearMerged.length;
 
     // ---------- 第二轮：拿不准的进待处理（只有普通行；不计入的配不上照常导入）----------
     bills.forEach(function (b) {

@@ -56,7 +56,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   }
 
   // ===== 2. jsdom：导两批，弄出四种待处理 =====
-  const RECS = [man('m1', 10, 5, 30, { remark: '面条' }), man('m2', 10, 1, 50, { remark: '聚餐' })];
+  const RECS = [man('m1', 10, 5, 30, { remark: '面条', cat: '购物' }), man('m2', 10, 1, 50, { remark: '聚餐' })];   // 1.1 起金额相近、分类对得上的会自动合并；这里要的是「待你确认」，分类故意不一样
   const t = await A.boot({ html, www: WWW, seed: A.seedOf(RECS) });
   const { $, d } = t;
   const D0 = await t.dump();
@@ -165,7 +165,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   }
   // ===== 10. 写到一半失败：什么都不改 =====
   {
-    const t2 = await A.boot({ html, www: WWW, seed: A.seedOf([man('k1', 10, 5, 30)]) });
+    const t2 = await A.boot({ html, www: WWW, seed: A.seedOf([man('k1', 10, 5, 30, { cat: '购物' })]) });
     await t2.importFiles([['微信.csv', bill([wx({ time: T(10, 5, 13), cp: '某虚构面馆', fen: 2950 })])]]);
     const before = await t2.dump();
     t2.w.__impFailAt = 'pendingSave';
