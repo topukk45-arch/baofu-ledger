@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-K</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-L</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1469,7 +1469,7 @@
                     <!-- 1015-A：账单导入还在开发，入口默认藏着；设置页底部版本号连点 5 次才出现（只在这台手机上） -->
                     <button class="set-item" id="devImportBtn" style="display:none"><span>导入（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devRestoreBtn" style="display:none"><span>恢复到导入前（开发中）</span><span class="set-arrow">›</span></button>
-                    <button class="set-item" id="devUndoBtn" style="display:none"><span>撤销导入（开发中）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="devLogsBtn" style="display:none"><span>导入记录（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
                 </div>
@@ -5675,7 +5675,7 @@ ${detail}
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devUndoBtn').style.display = devImportOn() ? '' : 'none'; }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = devImportOn() ? '' : 'none'; }
         $('setBuild').textContent=$('loginBuild').textContent;
         renderDevImport();
         // 2 秒内连点 5 次版本号：开 / 关
@@ -5759,29 +5759,10 @@ ${detail}
                 }
             }, '恢复到导入前');
         });
-        // 1016-K：撤销导入（临时入口，⑦b 换成结果页和「设置 → 导入记录」）
-        $('devUndoBtn').addEventListener('click', async () => {
-            let logs=[];
-            try{ await loadImportUI(); logs=(await window.JiwenImportStore.importsRead()).slice().reverse(); }
-            catch(e){ customAlert('读不出导入记录：' + (e && (e.code || e.message) || e), '撤销导入'); return; }
-            if(!logs.length){ customAlert('这个存档没有可以撤销的导入（只保留最近 10 次）。', '撤销导入'); return; }
-            const lines=logs.map((l, i)=>`${i+1}. ${(l.at||'').replace('T', ' ')} · ${(l.apps||[]).map(x=>x==='alipay' ? '支付宝' : '微信').join('+')} · ${l.from}～${l.to} · 新增 ${(l.add||[]).length}`);
-            customPrompt('撤销哪一次？输入序号（1 是最近一次）：\n\n' + lines.join('\n'), '1', async v=>{
-                const k=parseInt(String(v).trim(), 10);
-                if(!(k>=1 && k<=logs.length)){ customAlert('序号不对。', '撤销导入'); return; }
-                let p;
-                try{ p=await window.JiwenImportStore.undoPlan(logs[k-1].b); }
-                catch(e){ customAlert('算撤销方案时出错，什么都没改：' + (e && (e.code || e.message) || e), '撤销导入'); return; }
-                customConfirm(window.JiwenImportUndo.describe(p) + '\n\n撤销前会自动备份一份。确定撤销吗？', async () => {
-                    try{
-                        const r=await window.JiwenImportStore.undo(p);
-                        customAlert(`撤销好了（${r.chain.length} 次导入）。`, '撤销导入');
-                    }catch(err){
-                        const c=err && (err.code || err.message);
-                        customAlert(c==='stale' ? '账本在这期间变了，没有撤销，请再点一次重新算。' : c==='quota' || c==='nospace' ? '存储空间不够，没有撤销，账本没动。' : '撤销失败，账本没动：' + c, '撤销导入');
-                    }
-                }, '撤销导入');
-            }, '撤销导入');
+        // 1016-L：「设置 → 导入记录」最近 10 次，每次右侧「撤销」（导入页那一层里打开，返回键照样一层层关）
+        $('devLogsBtn').addEventListener('click', () => {
+            if(!devImportOn()) return;
+            loadImportUI().then(ui=>ui.openLogs()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入记录'));
         });
         function openDevImportCheck(){ $('devImportMask').style.display='flex'; runDevImportCheck(); }
         $('devImportRerun').addEventListener('click', runDevImportCheck);

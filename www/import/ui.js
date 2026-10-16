@@ -7,6 +7,8 @@
 // 1016-F：点「导入」真的写进去（write.js 出写入清单 → JiwenImportStore.commit 一个事务写入，写前自动备份），写完显示结果页。
 // 1016-C：多笔合一、几笔抢一条手记、转账往来三块卡片；候选第一条标「最像」、其余收起；合并记录（分分捐等）明细里一行、点开看；
 //   套话不当标题；存储那行改成「可用存储空间」。
+// 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
+//   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
 (function () {
   'use strict';
   if (window.JiwenImportUI) return;
@@ -116,7 +118,7 @@
     renderPick();
   }
   function close() {
-    if (S && S.phase === 'writing') return;
+    if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;
     runId++;
     if (J()) try { J().cancel(); } catch (_) {}
     if (!dom) return;
@@ -130,7 +132,7 @@
   function canBack() { return isOpen(); }
   function back() {
     if (dom.sheetMask.style.display === 'flex') { closeSheet(); return; }
-    if (S && S.phase === 'writing') return;          // 写入中不让退出（写完或失败会自己回来）
+    if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;   // 写入 / 撤销中不让退出（写完或失败会自己回来）
     close();
   }
 
@@ -151,7 +153,7 @@
   // ---------- 进度 ----------
   function progress(text, done, total) {
     dom.prog.style.display = 'flex';
-    var pc = document.getElementById('impProgCancel'); if (pc) pc.style.display = S && S.phase === 'writing' ? 'none' : '';
+    var pc = document.getElementById('impProgCancel'); if (pc) pc.style.display = S && (S.phase === 'writing' || S.phase === 'undoing') ? 'none' : '';
     dom.progText.textContent = text;
     dom.progBar.style.width = total ? Math.round(done / total * 100) + '%' : '0';
   }
@@ -789,15 +791,90 @@
     if (res.r.added !== undefined) card.appendChild(el('div', 'imp-soft', '新建 ' + res.r.added + ' 条记录，改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）'));
     if (c.pending) card.appendChild(el('div', 'imp-soft', '待处理的 ' + c.pending + ' 笔没进账本，存在待处理里，以后处理。'));
     card.appendChild(el('div', 'imp-soft imp-res-batch', '批次号 ' + res.ws.batch + ' · 写入用时 ' + (res.ms / 1000).toFixed(1) + ' 秒'));
-    card.appendChild(el('div', 'imp-soft', '写之前自动备份了一份，在设置里「恢复到导入前（开发中）」可以一键还原。'));
+    card.appendChild(el('div', 'imp-soft', '写之前自动备份了一份。导错了可以点下面「撤销这次导入」，以后也能在「设置 → 导入记录」里撤销。'));
     var go = btn('回到账本', 'imp-btn gold', function () {
       close();
       var tb = document.querySelector('.tab-btn[data-tab="ledger"]'); if (tb) tb.click();
     });
     go.id = 'impBackToLedger'; go.style.marginTop = '12px'; go.style.width = '100%';
     card.appendChild(go);
+    var un = btn('撤销这次导入', 'imp-btn', function () { undoBatch(res.ws.batch); });
+    un.id = 'impUndoThis'; un.style.marginTop = '8px'; un.style.width = '100%';
+    card.appendChild(un);
     b.appendChild(card);
     dom.page.scrollTop = 0;
+  }
+
+  // ---------- 1016-L：导入记录、撤销（⑦b）----------
+  // 「设置 → 导入记录」：最近 10 次（新的在上），每次右侧「撤销」。notice：顶上的一行提示（撤销成功后「已撤销，删了 x 条、还原了 y 条」）
+  function appNames(apps) { return (apps || []).map(function (x) { return APP[x] || x; }).join(' + ') || '账单'; }
+  function openLogs(notice) {
+    build();
+    var my = ++runId;
+    S = { phase: 'logs', view: {} };
+    try { dom.archive.textContent = '存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
+    dom.title.textContent = '导入记录';
+    dom.page.style.display = 'block'; dom.bar.style.display = 'none';
+    dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none';
+    dom.body.innerHTML = '';
+    if (notice) { var nt = el('div', 'imp-card imp-line imp-ok', notice); nt.id = 'impUndoNotice'; dom.body.appendChild(nt); }
+    var loading = el('div', 'imp-soft', '正在读导入记录…'); dom.body.appendChild(loading);
+    return store().importsRead().then(function (logs) {
+      if (my !== runId || !S) return;
+      loading.remove();
+      renderLogs(logs.slice().reverse());
+    }, function (e) {
+      if (my !== runId || !S) return;
+      loading.textContent = '读不出导入记录：' + (e && (e.code || e.message) || e);
+    });
+  }
+  function renderLogs(logs) {
+    var c = el('div', 'imp-card'); c.id = 'impLogs';
+    c.appendChild(el('h4', null, '最近的导入（只保留 10 次）'));
+    if (!logs.length) c.appendChild(el('div', 'imp-soft', '这个存档还没有导入记录。'));
+    logs.forEach(function (l) {
+      var r = el('div', 'imp-row-opt imp-log'); r.dataset.batch = l.b;
+      var g = el('div', 'grow');
+      g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · ' + appNames(l.apps)));
+      var nAdd = (l.add || []).length, nChg = (l.chg || []).length;
+      g.appendChild(el('div', 'imp-soft', '账单 ' + String(l.from || '').slice(0, 10) + ' 至 ' + String(l.to || '').slice(0, 10)
+        + ' · 新建 ' + nAdd + ' 条' + (nChg ? ' · 改了 ' + nChg + ' 条以前的记录' : '')));
+      r.appendChild(g);
+      var u = btn('撤销', 'imp-btn imp-log-undo', function () { undoBatch(l.b); });
+      r.appendChild(u);
+      c.appendChild(r);
+    });
+    dom.body.appendChild(c);
+  }
+  // 撤销一批：算方案 → 确认框（⑦a 的摘要）→ 先备份「撤销前」再一个事务写 → 停在导入记录，顶上提示
+  function undoBatch(b) {
+    if (!S || S.phase === 'writing' || S.phase === 'undoing') return;
+    var back0 = S.phase;
+    var fail = function (e, what) {
+      var c = e && (e.code || e.message);
+      if (S) S.phase = back0;
+      dom.prog.style.display = 'none';
+      alertMsg(c === 'stale' ? '账本在这期间变了，没有撤销。请再点一次「撤销」重新算。'
+        : c === 'quota' || c === 'nospace' ? '存储空间不够，放不下撤销前的备份，没有撤销，账本没动。'
+        : what + '，账本没动：' + (c || e), '撤销导入');
+    };
+    store().undoPlan(b).then(function (p) {
+      if (!S) return;
+      if (!p || !p.ok) { alertMsg('找不到这次导入的记录（只保留最近 10 次），没法撤销。', '撤销导入'); return; }
+      var msg = window.JiwenImportUndo.describe(p) + '\n\n撤销前会自动备份一份。确定撤销吗？';
+      window.customConfirm(msg, function () {
+        if (!S) return;
+        S.phase = 'undoing';
+        progress('撤销中…', 1, 2);
+        store().undo(p).then(function (r) {
+          dom.prog.style.display = 'none';
+          if (S) S.phase = back0;
+          var t = r.totals || {};
+          var del = (t.deleted || 0) + (t.userRefunds || 0), rest = (t.restored || 0) + (t.sums || 0) + (t.links || 0);
+          openLogs('已撤销' + (r.chain.length > 1 ? ' ' + r.chain.length + ' 次导入' : '') + '，删了 ' + del + ' 条、还原了 ' + rest + ' 条');
+        }, function (e) { fail(e, '撤销失败'); });
+      }, '撤销导入', { okText: '撤销' });
+    }, function (e) { fail(e, '算撤销方案时出错'); });
   }
   function copyDev() {
     var text = Plan.devText(S.plan);
@@ -812,7 +889,7 @@
     try { var ta = el('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand && document.execCommand('copy'); ta.remove(); } catch (_) {}
   }
 
-  var UI = { open: open, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  var UI = { open: open, openLogs: openLogs, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();
