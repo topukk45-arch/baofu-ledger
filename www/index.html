@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z5</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z6</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3452,13 +3452,25 @@
                         Object.keys(c.was).slice(0, 20).forEach(k=>{ const v=c.was[k]; if(v===null || ['string','number','boolean'].includes(typeof v)) was[k]=v; });
                     }
                     const nos=(Array.isArray(c.nos) ? c.nos : []).filter(p=>Array.isArray(p) && IMP_APPS.includes(p[0]) && typeof p[1]==='string' && p[1]).map(p=>[p[0], p[1].slice(0, 80)]);
+                    // 第二期（1016-Z6）：合并进去的账单（账单详情里「拆开」用）。名单编号超出现在名单长度的去掉
+                    const bills=(Array.isArray(c.bills) ? c.bills : []).slice(0, 50).map(b=>{
+                        if(!b || typeof b!=='object' || !IMP_APPS.includes(b.app)) return null;
+                        const fen=Number(b.fen); if(!Number.isInteger(fen) || fen<0) return null;
+                        const o={ app:b.app, no:typeof b.no==='string' ? b.no.slice(0, 80) : '', fen, time:typeof b.time==='string' ? b.time.slice(0, 16) : '',
+                                  type:b.type==='income' ? 'income' : 'expense', remark:typeof b.remark==='string' ? b.remark.slice(0, 5000) : '' };
+                        if(Number.isInteger(b.cp) && b.cp>=0 && b.cp<cpsLen) o.cp=b.cp;
+                        if(Number.isInteger(b.pm) && b.pm>=0 && b.pm<pmsLen) o.pm=b.pm;
+                        if(typeof b.oc==='string' && b.oc) o.oc=b.oc.slice(0, 32);
+                        return o;
+                    }).filter(Boolean);
+                    const withB=o=>{ if(bills.length) o.bills=bills; return o; };
                     // 1016-K：导入写进去的值（撤销时比一比，不一样就是你后来改过）。旧批次没有
                     if(c.now && typeof c.now==='object' && !Array.isArray(c.now)){
                         const now={};
                         Object.keys(c.now).slice(0, 20).forEach(k=>{ const v=c.now[k]; if(v===null || ['string','number','boolean'].includes(typeof v)) now[k]=v; });
-                        return { id, was, now, nos };
+                        return withB({ id, was, now, nos });
                     }
-                    return { id, was, nos };
+                    return withB({ id, was, nos });
                 }).filter(Boolean);
                 // 新增的记录 id 和指纹（1016-K 起，一一对应）一起换编号、一起丢
                 const add0=Array.isArray(x.add) ? x.add : [], withH=Array.isArray(x.h) && x.h.length===add0.length;
@@ -3685,7 +3697,9 @@
                 // 1016-K：导入写进去的值，和原值同样的写法（对象存 JSON 文本，没有记 null）
                 const now={};
                 Object.keys(was).forEach(k=>{ const v=n[k]; now[k]= v===undefined ? null : (v!==null && typeof v==='object' ? JSON.stringify(v) : v); });
-                chg.push({ id:c.id, was, now, nos:c.nos });
+                const ce={ id:c.id, was, now, nos:c.nos };
+                if(Array.isArray(c.bills) && c.bills.length) ce.bills=c.bills;      // 第二期：合并进去的账单（拆开时用）
+                chg.push(ce);
             });
             // 退款：分类、口径照原单
             const byId=new Map(recs.map(r=>[r.id, r])); made.forEach(r=>byId.set(r.id, r));
@@ -4015,6 +4029,68 @@
                 return recs.filter(r=>r.type==='expense' && !r.refundOf && typeof r.time==='string' && r.time<=tq && r.time.slice(0, 10)>=fromStr)
                     .map(r=>{ const f=Math.round(safeNum(r.money)*100); return { id:r.id, time:r.time, fen:f, left:f-(refunded.get(r.id)||0), cat:r.cat||'', remark:(r.remark||'').split('\n')[0].slice(0, 30), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '' }; })
                     .filter(x=>x.left>=fen).sort((a, b)=>a.time<b.time ? 1 : a.time>b.time ? -1 : 0).slice(0, 50);
+            },
+            // ---- 第二期（1016-Z6）：账单详情里「拆开」一条和账单合并过的手记 ----
+            //   找到合并它的那次导入记录：手记还原成合并前的样子（你后来改过的字段不动）；导入记录里存了合并进去的账单（1016-Z6 起），
+            //   就把账单另记一条（分类「未分类」、带那次的批次号，单号改登记到它，写进那次的导入记录，撤销那次时一起撤）；
+            //   旧的导入记录没存账单的：只还原手记，把那几个单号从单号表里拿掉（下次再导同一份账单，它会作为新增出现）。一个事务写
+            async splitMerge(id, archive){
+                const t=impTarget(archive);
+                const user=t.e.id, store=loadStore(user), a=store.archives[t.name], recs=a.records;
+                const i=recs.findIndex(r=>r.id===id);
+                if(i<0) throw impErr('gone');
+                const rec=recs[i];
+                if(!rec.src || !rec.src.merged) throw impErr('notmerged');
+                const curLog=await impGetJson(t.e, impLogKey(t.e.id, t.aid)), logs=((curLog && curLog.list) || []).map(l=>Object.assign({}, l));
+                let li=-1, ci=-1;
+                for(let k=logs.length-1;k>=0 && li<0;k--){ const j=(logs[k].chg||[]).findIndex(c=>c.id===id && c.was && ('src' in c.was)); if(j>=0){ li=k; ci=j; } }
+                if(li<0) throw impErr('nolog');
+                const lg=logs[li], c=lg.chg[ci];
+                const cur=(r, k)=>(k in r && r[k]!==undefined) ? (r[k]!==null && typeof r[k]==='object' ? JSON.stringify(r[k]) : r[k]) : null;
+                const n=Object.assign({}, rec);
+                Object.keys(c.was||{}).forEach(k=>{
+                    if(c.now && (k in c.now) && cur(n, k)!==c.now[k]) return;        // 你后来改过的字段不动
+                    const w=c.was[k];
+                    if(w===null) delete n[k];
+                    else if(k==='src' && typeof w==='string'){ try{ n[k]=JSON.parse(w); }catch(_){ n[k]=w; } }
+                    else n[k]=w;
+                });
+                if(n.src && n.src.merged){ delete n.src; }      // 来源一定拿掉（它就是因为合并才有的）
+                recs[i]=n;
+                const made=[], orders=[];
+                (Array.isArray(c.bills) ? c.bills : []).forEach(b=>{
+                    const r={ id:genId(), time:b.time, money:round2(b.fen/100), cat:'未分类', remark:b.remark||'', type:b.type==='income' ? 'income' : 'expense', src:{ app:b.app }, batch:lg.b };
+                    if(Number.isInteger(b.cp)) r.cp=b.cp;
+                    if(Number.isInteger(b.pm)) r.pm=b.pm;
+                    if(b.oc) r.oc=b.oc;
+                    made.push(r);
+                    const o=b.no ? impCleanOrder({ app:b.app, no:b.no, time:b.time, id:r.id, batch:lg.b, st:0 }) : null;
+                    if(o) orders.push(o);
+                });
+                made.forEach(r=>recs.push(r));
+                const pairs=orders.length ? await impOrderPairs(t.e, t.aid, orders) : [];
+                if(!made.length){
+                    // 没存账单：单号从单号表里拿掉
+                    const drop=new Set((c.nos||[]).map(p=>p[0]+'|'+p[1]));
+                    const blocks=await impReadOrders(t.e, t.aid);
+                    blocks.forEach((list, k)=>{
+                        const app=impParseOrdKey(t.e.id, t.aid, k).app, keep=list.filter(x=>!(x.id===id && drop.has(app+'|'+x.no)));
+                        if(keep.length!==list.length) pairs.push([k, keep.length ? JSON.stringify(impBlkEncode(keep)) : null]);
+                    });
+                }
+                lg.chg=lg.chg.filter((_, k)=>k!==ci);
+                if(made.length){
+                    const hadH=Array.isArray(lg.h) && lg.h.length===(lg.add||[]).length;
+                    lg.add=(lg.add||[]).concat(made.map(r=>r.id));
+                    if(hadH) lg.h=lg.h.concat(made.map(r=>impRecHash(r)));
+                }
+                const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
+                pairs.push([impLogKey(t.e.id, t.aid), cleanLog.length ? JSON.stringify({ v:1, list:cleanLog }) : null]);
+                if(window.__impFailAt==='splitSave') throw impErr('test');
+                await saveStoreDurable(store, user, ()=>pairs);
+                if(t.e.id===currentUser && t.name===currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
+                odOrdersSync(t.e.id, t.name).catch(()=>{});
+                return { added:made.length, ids:made.map(r=>r.id) };
             },
             // ---- 第二期：管理导入规则。rules：{ cat:[{kw,cat}], type:[{app,type|status,as}], map:[{from,cat}] }，洗过再存（同导入备份）；
             //   只改存档设置里的 importRules，不动记录、不动导入记录（以后撤销某次导入时，规则被你改过的那条就不删）
@@ -9443,12 +9519,43 @@ ${detail}
                 : (isRefund(rec) ? '<span class="io-tag io-refund">退款</span>' : '<span class="io-tag io-in">收入</span>'))
                 + modeTag(rec, true) + refundedTag(rec, refundedMap(all));
             paintDetailRefund(rec, all);
+            paintDetailSource(rec);
             const rk=(rec.remark||'').trim();
             $('detailRemark').textContent = rk || '（无备注）';
             detailCurId=id;
             $('detailMask').style.display='flex';
         }
 
+        // 第二期（1016-Z6）：详情里一行浅色「来自微信账单」/「已和微信账单合并」；合并过的、开着开发开关时有「拆开」。手记、没来源的不显示
+        function paintDetailSource(rec){
+            let f=$('detailSrcField');
+            const app=rec.src && IMP_APPS.includes(rec.src.app) ? (rec.src.app==='alipay' ? '支付宝' : '微信') : '';
+            if(!app){ if(f) f.remove(); return; }
+            if(!f){
+                f=document.createElement('div'); f.className='field'; f.id='detailSrcField';
+                const remarkField=$('detailRemark').parentNode; remarkField.parentNode.insertBefore(f, remarkField.nextSibling);
+            }
+            f.textContent='';
+            const v=document.createElement('div'); v.className='detail-val'; v.id='detailSrc'; v.style.color='var(--c-text-soft)'; v.style.fontSize='12.5px';
+            v.textContent = rec.src.merged ? `已和${app}账单合并（你记的这条，补上了来源）` : rec.src.sum ? `来自${app}账单（几笔合成的一条）` : `来自${app}账单`;
+            f.appendChild(v);
+            if(rec.src.merged && devImportOn()){
+                const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='detailSplit'; b.textContent='拆开'; b.style.marginTop='6px';
+                b.addEventListener('click', ()=>{
+                    customConfirm(`把这条和${app}账单拆开：你记的这条改回合并前的样子（你后来改过的不动），账单另记一条（分类先放「未分类」）。\n\n确定拆开吗？`, async ()=>{
+                        try{
+                            const r=await window.JiwenImportStore.splitMerge(rec.id);
+                            $('detailMask').style.display='none';
+                            customAlert(r.added ? `拆开了：你记的那条还原了，账单另记了 ${r.added} 条（分类是「未分类」，可以去改）。` : '拆开了：你记的那条还原了。这次导入是旧版本做的，没存账单本身，下次再导同一份账单时它会作为新增出现。', '拆开');
+                        }catch(err){
+                            const c=err && (err.code || err.message);
+                            customAlert(c==='nolog' ? '找不到合并它的那次导入记录了（只保留最近 10 次），拆不开。' : '没拆成，账本没动：' + c, '拆开');
+                        }
+                    }, '拆开', { okText:'拆开' });
+                });
+                f.appendChild(b);
+            }
+        }
         // 一笔关联记录的一行：时间 / 备注 / 金额（详情与修改弹窗共用）
         function refundLineHtml(r, sign){
             return `<div class="dr-line"><span class="dr-when">${String(r.time).slice(5,16).replace('T',' ')}</span>`
