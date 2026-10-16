@@ -122,6 +122,9 @@ async function bootIn(o) {
     if (chip) chip.click();
     else { t.$('newAccountBtn').click(); t.$('askInput').value = '小明'; t.$('askOk').click(); }
     await t.idle();
+    // 1016-R 起新账号（开着开发开关）进去会问一次「怎么开始？」，这里选「从零开始记」
+    await until(() => t.$('askMask').style.display === 'flex' && t.$('askTitle').textContent === '怎么开始', 300);
+    if (t.$('askMask').style.display === 'flex' && t.$('askTitle').textContent === '怎么开始') { t.$('askCancel').click(); await t.idle(); }
   }
   t.d.querySelector('.tab-btn[data-tab="settings"]').click();
   return t;

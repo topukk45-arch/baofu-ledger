@@ -430,7 +430,8 @@
         .stat-cal-head span { font-size:16px; font-weight:bold; color:var(--c-text); }
         #statMonthLabel { cursor:pointer; padding:4px 12px; border-radius:9px; border:1px solid var(--c-border); }
         #statMonthLabel:active { background:var(--c-chip); }
-        .stat-pend-banner { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 10px; margin-bottom:10px; border:1px solid var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-text); }
+        .imp-empty-entry { display:block; width:100%; margin:0 0 10px; padding:8px 10px; font-size:13px; text-align:left; border:1px dashed var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-primary-deep); cursor:pointer; }
+                .stat-pend-banner { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 10px; margin-bottom:10px; border:1px solid var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-text); }
         .stat-pend-banner span { flex:1; }
         .stat-pend-banner button { border:none; background:none; color:var(--c-primary-deep); text-decoration:underline; font-size:12.5px; padding:0; cursor:pointer; }
         /* 年月选择器 */
@@ -1303,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Q</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-R</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -4945,7 +4946,14 @@
                     let id;
                     try{ id=await createAccount(name, preferId); }
                     catch(_){ customAlert('存储空间不足，没能新建账号。请删除部分存档或记录后重试。', '新建失败'); return; }
-                    if(onCreated) onCreated(id); else login(id);
+                    if(onCreated) onCreated(id);
+                    else {
+                        await login(id);
+                        // 1016-R：新账号进去以后问一次「怎么开始？」（开发开关开着才问；只在新建账号这一次，可以跳过）
+                        if(currentUser===id && devImportOn()) customConfirm('怎么开始？\n\n可以从零开始一笔笔记，也可以先把微信、支付宝的账单导进来，第一次打开就有几个月的统计可看。', ()=>{
+                            loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
+                        }, '怎么开始', { okText:'导入微信、支付宝账单', cancelText:'从零开始记' });
+                    }
                 })());
             }, '新建账号', (name)=>accountNameError(name.trim()), { placeholder:'输入名字（最多 8 字）', maxchars:8 });
         }
@@ -5805,6 +5813,7 @@ ${detail}
             const on=!devImportOn();
             try{ if(on) localStorage.setItem(DEV_IMPORT_KEY,'1'); else localStorage.removeItem(DEV_IMPORT_KEY); }catch(_){}
             renderDevImport();
+            try{ if(currentUser) renderBill(); }catch(_){}     // 1016-R：空账本的小入口跟着开关出现 / 消失
             customAlert(on ? '已打开「导入（开发中）」，入口在上面「存档管理」里。只在这台手机上有效。' : '已关闭「导入（开发中）」。', '开发开关');
         });
         let __importLoading=null;
@@ -6905,6 +6914,19 @@ ${detail}
             return (fv==='__all' ? true : r.cat===fv) && searchMatch(r);
         }
 
+        // 1016-R：空账本的小入口「有微信、支付宝账单？可以一次导进来 ›」。只在开发开关开着、账本少于 IMP_EMPTY_MAX 条时出现，
+        //   记了几条以后消失；开关关着时不生成任何东西
+        const IMP_EMPTY_MAX=5;
+        function renderImpEmptyEntry(n){
+            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            let b=$('impEmptyEntry');
+            if(!on || n>=IMP_EMPTY_MAX){ if(b) b.remove(); return; }
+            if(b) return;
+            b=document.createElement('button'); b.type='button'; b.id='impEmptyEntry'; b.className='imp-empty-entry';
+            b.textContent='有微信、支付宝账单？可以一次导进来 ›';
+            b.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入')); });
+            const head=$('billHead'); head.parentNode.insertBefore(b, head);
+        }
         function renderBill(){
             const filterVal=filterCat.value;
             // 结余必须基于「全部记录」累计，否则筛选时结余列会误导（这正是账对不上的根源）
@@ -6912,6 +6934,7 @@ ${detail}
             // 时间精度仅到分钟，同分钟多笔用「记录在存储数组里的原始顺序」作次级键——
             // 它天然稳定且唯一，不依赖 id 的字符串大小（旧 id 不定长，字符串比较会乱序）。
             const raw=getUserData();
+            renderImpEmptyEntry(raw.length);
             // 【为什么先算时间戳再排序】比较器里每调一次 parseRecTime 就是一次
             //   正则 + new Date()。而排序要做 O(n log n) 次比较，每次比较调两遍
             //   —— 12000 条记录约 16 万次比较、32 万次解析，实测占掉 renderBill
