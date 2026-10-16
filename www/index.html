@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Y</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -4041,8 +4041,13 @@
                 const a=ledgerAssembleArchive(t.e, t.aid), st=t.e.archs.get(t.aid), n=st ? st.recs.length : 0;
                 const cats=(a.cats||[]).slice(), rules=a.importRules||{};
                 const isDefault=cats.length===DEFAULT_CATS.length && DEFAULT_CATS.every(c=>cats.includes(c));
+                // 1016-Z：每个分类以前的支出（计入、不是退款）有几笔、第 80 百分位多少分（异常金额提醒用）
+                const byCat=new Map();
+                (st ? st.recs : []).forEach(r=>{ if(r.type!=='expense' || r.refundOf || recMode(r)!=='normal') return; const f=Math.round(safeNum(r.money)*100); if(!(f>0)) return; let x=byCat.get(r.cat||'未分类'); if(!x) byCat.set(r.cat||'未分类', x=[]); x.push(f); });
+                const catStats={};
+                byCat.forEach((xs, c)=>{ xs.sort((p, q)=>p-q); catStats[c]={ n:xs.length, p80:xs[Math.min(xs.length-1, Math.floor(xs.length*0.8))] }; });
                 return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(),
-                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid };
+                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）
             async knownFor(lk, archive){

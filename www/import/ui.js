@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-Z（1.1）：确认页「金额要你看一眼」：比这个分类平时高很多的、单笔特别大的列出来，点开改（参考值在 plan.js 的 AMOUNT，待真实数据调）。
 // 1016-Y（1.1）：按你的规则归的那笔在详情里改分类时问「只改这一条 / 以后都改」；按对方选的分类、从合并里学到满 2 次的都存成规则，结果页写学到几条。
 // 1016-X（1.1）：金额相近、分类对得上的自动合并，确认页一张卡（可一键改成实付），结果页写「N 笔手记比实付多 x 元，多半是立减」。
 // 1016-U：文件卡上写「上次微信导到 YYYY-MM-DD，这之后的才是新的」（按导入记录算，每个来源各算各的）。
@@ -500,6 +501,19 @@
       c.appendChild(el('div', 'imp-soft', '选了处理方式的，导入时记成规则，下次直接照办；不选的照收支导入、放进「其他」，下次还会问。'));
       out.push(c);
     }
+    // 1.1（1016-Z）：金额要你看一眼（异常金额、大额）：点一行打开详情，在那里改分类 / 口径
+    if (s.amountChecks && s.amountChecks.length) {
+      var ac = el('div', 'imp-card'); ac.id = 'impAmounts';
+      ac.appendChild(el('h4', null, '金额要你看一眼（' + s.amountChecks.length + ' 笔）'));
+      s.amountChecks.forEach(function (x) {
+        var r = el('div', 'imp-row-opt imp-amount-row'); r.dataset.key = x.key; r.dataset.kind = x.kind; r.style.cursor = 'pointer';
+        r.appendChild(el('span', 'grow', (x.cp || '—') + ' · ' + yuan(x.fen) + ' 元 → ' + (x.cat || '未分类') + (x.kind === 'abnormal' ? '？' : '') + ' 理由：' + x.why));
+        r.addEventListener('click', function () { openSheet(x.key); });
+        ac.appendChild(r);
+      });
+      ac.appendChild(el('div', 'imp-soft', '分类照常推荐、钱照常导入，只是提醒你看一眼；不对就点开改。'));
+      out.push(ac);
+    }
     // 1.1（1016-X）：金额相近、分类对得上，自动当作记过的
     if (s.nearMerged) {
       var nc0 = el('div', 'imp-card'); nc0.id = 'impNear';
@@ -681,7 +695,7 @@
   }
 
   // ---------- 全部明细 ----------
-  var TAGNAME = { joined: '拼回', noNote: '单号带附加信息', overlap: '以前导入过这段', otherType: '新类型', otherStatus: '新状态', neutralVsNormal: '撞上普通手记' };
+  var TAGNAME = { abnormal: '金额偏高', big: '大额', joined: '拼回', noNote: '单号带附加信息', overlap: '以前导入过这段', otherType: '新类型', otherStatus: '新状态', neutralVsNormal: '撞上普通手记' };
   var MODENAME = { normal: '计入', flow: '只算结余', skip: '不计入' };
   function renderDetails(p) {
     var wrap = el('div'); wrap.id = 'impDetails';

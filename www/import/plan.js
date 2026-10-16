@@ -31,7 +31,17 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Y';
+  var VERSION = '1016-Z';
+  // 1.1（1016-Z）异常金额提醒的参考值。都是先拍的数，标「待真实数据调」：用真实账单跑过以后再定（目标是每次导入只提醒几笔）
+  var AMOUNT = {
+    RATIO: 5,              // 比这个分类平时大多数单笔（第 80 百分位）高 5 倍以上……（待真实数据调）
+    MIN_FEN: 20000,        // ……而且超过 200 元，才算「高很多」（待真实数据调）
+    HISTORY_MIN: 5,        // 这个分类至少有 5 笔以前的支出才算「有历史」（待真实数据调）
+    NEW_CAPS: { '餐饮': 50000, '交通出行': 100000 },   // 没历史时用的单笔参考上限：餐饮 500、交通 1000（按内置大类名，待真实数据调）
+    BIG_FEN: 200000,       // 不管哪类，单笔超过 2000 元单列出来（待真实数据调）
+    BIG_TOP: 3,            // 本次最大的 3 笔也单列……（待真实数据调）
+    BIG_TOP_MIN: 50000     // ……但不到 500 元的不算「大额」（免得小账单也列出来，待真实数据调）
+  };
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -398,6 +408,32 @@
         text: '这笔 ' + yuan(d.fen) + ' 元已全额退款；你 ' + md(h.time) + '记的「' + (h.cat || '未分类') + ' · ' + yuan(h.fen) + '」如果就是它，那条手记可能要删掉或改成退款' });
     });
 
+    // ---- 1.1（1016-Z）异常金额、大额：分类照常推荐、钱照常导入，只是列出来让你看一眼（理由写明）----
+    //   info.catStats：{ 分类: { n: 以前的支出笔数, p80: 第 80 百分位（分）} }（主页面从账本里算好交进来）
+    var cst = info.catStats || {}, checks = [], seenChk = {};
+    var newRows = rows.filter(function (d) { return d.src === 'row' && (d.group === 'add' || d.group === 'neutral') && !inGroup[d.file + ':' + d.row]; });
+    newRows.forEach(function (d) {
+      if (d.group !== 'add' || d.mode !== 'normal' || d.pio !== 'expense' || !d.cat || d.cat === '未分类') return;
+      var st = cst[d.cat], why = null;
+      if (st && st.n >= AMOUNT.HISTORY_MIN && st.p80 > 0) {
+        if (d.fen > AMOUNT.MIN_FEN && d.fen >= st.p80 * AMOUNT.RATIO) why = '比你平时' + d.cat + '单笔高很多（平时大多在 ' + yuan(st.p80) + ' 元以内）';
+      } else {
+        var want = d.rec && d.rec.want, cap = AMOUNT.NEW_CAPS[d.cat] || (want ? AMOUNT.NEW_CAPS[want] : 0);
+        if (cap && d.fen > cap) why = '一般' + d.cat + '单笔不到 ' + yuan(cap) + ' 元';
+      }
+      if (why) { checks.push({ key: d.key, kind: 'abnormal', fen: d.fen, cat: d.cat, cp: d.cp, time: d.time, why: why }); seenChk[d.key] = true; if (d.tags.indexOf('abnormal') < 0) d.tags.push('abnormal'); }
+    });
+    var byFen = newRows.slice().sort(function (a, b) { return b.fen - a.fen; });
+    byFen.forEach(function (d, i) {
+      if (seenChk[d.key]) return;
+      var big = d.fen > AMOUNT.BIG_FEN || (i < AMOUNT.BIG_TOP && d.fen >= AMOUNT.BIG_TOP_MIN);
+      if (!big) return;
+      checks.push({ key: d.key, kind: 'big', fen: d.fen, cat: d.cat, cp: d.cp, time: d.time, mode: d.mode,
+                    why: (d.fen > AMOUNT.BIG_FEN ? '单笔超过 ' + yuan(AMOUNT.BIG_FEN) + ' 元' : '这次最大的几笔之一') + '，看看收支和「计入 / 不计入」对不对' });
+      if (d.tags.indexOf('big') < 0) d.tags.push('big');
+    });
+    sec.amountChecks = checks;
+
     // ---- 要新建几条记录（分分捐、收款按天合并、勾上的零碎扣款合成一条）----
     var records = 0, seenG = {};
     rows.forEach(function (d) {
@@ -481,6 +517,6 @@
     return out.join('\n');
   }
 
-  return { VERSION: VERSION, plan: plan, devText: devText, missed: missed, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
+  return { VERSION: VERSION, AMOUNT: AMOUNT, plan: plan, devText: devText, missed: missed, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
            GROUPS: GROUPS, GROUP_NAME: GROUP_NAME };
 });
