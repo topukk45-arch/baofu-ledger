@@ -18,9 +18,12 @@ function txn(o) {
 const IO_ALI = { income: '收入', expense: '支出', neutral: '不计收支' };
 const IO_WX = { income: '收入', expense: '支出', neutral: '/' };
 
-function statsOf(txns) {
+// 1016-I：支付宝头部的「支出」是扣掉退款以后的（真机核对出来的）：退款行（状态退款成功、单号带「_后缀」）记在不计收支里，
+//   同时从支出合计里减掉。微信照旧是各行相加
+function statsOf(txns, app) {
   const s = { total: txns.length, income: [0, 0], expense: [0, 0], neutral: [0, 0] };
   txns.forEach(t => { s[t.io][0]++; s[t.io][1] += t.fen; });
+  if (app === 'alipay') txns.forEach(t => { if (t.status === '退款成功' && /_/.test(t.no || '')) s.expense[1] -= t.fen; });
   return s;
 }
 function rangeOf(txns) {
@@ -30,7 +33,7 @@ function rangeOf(txns) {
 
 // 开头的说明行（每个元素是一行，按 CSV 一格写）
 function preamble(app, txns, opts) {
-  const st = Object.assign(statsOf(txns), opts.statsOverride || {});
+  const st = Object.assign(statsOf(txns, app), opts.statsOverride || {});
   const r = opts.range || rangeOf(txns);
   if (app === 'alipay') {
     return ['------------------------------------------------------------------------------------', '导出信息：', '姓名：测试用户', '支付宝账户：test***@example.com',
@@ -167,10 +170,10 @@ function encodeText(text, enc) {
 }
 function bill(app, txns, opts) {
   opts = opts || {};
-  if (opts.format === 'xlsx') return { bytes: renderXlsx(app, txns, opts), stats: statsOf(txns) };
+  if (opts.format === 'xlsx') return { bytes: renderXlsx(app, txns, opts), stats: statsOf(txns, app) };
   let text = renderCsv(app, txns, opts);
   if (opts.edit) text = opts.edit(text);
-  return { bytes: encodeText(text, opts.encoding), text, stats: statsOf(txns) };
+  return { bytes: encodeText(text, opts.encoding), text, stats: statsOf(txns, app) };
 }
 // 字节 → 交给解析的 ArrayBuffer（拷一份，免得共用底层缓冲）
 const ab = u8 => u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);

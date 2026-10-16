@@ -21,7 +21,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-C';
+  var VERSION = '1016-I';
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -59,7 +59,7 @@
     '转账红包': ['转账', '红包'],
     '文化休闲': ['娱乐', '休闲', '文娱', '游戏'],
     '交通出行': ['出行', '交通', '通勤'],
-    '充值缴费': ['缴费', '生活缴费', '话费', '水电'],
+    '充值缴费': ['缴费', '生活缴费', '日常缴费', '话费', '通讯', '通信', '手机', '充值', '水电', '水电煤'],
     '医疗健康': ['医疗', '健康', '看病', '医药'],
     '酒店旅游': ['旅游', '旅行', '酒店'],
     '生活服务': ['生活', '服务'],
@@ -73,6 +73,7 @@
     return null;
   }
 
+  var CARRIER_RE = /(联通|移动|电信)(股份有限公司|有限责任公司|有限公司|分公司|公司|集团)?$/;
   var PLATFORMS = ['淘宝', '天猫', '京东', '拼多多', '抖音商城', '唯品会'];
   function isPlatform(word) { return PLATFORMS.some(function (p) { return String(word).indexOf(p) >= 0; }); }
   // 分分捐这类合并记录的默认分类：存档里有公益类的就用它，没有用「其他」，再没有「未分类」
@@ -136,6 +137,8 @@
         if (bw) return { want: bw, layer: 'borrow', conf: 'mid', reason: '支付宝里「' + cc + '」是' + bw };
       }
       // 4. 内置词表：对方里找到算中，只在商品说明里找到算低
+      // 1016-I：对方是运营商（联通、移动、电信，含「中国联通」「河南联通」这类）：直接充值缴费，把握中
+      if (CARRIER_RE.test(cc)) return { want: '充值缴费', layer: 'builtin', conf: 'mid', reason: '对方是运营商「' + cc + '」→ 充值缴费' };
       var hit = findIn(words, cc) || findIn(words, cp);
       var hd = findIn(nonPlat, r.desc || '');
       var aw = r.app === 'alipay' ? aliWant(r.kind) : null;

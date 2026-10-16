@@ -293,14 +293,15 @@
       ['expense', 'income', 'neutral'].forEach(function (io) {
         var d = f.diff[io];
         if (!d || (!d.header && !d.sum)) return;
-        var parts = d.parts.filter(function (x) { return x.n; }).map(function (x) { return x.label + ' ' + yuan(x.fen); });
+        var parts = d.parts.filter(function (x) { return x.n && x.fen >= 0; }).map(function (x) { return x.label + ' ' + yuan(x.fen); });
+        var minus = d.parts.filter(function (x) { return x.n && x.fen < 0; }).map(function (x) { return ' − ' + x.label + ' ' + yuan(-x.fen); }).join('');
         var head = d.header ? d.title + ' ' + yuan(d.header.fen) + '（' + d.header.n + ' 笔）' : d.title + '（账单没写）';
         var tail = '';
         if (d.header) {
           if (d.unreadable && f.errors) { parts.push('读不出来的 ' + yuan(d.unreadable)); tail = ' · 合计差 0.00'; }
           else tail = ' · 合计差 ' + yuan(d.unreadable || 0);
         }
-        var line = el('div', 'imp-soft imp-diff-' + io, head + ' = ' + (parts.join(' + ') || '0.00') + tail);
+        var line = el('div', 'imp-soft imp-diff-' + io, head + ' = ' + (parts.join(' + ') || '0.00') + minus + tail);
         if (d.header && d.ok === false) line.className += ' imp-bad';
         box.appendChild(line);
         if (d.mergeDelta) box.appendChild(el('div', 'imp-soft', '其中合并的手记比账单' + (d.mergeDelta > 0 ? '多记 ' : '少记 ') + yuan(Math.abs(d.mergeDelta)) + '（金额按手记的算）'));

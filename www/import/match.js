@@ -38,8 +38,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-H';
-  var PARTIAL_MAX = 3;            // 部分付款：手记最多是账单的 3 倍
+  var VERSION = '1016-I';
+  var PARTIAL_MAX = 3;
+  var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
   var BUCKETS = ['add', 'merge', 'skip', 'neutral', 'refund', 'pending', 'error'];
 
@@ -364,7 +365,21 @@
       got.sort(function (x, y) { return Math.abs(minOf(x.time) - tm) - Math.abs(minOf(y.time) - tm) || Math.abs(x.fen - b.fen) - Math.abs(y.fen - b.fen); });
       var yuan = function (f) { return (f / 100).toFixed(2); };
       var md = function (t) { return (+t.slice(5, 7)) + ' 月 ' + (+t.slice(8, 10)) + ' 日'; };
-      it.trace = got.slice(0, 8).map(function (m) {
+      var fmtHm = function (t) { return t.slice(11, 16); };
+      // 1016-I：当天能和别的账单凑成一条手记、却没凑成的，写明被谁打断了
+      var broken = (conflictSums.combos || []).filter(function (c) { return c.bs.indexOf(b) >= 0 && it.why !== 'multisum'; }).slice(0, 2).map(function (c) {
+        var others = c.bs.filter(function (x) { return x !== b; });
+        var who = mstate.get(c.m.id) === 'used' ? '那条手记已经和 ' + (usedBy[c.m.id] ? md(usedBy[c.m.id].r.time) + ' ' + yuan(usedBy[c.m.id].fen) + ' 元那笔账单' : '别的账单') + '合并了'
+          : others.map(function (o) {
+              var oi = o.it;
+              return oi.bucket === 'merge' ? fmtHm(o.r.time) + ' 那笔 ' + yuan(o.fen) + ' 元已经和别的手记合并了'
+                : (oi.bucket === 'pending' && oi.why === 'ambiguous') ? fmtHm(o.r.time) + ' 那笔 ' + yuan(o.fen) + ' 元被「金额一样、分不清谁是谁」那一组拿走了'
+                : fmtHm(o.r.time) + ' 那笔 ' + yuan(o.fen) + ' 元去了别处';
+            }).join('；');
+        return { record: c.m.id, time: c.m.time, fen: c.m.fen, cat: c.m.cat || '',
+                 why: '和 ' + others.map(function (o) { return fmtHm(o.r.time) + ' 那笔 ' + yuan(o.fen) + ' 元'; }).join('、') + '加起来正好是这条，但' + who };
+      });
+      it.trace = broken.concat(got.filter(function (m) { return !broken.some(function (x) { return x.record === m.id; }); }).slice(0, 8 - broken.length).map(function (m) {
         var dd = Math.abs(dayNo(m.time) - b.day), diff = m.fen - b.fen, why;
         var rc = it.rec && it.rec.layer !== 'none' ? it.rec.cat : null;
         if (m.type !== b.type) why = '收支不一样（账单是' + (b.type === 'income' ? '收入' : '支出') + '，手记是' + (m.type === 'income' ? '收入' : '支出') + '）';
@@ -382,7 +397,7 @@
           else why = '可能是部分付款，已列为候选';
         } else why = '金额差 ' + yuan(-diff) + ' 元，超过容差 ' + yuan(tol) + ' 元';
         return { record: m.id, time: m.time, fen: m.fen, cat: m.cat || '', why: why };
-      });
+      }));
     });
 
     // ---------- 汇总 ----------
@@ -420,7 +435,16 @@
       function hit(bs, kind) { var sum = bs.reduce(function (s, b) { return s + b.fen; }, 0), m = byFen.get(sum); if (m) m.forEach(function (x) { combos.push({ m: x, bs: bs, kind: kind }); }); }
       // a. 同一对方的全部
       var byCp = new Map();
-      list.forEach(function (b) { var c = C.cleanCp(b.r.cp || ''); if (!c) return; var a = byCp.get(c); if (!a) byCp.set(c, a = []); a.push(b); b.ccp = c; });
+      // 1016-I：一个对方名是另一个的开头（至少 3 个字，平台名开头的不算）算同一对方：「某某排骨」和「某某排骨某某店」
+      var keys = list.map(function (b) { return C.cleanCp(b.r.cp || ''); }).filter(Boolean)
+        .filter(function (c, i, a) { return a.indexOf(c) === i; }).sort(function (x, y) { return x.length - y.length || (x < y ? -1 : 1); });
+      var root = {};
+      keys.forEach(function (c) {
+        root[c] = c;
+        if (PLATFORM_RE.test(c)) return;
+        for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (k.length >= 3 && k.length < c.length && c.indexOf(k) === 0 && !PLATFORM_RE.test(k)) { root[c] = root[k]; break; } }
+      });
+      list.forEach(function (b) { var c0 = C.cleanCp(b.r.cp || ''); if (!c0) return; var c = root[c0] || c0; var a = byCp.get(c); if (!a) byCp.set(c, a = []); a.push(b); b.ccp = c; });
       byCp.forEach(function (a) { if (a.length >= 2) hit(a, 'samecp'); });
       // b. 2–3 笔不同对方：推荐分类一样（未分类不算），或者都在 1 小时内
       if (list.length > COMBO_DAY_MAX) { skipped.push(dayStr(day)); return; }
@@ -448,10 +472,12 @@
   }
   // 1016-G：多笔合一和单笔金额正好相等撞上同一条手记 → 两种凑法一起列（不带默认）
   function conflictSums(bills, idx, free, reserve, h) {
+    conflictSums.combos = [];
     var cand = bills.filter(function (b) { return !b.done && !b.neutral && !b.personal; });
     if (cand.length < 2) return [];
     var recs = h.classify(cand), catOf = function (b) { var r = recs[cand.indexOf(b)]; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; };
     var combos = findCombos(cand, idx, free, catOf).combos;
+    conflictSums.combos = combos;
     if (!combos.length) return [];
     // 3 天内金额正好相等（或等于净额）的、还没用的手记
     var exactOf = function (b) {
@@ -464,17 +490,27 @@
       var a = byM.get(c.m.id); if (!a) byM.set(c.m.id, a = { m: c.m, cs: [] }); a.cs.push(c);
       c.bs.forEach(function (b) { var s = billIn.get(b); if (!s) billIn.set(b, s = new Set()); s.add(c.m.id); });
     });
-    var pick = [], usedB = new Set();
+    var pick = [], usedB = new Set(), usedM = new Set();
+    conflictSums.combos = combos;
     byM.forEach(function (x) {
       var bs = []; x.cs.forEach(function (c) { c.bs.forEach(function (b) { if (bs.indexOf(b) < 0) bs.push(b); }); });
       // 凑法里的账单只属于这条手记的凑法、也没有别的手记能精确配
-      if (bs.some(function (b) { return billIn.get(b).size > 1 || usedB.has(b) || exactOf(b).some(function (m) { return m !== x.m; }); })) return;
+      if (bs.some(function (b) { return billIn.get(b).size > 1 || usedB.has(b); })) return;
+      // 凑法里的账单自己也有金额正好相等的手记：一起列成「单笔」选项（每笔最多 3 条最近的），不让第一轮先拿走（1016-I）
+      var own = [];
+      bs.forEach(function (b) {
+        var es = exactOf(b).filter(function (m) { return m !== x.m && !usedM.has(m.id); });
+        var tb = minOf(b.r.time);
+        es.sort(function (p, q) { return Math.abs(minOf(p.time) - tb) - Math.abs(minOf(q.time) - tb) || (p.id < q.id ? -1 : 1); });
+        es.slice(0, 3).forEach(function (m) { own.push({ m: m, bs: [b], kind: 'single' }); });
+      });
       var singles = bills.filter(function (b) {
         if (b.done || b.neutral || bs.indexOf(b) >= 0 || usedB.has(b) || billIn.has(b) || b.type !== x.m.type) return false;
         var es = exactOf(b); return es.length === 1 && es[0] === x.m;
       });
-      if (!singles.length) return;
+      if (!singles.length && !own.length) return;
       bs.concat(singles).forEach(function (b) { usedB.add(b); });
+      usedM.add(x.m.id); own.forEach(function (c) { usedM.add(c.m.id); pick.push(c); });
       x.cs.forEach(function (c) { pick.push(c); });
       singles.forEach(function (b) { pick.push({ m: x.m, bs: [b], kind: 'single' }); });
     });

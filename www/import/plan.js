@@ -29,12 +29,13 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-H';
+  var VERSION = '1016-I';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
   var PARTS = [['newNormal', '新增（计入）'], ['newFlow', '新增（只算结余）'], ['neutral', '不计入'], ['merge', '和手记合并'],
-               ['refund', '退款'], ['pending', '待你确认'], ['skip', '跳过'], ['excluded', '你勾掉的']];
+               ['refund', '退款'], ['pending', '待你确认'], ['skip', '跳过'], ['excluded', '你勾掉的'],
+               ['aliRefund', '支付宝统计里已扣掉的退款']];   // 1016-I：支付宝头部的「支出」是扣掉退款以后的，这一项是负数
   var IOS = ['expense', 'income', 'neutral'];
   var IO_NAME = { expense: '账单支出', income: '账单收入', neutral: '账单不计收支' };
 
@@ -280,6 +281,10 @@
           else if (d.group === 'merge') { k = 'merge'; var m = manualById[d.into]; if (m && !d.viaSum) mergeDelta += m.fen - d.fen; }
           else k = d.group;
           parts[k].n += d.units; parts[k].fen += d.fen;
+        });
+        // 支付宝：这份文件里所有退款行（状态退款成功、单号带后缀）的金额，支付宝已经从「支出」合计里扣掉了
+        if (f.app === 'alipay' && io === 'expense') f.rows.forEach(function (r) {
+          if (r.status === '退款成功' && r.noRest && r.noRest[0] === '_') { parts.aliRefund.n += r.merged || 1; parts.aliRefund.fen -= r.fen; }
         });
         var h = f.stats.header[io], sum = 0;
         PARTS.forEach(function (p) { sum += parts[p[0]].fen; });

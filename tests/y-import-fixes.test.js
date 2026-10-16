@@ -525,6 +525,57 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   }
 }
 
+// ===== 17. 1016-I 支付宝真机 =====
+{
+  // 1. 支付宝头部「支出」是扣掉退款以后的：原单 + 退款成功行、交易成功又全额退款的一对、待处理的退款，三栏合计都差 0
+  const o1 = ano(), o2 = ano(), o3 = ano();
+  const tx = [
+    ali({ time: T(9, 1, 10), no: o1, cp: '虚构铁路', kind: '交通出行', fen: 39600 }),
+    ali({ time: T(9, 3, 10), no: o1 + '_M1', cp: '虚构铁路', kind: '交通出行', fen: 39600, status: '退款成功', io: 'neutral', desc: '退款-火车票' }),
+    ali({ time: T(9, 5, 10), no: o2, cp: '某虚构商城', fen: 100000 }),
+    ali({ time: T(9, 6, 10), no: o2 + '_A', cp: '某虚构商城', fen: 32650, status: '退款成功', io: 'neutral' }),
+    ali({ time: T(9, 7, 10), no: o3, cp: '某虚构外卖', fen: 1000 }),
+    ali({ time: T(9, 8, 10), no: o3 + '_A', cp: '某虚构外卖', fen: 1031, status: '退款成功', io: 'neutral' }),   // 退多了（汇率差那种）→ 待处理
+    ali({ time: T(9, 9, 10), cp: '某虚构超市', fen: 7350 }),
+  ];
+  const r = run([{ app: 'alipay', txns: tx }], []);
+  const f = r.plan().files[0];
+  ok(['expense', 'income', 'neutral'].every(io => !f.diff[io].header || f.diff[io].unreadable === 0), '17-1 支付宝原单 + 退款、全额退款的一对、待处理的退款：三栏合计都差 0 ' + ['expense', 'neutral'].map(io => f.diff[io].unreadable).join(','));
+  ok(f.diff.expense.parts.find(x => x.key === 'aliRefund').fen === -(39600 + 32650 + 1031), '17-1 支出一栏多拆一项「支付宝统计里已扣掉的退款」');
+  // 2. 26.80 + 1.60 同一分钟，对方名前缀相同；26.80 前后 3 天还有 2 笔、手记里 8 条 26.80
+  const a = ali({ time: T(9, 25, 22, 6), cp: '某虚构排骨', kind: '餐饮美食', desc: '某虚构排骨套餐兑换券', fen: 2680 });
+  const b = ali({ time: T(9, 25, 22, 6), cp: '某虚构排骨某某店', kind: '餐饮美食', desc: '外卖订单', fen: 160 });
+  const more = [ali({ time: T(9, 23, 12), cp: '某虚构排骨', kind: '餐饮美食', fen: 2680 }), ali({ time: T(9, 27, 12), cp: '某虚构排骨', kind: '餐饮美食', fen: 2680 })];
+  const hands = [man('h2840', 9, 25, 2840)].concat([22, 23, 24, 25, 26, 27, 28, 24].map((d, i) => man('k' + i, 9, d, 2680, { hm: '1' + i + ':00' })));
+  const r2 = run([{ app: 'alipay', txns: [a, b].concat(more) }], hands);
+  const g = r2.matched.multiSums.find(x => x.options.some(o => o.record === 'h2840'));
+  ok(g && g.suggest === null && g.options.some(o => o.record === 'h2840' && o.kind === 'samecp' && o.bills.length === 2), '17-2 对方名前缀相同的 26.80 + 1.60：按同一对方凑成 28.40，卡片里有');
+  const singles = g ? g.options.filter(o => o.kind === 'single') : [];
+  ok(singles.length >= 1 && singles.length <= 3 && singles.every(o => o.bills.length === 1), '17-2 26.80 自己有同金额的手记：列成单笔选项，最多 3 条：' + singles.length);
+  ok(r2.item(a).why === 'multisum' && r2.item(b).why === 'multisum', '17-2 26.80 不再被「分不清谁是谁」先拿走，1.60 也不单独成新增');
+  const pk = r2.plan({ sums: { [g.id]: g.options.indexOf(singles[0]) } });
+  ok(rowOf(pk, r2.key(a)).group === 'merge' && rowOf(pk, r2.key(b)).group === 'add' && noReuse(pk) && diffOk(pk), '17-2 选单笔：26.80 合并，1.60 自动新增');
+  // 前缀规则：平台名开头的不算
+  const m1 = wx({ time: T(9, 10, 9), cp: '美团虚构店甲', fen: 1000 }), m2 = wx({ time: T(9, 10, 15), cp: '美团虚构店甲某某分店', fen: 2000 });
+  const r4 = run([{ app: 'wechat', txns: [m1, m2] }], [man('h30', 9, 10, 3000)]);
+  ok(!r4.matched.multiSums.length && r4.item(m1).why !== 'multisum', '17-2 同一天两笔美团订单：不因为都以「美团」开头就凑一条手记');
+  const n1 = wx({ time: T(9, 11, 9), cp: '某虚构店甲', fen: 1000 }), n2 = wx({ time: T(9, 11, 15), cp: '某虚构店甲某某分店', fen: 2000 });
+  const r5 = run([{ app: 'wechat', txns: [n1, n2] }], [man('h30b', 9, 11, 3000)]);
+  ok(r5.matched.multiSums.length === 1 && r5.matched.multiSums[0].options[0].kind === 'samecp', '17-2 对照：普通店名「某虚构店甲」和「某虚构店甲某某分店」算同一对方');
+  const s1 = wx({ time: T(9, 12, 9), cp: '某虚', fen: 1000 }), s2 = wx({ time: T(9, 12, 15), cp: '某虚构店乙', fen: 2000 });
+  const r6 = run([{ app: 'wechat', txns: [s1, s2] }], [man('h30c', 9, 12, 3000)]);
+  ok(!r6.matched.multiSums.length, '17-2 开头不到 3 个字的不算');
+  // 7. 运营商：对方是联通、移动、电信的，充值缴费（把握中）；手机充值落不到分类时看新建分类
+  const c1 = ali({ time: T(10, 3, 9), cp: '某省联通', kind: '充值缴费', desc: '手机充值', fen: 5000 });
+  const c2 = wx({ time: T(10, 3, 10), cp: '中国移动', desc: '/', fen: 3000 });
+  const c3 = wx({ time: T(10, 3, 11), cp: '中国电信股份有限公司', desc: '/', fen: 3000 });
+  const r7 = run([{ app: 'alipay', txns: [c1] }, { app: 'wechat', txns: [c2, c3] }], [], { cats: CATS.filter(c => c !== '缴费').concat(['通讯']) });
+  ok([c1, c2, c3].every(x => r7.item(x).rec.want === '充值缴费' && r7.item(x).rec.conf === 'mid' && r7.item(x).rec.cat === '通讯'), '17-7 运营商对方：充值缴费（把握中），落到存档的「通讯」');
+  const r8 = run([{ app: 'alipay', txns: [ali({ time: T(10, 3, 9), cp: '某省联通', kind: '充值缴费', desc: '手机充值', fen: 5000 })] }], [], { cats: ['未分类', '吃饭', '购物', '其他'] });
+  const it8 = r8.matched.items[0];
+  ok(it8.rec.want === '充值缴费' && it8.rec.cat === '未分类' && r8.matched.newCats.some(c => c.name === '充值缴费'), '17-7 存档里没有对得上的分类：推荐还是充值缴费，落「未分类」并建议新建（老用户默认不勾）');
+}
+
 // ===== 12. 性质测试：随机账单 + 随机手记 + 随机改动 =====
 {
   let s = 20261016;
