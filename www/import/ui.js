@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-M：「没见过的交易类型 / 状态」选了处理方式的，导入时存成类型规则（write.js 的 typesAdd）；选过的行重算后照样留着能改。
 (function () {
   'use strict';
   if (window.JiwenImportUI) return;
@@ -347,24 +348,30 @@
       se.value = val; se.addEventListener('change', function () { fn(se.value); });
       return se;
     }
-    if (s.unknownTypes.length || s.unknownStatuses.length) {
+    // 1016-M：选过的那几行重算以后就不算「没见过」了，照样留在这里（能改回去）；记在 S.seenTypes / S.seenStatuses
+    S.seenTypes = S.seenTypes || {}; S.seenStatuses = S.seenStatuses || {};
+    s.unknownTypes.forEach(function (t) { S.seenTypes[t.app + '|' + t.type] = t; });
+    s.unknownStatuses.forEach(function (t) { S.seenStatuses[t.app + '|' + t.status] = t; });
+    var typeRows = Object.keys(S.seenTypes).filter(function (k) { return S.types[k] || s.unknownTypes.some(function (t) { return t.app + '|' + t.type === k; }); }).map(function (k) { return S.seenTypes[k]; });
+    var statusRows = Object.keys(S.seenStatuses).filter(function (k) { return S.statuses[k] || s.unknownStatuses.some(function (t) { return t.app + '|' + t.status === k; }); }).map(function (k) { return S.seenStatuses[k]; });
+    if (typeRows.length || statusRows.length) {
       var c = el('div', 'imp-card'); c.id = 'impTypes';
       c.appendChild(el('h4', null, '没见过的交易类型 / 状态'));
-      s.unknownTypes.forEach(function (t) {
+      typeRows.forEach(function (t) {
         var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.type;
         r.appendChild(el('span', 'grow', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔，共 ' + yuan(t.fen) + ' 元'));
         r.appendChild(select([['', '照收支导入（放进其他）'], ['normal', '照收支导入'], ['transfer', '当转账（不计入）'], ['skip', '跳过']], S.types[k] || '',
           function (v) { if (v) S.types[k] = v; else delete S.types[k]; rerun(); }, 'imp-type-sel'));
         c.appendChild(r);
       });
-      s.unknownStatuses.forEach(function (t) {
+      statusRows.forEach(function (t) {
         var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.status;
         r.appendChild(el('span', 'grow', '状态「' + t.status + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
         r.appendChild(select([['', '导入（放进其他）'], ['import', '导入'], ['skip', '跳过']], S.statuses[k] || '',
           function (v) { if (v) S.statuses[k] = v; else delete S.statuses[k]; rerun(); }, 'imp-status-sel'));
         c.appendChild(r);
       });
-      c.appendChild(el('div', 'imp-soft', '这里选的只影响这一次（这一版先不记成规则）。'));
+      c.appendChild(el('div', 'imp-soft', '选了处理方式的，导入时记成规则，下次直接照办；不选的照收支导入、放进「其他」，下次还会问。'));
       out.push(c);
     }
     if (s.receipt) {
@@ -743,7 +750,7 @@
     var ws;
     try {
       ws = window.JiwenImportWrite.build({ parsed: S.parsed, matched: S.matched, info: S.info, manualById: S.manualById }, p,
-                                         { batch: batch, at: at, cpCats: S.edits.cpCats });
+                                         { batch: batch, at: at, cpCats: S.edits.cpCats, types: S.types, statuses: S.statuses });
     } catch (e) { alertMsg('整理要写的内容时出错了，什么都没写：' + (e && e.message || e)); return; }
     S.phase = 'writing';
     var t0 = Date.now(), slowTimer = null;

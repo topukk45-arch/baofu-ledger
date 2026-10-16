@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-K';
+  var VERSION = '1016-M';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -37,7 +37,8 @@
   function money(fen) { return Math.round(fen) / 100; }
 
   // input：plan() 的输入（parsed、matched、info:{ cats, cps, pms, catRules }、manualById）
-  // p：plan() 的结果；ctx：{ batch, at:'YYYY-MM-DDTHH:mm', cpCats }
+  // p：plan() 的结果；ctx：{ batch, at:'YYYY-MM-DDTHH:mm', cpCats, types, statuses }
+  //   types / statuses（1016-M）：确认页「没见过的交易类型 / 状态」里选了的 { '来源|类型': 怎么处理 }，存成类型规则
   function build(input, p, ctx) {
     ctx = ctx || {};
     var PL = cleaner(), cleanDesc = PL.cleanDesc;
@@ -210,6 +211,26 @@
       mapsAdd.push({ from: n.name, cat: n.into });
     });
 
+    // 1016-M：类型规则。确认页上选了处理方式的没见过的交易类型 / 状态，存成 importRules.type，下次直接照办；
+    //   没选的不存（下次还问）；存档里同一来源、同一类型（状态）已经有规则的不重复存
+    var typesAdd = [];
+    var haveType = {}; (info.typeRules || []).forEach(function (r) {
+      if (!r || !r.app) return;
+      if (r.type !== undefined) haveType['t|' + r.app + '|' + r.type] = 1;
+      if (r.status !== undefined) haveType['s|' + r.app + '|' + r.status] = 1;
+    });
+    var TYPE_AS = ['normal', 'transfer', 'skip'], STATUS_AS = ['import', 'skip'];
+    Object.keys(ctx.types || {}).sort().forEach(function (k) {
+      var i = k.indexOf('|'), app = k.slice(0, i), type = k.slice(i + 1), as = ctx.types[k];
+      if (i <= 0 || !type || TYPE_AS.indexOf(as) < 0 || haveType['t|' + k]) return;
+      typesAdd.push({ app: app, type: type, as: as });
+    });
+    Object.keys(ctx.statuses || {}).sort().forEach(function (k) {
+      var i = k.indexOf('|'), app = k.slice(0, i), status = k.slice(i + 1), as = ctx.statuses[k];
+      if (i <= 0 || !status || STATUS_AS.indexOf(as) < 0 || haveType['s|' + k]) return;
+      typesAdd.push({ app: app, status: status, as: as });
+    });
+
     // ---- 这一批的导入记录（新记录的编号由主页面填进 add）----
     var apps = [], from = '', to = '';
     parsed.files.forEach(function (f) {
@@ -223,9 +244,9 @@
     return {
       version: VERSION, batch: batch, at: ctx.at || '',
       records: recs, changes: chgList, orders: orders, pending: pending,
-      cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd,
+      cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd, typesAdd: typesAdd,
       log: { b: batch, at: ctx.at || '', apps: apps, from: from, to: to, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded,
-             rulesAdded: mapsAdd.length ? { cat: rulesAdd, type: [], map: mapsAdd } : { cat: rulesAdd, type: [] } },
+             rulesAdded: mapsAdd.length ? { cat: rulesAdd, type: typesAdd, map: mapsAdd } : { cat: rulesAdd, type: typesAdd } },
       counts: counts, total: total
     };
   }

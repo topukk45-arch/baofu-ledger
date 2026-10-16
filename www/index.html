@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-L</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-M</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3671,6 +3671,17 @@
                 const r0=a.importRules||{};
                 a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]).concat(ws.rulesAdd), type:(r0.type||[]) });
             }
+            // 1016-M：类型规则（没见过的交易类型 / 状态选了怎么处理）：同一来源、同一类型（状态）已有规则的不重复存
+            const typesAdd0=(Array.isArray(ws.typesAdd) ? ws.typesAdd : []).filter(x=>x && IMP_APPS.includes(x.app) && (
+                (typeof x.type==='string' && x.type && x.status===undefined && IMP_TYPE_AS.includes(x.as)) ||
+                (typeof x.status==='string' && x.status && x.type===undefined && IMP_STATUS_AS.includes(x.as))));
+            let typesDone=[];
+            if(typesAdd0.length){
+                const r0=a.importRules||{}, had=new Set((r0.type||[]).map(x=>x.type!==undefined ? 't|'+x.app+'|'+x.type : 's|'+x.app+'|'+x.status));
+                typesDone=typesAdd0.filter(x=>!had.has(x.type!==undefined ? 't|'+x.app+'|'+x.type : 's|'+x.app+'|'+x.status))
+                    .map(x=>x.type!==undefined ? { app:x.app, type:x.type, as:x.as } : { app:x.app, status:x.status, as:x.as });
+                if(typesDone.length) a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]), type:(r0.type||[]).concat(typesDone) });
+            }
             // 分类对照（1016-J）：上面已经先建了新分类，目标是这一批新建的也认；同一个推荐分类已有对照的不重复存
             const mapsAdd=(Array.isArray(ws.mapsAdd) ? ws.mapsAdd : []).filter(m=>m && typeof m.from==='string' && m.from && a.cats.includes(m.cat));
             let mapsDone=[];
@@ -3694,7 +3705,7 @@
             const curLog=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
             const logs=((curLog && curLog.list) || []).slice();
             const ra0=(ws.log && ws.log.rulesAdded) || { cat:[], type:[] };
-            const ra={ cat:ra0.cat||[], type:ra0.type||[] }; if(mapsDone.length) ra.map=mapsDone;   // 导入记录里只记真存进去的对照（给 ⑦ 撤销）
+            const ra={ cat:ra0.cat||[], type:typesDone }; if(mapsDone.length) ra.map=mapsDone;   // 1016-M：类型规则也只记真存进去的   // 导入记录里只记真存进去的对照（给 ⑦ 撤销）
             // 1016-K：新增记录的指纹（撤销时认「导入后你改过没有」）、导完时名单多长
             const W=window.JiwenImportWrite, hs=W && W.recHash ? made.map(r=>W.recHash(r)) : null;
             const lg=Object.assign({}, ws.log, { add:made.map(r=>r.id), chg, rulesAdded:ra, cpEnd:(a.cps||[]).length, pmEnd:(a.pms||[]).length });
