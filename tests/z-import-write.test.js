@@ -81,7 +81,7 @@ async function boot(o) {
     const input = $('impFile');
     Object.defineProperty(input, 'files', { value: files.map(([name, bytes]) => new w.File([bytes], name)), configurable: true });
     input.dispatchEvent(new w.Event('change'));
-    await until(() => $('impGo') && /^导入 \d+ 笔/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
+    await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
     const S = t.S();
     if (edit) { edit(S); w.JiwenImportUI._replan(); }
     const plan = S.plan;

@@ -31,7 +31,7 @@ function run(bills, manual, opts) {
   const parsed = P.parseFiles(bills.map((b, i) => ({ name: '账单' + (i + 1), data: B.ab(B.bill(b.app, b.txns, Object.assign({ range: RANGE }, b.opts || {})).bytes) })));
   const routed = R.route(parsed, { known: opts.known || {}, rules: [] });
   const cats = opts.cats || CATS;
-  const matched = M.match(routed, parsed, { manual: manual || [], cats, merchants: W, isNewUser: false });
+  const matched = M.match(routed, parsed, { manual: manual || [], cats, merchants: W, isNewUser: false, trace: true });
   const manualById = {}; (manual || []).forEach(m => { manualById[m.id] = m; });
   const input = { parsed, matched, info: { cats, isNewUser: false }, manualById, overlaps: [] };
   const key = txn => matched.items.find(it => it.src === 'row' && parsed.files[it.file].rows[it.row].no === txn.no).key;
@@ -442,6 +442,75 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   ok(r.plan().sections.comboSkippedDays.join() === '2026-08-08', '14 一天超过 ' + M.COMBO_DAY_MAX + ' 笔：记下这一天，确认页加一行说明');
 }
 
+// ===== 16. 1016-G 真机试用 1016-E 后的修改 =====
+{
+  // 2. 多笔合一和单笔撞上同一条手记：两种凑法都列、不带默认
+  const four = () => [[16, 59], [17, 51], [17, 51], [18, 55]].map(([h, mi]) => wx({ time: T(10, 12, h, mi), cp: '某虚构智能', desc: '七日秒杀礼包', fen: 100 }));
+  const hand = [man('g4', 10, 12, 400, { cat: '娱乐', hm: '19:31', remark: '游戏测试' })];     // 10-15 补记、记账时间改成了 10-12
+  {
+    const f = four(), other = wx({ time: T(10, 13, 9), cp: '某虚构书店', fen: 400 });
+    const r = run([{ app: 'wechat', txns: f.concat([other]) }], hand);
+    const g = r.matched.multiSums.find(x => x.options.some(o => o.record === 'g4'));
+    ok(g && g.options.length === 2 && g.suggest === null && g.options.some(o => o.kind === 'samecp' && o.bills.length === 4) && g.options.some(o => o.kind === 'single' && o.bills.length === 1),
+      '16-2 隔天另一笔 4 元也能配这条补记的手记：合并卡片里两种凑法都在，不带默认');
+    ok(f.concat([other]).every(x => r.item(x).bucket === 'pending' && r.item(x).why === 'multisum'), '16-2 5 笔都留在待处理，手记没被隔天那笔先拿走');
+    const pa = r.plan({ sums: { [g.id]: g.options.findIndex(o => o.kind === 'samecp') } });
+    ok(f.every(x => rowOf(pa, r.key(x)).group === 'merge') && rowOf(pa, r.key(other)).group === 'add' && noReuse(pa) && diffOk(pa), '16-2 选「4 笔加起来」：4 笔合并，那笔 4 元新增');
+    const pb = r.plan({ sums: { [g.id]: g.options.findIndex(o => o.kind === 'single') } });
+    ok(rowOf(pb, r.key(other)).group === 'merge' && f.every(x => rowOf(pb, r.key(x)).group === 'add') && noReuse(pb) && diffOk(pb), '16-2 选「那一笔 4 元」：它合并，4 笔新增');
+  }
+  {
+    const f = four(), same = wx({ time: T(10, 12, 12, 0), cp: '某虚构书店', fen: 400 });
+    const r = run([{ app: 'wechat', txns: f.concat([same]) }], hand);
+    const g = r.matched.multiSums.find(x => x.options.some(o => o.record === 'g4'));
+    ok(g && g.options.length === 2 && g.suggest === null && r.item(same).bucket === 'pending', '16-2 同一天另有一笔 4 元：也列两种凑法，同一天的单笔不先拿走');
+  }
+  {
+    const f = four();
+    const r = run([{ app: 'wechat', txns: f }], hand);
+    const g = r.matched.multiSums.find(x => x.options.some(o => o.record === 'g4'));
+    ok(g && g.options.length === 1 && g.suggest === 0, '16-2 没有撞的：照旧一种凑法、默认合并（备注对不上不影响）');
+  }
+  // 4. 部分付款：账单不到手记的三分之一不当候选
+  {
+    const b = wx({ time: T(10, 3, 12), cp: '某虚构火锅', desc: '脑花', fen: 100 });
+    const r = run([{ app: 'wechat', txns: [b] }], [man('h29', 10, 3, 2900, { cat: '吃饭' })], { cats: CATS });
+    ok(r.item(b).bucket === 'add' && !(r.item(b).cands || []).some(c => c.record === 'h29'), '16-4 1 元的账单不当 29 元手记的部分付款候选');
+    ok(r.item(b).trace.length === 0, '16-7 三分之一以外的不列进「为什么没配上」');
+  }
+  // 7. 为什么没配上：每条卡在哪
+  {
+    const a = wx({ time: T(10, 20, 12), cp: '某虚构面馆', fen: 2000 });
+    const taker = wx({ time: T(10, 20, 13), cp: '另一虚构面馆', fen: 2500 });
+    const manual = [man('used', 10, 20, 2500), man('far', 10, 26, 2000), man('big', 10, 20, 2900), man('inc', 10, 20, 2000, { type: 'income' })];
+    const r = run([{ app: 'wechat', txns: [a, taker] }], manual);
+    const tr = r.item(a).trace, why = id => (tr.find(x => x.record === id) || {}).why || '';
+    ok(/已经和 10 月 20 日 25.00 元那笔账单合并了/.test(why('used')), '16-7 已被别的账单用：' + why('used'));
+    ok(/差了 6 天/.test(why('far')), '16-7 金额一样但日期差 6 天：' + why('far'));
+    ok(/超过容差|部分付款/.test(why('big')), '16-7 金额差太多：' + why('big'));
+    ok(/收支不一样/.test(why('inc')), '16-7 收支类型不符：' + why('inc'));
+    const lone = wx({ time: T(11, 1, 9), cp: '某虚构小店', fen: 99 });
+    const r2 = run([{ app: 'wechat', txns: [lone] }], manual);
+    ok(Array.isArray(r2.item(lone).trace) && r2.item(lone).trace.length === 0, '16-7 一条都没有：trace 是空的（确认页写「当天没有金额相符的手记」）');
+  }
+  // 1. 转账往来里的行不进按对方选分类；标成不计入挪进「不计入」组，各组合计照样等于文件行数
+  {
+    const tx = [wx({ time: T(10, 1, 9), kind: '转账', cp: '某亲戚甲', fen: 20000 }), wx({ time: T(10, 2, 9), kind: '转账', io: 'income', cp: '某亲戚甲', fen: 20000 }),
+                wx({ time: T(10, 3, 9), kind: '微信红包（单发）', cp: '某亲戚乙', fen: 5000 }), wx({ time: T(10, 25, 9), kind: '转账', cp: '某同事', fen: 3000 })];
+    const r = run([{ app: 'wechat', txns: tx }], []);
+    const p0 = r.plan();
+    ok(!p0.sections.cpGroups.some(g => ['某亲戚甲', '某亲戚乙'].includes(g.cp)) && p0.sections.cpGroups.some(g => g.cp === '某同事'), '16-1 转账往来段里的行不进按对方选分类，段外的单笔照旧');
+    const ed = { rows: {} }; p0.sections.transfers[0].keys.forEach(k => { ed.rows[k] = { mode: 'skip' }; });
+    const p1 = r.plan(ed);
+    const total = r.parsed.files[0].stats.parsed.total;
+    ok(p1.counts.neutral === 3 && p1.counts.add === 1 && Object.values(p1.counts).reduce((x, y) => x + y, 0) === total && diffOk(p1), '16-1 标成不计入的挪进「不计入」组（顶上的笔数跟着变），合计照样等于文件行数');
+    const p2 = r.plan({ rows: { [r.key(tx[0])]: { mode: 'skip' } } });
+    ok(p2.counts.neutral === 1 && rowOf(p2, r.key(tx[0])).group === 'neutral', '16-1 一笔一笔勾也一样');
+    const back = r.plan({ rows: Object.assign({}, ed.rows, { [r.key(tx[0])]: { mode: 'normal' } }) });
+    ok(rowOf(back, r.key(tx[0])).group === 'add' && back.counts.neutral === 2, '16-1 改回计入：挪回「新增」');
+  }
+}
+
 // ===== 12. 性质测试：随机账单 + 随机手记 + 随机改动 =====
 {
   let s = 20261016;
@@ -505,7 +574,7 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     }
     if (why.length) { bad++; if (notes.length < 3) notes.push('#' + k + ' ' + why.join('、')); }
   }
-  ok(bad === 0, '12 150 份随机账单：守恒、差 0 分、被合并的手记不重复使用、全额退款原单不合并、个人转账只做精确、多笔合一金额对 ' + notes.join(' | '));
+  ok(bad === 0, '12 150 份随机账单：守恒（含改口径以后挪进 / 挪出「不计入」组）、差 0 分、被合并的手记不重复使用、全额退款原单不合并、个人转账只做精确、多笔合一金额对 ' + notes.join(' | '));
 }
 
 console.log(`\n${pass} 通过，${fail} 失败`);

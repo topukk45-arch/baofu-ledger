@@ -72,7 +72,7 @@ async function snap() {
   const input = $('impFile');
   Object.defineProperty(input, 'files', { value: BILLS.map(([name, app, txns]) => new w.File([B.bill(app, txns, { range: { from: '2026-10-01 00:00:00', to: '2026-10-31 23:59:59' } }).bytes], name)), configurable: true });
   input.dispatchEvent(new w.Event('change'));
-  await until(() => $('impGo') && /^导入 \d+ 笔/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
+  await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
   // 固定的确认页操作：多笔合一确认、转账往来都标成不计入
   const S = w.JiwenImportUI._state();
   (S.matched.multiSums || []).forEach(g => { if (g.suggest !== null) S.edits.sums[g.id] = g.suggest; });

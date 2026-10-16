@@ -29,7 +29,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-F';
+  var VERSION = '1016-G';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -152,6 +152,9 @@
       }
       if (e.exclude && (d.group === 'add' || d.group === 'neutral' || d.group === 'refund')) { d.group = 'excluded'; d.reason = '你勾掉了'; }
       if (e.mode && (d.group === 'add' || d.group === 'neutral')) d.mode = e.mode;
+      // 1016-G：口径改成不计入的挪进「不计入」组，不计入改回计入 / 只算结余的挪回「新增」，顶上的笔数跟着变
+      if (d.group === 'add' && d.mode === 'skip') d.group = 'neutral';
+      else if (d.group === 'neutral' && d.mode !== 'skip') d.group = 'add';
     });
     // 按手记 / 按账单归组：只能配手记的待处理账单，候选手记都被选走了 → 自动新增（同组里另一笔合并了）
     var pendRows = rows.filter(function (d) { return d.src === 'row' && d.bucket0 === 'pending' && !d.item.msum && d.cands && d.cands.length && !refundish(d.item); });
@@ -203,11 +206,24 @@
       if (g.kind === 'petty' && d.catFrom === 'rec') { d.cat = pCat; d.catFrom = 'summary'; }
       else if (d.catFrom === 'rec') d.catFrom = 'summaryRec';
     });
+    // 1016-G：转账往来段里的行（按交易类型认、相邻隔不到 3 天、有出有进）不进「按对方选分类」，免得要定两遍
+    var trKeys = {};
+    (function () {
+      var dirOf = function (d) { var it = d.item; return (it.io === 'income' || it.io === 'expense') ? it.io : (it.dir || (d.pio === 'income' ? 'income' : 'expense')); };
+      var tr = rows.filter(function (d) { return d.src === 'row' && (d.group === 'add' || d.group === 'neutral') && !d.summary && isTransferKind(d.app, d.kind); })
+        .sort(function (a, b) { return minOf(a.time) - minOf(b.time) || (a.key < b.key ? -1 : 1); });
+      var ps = [], cur = null;
+      tr.forEach(function (d) { if (!cur || minOf(d.time) - minOf(cur.last.time) >= TRANSFER_GAP) ps.push(cur = { rows: [] }); cur.rows.push(d); cur.last = d; });
+      ps.forEach(function (p) {
+        if (p.rows.length >= 2 && p.rows.some(function (d) { return dirOf(d) === 'income'; }) && p.rows.some(function (d) { return dirOf(d) === 'expense'; }))
+          p.rows.forEach(function (d) { trKeys[d.key] = true; });
+      });
+    })();
     // 未分类按对方归组，一组选一次
     var cpg = {};
     rows.forEach(function (d) {
       if (d.src !== 'row' || d.catFrom !== 'rec' || d.cat !== '未分类') return;
-      if (['add', 'pending', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip') return;     // 不计入的不用选分类
+      if (['add', 'pending', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;     // 不计入的、转账往来里的不用选分类
       var k = clean(d.cp) || '（没有交易对方）';
       var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [] });
       g.n += d.units; g.fen += d.fen; g.min = Math.min(g.min, d.fen); g.max = Math.max(g.max, d.fen); g.keys.push(d.key);

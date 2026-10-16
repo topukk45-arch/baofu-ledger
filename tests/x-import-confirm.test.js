@@ -79,7 +79,7 @@ async function boot(o) {
     const list = files.map(([name, bytes]) => new w.File([bytes], name));
     Object.defineProperty(input, 'files', { value: list, configurable: true });
     input.dispatchEvent(new w.Event('change'));
-    if (wait) await until(() => $('impGo') && /^导入 \d+ 笔/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 15000);
+    if (wait) await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 15000);
   };
   t.go = () => $('impGo').textContent;
   t.chip = g => { const c = d.querySelector('#impSummary .imp-chip[data-group="' + g + '"]'); return c ? +c.querySelector('b').textContent : 0; };
@@ -117,7 +117,7 @@ const before = await t.snapshot();
   const S = t.S(), want = direct(FILES);
   ok(S && S.phase === 'confirm' && t.$('impProg').style.display === 'none', '1 跑完进度，打开确认页');
   ok(JSON.stringify(S.plan.counts) === JSON.stringify(want.counts) && S.plan.importN === want.importN && S.plan.mergeM === want.mergeM, '1 页面上的方案和直接算的一样：' + JSON.stringify(S.plan.counts));
-  ok(t.go() === `导入 ${want.importN} 笔，合并 ${want.mergeM} 笔` && !t.$('impGo').disabled, '1 底部按钮：' + t.go());
+  ok(t.go() === `新建 ${want.records} 条记录，合并 ${want.mergeM} 笔` && !t.$('impGo').disabled, '1 底部按钮：' + t.go());
   ok(['add', 'merge', 'pending', 'neutral', 'skip'].every(g => t.chip(g) === want.counts[g]) && t.chip('refund') === want.counts.refund, '1 汇总一行的数字对得上');
   const cards = [...t.d.querySelectorAll('#impFiles .imp-card')];
   ok(cards.length === 3 && cards[0].textContent.includes('微信 · 2026-03-01 至 2026-03-31 · 共 11 笔') && cards[1].textContent.includes('支付宝'), '1 每个文件一张卡：来源、时间范围、笔数');
@@ -150,7 +150,7 @@ const before = await t.snapshot();
   t.select(t.d.querySelector('#impSheet .imp-row-cat'), '购物');
   ok(t.S().plan.groups.add.find(d => d.cp === '某某').cat === '购物' && ![...t.$('impCpGroups') ? t.$('impCpGroups').querySelectorAll('.imp-row-opt') : []].some(r => r.dataset.cp === '某某'), '2 详情里改分类：这行变成购物，不再出现在按对方选分类里');
   t.$('impExclude').click();
-  ok(t.S().plan.importN === N0 - 1 && t.go() === `导入 ${N0 - 1} 笔，合并 ${M0} 笔` && t.chip('excluded') === 1, '2 勾掉一笔：按钮变成 ' + t.go());
+  ok(t.S().plan.importN === N0 - 1 && t.go() === `新建 ${t.S().plan.records} 条记录，合并 ${M0} 笔` && t.chip('excluded') === 1, '2 勾掉一笔：按钮变成 ' + t.go());
   ok(t.d.querySelector('#impFiles .imp-diff-expense').textContent.includes('你勾掉的 50.00') && t.d.querySelector('#impFiles .imp-diff-expense').textContent.endsWith('合计差 0.00'), '2 差额里多出「你勾掉的」，合计照样差 0');
   t.$('impRestore').click();
   ok(t.S().plan.importN === N0, '2 恢复：按钮回到 ' + t.go());
@@ -218,7 +218,7 @@ const before = await t.snapshot();
   // 取消以后再导一次：正常
   await new Promise(r => setTimeout(r, 150));
   await t.openImport(); await t.pick(FILES);
-  ok(t.S().phase === 'confirm' && t.go().startsWith('导入 '), '4 取消以后再导一次：正常');
+  ok(t.S().phase === 'confirm' && t.go().startsWith('新建 '), '4 取消以后再导一次：正常');
   t.$('impBack').click();
   ok(t.$('impPage').style.display === 'none', '4 顶上「‹ 取消」关掉导入页');
   ok(!t.errs.length, '4 无报错 ' + t.errs.join('|'));
@@ -297,6 +297,8 @@ const before = await t.snapshot();
   ok(t.$('impTransfers').querySelectorAll('.imp-tr-cb:checked').length === 4 && f0.expense.unreadable === 0 && f0.income.unreadable === 0
      && f0.expense.parts.find(x => x.key === 'neutral').fen === 50000, '7 一键都标成不计入：勾上 4 笔，差额照样 0 分');
   ok(p2.rows.find(d => d.key === keyOf(shop)).mode === 'normal', '7 长名带 * 的商户没被标成不计入');
+  ok([...t.$('impTransfers').querySelectorAll('.imp-tr-state')].every(x => x.textContent === '不计入') && t.chip('neutral') === p2.counts.neutral && p2.counts.neutral >= 4, '7 勾上的行尾写「不计入」，顶上「不计入」的笔数跟着变（1016-G）');
+  ok(!(t.$('impCpGroups') && /某亲戚/.test(t.$('impCpGroups').textContent)), '7 转账往来里的人不再出现在按对方选分类里（1016-G）');
   // 明细：分分捐一行、套话显示对方
   t.$('impDetailsToggle').click();
   t.d.querySelector('.imp-gh[data-group="add"]').click();
@@ -304,8 +306,10 @@ const before = await t.snapshot();
   ok(sr && sr.textContent.includes('分分捐 · 3 月 · 25 笔 · 0.25 元') && t.d.querySelectorAll('.imp-list[data-group="add"] .al-row').length < 25, '7 分分捐在明细里一行');
   sr.click();
   ok(t.d.querySelectorAll('.imp-members .imp-sub-row').length === 25, '7 点开看 25 笔');
+  t.d.querySelector('.imp-gh[data-group="neutral"]').click();     // 1016-G：标成不计入的挪进了「不计入」组
   const giftRow = t.d.querySelector('.al-row[data-key="' + keyOf(gift[0]) + '"]');
   ok(giftRow && giftRow.querySelector('.al-remark').textContent === '某亲戚甲', '7 「转账备注:微信转账」不当标题，显示交易对方');
+  ok(giftRow && !giftRow.querySelector('.cat-tag') && !/[−+]/.test(giftRow.querySelector('.al-amt').textContent), '7 不计入的行：不显示分类，金额不带正负号（1016-G）');
   // 候选：最像排第一，其他收起
   t.d.querySelector('.imp-gh[data-group="pending"]').click();
   t.d.querySelector('.al-row[data-key="' + keyOf(noodle) + '"]').click();
@@ -314,14 +318,15 @@ const before = await t.snapshot();
   ok(sh.querySelector('.imp-row-opt').textContent.includes('19.50'), '7 最像的是 19:09 的 19.50（不是 4 天外的 19.80）');
   sh.querySelector('.imp-more-cands').click();
   ok(t.$('impSheet').querySelectorAll('.imp-pick').length === 2, '7 点开「其他 1 条」');
+  ok(t.$('impTrace') && t.$('impTrace').textContent.includes('为什么没配上') && t.$('impTrace').querySelectorAll('.imp-trace-row').length >= 2, '7 行详情里有「为什么没配上」，列出试过的手记（1016-G）');
   t.UI().back();
   // 全额退款：两条都跳过，弱提醒
   const hc = t.$('impRefundHints');
   ok(hc && hc.textContent.includes('这笔 50.00 元已全额退款；你 3 月 14 日记的「其他 · 50.00」如果就是它'), '7 全额退款提醒，用手记的真实日期');
   ok(t.S().plan.rows.find(d => d.key === keyOf(fo)).group === 'skip', '7 全额退款的原单跳过');
   // 存储文案
-  await until(() => t.$('impStorage').textContent.includes('可用存储空间'));
-  ok(t.$('impStorage').textContent.includes('可用存储空间约 2048 MB') && !t.$('impStorage').textContent.includes('手机上还能用'), '7 存储那行写「可用存储空间约 x MB」（是配额，不是手机剩余空间）');
+  await until(() => t.$('impStorage').textContent.includes('本应用可用上限'));
+  ok(t.$('impStorage').textContent.includes('本应用可用上限约 2.0 GB') && !t.$('impStorage').textContent.includes('手机上还能用'), '7 存储那行写「本应用可用上限约 x GB」（1016-G）');
   t.$('impCancel').click();
   ok(!t.errs.length && !t.jsErr.length, '7 无报错 ' + t.errs.concat(t.jsErr).join('|'));
 }

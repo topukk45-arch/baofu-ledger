@@ -208,7 +208,7 @@
       S.ledger = store().ledgerFor(r.result);
       progress('和手记配对、推荐分类…', 0, 1);
       return J().run('match', { routed: S.routed, parsed: S.parsed, manual: S.ledger.manual, refundCands: S.ledger.refundCands,
-                                cats: S.info.cats, rules: S.info.catRules, isNewUser: S.info.isNewUser });
+                                cats: S.info.cats, rules: S.info.catRules, isNewUser: S.info.isNewUser, trace: true });
     }).then(function (r) {
       if (!alive() || !r) return;
       S.matched = r.result;
@@ -256,7 +256,9 @@
     b.appendChild(renderDetails(p));
     // 底部按钮
     dom.bar.style.display = 'flex';
-    dom.go.textContent = '导入 ' + p.importN + ' 笔，合并 ' + p.mergeM + ' 笔';
+    // 1016-G：写实际新建几条记录（分分捐、收款合并以后），和上面那行一致
+    dom.go.textContent = (p.records + p.mergeM === 0 && p.counts.pending) ? '存下待处理 ' + p.counts.pending + ' 笔'
+      : '新建 ' + p.records + ' 条记录，合并 ' + p.mergeM + ' 笔';
     dom.go.disabled = !p.canImport;
     dom.page.scrollTop = y;
   }
@@ -317,7 +319,7 @@
       chips.appendChild(ch);
     });
     c.appendChild(chips);
-    if (p.records !== p.importN) c.appendChild(el('div', 'imp-soft', '分分捐、收款这类合并以后，实际新建 ' + p.records + ' 条记录'));
+    if (p.records !== p.importN) c.appendChild(el('div', 'imp-soft', '导入 ' + p.importN + ' 笔，分分捐、收款这类合并以后，实际新建 ' + p.records + ' 条记录'));
     if (p.blocking.length) c.appendChild(el('div', 'imp-line imp-bad', '有账单笔数对不上，先不能导入'));
     if (S.lost) c.appendChild(el('div', 'imp-soft', '有 ' + S.lost + ' 处改动因为重新计算失效了'));
     var cs = p.sections.comboSkippedDays || [];
@@ -473,7 +475,8 @@
           var d = rowByKey(k); if (!d) return;
           var r = el('label', 'imp-sub-row'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = d.mode === 'skip'; cb.className = 'imp-tr-cb'; cb.dataset.key = k;
           cb.addEventListener('change', function () { var e = S.edits.rows[k] || (S.edits.rows[k] = {}); if (cb.checked) e.mode = 'skip'; else e.mode = 'normal'; replan(); });
-          r.appendChild(cb); r.appendChild(el('span', 'grow', fmtTime(d.time) + ' · ' + (d.cp || '—') + ' · ' + (d.type === 'expense' ? '−' : '+') + yuan(d.fen) + ' · 不计入'));
+          r.appendChild(cb); r.appendChild(el('span', 'grow', fmtTime(d.time) + ' · ' + (d.cp || '—') + ' · ' + (d.type === 'expense' ? '转出 ' : '转入 ') + yuan(d.fen)));
+          r.appendChild(el('span', 'imp-tr-state', cb.checked ? '不计入' : '计入'));
           box.appendChild(r);
         });
         var all = btn(t.allSkip ? '都恢复计入' : '这几笔都标成不计入', t.allSkip ? 'imp-btn' : 'imp-btn gold', function () {
@@ -519,7 +522,7 @@
     c.appendChild(el('div', 'imp-line', '存储：预计多占约 ' + (mb < 0.1 ? '不到 0.1' : mb.toFixed(1)) + ' MB'));
     if (navigator.storage && navigator.storage.estimate) {
       var sp = el('div', 'imp-soft'); c.appendChild(sp);
-      navigator.storage.estimate().then(function (q) { if (q && q.quota) sp.textContent = '可用存储空间约 ' + ((q.quota - (q.usage || 0)) / 1048576).toFixed(0) + ' MB'; }).catch(function () {});
+      navigator.storage.estimate().then(function (q) { if (q && q.quota) sp.textContent = '本应用可用上限约 ' + (q.quota / 1073741824).toFixed(1) + ' GB（是系统给记问的上限，不是手机剩余空间）'; }).catch(function () {});
     }
     return c;
   }
@@ -571,10 +574,12 @@
       if (d.fen !== null) row.appendChild(el('span', 'al-amt', yuan(d.fen)));
     } else {
       row.appendChild(el('span', 'al-time', fmtTime(d.time)));
-      var c = el('span', 'al-cat'); c.appendChild(el('span', 'cat-tag', d.cat || '未分类')); row.appendChild(c);
+      // 1016-G：不计入的不显示分类，金额不带正负号
+      var skipRow = d.group === 'neutral' || d.mode === 'skip';
+      var c = el('span', 'al-cat'); if (!skipRow) c.appendChild(el('span', 'cat-tag', d.cat || '未分类')); row.appendChild(c);
       row.appendChild(el('span', 'al-remark', d.title || d.cp || '—'));
       var isExp = d.type === 'expense';
-      row.appendChild(el('span', 'al-amt ' + (isExp ? 'neg' : 'pos'), (isExp ? '−' : '+') + yuan(d.fen)));
+      row.appendChild(el('span', 'al-amt ' + (skipRow ? 'imp-skip-amt' : (isExp ? 'neg' : 'pos')), (skipRow ? '' : (isExp ? '−' : '+')) + yuan(d.fen)));
       row.appendChild(el('span', 'al-go', '›'));
     }
     row.addEventListener('click', open);
@@ -627,15 +632,16 @@
     var d = rowByKey(key); if (!d) return;
     var sh = dom.sheet; sh.innerHTML = '';
     sh.dataset.key = key;
-    sh.appendChild(el('h4', null, (d.type === 'expense' ? '−' : '+') + yuan(d.fen) + ' · ' + (S.plan.groupNames[d.group])));
+    var skipRow = d.group === 'neutral' || d.mode === 'skip';
+    sh.appendChild(el('h4', null, (skipRow ? '' : (d.type === 'expense' ? '−' : '+')) + yuan(d.fen) + ' · ' + (S.plan.groupNames[d.group])));
     var kv = function (k, v) { if (!v) return; var r = el('div', 'kv'); r.appendChild(el('span', null, k)); r.appendChild(el('span', null, v)); sh.appendChild(r); };
     kv('时间', d.time.replace('T', ' ')); kv('交易对方', d.cp); kv('商品', d.desc); kv('备注', d.remark);
     kv('支付方式', (S.parsed.files[d.file].rows[d.row] || {}).pm); kv(d.app === 'alipay' ? '交易分类' : '交易类型', d.kind); kv('状态', d.status);
     kv('来源', APP[d.app]); kv('去向', d.reason);
-    if (d.rec) kv('分类推荐', d.rec.cat + '（' + d.rec.reason + (d.rec.conf ? '，把握' + { high: '高', mid: '中', low: '低' }[d.rec.conf] : '') + '）');
+    if (d.rec && !skipRow) kv('分类推荐', d.rec.cat + '（' + d.rec.reason + (d.rec.conf ? '，把握' + { high: '高', mid: '中', low: '低' }[d.rec.conf] : '') + '）');
     if (d.into && S.manualById[d.into]) { var m = S.manualById[d.into]; kv('合并到', '手记 ' + fmtTime(m.time) + ' · ' + m.cat + ' · ' + yuan(m.fen)); }
     var acts = el('div', 'acts');
-    if (d.canCat) {
+    if (d.canCat && !skipRow) {
       var se = el('select', 'imp-row-cat');
       var list = ['未分类'].concat(S.info.cats.filter(function (c) { return c !== '未分类'; }));
       S.plan.sections.newCats.forEach(function (n) { if (n.on && list.indexOf(n.name) < 0) list.push(n.name); });
@@ -699,6 +705,16 @@
       var db = btn('不要了', 'imp-btn', function () { setEdit(key, { pick: 'drop' }); }); db.id = 'impPickDrop';
       var cb = btn('还是待确认', 'imp-btn', function () { setEdit(key, { pick: null }); }); cb.id = 'impPickClear';
       a2.appendChild(nb); a2.appendChild(db); a2.appendChild(cb); sh.appendChild(a2);
+    }
+    // 1016-G：为什么没配上（开发用：试过哪几条手记、每条卡在哪）
+    if (d.item && d.item.trace && d.group !== 'merge') {
+      var tb = el('div', 'imp-trace'); tb.id = 'impTrace'; tb.style.marginTop = '10px';
+      tb.appendChild(el('div', 'imp-line', '为什么没配上（开发用）'));
+      if (!d.item.trace.length) tb.appendChild(el('div', 'imp-soft', '当天没有金额相符的手记（前后 7 天、金额在三分之一到三倍之间的都没有）'));
+      d.item.trace.forEach(function (x) {
+        tb.appendChild(el('div', 'imp-soft imp-trace-row', fmtTime(x.time) + ' · ' + (x.cat || '未分类') + ' · ' + yuan(x.fen) + '：' + x.why));
+      });
+      sh.appendChild(tb);
     }
     var cl = btn('关闭', 'imp-btn', closeSheet); cl.id = 'impSheetClose'; cl.style.marginTop = '12px'; cl.style.width = '100%';
     sh.appendChild(cl);

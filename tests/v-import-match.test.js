@@ -119,7 +119,7 @@ const intoUnique = res => { const s = new Set(); return res.items.every(it => it
 // ===== 7. 部分付款 =====
 {
   const a = wx({ time: T(9, 1), cp: '某某餐厅', fen: 3000 }), b = wx({ time: T(9, 2), cp: '某某餐厅', fen: 3000 });
-  const { res, by } = pipeline([{ app: 'wechat', txns: [a, b] }], [man('p1', 9, 1, 10000, { cat: '餐饮' }), man('p2', 9, 2, 10000, { cat: '购物' })]);
+  const { res, by } = pipeline([{ app: 'wechat', txns: [a, b] }], [man('p1', 9, 1, 8000, { cat: '餐饮' }), man('p2', 9, 2, 8000, { cat: '购物' })]);
   ok(by[a.no].rec.cat === '餐饮' && by[a.no].bucket === 'pending' && by[a.no].why === 'partial' && by[a.no].cands[0].record === 'p1', '7 同一天、账单只有手记一部分、推荐的分类（餐饮）和手记一样：进待处理');
   ok(by[b.no].bucket === 'add', '7 分类对不上（手记是购物）：作为新增');
   ok(conserved(res), '7 守恒');
