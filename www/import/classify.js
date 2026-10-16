@@ -24,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-J';
+  var VERSION = '1016-Y';
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -135,7 +135,7 @@
       // 1. 你的规则
       for (var i = 0; i < rules.length; i++) {
         var kw = rules[i].kw;
-        if (cp.indexOf(kw) >= 0 || cc.indexOf(kw) >= 0) return { cat: rules[i].cat, layer: 'rule', conf: 'high', reason: '你的规则：' + kw + ' → ' + rules[i].cat };
+        if (cp.indexOf(kw) >= 0 || cc.indexOf(kw) >= 0) return { cat: rules[i].cat, layer: 'rule', conf: 'high', reason: '你的规则：' + kw + ' → ' + rules[i].cat, kw: kw };
       }
       // 2. 从本批合并里学
       if (cc && learned.has(cc)) { var lc = learned.get(cc); return { cat: lc, layer: 'learned', conf: 'high', reason: '从合并里学：「' + cc + '」你记成' + lc }; }
@@ -192,6 +192,7 @@
     var plan = {}; newCats.forEach(function (c) { plan[c.name] = c; });
     var recs = raw.map(function (x) {
       var o = { cat: x.cat, want: x.want || x.cat, layer: x.layer, conf: x.conf, reason: x.reason };
+      if (x.kw) o.kw = x.kw;          // 1016-Y：命中的是你的哪条规则（确认页改了分类时问「以后都改吗」）
       if (!x.cat) {
         var p = plan[x.want];
         o.newCat = x.want;

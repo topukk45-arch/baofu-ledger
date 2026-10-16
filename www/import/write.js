@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-X';
+  var VERSION = '1016-Y';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -202,11 +202,26 @@
     var catsAdded = [];
     recs.forEach(function (r) { if (r.cat && cats.indexOf(r.cat) < 0 && catsAdded.indexOf(r.cat) < 0) catsAdded.push(r.cat); });
     var have = {}; (info.catRules || []).forEach(function (r) { if (r && r.kw) have[r.kw] = r.cat; });
-    var rulesAdd = [];
+    var rulesAdd = [], rulesChange = [], learnedN = 0;
+    var okCat = function (c) { return c && c !== '未分类' && (cats.indexOf(c) >= 0 || catsAdded.indexOf(c) >= 0); };
+    // 确认页「按对方选分类」选了的：记成你的规则（1016-Y：这个关键词已经有规则、分类不一样的，改那条规则，不再加一条一样的关键词）
     Object.keys(ctx.cpCats || {}).forEach(function (kw) {
       var cat = ctx.cpCats[kw];
       if (!kw || !cat || cat === '未分类' || have[kw] === cat || kw.indexOf('（') === 0) return;
-      rulesAdd.push({ kw: kw, cat: cat });
+      if (have[kw] !== undefined) rulesChange.push({ kw: kw, from: have[kw], to: cat });
+      else { rulesAdd.push({ kw: kw, cat: cat }); have[kw] = cat; }
+    });
+    // 1016-Y：你的规则归的分类被你在确认页改掉、选了「以后都改」：改那条规则
+    Object.keys(ctx.ruleFix || {}).forEach(function (kw) {
+      var cat = ctx.ruleFix[kw];
+      if (!kw || !okCat(cat) || have[kw] === undefined || have[kw] === cat) return;
+      if (rulesChange.some(function (x) { return x.kw === kw; })) return;
+      rulesChange.push({ kw: kw, from: have[kw], to: cat });
+    });
+    // 1016-Y：从合并里学到的（同一对方至少合并上 2 次、分类一致、没矛盾）：存成你的规则；已经有这个关键词的规则就不存
+    ((input.matched && input.matched.learned) || []).forEach(function (x) {
+      if (!x || !x.kw || x.count < 2 || !okCat(x.cat) || have[x.kw] !== undefined) return;
+      rulesAdd.push({ kw: x.kw, cat: x.cat }); have[x.kw] = x.cat; learnedN++;
     });
     // 1016-J：分类对照。「新建分类」里手动选了「并到 X」的存「推荐分类 → X」；没动过的默认、选了新建的、落未分类的不存。
     // X 可以是这一批才新建的分类（在 catsAdded 里）：主页面先建分类再存对照
@@ -254,7 +269,7 @@
     return {
       version: VERSION, batch: batch, at: ctx.at || '',
       records: recs, changes: chgList, orders: orders, pending: pending, pendTaken: pendTaken,
-      cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd, typesAdd: typesAdd,
+      cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd, typesAdd: typesAdd, rulesChange: rulesChange, learnedN: learnedN,
       log: { b: batch, at: ctx.at || '', apps: apps, from: from, to: to, rng: rng, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded,
              rulesAdded: mapsAdd.length ? { cat: rulesAdd, type: typesAdd, map: mapsAdd } : { cat: rulesAdd, type: typesAdd } },
       counts: counts, total: total

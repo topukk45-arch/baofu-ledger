@@ -25,7 +25,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-O';
+  var VERSION = '1016-Y';
   var OBJ_KEYS = ['src'];          // chg 里这些字段的原值 / 新值存的是 JSON 文本
 
   function hasher() {
@@ -107,7 +107,7 @@
                 added: (log.add || []).length, deleted: 0, gone: 0, changed: [], userRefunds: [],
                 restored: 0, mergeGone: 0, kept: [], sums: 0, links: 0,
                 catsDropped: [], catsKept: [], rulesRemoved: 0, typesRemoved: 0, mapsRemoved: 0,
-                orders: 0, pending: 0, pendBack: 0, names: null };
+                orders: 0, pending: 0, pendBack: 0, rulesRestored: 0, names: null };
     var at = new Map(); S.records.forEach(function (r, k) { at.set(r.id, k); });
     var del = new Set();
     // 新增的
@@ -148,6 +148,13 @@
       (ra.cat || []).forEach(function (q) { if (dropLast(cat, function (r) { return r.kw === q.kw && r.cat === q.cat; })) sum.rulesRemoved++; });
       (ra.type || []).forEach(function (q) { if (dropLast(type, function (r) { return r.app === q.app && r.type === q.type && r.status === q.status && r.as === q.as; })) sum.typesRemoved++; });
       (ra.map || []).forEach(function (q) { if (dropLast(map, function (m) { return m.from === q.from && m.cat === q.cat; })) sum.mapsRemoved++; });
+      // 1016-Y：这批改过的你的规则：现在还是改成的那个分类，就改回原来的（原来的分类已经没了就不动）
+      (log.rulesChanged || []).slice().reverse().forEach(function (q) {
+        for (var x = cat.length - 1; x >= 0; x--) if (cat[x].kw === q.kw && cat[x].cat === q.to) {
+          if (S.cats.indexOf(q.from) >= 0) { cat[x] = { kw: q.kw, cat: q.from }; sum.rulesRestored++; }
+          return;
+        }
+      });
       if (!cat.length && !type.length && !map.length) S.importRules = undefined;
       else { o.cat = cat; o.type = type; if (map.length) o.map = map; else delete o.map; S.importRules = o; }
     }
@@ -216,7 +223,7 @@
       totals.deleted += s.deleted; totals.gone += s.gone + s.mergeGone; totals.changed += s.changed.length; totals.userRefunds += s.userRefunds.length;
       totals.restored += s.restored; totals.kept += s.kept.length; totals.sums += s.sums; totals.links += s.links;
       totals.catsDropped += s.catsDropped.length; totals.catsKept += s.catsKept.length;
-      totals.rules += s.rulesRemoved + s.typesRemoved + s.mapsRemoved; totals.orders += s.orders; totals.pending += s.pending; totals.pendBack += s.pendBack;
+      totals.rules += s.rulesRemoved + s.typesRemoved + s.mapsRemoved + s.rulesRestored; totals.orders += s.orders; totals.pending += s.pending; totals.pendBack += s.pendBack;
       if (s.legacy) totals.legacy = true;
     });
     return { ok: true, version: VERSION, target: b, chain: chain, why: d.why, steps: steps, totals: totals, after: S };
@@ -241,7 +248,7 @@
     if (t.kept) out.push('合并的手记里有 ' + t.kept + ' 处你导入后改过，保留你改的。');
     if (t.gone) out.push(t.gone + ' 条已经被你删掉了，跳过。');
     if (t.catsDropped || t.catsKept) out.push('新建的分类删 ' + t.catsDropped + ' 个' + (t.catsKept ? '，' + t.catsKept + ' 个还在用，留下' : '') + '。');
-    if (t.rules) out.push('删掉 ' + t.rules + ' 条规则和对照。');
+    if (t.rules) out.push('删掉（或改回）' + t.rules + ' 条规则和对照。');
     if (t.pending) out.push('待处理里这几次带进来的 ' + t.pending + ' 笔一起清掉。');
     if (t.pendBack) out.push('这几次处理掉的以前的待处理 ' + t.pendBack + ' 笔放回待处理。');
     if (t.legacy) out.push('这批是旧版本导入的，看不出你导入后改没改过，撤销会按导入前的样子还原。');

@@ -11,6 +11,7 @@
 //   petty[键]  疑似零碎扣款合不合并（默认 false）
 //   没见过的交易类型 / 状态怎么处理会牵连别的行，不在这里：由确认页带着临时规则重跑 route、match。
 //   sums[多笔合一的组 id] = 第几种凑法（数字）| 'none'    （1016-C）不改就一直待处理
+//   ruleFix[关键词] = 新分类   （1.1，1016-Y）你的规则归的分类在确认页被改掉、选了「以后都改」：这条规则命中的行都改，写入时改规则
 //   nearPay    （1.1，1016-X）金额相近、分类对得上自动合并的那几条手记，一键改成实付金额（默认 false：手记金额不动）
 //
 // 1016-C：
@@ -30,7 +31,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-X';
+  var VERSION = '1016-Y';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -74,6 +75,7 @@
   function plan(input, edits) {
     edits = edits || {};
     var E = edits.rows || {}, cpCats = edits.cpCats || {}, ncE = edits.newCats || {}, pettyE = edits.petty || {}, sumsE = edits.sums || {};
+    var ruleFixE = edits.ruleFix || {};
     var receiptOn = edits.receipt !== false;
     var parsed = input.parsed, matched = input.matched, info = input.info || {}, manualById = input.manualById || {};
     var clean = cleaner();
@@ -185,6 +187,7 @@
       if (e.cat) { d.cat = e.cat; d.catFrom = 'edit'; return; }
       if (d.splitFrom) { var sm = manualById[d.splitFrom]; d.cat = sm ? sm.cat : '未分类'; d.catFrom = 'split'; return; }
       d.cat = recCat(it.rec); d.catFrom = 'rec'; d.rec = it.rec || null;
+      if (it.rec && it.rec.layer === 'rule' && it.rec.kw && ruleFixE[it.rec.kw]) { d.cat = ruleFixE[it.rec.kw]; d.catFrom = 'rulefix'; }
     });
     // 合并记录（分分捐、收款按天、勾上的零碎扣款）：分分捐默认落公益类 / 其他；都不进「按对方选分类」
     var inGroup = {}, sumList = [];

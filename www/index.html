@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-X</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Y</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3475,6 +3475,11 @@
                 o.catsAdded=(Array.isArray(x.catsAdded) ? x.catsAdded : []).filter(c=>typeof c==='string' && cats.includes(c));
                 o.rulesAdded=ra;
                 if(x.only===true) o.only=true;      // 1016-Q：只对账（只补了勾选的几笔）
+                // 1016-Y：这次改了你已有的哪几条规则（关键词、原来的分类、改成的分类），撤销时改回去
+                if(Array.isArray(x.rulesChanged)){
+                    const rc=x.rulesChanged.filter(r=>r && typeof r.kw==='string' && r.kw && typeof r.from==='string' && typeof r.to==='string').map(r=>({ kw:r.kw.slice(0, 32), from:r.from, to:r.to }));
+                    if(rc.length) o.rulesChanged=rc;
+                }
                 // 1016-U：每个来源各自的账单起止 { 来源: [起, 止] }（记住上次导到哪天）
                 if(x.rng && typeof x.rng==='object' && !Array.isArray(x.rng)){
                     const rng={};
@@ -3693,6 +3698,16 @@
                 const r0=a.importRules||{};
                 a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]).concat(ws.rulesAdd), type:(r0.type||[]) });
             }
+            // 1016-Y：改你已有的规则（确认页上选了「以后都改」）：现在还是原来那个分类才改，原值记进导入记录（撤销时改回去）
+            const rulesChanged=[];
+            (Array.isArray(ws.rulesChange) ? ws.rulesChange : []).forEach(x=>{
+                if(!x || typeof x.kw!=='string' || !a.cats.includes(x.to)) return;
+                const r0=a.importRules||{}, list=(r0.cat||[]).slice(), i=list.findIndex(r=>r.kw===x.kw && r.cat===x.from);
+                if(i<0) return;
+                list[i]={ kw:x.kw, cat:x.to };
+                a.importRules=Object.assign({}, r0, { cat:list, type:(r0.type||[]) });
+                rulesChanged.push({ kw:x.kw, from:x.from, to:x.to });
+            });
             // 1016-M：类型规则（没见过的交易类型 / 状态选了怎么处理）：同一来源、同一类型（状态）已有规则的不重复存
             const typesAdd0=(Array.isArray(ws.typesAdd) ? ws.typesAdd : []).filter(x=>x && IMP_APPS.includes(x.app) && (
                 (typeof x.type==='string' && x.type && x.status===undefined && IMP_TYPE_AS.includes(x.as)) ||
@@ -3740,6 +3755,7 @@
             const W=window.JiwenImportWrite, hs=W && W.recHash ? made.map(r=>W.recHash(r)) : null;
             const lg=Object.assign({}, ws.log, { add:made.map(r=>r.id), chg, rulesAdded:ra, cpEnd:(a.cps||[]).length, pmEnd:(a.pms||[]).length });
             if(pendTaken.length) lg.pendTaken=pendTaken;
+            if(rulesChanged.length) lg.rulesChanged=rulesChanged;
             if(hs) lg.h=hs;
             logs.push(lg);
             const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);

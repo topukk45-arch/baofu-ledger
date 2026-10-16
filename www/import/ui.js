@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-Y（1.1）：按你的规则归的那笔在详情里改分类时问「只改这一条 / 以后都改」；按对方选的分类、从合并里学到满 2 次的都存成规则，结果页写学到几条。
 // 1016-X（1.1）：金额相近、分类对得上的自动合并，确认页一张卡（可一键改成实付），结果页写「N 笔手记比实付多 x 元，多半是立减」。
 // 1016-U：文件卡上写「上次微信导到 YYYY-MM-DD，这之后的才是新的」（按导入记录算，每个来源各算各的）。
 // 1016-T：结果页「接下来可以」：去看统计、按过去几个月设预算（现在先到预算页）、补一笔期初余额（主页面的 JiwenImportNext）。
@@ -119,7 +120,7 @@
   // ---------- 打开 / 关掉 ----------
   function open() {
     build();
-    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, receipt: true, sums: {} }, types: {}, statuses: {},
+    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, receipt: true, sums: {}, ruleFix: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {} } };
     try { dom.archive.textContent = '导入到存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
     dom.title.textContent = '导入账单';
@@ -556,7 +557,7 @@
         }, 'imp-cp-sel'));
         gc.appendChild(r);
       });
-      gc.appendChild(el('div', 'imp-soft', '这一版只改这次的推荐，不记成规则。'));
+      gc.appendChild(el('div', 'imp-soft', '选了的导入时记成你的规则，以后同一个对方直接归过去（规则只管以后的导入，不改已经入账的）。'));
       out.push(gc);
     }
     // 多笔合一
@@ -800,7 +801,18 @@
       if (d.cat && list.indexOf(d.cat) < 0) list.push(d.cat);
       list.forEach(function (c) { var o = el('option', null, c); o.value = c; se.appendChild(o); });
       se.value = d.cat || '未分类';
-      se.addEventListener('change', function () { setEdit(key, { cat: se.value }); });
+      se.addEventListener('change', function () {
+        var v = se.value;
+        // 1016-Y：这一笔是按你的规则归的，改掉时问一句：只改这一条，还是以后都改（不默默覆盖，也不默默无视）
+        if (d.catFrom === 'rec' && d.rec && d.rec.layer === 'rule' && d.rec.kw && v !== d.cat && v !== '未分类' && typeof window.customConfirm === 'function') {
+          var kw = d.rec.kw;
+          window.customConfirm('这笔是按你的规则「' + kw + ' → ' + d.cat + '」归的。\n\n只改这一条，还是以后「' + kw + '」都归到「' + v + '」？（选以后都改，这次同一条规则归的几笔也一起改）',
+            function () { S.edits.ruleFix = S.edits.ruleFix || {}; S.edits.ruleFix[kw] = v; replan(); if (dom.sheetMask.style.display === 'flex') openSheet(key); },
+            '改分类', { okText: '以后都改', cancelText: '只改这一条', onCancel: function () { setEdit(key, { cat: v }); } });
+          return;
+        }
+        setEdit(key, { cat: v });
+      });
       var l = el('label', 'imp-line', '分类 '); l.appendChild(se); acts.appendChild(l);
     }
     if (d.canMode) {
@@ -887,7 +899,7 @@
     var ws;
     try {
       ws = window.JiwenImportWrite.build({ parsed: S.parsed, matched: S.matched, info: S.info, manualById: S.manualById }, p,
-                                         { batch: batch, at: at, cpCats: S.edits.cpCats, types: S.types, statuses: S.statuses });
+                                         { batch: batch, at: at, cpCats: S.edits.cpCats, types: S.types, statuses: S.statuses, ruleFix: S.edits.ruleFix });
       if (onlyKeys) ws = window.JiwenImportWrite.onlyKeys(ws, onlyKeys, S.info);   // 1016-Q：只对账，只写勾选的几笔
     } catch (e) { alertMsg('整理要写的内容时出错了，什么都没写：' + (e && e.message || e)); return; }
     S.phase = 'writing';
@@ -939,6 +951,8 @@
     });
     if (!res.ws.only) card.appendChild(el('div', 'imp-line imp-res-total', '合计 ' + sum + ' 笔，文件里共 ' + res.ws.total + ' 笔' + (sum === res.ws.total ? '' : '（对不上，请截图发给开发者）')));
     if (res.r.added !== undefined && !res.ws.only) card.appendChild(el('div', 'imp-soft', '新建 ' + res.r.added + ' 条记录，改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）'));
+    if (res.ws.learnedN && !res.ws.only) card.appendChild(el('div', 'imp-soft imp-res-learned', '从合并里学到了 ' + res.ws.learnedN + ' 条规则（同一个对方合并上 2 次以上、分类一致），以后直接用。'));
+    if (res.ws.rulesChange && res.ws.rulesChange.length && !res.ws.only) card.appendChild(el('div', 'imp-soft imp-res-rulefix', '改了你的 ' + res.ws.rulesChange.length + ' 条规则：' + res.ws.rulesChange.map(function (x) { return x.kw + ' → ' + x.to; }).join('，')));
     var nmr = S.plan && S.plan.sections && S.plan.sections.nearMerged;
     if (nmr && !res.ws.only) card.appendChild(el('div', 'imp-soft imp-res-near', nmr.pay ? nmr.n + ' 笔金额差一点的手记已改成实付金额。' : nmr.n + ' 笔手记比实付多 ' + yuan(nmr.fen) + ' 元，多半是立减。'));
     if (c.pending) {
