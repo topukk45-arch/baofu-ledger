@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z8</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z9</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -7662,8 +7662,84 @@ ${detail}
             if(e.target.closest('[data-act="toBudget"]')) setStatTab('budget');
         });
 
+        // ===== 单独一版（1016-Z9）：按过去 3–6 个月的中位数给每月预算建议，一键写入 =====
+        // 只看今天之前已经过完的月份，往前最多 6 个、这个存档有记录的月份；不到 3 个月不建议。
+        // 每个分类：这几个月各花了多少（支出、口径「计入」、退款抵扣，和预算页的「已花」同一个口径；某个月没花算 0），取中位数，
+        //   往上取整到 10 元；中位数是 0 的不建议。只算不写，写不写、写哪几个由你勾
+        const BUDGET_SUGGEST={ MIN_MONTHS:3, MAX_MONTHS:6, ROUND:10 };
+        function budgetSuggest(dec, now){
+            now=now||new Date();
+            const cur=now.getFullYear()*12+now.getMonth(), has=new Set(), sums=new Map();
+            dec.forEach(x=>{
+                const m=x.y*12+x.mo; if(m>=cur) return;
+                has.add(m);
+                const e=expSigned(x.r); if(!e || recMode(x.r)!=='normal') return;
+                const c=x.r.cat||'未分类';
+                let o=sums.get(c); if(!o) sums.set(c, o=new Map());
+                o.set(m, (o.get(m)||0)+e);
+            });
+            const months=[...has].sort((a, b)=>b-a).slice(0, BUDGET_SUGGEST.MAX_MONTHS);
+            if(months.length<BUDGET_SUGGEST.MIN_MONTHS) return { months:months.length, list:[] };
+            const list=[];
+            sums.forEach((o, c)=>{
+                const vs=months.map(m=>Math.max(0, round2(o.get(m)||0))).sort((a, b)=>a-b), n=vs.length;
+                const med=n%2 ? vs[(n-1)/2] : (vs[n/2-1]+vs[n/2])/2;
+                if(!(med>0)) return;
+                list.push({ cat:c, median:round2(med), suggest:Math.ceil(med/BUDGET_SUGGEST.ROUND)*BUDGET_SUGGEST.ROUND });
+            });
+            list.sort((a, b)=>b.suggest-a.suggest);
+            return { months:months.length, list };
+        }
+        var bgSuggestOpen=false;   // var：导入结果页的「按过去几个月设预算」可能比这行先用到
+        function renderBudgetSuggest(dec){
+            let card=$('bgSuggestCard');
+            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            if(!on){ if(card) card.remove(); return; }
+            if(!card){ card=document.createElement('div'); card.className='stat-card'; card.id='bgSuggestCard'; $('statPaneBudget').appendChild(card); }
+            card.textContent='';
+            if(!bgSuggestOpen){
+                const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='bgSuggestBtn'; b.textContent='按过去几个月给预算建议（开发中）';
+                b.addEventListener('click', ()=>{ bgSuggestOpen=true; renderBudgetSuggest(dec); });
+                card.appendChild(b); return;
+            }
+            const S=budgetSuggest(dec), budgets=getBudgets(), cats=getCats();
+            const h=document.createElement('div'); h.className='stat-day-title'; h.textContent='预算建议'; card.appendChild(h);
+            const note=document.createElement('div'); note.style.fontSize='12px'; note.style.color='var(--c-text-soft)'; card.appendChild(note);
+            if(!S.list.length){
+                note.textContent = S.months<BUDGET_SUGGEST.MIN_MONTHS ? `过去有记录的完整月份只有 ${S.months} 个，至少要 ${BUDGET_SUGGEST.MIN_MONTHS} 个月才给建议。` : '过去几个月没有能参考的支出。';
+            } else {
+                note.textContent=`按过去 ${S.months} 个月每月花的中位数，往上取整到 10 元。没设预算的默认勾上；已经设了的不勾，勾上就换成建议的。`;
+                const box=document.createElement('div'); box.id='bgSuggestList';
+                S.list.filter(x=>cats.includes(x.cat)).forEach(x=>{
+                    const row=document.createElement('label'); row.className='bg-suggest-row'; row.dataset.cat=x.cat;
+                    row.style.display='flex'; row.style.gap='8px'; row.style.alignItems='center'; row.style.padding='6px 0'; row.style.fontSize='13px';
+                    const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!(budgets[x.cat]>0);
+                    const tx=document.createElement('span'); tx.style.flex='1';
+                    tx.textContent=`${x.cat}：建议 ${x.suggest.toFixed(0)} 元（中位数 ${x.median.toFixed(2)}）` + (budgets[x.cat]>0 ? `，现在 ${safeNum(budgets[x.cat]).toFixed(2)}` : '，还没设');
+                    row.appendChild(cb); row.appendChild(tx); box.appendChild(row);
+                });
+                card.appendChild(box);
+                const go=document.createElement('button'); go.type='button'; go.className='mini-btn gold'; go.id='bgSuggestApply'; go.textContent='写入勾上的'; go.style.marginTop='8px';
+                go.addEventListener('click', ()=>{
+                    const pick=[...box.querySelectorAll('.bg-suggest-row')].filter(r=>r.querySelector('input').checked).map(r=>S.list.find(x=>x.cat===r.dataset.cat));
+                    if(!pick.length){ customAlert('一个都没勾。', '预算建议'); return; }
+                    const store=loadStore(); const a=curArchive(store);
+                    a.budgets=Object.assign({}, a.budgets||{});
+                    pick.forEach(x=>{ a.budgets[x.cat]=x.suggest; });
+                    if(!saveStoreSafe(store)) return;
+                    bgSuggestOpen=false;
+                    customAlert(`写好了 ${pick.length} 个分类的每月预算。以后可以在「设置 → 管理账单分类」或预算页里改。`, '预算建议');
+                    renderStats();
+                });
+                card.appendChild(go);
+            }
+            const cl=document.createElement('button'); cl.type='button'; cl.className='mini-btn'; cl.id='bgSuggestClose'; cl.textContent='收起'; cl.style.marginTop='8px'; cl.style.marginLeft='8px';
+            cl.addEventListener('click', ()=>{ bgSuggestOpen=false; renderBudgetSuggest(dec); });
+            card.appendChild(cl);
+        }
         // 「预算」页签
         function renderBudgetPane(dec){
+            renderBudgetSuggest(dec);
             $('bgMonthLabel').textContent=`${statYear}年${pad(statMonth+1)}月`;
             const B=computeBudget(dec, statYear, statMonth);
 
@@ -8285,7 +8361,7 @@ ${detail}
         // 1016-T：导入结果页「接下来」的三个去处（import/ui.js 调）：去看统计、去设预算、补一笔期初余额（只算结余的收入）
         window.JiwenImportNext={
             stats(){ const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('flow'); },
-            budget(){ const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('budget'); },
+            budget(){ bgSuggestOpen=true; const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('budget'); },   // 1016-Z9：直接打开预算建议
             opening(){
                 const b=document.querySelector('.tab-btn[data-tab="ledger"]'); if(b) b.click();
                 openAddModal();
