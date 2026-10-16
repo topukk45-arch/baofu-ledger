@@ -29,7 +29,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-J';
+  var VERSION = '1016-Q';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -444,6 +444,23 @@
   }
 
   // 「复制给开发者」：只带表头、交易类型、交易状态，不带金额、对方、单号、文件名
+  // 1016-Q：漏记报告 / 只对账。漏记 = 「新增」组（没和手记配上、要新建的），合并记录（分分捐等）算一项；
+  //   往已有合并记录上追加的不算（只对账不改以前的记录）。→ { n:笔数, out:支出分, inc:收入分, items:[{ id, keys, title, time, fen, type, cat, units }] }
+  function missed(p) {
+    var out = { n: 0, out: 0, inc: 0, items: [] };
+    ((p.groups && p.groups.add) || []).forEach(function (d) {
+      if (d.summary) {
+        if (d.appendTo) return;
+        var t0 = d.members[0] || {};
+        out.items.push({ id: 'S:' + d.id, keys: d.members.map(function (m) { return m.key; }), title: d.title, time: d.time, fen: d.fen, type: t0.type, cat: d.cat, units: d.units });
+      } else {
+        out.items.push({ id: d.key, keys: [d.key], title: d.title || d.cp || '', time: d.time, fen: d.fen, type: d.type, cat: d.cat, units: d.units });
+      }
+    });
+    out.items.forEach(function (x) { out.n += x.units; if (x.type === 'income') out.inc += x.fen; else out.out += x.fen; });
+    return out;
+  }
+
   function devText(p) {
     var out = ['记问 · 账单导入 · 认不出来的情况（' + VERSION + '）'];
     p.files.forEach(function (f, i) {
@@ -456,6 +473,6 @@
     return out.join('\n');
   }
 
-  return { VERSION: VERSION, plan: plan, devText: devText, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
+  return { VERSION: VERSION, plan: plan, devText: devText, missed: missed, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
            GROUPS: GROUPS, GROUP_NAME: GROUP_NAME };
 });

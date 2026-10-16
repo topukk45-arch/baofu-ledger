@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-Q：确认页写「这段时间漏记了 N 笔，共 x 元」；底部「只对账」进勾选清单，「补进 K 笔」只写勾选的（write.js 的 onlyKeys）。
 // 1016-O：再导入时原来待处理的用新文件重新判断，有了结论的确认页提示「原来待处理的 N 笔有结论了」。
 // 1016-N：openPending() 是待处理页（合并 / 挂退款 / 作为新增 / 不要了 / 全部不要了、候选失效提示），入口在结果页和导入记录页。
 // 1016-M：「没见过的交易类型 / 状态」选了处理方式的，导入时存成类型规则（write.js 的 typesAdd）；选过的行重算后照样留着能改。
@@ -93,8 +94,9 @@
     page.appendChild(head); page.appendChild(body);
     var bar = el('div'); bar.id = 'impBar';
     var cancel = btn('取消', 'imp-btn', function () { close(); }); cancel.id = 'impCancel';
-    var go = btn('导入', 'imp-btn gold', onImport); go.id = 'impGo';
-    bar.appendChild(cancel); bar.appendChild(go);
+    var go = btn('导入', 'imp-btn gold', function () { if (S && S.view && S.view.recon) onImport(reconKeys()); else onImport(); }); go.id = 'impGo';
+    var rc = btn('只对账', 'imp-btn', function () { toggleRecon(); }); rc.id = 'impRecon';
+    bar.appendChild(cancel); bar.appendChild(rc); bar.appendChild(go);
     var file = el('input'); file.type = 'file'; file.id = 'impFile'; file.multiple = true; file.accept = '.csv,.xlsx,text/csv'; file.style.display = 'none';
     file.addEventListener('change', function () { var fs = [].slice.call(file.files || []); file.value = ''; if (fs.length) start(fs); });
     var sm = el('div'); sm.id = 'impSheetMask'; var sh = el('div'); sh.id = 'impSheet'; sm.appendChild(sh);
@@ -106,7 +108,7 @@
     box.appendChild(pt); box.appendChild(pb); box.appendChild(pc);
     pg.appendChild(box);
     [page, bar, file, sm, pg].forEach(function (x) { document.body.appendChild(x); });
-    dom = { page: page, body: body, bar: bar, go: go, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub };
+    dom = { page: page, body: body, bar: bar, go: go, recon: rc, cancel: cancel, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub };
     return dom;
   }
 
@@ -136,6 +138,7 @@
   function back() {
     if (dom.sheetMask.style.display === 'flex') { closeSheet(); return; }
     if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;   // 写入 / 撤销中不让退出（写完或失败会自己回来）
+    if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }   // 只对账清单 → 回到确认页
     close();
   }
 
@@ -254,6 +257,8 @@
     render();
   }
   function render() {
+    if (S.view.recon) { renderRecon(); return; }
+    dom.recon.textContent = '只对账'; dom.cancel.style.display = '';
     var y = dom.page.scrollTop;
     var b = dom.body, p = S.plan; b.innerHTML = '';
     dom.title.textContent = '导入确认';
@@ -268,7 +273,51 @@
     dom.go.textContent = (p.records + p.mergeM === 0 && p.counts.pending) ? '存下待处理 ' + p.counts.pending + ' 笔'
       : '新建 ' + p.records + ' 条记录，合并 ' + p.mergeM + ' 笔';
     dom.go.disabled = !p.canImport;
+    dom.recon.disabled = !p.canImport || !Plan.missed(p).items.length;
     dom.page.scrollTop = y;
+  }
+
+  // ---------- 1016-Q：只对账 ----------
+  // 只看漏记了哪些（「新增」组），勾几笔补进账本；其余一律不动（不合并、不登记、不标忽略、不进待处理），下次再导同一份文件结果不变
+  function toggleRecon() {
+    if (!S || S.phase !== 'confirm') return;
+    S.view.recon = !S.view.recon;
+    if (S.view.recon && !S.view.reconPick) S.view.reconPick = {};
+    dom.page.scrollTop = 0;
+    render();
+  }
+  function reconKeys() {
+    var m = Plan.missed(S.plan), out = [];
+    m.items.forEach(function (x) { if (S.view.reconPick[x.id]) out = out.concat(x.keys); });
+    return out;
+  }
+  function renderRecon() {
+    var b = dom.body, p = S.plan, m = Plan.missed(p); b.innerHTML = '';
+    dom.title.textContent = '只对账';
+    var c = el('div', 'imp-card'); c.id = 'impReconHead';
+    c.appendChild(el('div', 'imp-line', '这段时间漏记了 ' + m.n + ' 笔，共 ' + yuan(m.out) + ' 元' + (m.inc ? '（另有收入 ' + yuan(m.inc) + ' 元）' : '') + '。'));
+    c.appendChild(el('div', 'imp-soft', '勾上要补进账本的几笔，只写这几笔；其余什么都不改（不合并手记、不登记、不进待处理），下次再导同一份文件结果不变。'));
+    b.appendChild(c);
+    var list = el('div', 'imp-list'); list.id = 'impReconList';
+    var picked = 0, pickedFen = 0;
+    m.items.forEach(function (x) {
+      var r = el('label', 'imp-row-opt imp-recon-row'); r.dataset.id = x.id; r.style.padding = '8px 10px';
+      var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!S.view.reconPick[x.id];
+      cb.addEventListener('change', function () { if (cb.checked) S.view.reconPick[x.id] = true; else delete S.view.reconPick[x.id]; render(); });
+      r.appendChild(cb);
+      r.appendChild(el('span', 'grow', fmtTime(x.time) + ' · ' + (x.cat || '未分类') + ' · ' + (x.title || '—')));
+      r.appendChild(el('span', null, (x.type === 'income' ? '+' : '−') + yuan(x.fen)));
+      list.appendChild(r);
+      if (S.view.reconPick[x.id]) { picked += x.units; pickedFen += x.fen; }
+    });
+    if (!m.items.length) list.appendChild(el('div', 'imp-soft', '没有漏记的。'));
+    b.appendChild(list);
+    dom.bar.style.display = 'flex';
+    dom.cancel.style.display = 'none';
+    dom.recon.textContent = '‹ 返回';
+    dom.recon.disabled = false;
+    dom.go.textContent = '补进 ' + picked + ' 笔';
+    dom.go.disabled = !picked;
   }
 
   function renderFiles(p) {
@@ -328,6 +377,8 @@
       chips.appendChild(ch);
     });
     c.appendChild(chips);
+    var ms = Plan.missed(p);
+    if (ms.n) { var ml = el('div', 'imp-line', '这段时间漏记了 ' + ms.n + ' 笔，共 ' + yuan(ms.out) + ' 元' + (ms.inc ? '（另有收入 ' + yuan(ms.inc) + ' 元）' : '') + '（没和手记配上、要新建的）'); ml.id = 'impMissed'; c.appendChild(ml); }
     if (p.records !== p.importN) c.appendChild(el('div', 'imp-soft', '导入 ' + p.importN + ' 笔，分分捐、收款这类合并以后，实际新建 ' + p.records + ' 条记录'));
     if (p.blocking.length) c.appendChild(el('div', 'imp-line imp-bad', '有账单笔数对不上，先不能导入'));
     if (S.lost) c.appendChild(el('div', 'imp-soft', '有 ' + S.lost + ' 处改动因为重新计算失效了'));
@@ -746,8 +797,9 @@
   // ---------- 底部按钮、复制 ----------
   var BUCKET_LINE = [['add', '新增'], ['merge', '和手记合并'], ['neutral', '不计入'], ['refund', '退款'], ['pending', '待处理'],
                      ['skip', '跳过'], ['error', '出错'], ['excluded', '你勾掉的']];
-  function onImport() {
+  function onImport(onlyKeys) {
     if (!S || !S.plan || !S.plan.canImport || S.phase !== 'confirm') return;
+    if (onlyKeys && !onlyKeys.length) return;
     var p = S.plan, my = runId;
     var batch = 'b' + Date.now().toString(36);
     var now = new Date(), pad = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -756,6 +808,7 @@
     try {
       ws = window.JiwenImportWrite.build({ parsed: S.parsed, matched: S.matched, info: S.info, manualById: S.manualById }, p,
                                          { batch: batch, at: at, cpCats: S.edits.cpCats, types: S.types, statuses: S.statuses });
+      if (onlyKeys) ws = window.JiwenImportWrite.onlyKeys(ws, onlyKeys, S.info);   // 1016-Q：只对账，只写勾选的几笔
     } catch (e) { alertMsg('整理要写的内容时出错了，什么都没写：' + (e && e.message || e)); return; }
     S.phase = 'writing';
     var t0 = Date.now(), slowTimer = null;
@@ -792,15 +845,20 @@
     dom.title.textContent = '导入完成';
     dom.bar.style.display = 'none';
     var card = el('div', 'imp-card'); card.id = 'impResult';
+    if (res.ws.only) {
+      // 1016-Q：只对账
+      card.appendChild(el('h4', null, '只对账：补进了 ' + res.r.added + ' 条记录'));
+      card.appendChild(el('div', 'imp-line imp-res-only', '只写了你勾选的 ' + c.add + ' 笔，其余什么都没改。'));
+    } else
     card.appendChild(el('h4', null, '已写进账本'));
     var sum = 0;
-    BUCKET_LINE.forEach(function (x) {
+    if (!res.ws.only) BUCKET_LINE.forEach(function (x) {
       var n = c[x[0]] || 0; sum += n;
       if (!n && ['error', 'excluded', 'refund'].indexOf(x[0]) >= 0) return;
       var l = el('div', 'imp-line imp-res-' + x[0], x[1] + ' ' + n + ' 笔'); l.dataset.group = x[0]; card.appendChild(l);
     });
-    card.appendChild(el('div', 'imp-line imp-res-total', '合计 ' + sum + ' 笔，文件里共 ' + res.ws.total + ' 笔' + (sum === res.ws.total ? '' : '（对不上，请截图发给开发者）')));
-    if (res.r.added !== undefined) card.appendChild(el('div', 'imp-soft', '新建 ' + res.r.added + ' 条记录，改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）'));
+    if (!res.ws.only) card.appendChild(el('div', 'imp-line imp-res-total', '合计 ' + sum + ' 笔，文件里共 ' + res.ws.total + ' 笔' + (sum === res.ws.total ? '' : '（对不上，请截图发给开发者）')));
+    if (res.r.added !== undefined && !res.ws.only) card.appendChild(el('div', 'imp-soft', '新建 ' + res.r.added + ' 条记录，改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）'));
     if (c.pending) {
       card.appendChild(el('div', 'imp-soft', '待处理的 ' + c.pending + ' 笔没进账本，存在待处理里，以后处理。'));
       var pl = btn('还有 ' + c.pending + ' 笔待处理 ›', 'imp-link', function () { openPending(); }); pl.id = 'impResPending'; card.appendChild(pl);
@@ -857,7 +915,7 @@
     logs.forEach(function (l) {
       var r = el('div', 'imp-row-opt imp-log'); r.dataset.batch = l.b;
       var g = el('div', 'grow');
-      g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · ' + appNames(l.apps)));
+      g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · ' + appNames(l.apps) + (l.only ? ' · 只对账' : '')));
       var nAdd = (l.add || []).length, nChg = (l.chg || []).length;
       g.appendChild(el('div', 'imp-soft', '账单 ' + String(l.from || '').slice(0, 10) + ' 至 ' + String(l.to || '').slice(0, 10)
         + ' · 新建 ' + nAdd + ' 条' + (nChg ? ' · 改了 ' + nChg + ' 条以前的记录' : '') + (nb[l.b] ? ' · 待处理 ' + nb[l.b] + ' 笔' : '')));

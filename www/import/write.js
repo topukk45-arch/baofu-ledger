@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-O';
+  var VERSION = '1016-Q';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -257,6 +257,36 @@
     };
   }
 
+  // 1016-Q：只对账。从完整的写入清单里只留你勾选的几笔（keys：单号键）要新建的记录和它们的单号登记；
+  //   其余一律不动：不合并、不改以前的记录、不登记忽略、不进待处理池、不存规则 / 对照 / 类型规则。
+  //   名单按留下的记录重新拼（只加用到的名字），新分类只留用到的。导入记录照记（能撤销）
+  function onlyKeys(ws, keys, info) {
+    info = info || {};
+    var want = {}; (keys || []).forEach(function (k) { want[k] = true; });
+    var orders = ws.orders.filter(function (o) { return want[o.app + '|' + o.no] && o.st === 0 && o.ref && o.ref.tmp; });
+    var tmps = {}; orders.forEach(function (o) { tmps[o.ref.tmp] = true; });
+    var cps = (info.cps || []).slice(), pms = (info.pms || []).slice(), cpAt = {}, pmAt = {};
+    cps.forEach(function (n, i) { if (!(n in cpAt)) cpAt[n] = i; });
+    pms.forEach(function (n, i) { if (!(n in pmAt)) pmAt[n] = i; });
+    var idx = function (list, at, name) { if (!(name in at)) { at[name] = list.length; list.push(name); } return at[name]; };
+    var recs = ws.records.filter(function (r) { return tmps[r.tmp] && !r.refundOf; }).map(function (r) {
+      var o = {}; Object.keys(r).forEach(function (k) { o[k] = r[k]; });
+      if (Number.isInteger(r.cp)) o.cp = idx(cps, cpAt, ws.cps[r.cp]);
+      if (Number.isInteger(r.pm)) o.pm = idx(pms, pmAt, ws.pms[r.pm]);
+      return o;
+    });
+    var keep = {}; recs.forEach(function (r) { keep[r.tmp] = true; });
+    orders = orders.filter(function (o) { return keep[o.ref.tmp]; });
+    var catsAdded = ws.catsAdded.filter(function (c) { return recs.some(function (r) { return r.cat === c; }); });
+    var counts = {}; Object.keys(ws.counts).forEach(function (k) { counts[k] = 0; });
+    counts.add = orders.length;
+    var log = {}; Object.keys(ws.log).forEach(function (k) { log[k] = ws.log[k]; });
+    log.catsAdded = catsAdded; log.rulesAdded = { cat: [], type: [] }; log.only = true;
+    return { version: ws.version, batch: ws.batch, at: ws.at, records: recs, changes: [], orders: orders, pending: [], pendTaken: [],
+             cps: cps, pms: pms, cpLen: ws.cpLen, pmLen: ws.pmLen, catsAdded: catsAdded, rulesAdd: [], mapsAdd: [], typesAdd: [],
+             log: log, counts: counts, total: ws.total, only: true };
+  }
+
   // 1016-K：记录的指纹（给 ⑦ 撤销认「导入后你改过没有」）。不含 id、refundOf（导入备份时会重新编号），
   //   字段按名字排序（编辑时字段顺序变了不算改过），对象字段同样排序。53 位哈希，36 进制
   function canon(v) {
@@ -273,5 +303,5 @@
     return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
   }
 
-  return { VERSION: VERSION, build: build, FINAL_SKIP: FINAL_SKIP, recHash: recHash };
+  return { VERSION: VERSION, build: build, onlyKeys: onlyKeys, FINAL_SKIP: FINAL_SKIP, recHash: recHash };
 });
