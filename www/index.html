@@ -314,6 +314,44 @@
             color:var(--c-on-primary); border:none; border-radius:8px; cursor:pointer; font-size:15px; transition:0.3s; }
         .add-btn:hover { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.5); }
 
+        /* ===== 1016-UI：共用的「拇指够得着」样式。新页面都用这一套，不要每个页面各写一份 =====
+           规矩（见 CLAUDE.md「界面规矩」）：
+           1. 能点的东西点击区域至少 48×48px（字、图标本身可以小，用内边距或 .ui-hit 撑大），相邻两个之间至少 8px；
+           2. 每页的主按钮放进固定在底部的操作栏 .ui-bar（留出系统手势条 env(safe-area-inset-bottom)），
+              页面内容在底部让出操作栏的高度，不挡住最后一行；顶上的「‹ 返回」保留，但不是唯一的出口；
+           3. 几个选项的页面用整宽的 .ui-btn / .ui-choice 竖着排，主要的那个最靠下、最显眼。 */
+        :root { --ui-tap:48px; --ui-gap:8px; }
+        .ui-bar { position:fixed; left:0; right:0; bottom:0; z-index:991; display:flex; flex-wrap:wrap; gap:var(--ui-gap);
+            padding:10px 14px calc(10px + env(safe-area-inset-bottom)); background:var(--c-bg);
+            border-top:1px solid var(--c-border); box-shadow:0 -2px 12px rgba(var(--c-shadow-rgb),0.15); }
+        .ui-bar > * { flex:1 1 0; min-width:0; }
+        .ui-bar > .ui-full { flex-basis:100%; }          /* 主按钮单独占一行，放在最下面 */
+        @media (min-width:761px){ .ui-bar { padding-left:calc(50% - 366px); padding-right:calc(50% - 366px); } }
+        .ui-btn { min-height:var(--ui-tap); padding:11px 16px; border-radius:12px; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-text); font-size:16px; line-height:1.3; cursor:pointer;
+            font-family:inherit; text-align:center; transition:transform .1s, filter .1s; }
+        .ui-btn.primary { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); color:var(--c-on-primary);
+            border-color:transparent; font-weight:bold; box-shadow:0 3px 10px rgba(var(--c-shadow-rgb),0.35); }
+        .ui-btn.danger { color:var(--c-neg); }
+        .ui-btn.small { font-size:14px; padding:8px 14px; }
+        .ui-btn.block { display:block; width:100%; }
+        .ui-btn[disabled] { opacity:.45; cursor:not-allowed; box-shadow:none; }
+        .ui-btn:active:not([disabled]) { transform:scale(0.97); filter:brightness(0.96); }
+        .ui-stack { display:flex; flex-direction:column; gap:var(--ui-gap); }
+        /* 大卡片按钮：标题 + 一行说明，整块都能点 */
+        .ui-choice { display:flex; flex-direction:column; align-items:flex-start; gap:3px; width:100%; min-height:64px;
+            padding:12px 16px; border-radius:14px; border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-text); font-family:inherit; text-align:left; cursor:pointer; }
+        .ui-choice b { font-size:16px; color:var(--c-primary-deep); }
+        .ui-choice span { font-size:13px; color:var(--c-text-soft); line-height:1.5; }
+        .ui-choice:active { transform:scale(0.98); }
+        /* 文字链接、小图标：外观不变，点击区域撑到 48 */
+        .ui-tap { display:inline-flex; align-items:center; min-height:var(--ui-tap); min-width:var(--ui-tap); }
+        /* 老页面不改布局时用：外观一点不变，在元素上叠一块看不见的、至少 48×48 的点击区域（居中） */
+        .ui-hit { position:relative; }
+        .ui-hit::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:max(100%, var(--ui-tap)); height:max(100%, var(--ui-tap)); }
+
         /* 底部常驻操作栏：左「筛选」右「记一笔」，两个等宽对称按钮 */
         .action-bar { position:fixed; left:12px; right:12px; z-index:900;
             bottom:calc(60px + env(safe-area-inset-bottom));
@@ -1304,7 +1342,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z9</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-UI1</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
