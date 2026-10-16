@@ -47,15 +47,15 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
     const card = $('impTypes');
     ok(card && /群收款/.test(card.textContent) && /某虚构新类型/.test(card.textContent) && /记成规则/.test(card.textContent), '2 第一次：问没见过的类型，写明会记成规则');
     statusSeen = !!(card && /已收钱/.test(card.textContent));
-    const sel = [...d.querySelectorAll('.imp-type-sel')].find(s => /群收款/.test(s.parentNode.textContent));
+    const sel = [...d.querySelectorAll('.imp-type-sel')].find(s => /群收款/.test(s.closest('.imp-row-opt').textContent));
     select(t, sel, 'transfer');
-    const st = [...d.querySelectorAll('.imp-status-sel')].find(s => /已收钱/.test(s.parentNode.textContent));
+    const st = [...d.querySelectorAll('.imp-status-sel')].find(s => /已收钱/.test(s.closest('.imp-row-opt').textContent));
     if (st) select(t, st, 'import');
   }, { noGo: true, stay: true });
   ok(statusSeen, '2 没见过的状态「已收钱」也问了');
   await t.until(() => t.S() && t.S().phase === 'confirm' && t.S().plan && t.S().plan.counts.neutral === 2);
   {
-    const sel = [...d.querySelectorAll('.imp-type-sel')].find(s => /群收款/.test(s.parentNode.textContent));
+    const sel = [...d.querySelectorAll('.imp-type-sel')].find(s => /群收款/.test(s.closest('.imp-row-opt').textContent));
     rowsKeptOk = !!sel && sel.value === 'transfer';
     ok(rowsKeptOk, '2 选过的「群收款」重算后还在，显示选的「当转账」');
     ok(t.S().plan.groups.neutral.filter(x => x.kind === '群收款').length === 2, '2 两笔群收款挪进不计入');

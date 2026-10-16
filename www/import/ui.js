@@ -73,7 +73,17 @@
     '.imp-row-opt.imp-tap{border:1px solid var(--c-border);border-radius:10px;background:var(--c-surface);padding:8px 12px;margin:0 0 8px;}',
     '#impPage select,#impSheet select{min-height:48px;max-width:100%;padding:8px 30px 8px 12px;border:1px solid var(--c-primary);border-radius:10px;font-size:14px;font-family:inherit;color:var(--c-primary-deep);cursor:pointer;' +
       'background:var(--c-surface) url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%278%27%3E%3Cpath d=%27M1 1l5 5 5-5%27 fill=%27none%27 stroke=%27%23888%27 stroke-width=%272%27/%3E%3C/svg%3E") no-repeat right 10px center;}',
-    '.imp-row-opt select{flex:0 1 auto;max-width:11em;}',
+    '.imp-row-opt .imp-sel{flex:0 1 auto;max-width:11em;}',
+    // 1016-UI7：下拉框不弹系统自带的选择框（安卓上跟着系统主题配色，深色时白字配浅底看不清），点了从底部弹出记问自己的选择面板
+    '.imp-sel{position:relative;display:inline-flex;min-width:0;cursor:pointer;}.imp-sel select{width:100%;max-width:none;pointer-events:none;}',
+    '#impPickMask{position:fixed;inset:0;z-index:997;background:rgba(0,0,0,.35);display:none;align-items:flex-end;justify-content:center;}',
+    '#impPick{background:var(--c-surface-2);color:var(--c-text);width:100%;max-width:520px;max-height:75vh;max-height:75dvh;display:flex;flex-direction:column;border-radius:16px 16px 0 0;}',
+    '#impPick h4{font-size:15px;color:var(--c-primary-deep);padding:14px 16px 6px;}',
+    '#impPickList{overflow-y:auto;padding:0 12px;display:flex;flex-direction:column;gap:8px;}',
+    '.imp-pick-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:10px 14px;border:1px solid var(--c-border);border-radius:10px;background:var(--c-surface);color:var(--c-text);font-size:15px;font-family:inherit;text-align:left;cursor:pointer;}',
+    '.imp-pick-opt.on{background:var(--c-sel-bg);border-color:var(--c-sel-border);color:var(--c-sel-text);font-weight:bold;}',
+    '.imp-pick-opt i{font-style:normal;flex:0 0 auto;}',
+    '#impPick .imp-sheet-foot{margin:12px 0 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--c-surface-2);border-top:1px solid var(--c-border);}',
     '#impPage input[type=text]{min-height:48px;padding:8px 12px;border:1px solid var(--c-primary);border-radius:10px;font-size:15px;background:var(--c-surface);color:var(--c-text);}',
     '#impPage input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;accent-color:var(--c-primary);-webkit-appearance:checkbox;appearance:auto;}',
     '.imp-link{display:inline-flex;align-items:center;min-height:48px;background:none;border:none;color:var(--c-primary-deep);text-decoration:underline;text-underline-offset:3px;font-size:13.5px;padding:0 2px;cursor:pointer;font-family:inherit;text-align:left;}',
@@ -89,7 +99,7 @@
     '#impSheet h4{font-size:16px;margin-bottom:8px;color:var(--c-primary-deep);}',
     '#impSheet .kv{display:flex;gap:8px;font-size:14px;padding:3px 0;}#impSheet .kv span:first-child{flex:0 0 5em;color:var(--c-text-soft);}#impSheet .kv span:last-child{min-width:0;overflow-wrap:anywhere;}',
     '#impSheet .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}',
-    '#impSheet .acts > label{display:flex;align-items:center;gap:8px;flex:1 1 100%;}',
+    '#impSheet .acts > .imp-cat-line{display:flex;align-items:center;gap:8px;flex:1 1 100%;}',
     '#impSheet .imp-sheet-foot{position:sticky;bottom:0;margin:12px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--c-surface-2);border-top:1px solid var(--c-border);}',
     '.imp-sub-row{display:flex;align-items:center;gap:8px;padding:4px 0 4px 8px;min-height:48px;font-size:13.5px;}',
     '.imp-sub-row .grow{flex:1 1 140px;min-width:0;overflow-wrap:anywhere;}',
@@ -132,8 +142,10 @@
     var pc = btn('取消', 'ui-btn block', function () { close(); }); pc.id = 'impProgCancel';
     box.appendChild(pt); box.appendChild(pb); box.appendChild(pc);
     pg.appendChild(box);
-    [page, bar, file, sm, pg].forEach(function (x) { document.body.appendChild(x); });
-    dom = { page: page, body: body, bar: bar, go: go, recon: rc, cancel: cancel, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub, back: back };
+    var pm = el('div'); pm.id = 'impPickMask'; var pk = el('div'); pk.id = 'impPick'; pm.appendChild(pk);
+    pm.addEventListener('click', function (e) { if (e.target === pm) closePicker(); });
+    [page, bar, file, sm, pg, pm].forEach(function (x) { document.body.appendChild(x); });
+    dom = { page: page, body: body, bar: bar, go: go, recon: rc, cancel: cancel, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub, back: back, pickMask: pm, pick: pk };
     if (window.ResizeObserver) try { new ResizeObserver(syncBar).observe(bar); } catch (_) {}
     return dom;
   }
@@ -157,6 +169,35 @@
     close();
   }
   function setHead(title, backText) { dom.title.textContent = title; dom.back.textContent = backText || '‹ 返回'; }
+  // 1016-UI7：下拉框套一层，点了弹出记问自己的选择面板（底部，选项 48px 高、当前的那项标出来），选了照样给 select 赋值、发 change
+  function wrapSel(se) {
+    var w = el('span', 'imp-sel');
+    w.appendChild(se);
+    w.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); openPicker(se); });
+    return w;
+  }
+  function openPicker(se) {
+    var pk = dom.pick; pk.innerHTML = '';
+    var T = { 'imp-type-sel': '这类交易怎么处理', 'imp-status-sel': '这个状态怎么处理', 'imp-into': '并到哪个已有分类', 'imp-cp-sel': '这个对方归到哪个分类',
+              'imp-row-cat': '选分类', 'imp-pend-cat': '选分类', 'imp-rule-cat': '归到哪个分类', 'imp-rule-newcat': '归到哪个分类', 'imp-map-cat': '归到哪个分类' };
+    pk.appendChild(el('h4', null, T[se.className.split(' ')[0]] || '选一个'));
+    var list = el('div'); list.id = 'impPickList'; pk.appendChild(list);
+    var cur = null;
+    [].slice.call(se.options).forEach(function (o) {
+      var on = o.value === se.value;
+      var b = btn('', 'imp-pick-opt' + (on ? ' on' : ''), function () {
+        closePicker();
+        if (se.value !== o.value) { se.value = o.value; se.dispatchEvent(new Event('change', { bubbles: true })); }
+      });
+      b.dataset.value = o.value;
+      b.appendChild(el('span', null, o.textContent)); if (on) { b.appendChild(el('i', null, '✓')); cur = b; }
+      list.appendChild(b);
+    });
+    var ft = el('div', 'imp-sheet-foot'); var cl = btn('取消', 'ui-btn block', closePicker); cl.id = 'impPickCancel'; ft.appendChild(cl); pk.appendChild(ft);
+    dom.pickMask.style.display = 'flex';
+    if (cur) list.scrollTop = Math.max(0, cur.offsetTop - list.clientHeight / 2);
+  }
+  function closePicker() { if (dom) dom.pickMask.style.display = 'none'; }
   function closeBtn(text) { var b = btn(text || '返回', 'ui-btn', function () { close(); }); b.id = 'impBarClose'; return b; }
 
   // ---------- 打开 / 关掉 ----------
@@ -181,7 +222,7 @@
     if (J()) try { J().cancel(); } catch (_) {}
     if (!dom) return;
     dom.page.style.display = 'none'; dom.bar.style.display = 'none';
-    dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none';
+    dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none'; dom.pickMask.style.display = 'none';
     dom.body.innerHTML = '';
     S = null;
   }
@@ -189,6 +230,7 @@
   // 返回键：先关最上面那一层（行详情 → 进度（停掉线程，整页也关掉）→ 整页）
   function canBack() { return isOpen(); }
   function back() {
+    if (dom.pickMask.style.display === 'flex') { closePicker(); return; }
     if (dom.sheetMask.style.display === 'flex') { closeSheet(); return; }
     if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;   // 写入 / 撤销中不让退出（写完或失败会自己回来）
     if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }
@@ -574,7 +616,7 @@
       var se = el('select', cls || '');
       opts.forEach(function (o) { var op = el('option', null, o[1]); op.value = o[0]; se.appendChild(op); });
       se.value = val; se.addEventListener('change', function () { fn(se.value); });
-      return se;
+      return wrapSel(se);
     }
     // 1016-M：选过的那几行重算以后就不算「没见过」了，照样留在这里（能改回去）；记在 S.seenTypes / S.seenStatuses
     S.seenTypes = S.seenTypes || {}; S.seenStatuses = S.seenStatuses || {};
@@ -932,7 +974,7 @@
         }
         setEdit(key, { cat: v });
       });
-      var l = el('label', 'imp-line', '分类 '); se.style.flex = '1'; se.style.maxWidth = 'none'; l.appendChild(se); acts.appendChild(l);
+      var l = el('div', 'imp-line imp-cat-line', '分类 '); var sw = wrapSel(se); sw.style.flex = '1'; l.appendChild(sw); acts.appendChild(l);
     }
     if (d.canMode) {
       ['normal', 'flow', 'skip'].forEach(function (m) {
@@ -1234,14 +1276,14 @@
     rules.cat.forEach(function (r, i) {
       var row = el('div', 'imp-row-opt imp-rule-row'); row.dataset.kw = r.kw;
       row.appendChild(el('span', 'grow', '「' + r.kw + '」→'));
-      row.appendChild(catSel(r.cat, function (v) { var n = rules.cat.slice(); n[i] = { kw: r.kw, cat: v }; save(Object.assign({}, rules, { cat: n }), '已改：「' + r.kw + '」→ ' + v); }, 'imp-rule-cat'));
+      row.appendChild(wrapSel(catSel(r.cat, function (v) { var n = rules.cat.slice(); n[i] = { kw: r.kw, cat: v }; save(Object.assign({}, rules, { cat: n }), '已改：「' + r.kw + '」→ ' + v); }, 'imp-rule-cat')));
       row.appendChild(btn('删除', 'imp-btn imp-rule-del', function () { save(Object.assign({}, rules, { cat: rules.cat.filter(function (_, k) { return k !== i; }) }), '已删：「' + r.kw + '」'); }));
       c1.appendChild(row);
     });
     var add = el('div', 'imp-row-opt'); add.id = 'impRuleAdd';
     var kw = el('input'); kw.type = 'text'; kw.placeholder = '交易对方里的词'; kw.maxLength = 32; kw.id = 'impRuleKw'; kw.style.flex = '1 1 8em'; kw.style.minWidth = '0';
     var ac = catSel(null, function () {}, 'imp-rule-newcat'); ac.id = 'impRuleNewCat';
-    add.appendChild(kw); add.appendChild(ac);
+    add.appendChild(kw); add.appendChild(wrapSel(ac));
     var ab = btn('添加', 'imp-btn gold', function () {
       var k = kw.value.trim();
       if (!k) { alertMsg('先写一个词。', '管理导入规则'); return; }
@@ -1258,7 +1300,7 @@
     rules.map.forEach(function (m, i) {
       var row = el('div', 'imp-row-opt imp-map-row'); row.dataset.from = m.from;
       row.appendChild(el('span', 'grow', '推荐「' + m.from + '」→'));
-      row.appendChild(catSel(m.cat, function (v) { var n = rules.map.slice(); n[i] = { from: m.from, cat: v }; save(Object.assign({}, rules, { map: n }), '已改：推荐「' + m.from + '」→ ' + v); }, 'imp-map-cat'));
+      row.appendChild(wrapSel(catSel(m.cat, function (v) { var n = rules.map.slice(); n[i] = { from: m.from, cat: v }; save(Object.assign({}, rules, { map: n }), '已改：推荐「' + m.from + '」→ ' + v); }, 'imp-map-cat')));
       row.appendChild(btn('删除', 'imp-btn imp-map-del', function () { save(Object.assign({}, rules, { map: rules.map.filter(function (_, k) { return k !== i; }) }), '已删：推荐「' + m.from + '」的对照'); }));
       c2.appendChild(row);
     });
@@ -1343,7 +1385,7 @@
       if (!x.refund) {
         se = el('select', 'imp-pend-cat');
         cats.forEach(function (n) { var o = el('option', null, n); o.value = n; se.appendChild(o); });
-        var lb = el('label', 'imp-soft', '分类 '); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '6px'; lb.style.flex = '1 1 100%'; se.style.flex = '1'; se.style.maxWidth = 'none'; lb.appendChild(se); acts.appendChild(lb);
+        var lb = el('div', 'imp-soft', '分类 '); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '6px'; lb.style.flex = '1 1 100%'; var sw = wrapSel(se); sw.style.flex = '1'; lb.appendChild(sw); acts.appendChild(lb);
       }
       var nb = btn(x.refund ? '作为新增（只算结余）' : '作为新增', 'imp-btn imp-pend-new', function () {
         act([{ key: x.key, do: 'new', cat: se ? se.value : '未分类' }], '已作为新增记进账本');

@@ -69,6 +69,18 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   ok($('impLogsPending') && $('impLogs').compareDocumentPosition($('impLogsPending')) & 4, '9 导入记录：待处理入口在记录下面');
   t.w.JiwenImportUI.openRules();
   ok(inBar('impBarClose') && $('impRuleAddCard') && $('impRuleAddCard').contains($('impRuleAddBtn')) && $('impRuleAddCard').classList.contains('imp-push'), '10 规则页：底部有「返回」，「加一条分类规则」单独一块放在下面');
+  // 1016-UI7：下拉框不弹系统自带的选择框，点了从底部弹出记问自己的选择面板
+  const ns = $('impRuleNewCat'), wrap = ns.parentNode;
+  ok(wrap.classList.contains('imp-sel'), '11 下拉框套了一层（点它弹记问自己的面板）');
+  wrap.click();
+  const opts = [...t.d.querySelectorAll('#impPickList .imp-pick-opt')];
+  ok($('impPickMask').style.display === 'flex' && opts.length === ns.options.length && opts.filter(b => b.classList.contains('on')).length === 1, '11 选择面板打开：选项一个不少，当前那项标出来');
+  let changed = 0; ns.addEventListener('change', () => changed++);
+  const other = opts.find(b => !b.classList.contains('on'));
+  other.click();
+  ok($('impPickMask').style.display === 'none' && ns.value === other.dataset.value && changed === 1, '11 选一项：面板收起，下拉框的值跟着变、发一次 change');
+  wrap.click(); await t.back();
+  ok($('impPickMask').style.display === 'none' && $('impPage').style.display === 'block', '11 面板开着时按返回键只关面板');
   $('impBarClose').click();
   ok($('impPage').style.display === 'none' && $('impBar').style.display === 'none', '10 点「返回」关掉导入页、操作栏一起收起');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
