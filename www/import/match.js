@@ -9,7 +9,7 @@
 //   2. 主页面把这些记录挑几个字段交进来：
 //        manual      [{ id, time, type, fen, cat, mode }]
 //        refundCands [{ id, time, type, fen, refunded, cp, cat }]（cp 是对方名，不是编号）
-//      match(定去向结果, 解析结果, { manual, refundCands, cats, rules, isNewUser, merchants })
+//      match(定去向结果, 解析结果, { manual, refundCands, cats, rules, isNewUser, merchants, maps })
 //
 // 配对（只配没有来源标记的手记；跨来源永远不按金额自动合并）：
 //   第一轮 精确：相差 0、1、2、3 天一层一层配，只比日期不比时分。每一层里，同收支、金额相同（或等于净额）、
@@ -38,7 +38,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-I';
+  var VERSION = '1016-J';
   var PARTIAL_MAX = 3;
   var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
@@ -157,7 +157,7 @@
     var pre = conflictSums(bills, idx, free, function (m, why) { mstate.set(m.id, 'reserved'); reservedBy[m.id] = why; }, {
       classify: function (bs) {
         var res = C.classify(bs.map(function (b) { return { app: parsed.files[b.it.file].app, cp: b.r.cp, desc: b.r.desc, kind: b.r.kind, io: b.it.io }; }),
-          { cats: cats, rules: ctx.rules, learned: new Map(), borrowRows: [], merchants: ctx.merchants, isNewUser: !!ctx.isNewUser });
+          { cats: cats, rules: ctx.rules, learned: new Map(), borrowRows: [], merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps });
         return res.recs;
       }, scan: scan
     });
@@ -257,7 +257,7 @@
     var aliRows = [];
     rowItems.forEach(function (it) { if (it.bucket !== 'error') { var r = rowOf(parsed, it); if (parsed.files[it.file].app === 'alipay') aliRows.push({ cp: r.cp, kind: r.kind }); } });
     var cl = C.classify(toClass.map(function (it) { var r = rowOf(parsed, it); return { app: parsed.files[it.file].app, cp: r.cp, desc: r.desc, kind: r.kind, io: it.io }; }),
-      { cats: cats, rules: ctx.rules, learned: learned, borrowRows: aliRows, merchants: ctx.merchants, isNewUser: !!ctx.isNewUser });
+      { cats: cats, rules: ctx.rules, learned: learned, borrowRows: aliRows, merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps });
     toClass.forEach(function (it, i) { it.rec = cl.recs[i]; });
 
     // ---------- 第二轮（1016-C）：多笔合一，先于金额相近 / 部分付款 ----------

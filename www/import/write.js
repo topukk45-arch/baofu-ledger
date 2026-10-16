@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-F';
+  var VERSION = '1016-J';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -199,6 +199,16 @@
       if (!kw || !cat || cat === '未分类' || have[kw] === cat || kw.indexOf('（') === 0) return;
       rulesAdd.push({ kw: kw, cat: cat });
     });
+    // 1016-J：分类对照。「新建分类」里手动选了「并到 X」的存「推荐分类 → X」；没动过的默认、选了新建的、落未分类的不存。
+    // X 可以是这一批才新建的分类（在 catsAdded 里）：主页面先建分类再存对照
+    var haveMap = {}; (info.catMaps || []).forEach(function (m) { if (m && m.from) haveMap[m.from] = m.cat; });
+    var mapsAdd = [];
+    ((p.sections && p.sections.newCats) || []).forEach(function (n) {
+      if (!n.picked || n.on || !n.into || n.into === '未分类') return;
+      if (cats.indexOf(n.into) < 0 && catsAdded.indexOf(n.into) < 0) return;
+      if (n.name in haveMap) return;
+      mapsAdd.push({ from: n.name, cat: n.into });
+    });
 
     // ---- 这一批的导入记录（新记录的编号由主页面填进 add）----
     var apps = [], from = '', to = '';
@@ -213,9 +223,9 @@
     return {
       version: VERSION, batch: batch, at: ctx.at || '',
       records: recs, changes: chgList, orders: orders, pending: pending,
-      cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd,
+      cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd,
       log: { b: batch, at: ctx.at || '', apps: apps, from: from, to: to, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded,
-             rulesAdded: { cat: rulesAdd, type: [] } },
+             rulesAdded: mapsAdd.length ? { cat: rulesAdd, type: [], map: mapsAdd } : { cat: rulesAdd, type: [] } },
       counts: counts, total: total
     };
   }

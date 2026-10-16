@@ -211,7 +211,7 @@
       S.ledger = store().ledgerFor(r.result);
       progress('和手记配对、推荐分类…', 0, 1);
       return J().run('match', { routed: S.routed, parsed: S.parsed, manual: S.ledger.manual, refundCands: S.ledger.refundCands,
-                                cats: S.info.cats, rules: S.info.catRules, isNewUser: S.info.isNewUser, trace: true });
+                                cats: S.info.cats, rules: S.info.catRules, maps: S.info.catMaps || [], isNewUser: S.info.isNewUser, trace: true });
     }).then(function (r) {
       if (!alive() || !r) return;
       S.matched = r.result;
@@ -391,10 +391,10 @@
       s.newCats.forEach(function (x) {
         var r = el('div', 'imp-row-opt'); r.dataset.cat = x.name;
         var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
-        cb.addEventListener('change', function () { S.edits.newCats[x.name] = { on: cb.checked, into: cb.checked ? null : (x.into || null) }; replan(); });
+        cb.addEventListener('change', function () { S.edits.newCats[x.name] = { on: cb.checked, into: cb.checked ? null : (x.into || null), picked: !cb.checked && !!x.picked }; replan(); });
         r.appendChild(cb); r.appendChild(el('span', 'grow', '建「' + x.name + '」 ' + x.count + ' 笔'));
         var opts = [['', '并到已有…']].concat(S.info.cats.map(function (c) { return [c, '并到「' + c + '」']; }));
-        r.appendChild(select(opts, x.into || '', function (v) { S.edits.newCats[x.name] = { on: false, into: v || null }; replan(); }, 'imp-into'));
+        r.appendChild(select(opts, x.into || '', function (v) { S.edits.newCats[x.name] = { on: false, into: v || null, picked: !!v }; replan(); }, 'imp-into'));
         nc.appendChild(r);
       });
       out.push(nc);

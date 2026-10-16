@@ -6,7 +6,7 @@
 // 改动（edits），都按单号键（route 给每一行的 key）存：
 //   rows[key]  = { exclude, cat, mode: 'normal'|'flow'|'skip', split, pick: 'new' | 'drop' | { record } | { row } }
 //   cpCats[清洗后的对方] = 分类          未分类按对方归组，一组选一次
-//   newCats[分类名] = { on, into }        新建分类：建不建、不建就并到哪个已有分类
+//   newCats[分类名] = { on, into, picked }  新建分类：建不建、不建就并到哪个已有分类；picked = 你在下拉里手动选过「并到」（1016-J：只有它存对照）
 //   receipt    收款按天合并（默认 true）
 //   petty[键]  疑似零碎扣款合不合并（默认 false）
 //   没见过的交易类型 / 状态怎么处理会牵连别的行，不在这里：由确认页带着临时规则重跑 route、match。
@@ -29,7 +29,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-I';
+  var VERSION = '1016-J';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
@@ -83,6 +83,7 @@
       var e = ncE[c.name] || {};
       ncPlan[c.name] = { on: e.on !== undefined ? !!e.on : !!c.defaultOn,
                          into: e.into !== undefined ? e.into : (info.isNewUser ? c.mergeInto : null) };
+      var np = ncPlan[c.name]; np.picked = !np.on && !!np.into && np.into !== '未分类' && e.into !== undefined && !!e.picked;
     });
     function recCat(rec) {
       if (!rec) return '未分类';
@@ -311,7 +312,7 @@
     var rc = (matched.summaries || []).filter(function (g) { return g.kind === 'receipt'; });
     sec.receipt = rc.length ? { on: receiptOn, days: rc.length, n: rc.reduce(function (s, g) { return s + g.count; }, 0), fen: rc.reduce(function (s, g) { return s + g.fen; }, 0) } : null;
     sec.petty = (matched.suspects || []).map(function (x) { var k = x.app + '|' + x.cp + '|' + x.month; return { key: k, app: x.app, cp: x.cp, month: x.month, n: x.count, fen: x.fen, on: !!pettyE[k] }; });
-    sec.newCats = newCatsIn.map(function (c) { var p = ncPlan[c.name]; return { name: c.name, count: c.count, on: p.on, into: p.into, defaultOn: !!c.defaultOn }; });
+    sec.newCats = newCatsIn.map(function (c) { var p = ncPlan[c.name]; return { name: c.name, count: c.count, on: p.on, into: p.into, picked: p.picked, defaultOn: !!c.defaultOn }; });
     sec.cpGroups = Object.keys(cpg).map(function (k) {
       var g = cpg[k], hb = null, hn = 0;
       Object.keys(g.hours).forEach(function (h) { if (g.hours[h] > hn) { hn = g.hours[h]; hb = +h; } });

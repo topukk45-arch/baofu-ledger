@@ -14,6 +14,9 @@
 //   平台名（淘宝、天猫、京东、拼多多、抖音商城、唯品会）在对方里只算「低」，先看商品说明里有没有更具体的词，再看支付宝分类，最后才用平台；
 //   只在商品说明里找到的（低）按清洗后的对方投票：同一个对方票数最多的唯一一个分类给这个对方的所有这种行，打平就都不推荐，
 //   免得同一个对方的几笔有的推成「游戏」、有的未分类。
+// 1016-J：分类对照（importRules.map [{ from: 推荐分类, cat: 我的分类 }]）：确认页「新建分类」里手动选过「并到已有 X」的，下次直接归到 X。
+//   只管「落不到」这一步：同名 → 同义 → 对照 → 新建分类建议。你的规则、从合并里学的在前面就返回了，不经过这一步。
+//   目标分类不在存档里（被删了）的对照不算。命中对照的层级照旧（内置 / 支付宝 / 互借），理由写「你的对照：A → X（原依据）」。
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module && module.exports) module.exports = api;
@@ -21,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-I';
+  var VERSION = '1016-J';
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -98,7 +101,8 @@
   // ---------- 主函数 ----------
   //   rows：[{ app, cp, desc, kind, io }]（要推荐的行）
   //   ctx：{ cats: 存档分类, rules: importRules.cat [{kw, cat}], learned: Map(清洗后的对方 → 分类),
-  //          borrowRows: 本批全部支付宝行 [{ cp, kind }]（互借用）, merchants, isNewUser }
+  //          borrowRows: 本批全部支付宝行 [{ cp, kind }]（互借用）, merchants, isNewUser,
+  //          maps: importRules.map [{ from, cat }]（1016-J 分类对照） }
   //   返回 { recs: 与 rows 一一对应, newCats: [{ name, count, defaultOn, mergeInto }] }
   function classify(rows, ctx) {
     ctx = ctx || {};
@@ -107,6 +111,10 @@
       .filter(function (r) { return r && typeof r.kw === 'string' && r.kw && cats.indexOf(r.cat) >= 0; })
       .slice().sort(function (a, b) { return b.kw.length - a.kw.length; });
     var learned = ctx.learned instanceof Map ? ctx.learned : new Map();
+    var mapOf = {};
+    (Array.isArray(ctx.maps) ? ctx.maps : []).forEach(function (m) {
+      if (m && typeof m.from === 'string' && m.from && cats.indexOf(m.cat) >= 0 && !(m.from in mapOf)) mapOf[m.from] = m.cat;
+    });
     var words = builtinIndex(ctx.merchants);
     var nonPlat = words.filter(function (x) { return !isPlatform(x[0]); });
     // 两家互借：清洗后的对方 → 支付宝分类（取次数最多的，打平不借）
@@ -168,6 +176,10 @@
     raw.forEach(function (x) {
       if (x.cat) return;
       var c = land(x.want, cats);
+      if (!c && Object.prototype.hasOwnProperty.call(mapOf, x.want)) {
+        c = mapOf[x.want];
+        x.reason = '你的对照：' + x.want + ' → ' + c + '（' + x.reason + '）';
+      }
       if (c) x.cat = c; else need[x.want] = (need[x.want] || 0) + 1;
     });
     var other = land('其他', cats);

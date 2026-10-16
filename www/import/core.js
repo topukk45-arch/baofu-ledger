@@ -21,7 +21,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-I';
+  var VERSION = '1016-J';
   // 每处理这么多个字符 / 字节报一次进度
   var STEP = 1 << 16;
 
@@ -73,13 +73,13 @@
     // 主页面要查单号表 / 账本之前，先问线程这一批要查什么（route.js / match.js 主页面不载入）
     lookups: function (data, onProgress, ctx) { return ctx.route.lookups(data && data.parsed); },
     ledgerQuery: function (data, onProgress, ctx) { return ctx.match.ledgerQuery(data && data.routed, data && data.parsed); },
-    // 配对与分类：data = { routed, parsed, manual, refundCands, cats, rules, isNewUser }，见 match.js
+    // 配对与分类：data = { routed, parsed, manual, refundCands, cats, rules, maps, isNewUser }，见 match.js（maps：1016-J 分类对照）
     //   （manual、refundCands 由主页面按 match.ledgerQuery 从账本里取出来；内置词表线程里自己有）
     match: function (data, onProgress, ctx) {
       if (!ctx || !ctx.match) throw new Error('配对模块没有载入');
       data = data || {};
       var r = ctx.match.match(data.routed, data.parsed, { manual: data.manual, refundCands: data.refundCands, cats: data.cats,
-        rules: data.rules, isNewUser: data.isNewUser, merchants: ctx.merchants, trace: !!data.trace });
+        rules: data.rules, maps: data.maps, isNewUser: data.isNewUser, merchants: ctx.merchants, trace: !!data.trace });
       if (onProgress) onProgress(1, 1);
       return r;
     },

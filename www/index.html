@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-I</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-J</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3216,7 +3216,8 @@
         // 记录上的新字段（都可有可无，手记不填，没有就不写）：
         //   cp 交易对方（存档里 cps 名单的编号）、pm 支付方式（pms 名单的编号）、oc 原始分类（原文）、
         //   src { app }（alipay / wechat）、batch 导入批次号。名单只往后加，编号就是位置；撤销按导入前的长度截断。
-        // 存档里（meta）：cps、pms、importRules { cat:[{kw,cat}], type:[{app, type 或 status, as}] }。
+        // 存档里（meta）：cps、pms、importRules { cat:[{kw,cat}], type:[{app, type 或 status, as}], map:[{from,cat}] }。
+        //   map（1016-J）：分类对照「推荐分类 → 我的分类」，确认页「新建分类」里手动选了「并到已有」时存；没有就不写这一类。
         const IMP_APPS=['alipay','wechat'];
         const IMP_LOG_MAX=10;
         const IMP_TYPE_AS=['normal','transfer','refund','skip'];   // 新交易类型怎么处理：照收/支、转账不计入、当退款（1.1）、跳过
@@ -3398,7 +3399,18 @@
                     return { app:x.app, status:x.status.trim().slice(0, 32), as:x.as };
                 return null;
             }).filter(Boolean);
-            return (cat.length || type.length) ? { cat, type } : null;
+            // 分类对照：from 是推荐分类名，同一个 from 只留第一条；目标分类必须在存档里
+            const seenFrom=new Set();
+            const map=(Array.isArray(r.map) ? r.map : []).slice(0, 500).map(x=>{
+                if(!x || typeof x!=='object') return null;
+                const from=typeof x.from==='string' ? x.from.trim().slice(0, 32) : '';
+                const c=typeof x.cat==='string' ? x.cat : '';
+                if(!from || !cats.includes(c) || seenFrom.has(from)) return null;
+                seenFrom.add(from);
+                return { from, cat:c };
+            }).filter(Boolean);
+            if(!cat.length && !type.length && !map.length) return null;
+            return map.length ? { cat, type, map } : { cat, type };
         }
         function impCleanPending(items, mapId){
             if(!Array.isArray(items)) return [];
@@ -3468,7 +3480,7 @@
             const o={};
             if(Array.isArray(a.cps) && a.cps.length) o.cps=a.cps;
             if(Array.isArray(a.pms) && a.pms.length) o.pms=a.pms;
-            if(a.importRules && ((a.importRules.cat||[]).length || (a.importRules.type||[]).length)) o.importRules=a.importRules;
+            if(a.importRules && ((a.importRules.cat||[]).length || (a.importRules.type||[]).length || (a.importRules.map||[]).length)) o.importRules=a.importRules;
             return o;
         }
         // 单独存的那几样（导出备份 / 云同步时读）。withOrders：要不要带单号表（云同步不带，见 odSyncNow）
@@ -3492,14 +3504,20 @@
             }
             return o;
         }
-        // 分类改名 / 删除时，分类规则跟着改 / 一起删
+        // 分类改名 / 删除时，分类规则、分类对照（1016-J）跟着改 / 一起删
         function impRulesRenameCat(a, from, to){
-            if(!a.importRules || !Array.isArray(a.importRules.cat)) return;
-            a.importRules=Object.assign({}, a.importRules, { cat:a.importRules.cat.map(r=>r.cat===from ? { kw:r.kw, cat:to } : r) });
+            if(!a.importRules) return;
+            const o=Object.assign({}, a.importRules);
+            if(Array.isArray(o.cat)) o.cat=o.cat.map(r=>r.cat===from ? { kw:r.kw, cat:to } : r);
+            if(Array.isArray(o.map)) o.map=o.map.map(m=>m.cat===from ? { from:m.from, cat:to } : m);
+            a.importRules=o;
         }
         function impRulesDropCat(a, name){
-            if(!a.importRules || !Array.isArray(a.importRules.cat)) return;
-            a.importRules=Object.assign({}, a.importRules, { cat:a.importRules.cat.filter(r=>r.cat!==name) });
+            if(!a.importRules) return;
+            const o=Object.assign({}, a.importRules);
+            if(Array.isArray(o.cat)) o.cat=o.cat.filter(r=>r.cat!==name);
+            if(Array.isArray(o.map)){ o.map=o.map.filter(m=>m.cat!==name); if(!o.map.length) delete o.map; }
+            a.importRules=o;
         }
 
         // ---- 存储估算：导入前预检用 ----
@@ -3634,6 +3652,15 @@
                 const r0=a.importRules||{};
                 a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]).concat(ws.rulesAdd), type:(r0.type||[]) });
             }
+            // 分类对照（1016-J）：上面已经先建了新分类，目标是这一批新建的也认；同一个推荐分类已有对照的不重复存
+            const mapsAdd=(Array.isArray(ws.mapsAdd) ? ws.mapsAdd : []).filter(m=>m && typeof m.from==='string' && m.from && a.cats.includes(m.cat));
+            let mapsDone=[];
+            if(mapsAdd.length){
+                const r0=a.importRules||{}, had=new Set((r0.map||[]).map(m=>m.from));
+                const add=mapsAdd.filter(m=>!had.has(m.from));
+                mapsDone=add.map(m=>({ from:m.from, cat:m.cat }));
+                if(add.length) a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]), type:(r0.type||[]), map:(r0.map||[]).concat(add.map(m=>({ from:m.from, cat:m.cat }))) });
+            }
             prog && prog('write', 0, 1);
             // 单号表、待处理池、导入记录
             const orders=ws.orders.map(x=>impCleanOrder({ app:x.app, no:x.no, time:x.time, id:res(x.ref)||'', batch:ws.batch, st:x.st })).filter(Boolean);
@@ -3647,7 +3674,9 @@
             }
             const curLog=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
             const logs=((curLog && curLog.list) || []).slice();
-            logs.push(Object.assign({}, ws.log, { add:made.map(r=>r.id), chg }));
+            const ra0=(ws.log && ws.log.rulesAdded) || { cat:[], type:[] };
+            const ra={ cat:ra0.cat||[], type:ra0.type||[] }; if(mapsDone.length) ra.map=mapsDone;   // 导入记录里只记真存进去的对照（给 ⑦ 撤销）
+            logs.push(Object.assign({}, ws.log, { add:made.map(r=>r.id), chg, rulesAdded:ra }));
             const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
             pairs.push([impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:cleanLog })]);
             if(window.__impFailAt==='beforeSave') throw impErr('test');
@@ -3780,7 +3809,7 @@
                 const a=ledgerAssembleArchive(t.e, t.aid), st=t.e.archs.get(t.aid), n=st ? st.recs.length : 0;
                 const cats=(a.cats||[]).slice(), rules=a.importRules||{};
                 const isDefault=cats.length===DEFAULT_CATS.length && DEFAULT_CATS.every(c=>cats.includes(c));
-                return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(),
+                return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(),
                          cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）
