@@ -1177,12 +1177,6 @@
   function renderLogs(logs, pend) {
     pend = pend || [];
     var nb = {}; pend.forEach(function (x) { nb[x.b] = (nb[x.b] || 0) + 1; });
-    if (pend.length) {
-      var pc = el('div', 'imp-card');
-      pc.appendChild(el('div', 'imp-soft', '导入时拿不准、没进账本的'));
-      var pb = btn('待处理 ' + pend.length + ' 笔，去处理 ›', 'ui-btn block', function () { openPending(); }); pb.id = 'impLogsPending'; pb.style.marginTop = '6px';
-      pc.appendChild(pb); dom.body.appendChild(pc);
-    }
     var c = el('div', 'imp-card imp-push'); c.id = 'impLogs';     // 1016-UI2：记录少时整块落到下面，「撤销」够得着
     c.appendChild(el('h4', null, '最近的导入（只保留 10 次）'));
     if (!logs.length) c.appendChild(el('div', 'imp-soft', '这个存档还没有导入记录。'));
@@ -1199,6 +1193,13 @@
       c.appendChild(r);
     });
     dom.body.appendChild(c);
+    // 待处理的入口放在记录下面（离拇指近）
+    if (pend.length) {
+      var pc = el('div', 'imp-card');
+      pc.appendChild(el('div', 'imp-soft', '导入时拿不准、没进账本的'));
+      var pb = btn('待处理 ' + pend.length + ' 笔，去处理 ›', 'ui-btn block', function () { openPending(); }); pb.id = 'impLogsPending'; pb.style.marginTop = '6px';
+      pc.appendChild(pb); dom.body.appendChild(pc);
+    }
   }
   // ---------- 第二期：管理导入规则 ----------
   // 你的分类规则（关键词 → 分类，关键词越长越先用）、分类对照（推荐分类 → 你的分类）、类型规则（没见过的交易类型 / 状态怎么处理）。
