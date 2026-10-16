@@ -358,7 +358,7 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
   const res = run(parsed, { rules, oldRefunds: [{ cp: '某虚构饭店', fen: 5000, time: '2026-03-07T09:30', id: 'oldR' }] }), m = by(parsed, res);
   ok(m[nos.ruled].bucket === 'add', '11 用户把类型定成「正常收支」的照规则');
   ok(m[nos.oldfull].bucket === 'add' && m[nos.oldfull].why === 'fullrefundold' && m[nos.oldfull].noMerge && m[nos.oldfull].refundRec === 'oldR', '11 已全额退款、退款以前导入过：照常新增、不和手记合并，记下那条退款记录');
-  ok(m[nos.nofull].regIgnore.length === 2 && m[nos.nofull].regIgnore[1] === R.refundMarkKey('wechat', '某虚构饭店', 5000), '11 退款不在文件里的原单：带上「不要了」时要登记的忽略键（原单 + 退款记号）');
+  ok(m[nos.nofull].regIgnore.length === 2 && m[nos.nofull].regIgnore[1] === R.refundMarkKey('wechat', '某虚构饭店', 5000, '2026-03-08'), '11 退款不在文件里的原单：带上「不要了」时要登记的忽略键（原单 + 退款记号）');
   ok(m[nos.nofull].bucket === 'pending' && m[nos.nofull].why === 'fullnorefund', '11 已全额退款、退款时间早于原单的不算：进待处理');
   ok(conserved(res), '11 守恒');
 }

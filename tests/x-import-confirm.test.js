@@ -355,6 +355,14 @@ const before = await t.snapshot();
   const res = R.route(parsed, { known, rules: [] });
   const b = (fi, x) => res.items.find(it => it.file === fi && it.src === 'row' && parsed.files[fi].rows[it.row].no === x.no);
   ok(b(0, wo).why === 'fullrefundold' && b(0, wo).bucket === 'add' && b(0, wo2).why === 'fullnorefund' && b(1, ao).why === 'fullrefundold' && b(1, ao2).why === 'fullnorefund', '8 找到的照常新增，找不到的进待处理');
+  // 1016-E：退款记号——两个记号，一个已用
+  const mA = R.refundMarkKey('wechat', '某虚构咖啡', 3000, '2026-03-01'), mB = R.refundMarkKey('wechat', '某虚构咖啡', 3000, '2026-03-05');
+  await st.ordersRegister(undefined, [mA, mB, R.refundUsedKey(mA)].map(k => ({ app: 'wechat', no: k.slice(7), time: '2026-03-20T09:00', st: 1 })));
+  const rr = wx({ time: T(3, 20), cp: '某虚构咖啡', kind: '某虚构咖啡-退款', io: 'income', fen: 3000, status: '已全额退款', no: '5030000000' + String(++seq).padStart(19, '0') });
+  const p8 = P.parseFiles([{ name: 'r', data: B.ab(B.bill('wechat', [rr], { range: RANGE }).bytes) }]);
+  const lk8 = R.lookups(p8), k8 = await st.knownFor(lk8), mm = k8[R.markLookKey('wechat', '某虚构咖啡', 3000)];
+  ok(mm && mm.marks.length === 2 && mm.marks.find(x => x.key === mA).used === true && mm.marks.find(x => x.key === mB).used === false && mm.marks.find(x => x.key === mB).day === '20260305',
+    '8 退款记号：按开头查出两个，带原单日期和用过没有');
   ok(!t.errs.length && !t.jsErr.length, '8 无报错 ' + t.errs.concat(t.jsErr).join('|'));
 }
 

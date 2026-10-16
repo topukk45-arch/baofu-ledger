@@ -38,7 +38,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-D';
+  var VERSION = '1016-E';
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
   var BUCKETS = ['add', 'merge', 'skip', 'neutral', 'refund', 'pending', 'error'];
 
@@ -291,20 +291,44 @@
         .map(function (m) { return { record: m.id, time: m.time, cat: m.cat, fen: m.fen }; });
     });
 
-    // ---------- ④ 留下的「本批没配上」的微信退款：在账本里找候选 ----------
+    // ---------- ④ 留下的「本批没配上」的微信退款：在账本里找原单（1016-E：先找真原单，找不到才用记号）----------
+    //   同对方、在它之前、金额正好相等、还没被退过的以前导入的支出只有一笔 → 直接挂上；几笔 → 待处理让你选；
+    //   一笔都没有：有记号（原单以前被忽略了）→ 退款也跳过，登记记号「已用」和退款自己的单号；
+    //   还没有：账本里有金额更大的候选 → 待处理；什么都没有 → 只算结余
     var cands2 = Array.isArray(ctx.refundCands) ? ctx.refundCands : [];
-    rowItems.forEach(function (it) {
-      if (it.flags.indexOf('needLedger') < 0 || it.bucket !== 'refund') return;
-      var r = rowOf(parsed, it), cc = C.cleanCp(r.cp), t = r.time;
-      var cs = cands2.filter(function (x) {
-        return x && x.type === 'expense' && typeof x.time === 'string' && x.time < t && C.cleanCp(x.cp) === cc && (x.fen - (x.refunded || 0)) >= r.fen;
+    var claimedRec = {}, claimedMark = {};
+    rowItems.filter(function (it) { return it.flags.indexOf('needLedger') >= 0 && it.bucket === 'refund'; })
+      .sort(function (a, b) { var x = tkey(rowOf(parsed, a)), y = tkey(rowOf(parsed, b)); return x < y ? -1 : x > y ? 1 : 0; })
+      .forEach(function (it) {
+        var r = rowOf(parsed, it), cc = C.cleanCp(r.cp), t = r.time;
+        var cs = cands2.filter(function (x) {
+          return x && x.type === 'expense' && typeof x.time === 'string' && x.time < t && C.cleanCp(x.cp) === cc && (x.fen - (x.refunded || 0)) >= r.fen;
+        });
+        var exact = cs.filter(function (x) { return x.fen === r.fen && !(x.refunded > 0) && !claimedRec[x.id]; });
+        if (exact.length === 1) {
+          claimedRec[exact[0].id] = true;
+          it.why = 'matchedledger'; it.mode = 'normal'; it.refundTo = { record: exact[0].id }; it.msg = '挂到以前导入的原单上';
+          return;
+        }
+        if (exact.length > 1) {
+          it.bucket = 'pending'; it.why = 'refundcands'; it.mode = 'normal';
+          it.cands = exact.sort(function (x, y) { return x.time > y.time ? -1 : 1; }).map(function (x) { return { record: x.id }; });
+          it.msg = '账本里有 ' + exact.length + ' 笔金额一样的可能是这笔退款的原单，请你选';
+          return;
+        }
+        var mk = (it.markerCands || []).filter(function (x) { return !claimedMark[x.key]; })[0];
+        if (mk) {
+          claimedMark[mk.key] = true;
+          it.bucket = 'skip'; it.why = 'origignored'; it.mode = 'normal'; it.markerHit = mk; it.regIgnore = [it.key, mk.used];
+          it.msg = '原单（' + (+mk.day.slice(4, 6)) + ' 月 ' + (+mk.day.slice(6, 8)) + ' 日）以前跳过 / 忽略了，退款也跳过';
+          return;
+        }
+        if (cs.length) {
+          it.bucket = 'pending'; it.why = 'refundcands'; it.mode = 'normal';
+          it.cands = cs.map(function (x) { return { record: x.id }; });
+          it.msg = '账本里有 ' + cs.length + ' 笔可能是这笔退款的原单，请你选';
+        } else { it.why = 'noorig'; it.msg = '这一批和账本里都没找到原单，按「只算结余」导入'; it.mode = 'flow'; }
       });
-      if (cs.length) {
-        it.bucket = 'pending'; it.why = 'refundcands'; it.mode = 'normal';
-        it.cands = cs.map(function (x) { return { record: x.id }; });
-        it.msg = '账本里有 ' + cs.length + ' 笔可能是这笔退款的原单，请你选';
-      } else { it.why = 'noorig'; it.msg = '这一批和账本里都没找到原单，按「只算结余」导入'; it.mode = 'flow'; }
-    });
 
     // ---------- 汇总 ----------
     var counts = {}; BUCKETS.forEach(function (k) { counts[k] = 0; });

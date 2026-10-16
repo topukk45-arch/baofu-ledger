@@ -300,6 +300,11 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
         const r = L.recs.find(x => ids.has(x.id) && x.app === 'wechat' && (x.refundOf || /-退款$/.test(x.oc)) && x.fen === f.fen && x.cp === f.cp && x.time >= f.time);
         if (r) known[f.key] = { found: true, id: r.id };
       });
+      (lk.markers || []).forEach(m => {
+        const marks = Object.keys(L.orders).filter(k => k.startsWith(m.app + '|' + m.prefix) && L.orders[k].st === 1)
+          .map(k => ({ key: k, day: k.slice(-8), used: !!L.orders[R.refundUsedKey(k)] }));
+        if (marks.length) known[m.key] = { marks };
+      });
       return known;
     };
     L.run = (app, txns, decide, manual) => {
@@ -328,7 +333,7 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     L.income = () => L.recs.filter(r => r.type === 'income').length;
     return L;
   }
-  const pickAll = (why, pick) => p => { const rows = {}; p.rows.forEach(d => { if (d.why === why && d.group === 'pending') rows[d.key] = { pick: typeof pick === 'function' ? pick(d) : pick }; }); return { rows }; };
+  var pickAll = (why, pick) => p => { const rows = {}; p.rows.forEach(d => { if (d.why === why && d.group === 'pending') rows[d.key] = { pick: typeof pick === 'function' ? pick(d) : pick }; }); return { rows }; };
   const m50 = [man('hand50', 5, 9, 5000, { cat: '其他' })];       // 一条无关的 50 元手记：原单不能和它合并
   // 微信
   const wo = () => wx({ time: T(5, 10, 12), cp: '某虚构饭店', fen: 5000, status: '已全额退款' });
@@ -338,7 +343,7 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     const a = L.run('wechat', [wo()], pickAll('fullnorefund', 'drop'), m50);
     ok(a.p.ignoreOrders.length === 2, '13 微信先原单：选「不要了」，登记原单和退款记号两个忽略键');
     const b = L.run('wechat', [wr()], null, m50);
-    ok(b.routed.items[0].why === 'origignored' && L.recs.length === 0 && L.net() === 0, '13 微信先原单（不要了）再退款：退款也跳过，账本净额 0，没有多出的收入');
+    ok(b.matched.items[0].why === 'origignored' && L.recs.length === 0 && L.net() === 0, '13 微信先原单（不要了）再退款：退款也跳过，账本净额 0，没有多出的收入');
   }
   {
     const L = ledger();                                   // 先原单（选「作为新增」），再退款（挂到原单）
@@ -374,6 +379,59 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     const L = ledger();                                   // 同一批里成对：两条都跳过、都登记成忽略；再导一次同样的文件，还是全跳过
     L.run('wechat', [wo(), wr()], null, m50);
     ok(L.recs.length === 0 && Object.values(L.orders).filter(e => e.st === 1).length === 2, '13 同一批全额退款的一对：都不写，两个单号登记成忽略');
+  }
+}
+
+// ===== 15. 1016-E 退款记号收紧：先找真原单、180 天、一个只认一次、重复导入不变 =====
+{
+  const L0 = () => { const x = ledger(); return x; };
+  const shopO = (mo, d) => wx({ time: T(mo, d, 12), cp: '某虚构咖啡', fen: 3000, status: '已全额退款' });
+  const shopN = (mo, d) => wx({ time: T(mo, d, 12), cp: '某虚构咖啡', fen: 3000 });
+  const shopR = (mo, d) => wx({ time: T(mo, d, 9), cp: '某虚构咖啡', kind: '某虚构咖啡-退款', io: 'income', fen: 3000, status: '已全额退款', no: wrno() });
+  {
+    // 9 月原单（退款不在文件里，选不要了 → 留下记号）→ 11 月同店同金额正常支出 → 12 月退款：挂到 11 月那笔，不被记号吃掉
+    const L = L0();
+    L.run('wechat', [shopO(9, 3)], pickAll('fullnorefund', 'drop'));
+    const marks = Object.keys(L.orders).filter(k => k.includes('|RW'));
+    ok(marks.length === 1 && marks[0].endsWith('20260903'), '15 9 月原单不要了：留下一个带原单日期的记号');
+    L.run('wechat', [shopN(11, 5)]);
+    const dec = [shopR(12, 2)];
+    const b = L.run('wechat', dec);
+    const nov = L.recs.find(r => r.type === 'expense');
+    ok(b.matched.items[0].why === 'matchedledger' && L.recs.length === 2 && L.recs[1].refundOf === nov.id && L.net() === 0, '15 12 月的退款挂到 11 月那笔上，净额 0');
+    ok(!Object.keys(L.orders).some(k => k.includes('|RU')), '15 记号没被用掉');
+    const n = L.recs.length, again = L.run('wechat', dec);
+    ok(L.recs.length === n && again.matched.items[0].why === 'imported', '15 同一份退款文件再导一次：没有任何新增');
+  }
+  {
+    // 9 月原单不要了 → 10 月它的退款进来：认记号、跳过；再导一次：按忽略跳过，记号不会被第二次用
+    const L = L0();
+    L.run('wechat', [shopO(9, 3)], pickAll('fullnorefund', 'drop'));
+    const oct = [shopR(10, 1)];
+    const a = L.run('wechat', oct);
+    ok(a.matched.items[0].why === 'origignored' && L.recs.length === 0 && Object.keys(L.orders).filter(k => k.includes('|RU')).length === 1, '15 180 天内的退款：认记号、跳过，记号登记成已用');
+    ok(L.orders[a.matched.items[0].key].st === 1, '15 退款自己的单号登记成忽略');
+    const b = L.run('wechat', oct);
+    ok(b.matched.items[0].why === 'ignored' && L.recs.length === 0, '15 同一份文件再导一次：结果不变（按忽略跳过）');
+    // 记号已经用过：同店同金额又来一笔退款（没有原单）→ 不再跳过
+    const c = L.run('wechat', [shopR(10, 20)]);
+    ok(c.matched.items[0].why === 'noorig' && L.recs.length === 1, '15 记号用过一次就作废：下一笔同店同金额的退款不会被吃掉');
+  }
+  {
+    // 超过 180 天：不认记号，按普通找不到原单的退款
+    const L = L0();
+    L.run('wechat', [shopO(1, 3)], pickAll('fullnorefund', 'drop'));
+    const a = L.run('wechat', [shopR(8, 1)]);
+    ok(a.matched.items[0].why === 'noorig' && L.recs.length === 1, '15 原单之后超过 180 天的退款：不认记号，按找不到原单的退款处理');
+  }
+  {
+    // 两个记号、两条退款：各认一个
+    const L = L0();
+    L.run('wechat', [shopO(9, 3), shopO(9, 10)], pickAll('fullnorefund', 'drop'));
+    const a = L.run('wechat', [shopR(10, 1), shopR(10, 2)]);
+    ok(a.matched.items.every(it => it.why === 'origignored') && new Set(a.matched.items.map(it => it.markerHit.key)).size === 2 && L.recs.length === 0, '15 两个记号、两条退款：各认一个');
+    const b = L.run('wechat', [shopR(10, 3)]);
+    ok(b.matched.items[0].why === 'noorig', '15 两个都用完了，第三条照常导入');
   }
 }
 

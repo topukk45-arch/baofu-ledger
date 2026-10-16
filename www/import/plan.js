@@ -29,7 +29,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-D';
+  var VERSION = '1016-E';
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）

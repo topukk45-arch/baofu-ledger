@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-D</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-E</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3643,6 +3643,12 @@
                             && Math.round(safeNum(x.money)*100)===f.fen && typeof x.time==='string' && x.time>=f.time && cps[x.cp]===f.cp);
                         if(r) known[f.key]={ found:true, id:r.id };
                     }
+                });
+                // 1016-E：微信退款记号（原单被忽略时登记，键 RW金额-对方-原单日期），带上用过没有（RU 同样的后半截）
+                (lk && lk.markers || []).forEach(m=>{
+                    const marks=T.findPrefix(m.app, m.prefix, 50).filter(x=>x.st===1).map(x=>({
+                        key:m.app+'|'+x.no, day:x.no.slice(-8), used:!!T.get(m.app, 'RU'+x.no.slice(2)) }));
+                    if(marks.length) known[m.key]={ marks };
                 });
                 return known;
             },
