@@ -1344,7 +1344,6 @@
         .save, .cancel, .add-btn, .edit-del-btn, .mini-btn, .ask-extra-btn, .pager button,
         .days-back, .days-add, .days-manage, .bg-detail-head .bg-edit, .bgu-set, .bgu-head, .tpl-save-btn { min-height:var(--ui-tap); }
         .days-card-head { margin-bottom:16px; }
-        .days-card-more::after { top:auto; bottom:-8px; transform:translateX(-50%); }
         @media (max-width: 600px) { tbody td.ops-cell { padding-top:12px; } }
         #askInput, .search-input, .form-box input, .form-box select, .edit-dialog input, .edit-dialog select, .remark-area { min-height:var(--ui-tap); }
         .edit-dialog .dt-input, .form-box .dt-input { padding-top:14px; padding-bottom:13px; }
@@ -1369,6 +1368,7 @@
         .dt-nav::after, #statMonthLabel::after, #bgMonthLabel::after, .days-card-more::after, .remark-view::after, .link-btn::after, .user-chip .u-del::after {
             content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
             width:max(100%, var(--ui-tap)); height:max(100%, var(--ui-tap)); }
+        .days-card-more::after { top:auto; bottom:0; transform:translateX(-50%); }   /* 往上撑，不碰下面那一行 */
         /* 开发开关里的几处（空账本入口、月初提醒、统计页待处理横幅）：按钮做成正经按钮 */
         .imp-empty-entry { min-height:var(--ui-tap); }
         .stat-pend-banner { flex-wrap:wrap; padding:8px 10px; }
@@ -1388,7 +1388,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-UI5</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-UI6</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
