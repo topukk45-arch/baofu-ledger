@@ -1300,7 +1300,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-M</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-N</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3767,6 +3767,75 @@
             if(window.__impFailAt==='undoSave') throw impErr('test');
             await saveStoreDurable(store, user, ()=>pairs);
         }
+        // ---- 1016-N：待处理（交给 import/pending.js 算，照它的清单写）----
+        // 候选记录的样子：id → { id, time, money, type, cat, src }
+        function impPendRecs(t, items){
+            const want=new Set(); items.forEach(x=>(x.cand||[]).forEach(id=>want.add(id)));
+            const out={};
+            if(!want.size) return out;
+            ((t.e.archs.get(t.aid)||{ recs:[] }).recs).forEach(r=>{
+                if(want.has(r.id)) out[r.id]={ id:r.id, time:r.time||'', money:r.money, type:r.type, cat:r.cat||'', src:r.src ? { app:r.src.app } : null };
+            });
+            return out;
+        }
+        async function impApplyPending(t, acts){
+            const user=t.e.id, store=loadStore(user), a=store.archives[t.name];
+            const pend=await impGetJson(t.e, impPendKey(t.e.id, t.aid)), items=(pend && Array.isArray(pend.items)) ? pend.items : [];
+            const curLog=await impGetJson(t.e, impLogKey(t.e.id, t.aid)), logs=((curLog && curLog.list) || []).map(l=>Object.assign({}, l));
+            const P=window.JiwenImportPending.build({ items, recById:impPendRecs(t, items), cps:a.cps||[], logs }, acts);
+            if(!P.drop.length) throw impErr(P.errors.length && P.errors[0].why==='candgone' ? 'candgone' : 'nothing', { errors:P.errors });
+            const recs=a.records, at=new Map(); recs.forEach((r, i)=>at.set(r.id, i));
+            const idOf={}, made=[];
+            P.records.forEach(x=>{
+                const r={ id:idOf[x.tmp]=genId(), time:x.time, money:x.money, cat:x.cat||'未分类', remark:x.remark||'', type:x.type };
+                if(x.flow===true) r.flow=true;
+                r.src={ app:x.src.app };
+                if(Number.isInteger(x.cp)) r.cp=x.cp;
+                r.batch=x.batch;
+                if(x.refundOf){
+                    const o=at.has(x.refundOf) ? recs[at.get(x.refundOf)] : null;
+                    if(o){ r.refundOf=o.id; r.cat=o.cat; setRecMode(r, recMode(o)); }
+                    else { delete r.refundOf; r.flow=true; }
+                }
+                made.push(r);
+            });
+            const chgOf={};
+            P.changes.forEach(c=>{
+                const i=at.get(c.id); if(i===undefined) throw impErr('gone', { id:c.id });
+                const old=recs[i], n=Object.assign({}, old), was={}, now={};
+                Object.keys(c.set).forEach(k=>{ was[k]=(k in old) ? (old[k]!==null && typeof old[k]==='object' ? JSON.stringify(old[k]) : old[k]) : null; n[k]=c.set[k]; });
+                Object.keys(was).forEach(k=>{ const v=n[k]; now[k]= v===undefined ? null : (v!==null && typeof v==='object' ? JSON.stringify(v) : v); });
+                recs[i]=n;
+                chgOf[c.id]={ id:c.id, was, now, nos:c.nos };
+            });
+            made.forEach(r=>recs.push(r));
+            if(P.cps.length>(a.cps||[]).length) a.cps=P.cps.slice();
+            // 单号表、待处理池
+            const orders=P.orders.map(x=>impCleanOrder({ app:x.app, no:x.no, time:x.time, id:x.ref ? (x.ref.tmp ? idOf[x.ref.tmp] : x.ref.id) : '', batch:x.batch, st:x.st })).filter(Boolean);
+            const pairs=await impOrderPairs(t.e, t.aid, orders);
+            const drop=new Set(P.drop), left=items.filter(x=>!drop.has(x.app+'|'+x.no));
+            pairs.push([impPendKey(t.e.id, t.aid), left.length ? JSON.stringify({ v:1, items:left }) : null]);
+            // 算进原来那批：新记录、改过的手记写进那批的导入记录（撤销那批时一起撤）。那批的记录已经被挤掉（只留 10 次）就只带批次号
+            const W=window.JiwenImportWrite;
+            let logged=0;
+            Object.keys(P.logs).forEach(b=>{
+                const lg=logs.find(l=>l.b===b); if(!lg) return;
+                const x=P.logs[b], ids=x.add.map(tmp=>idOf[tmp]);
+                const hadH=Array.isArray(lg.h) && lg.h.length===(lg.add||[]).length;
+                lg.add=(lg.add||[]).concat(ids);
+                if(hadH && W && W.recHash){ const byId=new Map(made.map(r=>[r.id, r])); lg.h=lg.h.concat(ids.map(id=>W.recHash(byId.get(id)))); }
+                lg.chg=(lg.chg||[]).concat(x.chg.map(id=>chgOf[id]));
+                if(Number.isInteger(x.cpEnd)) lg.cpEnd=x.cpEnd;
+                logged++;
+            });
+            if(logged){
+                const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
+                pairs.push([impLogKey(t.e.id, t.aid), cleanLog.length ? JSON.stringify({ v:1, list:cleanLog }) : null]);
+            }
+            if(window.__impFailAt==='pendingSave') throw impErr('test');
+            await saveStoreDurable(store, user, ()=>pairs);
+            return { done:P.drop.length, errors:P.errors, added:made.length, merged:P.changes.length, left:left.length };
+        }
         window.JiwenImportStore={
             // 单号表：{ size, get(app, no), findPrefix(app, 开头, 最多几条) }；条目 { app, no, id, batch, st, mon }
             async ordersRead(archive){
@@ -3885,6 +3954,25 @@
                     try{ odScheduleSync(); }catch(_){}
                 }
                 return { chain:p.chain.slice(), totals:p.totals };
+            },
+            // ---- 1016-N：待处理（第一期 ⑧）----
+            // 打开待处理页时读池子，顺便看一遍候选还在不在（import/pending.js 的 check）
+            async pendingCheck(archive){
+                const t=impTarget(archive);
+                if(!window.JiwenImportPending) throw impErr('nomodule');
+                const pend=await impGetJson(t.e, impPendKey(t.e.id, t.aid)), items=(pend && Array.isArray(pend.items)) ? pend.items : [];
+                return window.JiwenImportPending.check(items, impPendRecs(t, items));
+            },
+            // 处理几条：acts 见 pending.js。一个事务写账本、单号表、待处理池和那几批的导入记录；动作全都做不了时什么都不写
+            async pendingApply(acts, archive){
+                const t=impTarget(archive);
+                if(!window.JiwenImportPending) throw impErr('nomodule');
+                const r=await impApplyPending(t, acts);
+                if(t.e.id===currentUser && t.name===currentArchive){
+                    try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
+                    try{ odScheduleSync(); }catch(_){}
+                }
+                return r;
             },
             async restoreLast(archive){
                 const t=impTarget(archive);
@@ -5724,7 +5812,7 @@ ${detail}
                 s.onload=()=>resolve(); s.onerror=()=>{ s.remove(); reject(new Error('导入模块没加载上')); };
                 document.head.appendChild(s);
             });
-            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/write.js')).then(()=>one('import/undo.js')).then(()=>one('import/ui.js')).then(()=>{
+            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/write.js')).then(()=>one('import/undo.js')).then(()=>one('import/route.js')).then(()=>one('import/pending.js')).then(()=>one('import/ui.js')).then(()=>{
                 if(!window.JiwenImportUI) throw new Error('导入模块不完整');
                 return window.JiwenImportUI;
             });

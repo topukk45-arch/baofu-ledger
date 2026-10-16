@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-N：openPending() 是待处理页（合并 / 挂退款 / 作为新增 / 不要了 / 全部不要了、候选失效提示），入口在结果页和导入记录页。
 // 1016-M：「没见过的交易类型 / 状态」选了处理方式的，导入时存成类型规则（write.js 的 typesAdd）；选过的行重算后照样留着能改。
 (function () {
   'use strict';
@@ -796,7 +797,10 @@
     });
     card.appendChild(el('div', 'imp-line imp-res-total', '合计 ' + sum + ' 笔，文件里共 ' + res.ws.total + ' 笔' + (sum === res.ws.total ? '' : '（对不上，请截图发给开发者）')));
     if (res.r.added !== undefined) card.appendChild(el('div', 'imp-soft', '新建 ' + res.r.added + ' 条记录，改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）'));
-    if (c.pending) card.appendChild(el('div', 'imp-soft', '待处理的 ' + c.pending + ' 笔没进账本，存在待处理里，以后处理。'));
+    if (c.pending) {
+      card.appendChild(el('div', 'imp-soft', '待处理的 ' + c.pending + ' 笔没进账本，存在待处理里，以后处理。'));
+      var pl = btn('还有 ' + c.pending + ' 笔待处理 ›', 'imp-link', function () { openPending(); }); pl.id = 'impResPending'; card.appendChild(pl);
+    }
     card.appendChild(el('div', 'imp-soft imp-res-batch', '批次号 ' + res.ws.batch + ' · 写入用时 ' + (res.ms / 1000).toFixed(1) + ' 秒'));
     card.appendChild(el('div', 'imp-soft', '写之前自动备份了一份。导错了可以点下面「撤销这次导入」，以后也能在「设置 → 导入记录」里撤销。'));
     var go = btn('回到账本', 'imp-btn gold', function () {
@@ -826,16 +830,23 @@
     dom.body.innerHTML = '';
     if (notice) { var nt = el('div', 'imp-card imp-line imp-ok', notice); nt.id = 'impUndoNotice'; dom.body.appendChild(nt); }
     var loading = el('div', 'imp-soft', '正在读导入记录…'); dom.body.appendChild(loading);
-    return store().importsRead().then(function (logs) {
+    return Promise.all([store().importsRead(), store().pendingRead().catch(function () { return []; })]).then(function (r) {
       if (my !== runId || !S) return;
       loading.remove();
-      renderLogs(logs.slice().reverse());
+      renderLogs(r[0].slice().reverse(), r[1]);
     }, function (e) {
       if (my !== runId || !S) return;
       loading.textContent = '读不出导入记录：' + (e && (e.code || e.message) || e);
     });
   }
-  function renderLogs(logs) {
+  function renderLogs(logs, pend) {
+    pend = pend || [];
+    var nb = {}; pend.forEach(function (x) { nb[x.b] = (nb[x.b] || 0) + 1; });
+    if (pend.length) {
+      var pc = el('div', 'imp-card');
+      var pb = btn('待处理 ' + pend.length + ' 笔（导入时拿不准、没进账本的）›', 'imp-link', function () { openPending(); }); pb.id = 'impLogsPending';
+      pc.appendChild(pb); dom.body.appendChild(pc);
+    }
     var c = el('div', 'imp-card'); c.id = 'impLogs';
     c.appendChild(el('h4', null, '最近的导入（只保留 10 次）'));
     if (!logs.length) c.appendChild(el('div', 'imp-soft', '这个存档还没有导入记录。'));
@@ -845,7 +856,7 @@
       g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · ' + appNames(l.apps)));
       var nAdd = (l.add || []).length, nChg = (l.chg || []).length;
       g.appendChild(el('div', 'imp-soft', '账单 ' + String(l.from || '').slice(0, 10) + ' 至 ' + String(l.to || '').slice(0, 10)
-        + ' · 新建 ' + nAdd + ' 条' + (nChg ? ' · 改了 ' + nChg + ' 条以前的记录' : '')));
+        + ' · 新建 ' + nAdd + ' 条' + (nChg ? ' · 改了 ' + nChg + ' 条以前的记录' : '') + (nb[l.b] ? ' · 待处理 ' + nb[l.b] + ' 笔' : '')));
       r.appendChild(g);
       var u = btn('撤销', 'imp-btn imp-log-undo', function () { undoBatch(l.b); });
       r.appendChild(u);
@@ -853,6 +864,93 @@
     });
     dom.body.appendChild(c);
   }
+  // ---------- 1016-N：待处理页（⑧）----------
+  // 池子里的每一笔：和某条手记合并 / 挂到某笔原单 / 作为新增（选分类）/ 不要了；顶上「全部不要了」。
+  // 候选手记被删了、已经和别的账单合并了的，标出来，全都不在时提示「原候选已不在，建议作为新增入账」。
+  // 每点一下就写一次（一个事务），写完重画；处理的这笔算进它原来那批导入（撤销那批时一起撤）。
+  var LOST = { gone: '已经删了', taken: '已经和别的账单合并了', dir: '收支不一样了' };
+  function openPending(notice) {
+    build();
+    var my = ++runId;
+    S = { phase: 'pending', view: {} };
+    try { S.info = store().archiveInfo(); dom.archive.textContent = '存档「' + S.info.name + '」'; } catch (_) { dom.archive.textContent = ''; }
+    dom.title.textContent = '待处理';
+    dom.page.style.display = 'block'; dom.bar.style.display = 'none';
+    dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none';
+    dom.body.innerHTML = '';
+    if (notice) { var nt = el('div', 'imp-card imp-line imp-ok', notice); nt.id = 'impPendNotice'; dom.body.appendChild(nt); }
+    var loading = el('div', 'imp-soft', '正在读待处理…'); dom.body.appendChild(loading);
+    return store().pendingCheck().then(function (list) {
+      if (my !== runId || !S) return;
+      loading.remove();
+      S.pend = list;
+      renderPending(list);
+    }, function (e) {
+      if (my !== runId || !S) return;
+      loading.textContent = '读不出待处理：' + (e && (e.code || e.message) || e);
+    });
+  }
+  function renderPending(list) {
+    var head = el('div', 'imp-card'); head.id = 'impPendHead';
+    if (!list.length) { head.appendChild(el('div', 'imp-line', '没有待处理的账单了。')); dom.body.appendChild(head); return; }
+    var fen = list.reduce(function (s, x) { return s + (x.item.amt || 0); }, 0);
+    head.appendChild(el('div', 'imp-line', '共 ' + list.length + ' 笔，' + yuan(fen) + ' 元。导入时拿不准，没进账本，在这里定。'));
+    var all = btn('全部不要了', 'imp-btn', function () {
+      window.customConfirm('这 ' + list.length + ' 笔都不要了：不进账本，以后再导同一份账单也不再出现。\n\n以后想要回来，可以撤销它们原来那次导入再重新导。确定吗？', function () {
+        act(list.map(function (x) { return { key: x.key, do: 'drop' }; }), '已经都不要了');
+      }, '待处理', { okText: '都不要了' });
+    }); all.id = 'impPendDropAll'; all.style.marginTop = '8px';
+    head.appendChild(all);
+    dom.body.appendChild(head);
+    var cats = ['未分类'].concat(((S.info && S.info.cats) || []).filter(function (c) { return c !== '未分类'; }));
+    list.slice().sort(function (a, b) { return a.item.t < b.item.t ? 1 : a.item.t > b.item.t ? -1 : 0; }).forEach(function (x) {
+      var it = x.item, c = el('div', 'imp-card imp-pend'); c.dataset.key = x.key;
+      c.appendChild(el('div', 'imp-line', fmtTime(it.t) + ' · ' + (APP[it.app] || it.app) + ' · ' + (it.cp || '—') + ' · ' + (it.io === 'income' ? '+' : '−') + yuan(it.amt)));
+      c.appendChild(el('div', 'imp-soft', x.why + (it.d ? ' · ' + it.d : '')));
+      if (x.lostAll) { var w = el('div', 'imp-soft imp-bad imp-pend-lost', '原候选已不在，建议作为新增入账'); c.appendChild(w); }
+      x.cands.forEach(function (cd) {
+        var r = el('div', 'imp-row-opt imp-pend-cand'); r.dataset.id = cd.id;
+        var m = cd.rec;
+        r.appendChild(el('span', 'grow', (m ? fmtTime(m.time) + ' · ' + (m.cat || '未分类') + ' · ' + yuan(Math.round(Number(m.money) * 100)) : '一条记录') + (cd.ok ? '' : '（' + LOST[cd.lost] + '）')));
+        if (cd.ok) {
+          var b = btn(x.refund ? '挂到这笔' : '和这条合并', 'imp-btn imp-pend-pick', function () {
+            act([{ key: x.key, do: x.refund ? 'refund' : 'merge', id: cd.id }], x.refund ? '已挂到那笔原单上（当退款）' : '已和那条手记合并');
+          });
+          r.appendChild(b);
+        }
+        c.appendChild(r);
+      });
+      var acts = el('div', 'imp-row-opt');
+      var se = null;
+      if (!x.refund) {
+        se = el('select', 'imp-pend-cat');
+        cats.forEach(function (n) { var o = el('option', null, n); o.value = n; se.appendChild(o); });
+        var lb = el('label', 'imp-soft', '分类 '); lb.appendChild(se); acts.appendChild(lb);
+      }
+      var nb = btn(x.refund ? '作为新增（只算结余）' : '作为新增', 'imp-btn imp-pend-new', function () {
+        act([{ key: x.key, do: 'new', cat: se ? se.value : '未分类' }], '已作为新增记进账本');
+      });
+      var db = btn('不要了', 'imp-btn imp-pend-drop', function () { act([{ key: x.key, do: 'drop' }], '这笔不要了'); });
+      acts.appendChild(nb); acts.appendChild(db);
+      c.appendChild(acts);
+      dom.body.appendChild(c);
+    });
+  }
+  function act(acts, okText) {
+    if (!S || S.phase !== 'pending') return;
+    S.phase = 'writing';
+    store().pendingApply(acts).then(function () {
+      if (S) S.phase = 'pending';
+      openPending(okText);
+    }, function (e) {
+      if (S) S.phase = 'pending';
+      var c = e && (e.code || e.message);
+      alertMsg(c === 'candgone' ? '那条记录已经不在了（被删了或和别的账单合并了），没有改。重新看一下。'
+        : c === 'quota' ? '存储空间满了，没写进去，账本没动。' : '没处理成，账本没动：' + (c || e), '待处理');
+      openPending();
+    });
+  }
+
   // 撤销一批：算方案 → 确认框（⑦a 的摘要）→ 先备份「撤销前」再一个事务写 → 停在导入记录，顶上提示
   function undoBatch(b) {
     if (!S || S.phase === 'writing' || S.phase === 'undoing') return;
@@ -896,7 +994,7 @@
     try { var ta = el('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand && document.execCommand('copy'); ta.remove(); } catch (_) {}
   }
 
-  var UI = { open: open, openLogs: openLogs, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  var UI = { open: open, openLogs: openLogs, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

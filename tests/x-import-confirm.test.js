@@ -112,7 +112,7 @@ const before = await t.snapshot();
 {
   await t.openImport();
   ok(t.$('impPage').style.display === 'block' && t.$('impArchive').textContent.includes('默认存档'), '1 开发入口打开导入页，写明导入到哪个存档');
-  ok(t.log.filter(p => p.startsWith('import/')).join(',') === 'import/import.js,import/plan.js,import/write.js,import/undo.js,import/ui.js', '1 打开时才载入导入页的五个文件：' + t.log.filter(p => p.startsWith('import/')).join(','));
+  ok(t.log.filter(p => p.startsWith('import/')).join(',') === 'import/import.js,import/plan.js,import/write.js,import/undo.js,import/route.js,import/pending.js,import/ui.js', '1 打开时才载入导入页的七个文件（1016-N 加 route.js、pending.js）：' + t.log.filter(p => p.startsWith('import/')).join(','));
   await t.pick(FILES);
   const S = t.S(), want = direct(FILES);
   ok(S && S.phase === 'confirm' && t.$('impProg').style.display === 'none', '1 跑完进度，打开确认页');
