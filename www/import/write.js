@@ -23,7 +23,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Y';
+  var VERSION = '1016-Z2';
   // 定了的跳过状态：以后不会再变成「交易成功」，登记成忽略；等待付款、等待确认收货这类不登记
   var FINAL_SKIP = ['交易关闭', '失败', '交易失败', '支付失败', '已撤销'];
   var IGNORE_WHY = ['fullrefund', 'refundedpair', 'closedpair', 'refunded', 'origignored', 'typerule'];
@@ -242,7 +242,7 @@
       if (r.type !== undefined) haveType['t|' + r.app + '|' + r.type] = 1;
       if (r.status !== undefined) haveType['s|' + r.app + '|' + r.status] = 1;
     });
-    var TYPE_AS = ['normal', 'transfer', 'skip'], STATUS_AS = ['import', 'skip'];
+    var TYPE_AS = ['normal', 'transfer', 'skip', 'refund'], STATUS_AS = ['import', 'skip'];   // 1016-Z2：加「当退款」
     Object.keys(ctx.types || {}).sort().forEach(function (k) {
       var i = k.indexOf('|'), app = k.slice(0, i), type = k.slice(i + 1), as = ctx.types[k];
       if (i <= 0 || !type || TYPE_AS.indexOf(as) < 0 || haveType['t|' + k]) return;

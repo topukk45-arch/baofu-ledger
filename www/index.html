@@ -1304,7 +1304,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z1</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-Z2</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -4003,6 +4003,17 @@
                 }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return { chain:p.chain.slice(), totals:p.totals };
+            },
+            // ---- 1016-Z2：「当作退款，挂到某一笔」的候选（只读）：账本里的支出，时间不晚于这笔、180 天以内、还没退完的够挂；新的在前，最多 50 条
+            refundTargets(q, archive){
+                const t=impTarget(archive);
+                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, cps=(ledgerAssembleArchive(t.e, t.aid).cps)||[];
+                const refunded=new Map(); recs.forEach(r=>{ if(r.refundOf) refunded.set(r.refundOf, (refunded.get(r.refundOf)||0)+Math.round(safeNum(r.money)*100)); });
+                const tq=String(q && q.time || ''), fen=Number(q && q.fen)||0;
+                const from=new Date(parseRecTime(tq).getTime()-180*86400000), fromStr=`${from.getFullYear()}-${pad(from.getMonth()+1)}-${pad(from.getDate())}`;
+                return recs.filter(r=>r.type==='expense' && !r.refundOf && typeof r.time==='string' && r.time<=tq && r.time.slice(0, 10)>=fromStr)
+                    .map(r=>{ const f=Math.round(safeNum(r.money)*100); return { id:r.id, time:r.time, fen:f, left:f-(refunded.get(r.id)||0), cat:r.cat||'', remark:(r.remark||'').split('\n')[0].slice(0, 30), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '' }; })
+                    .filter(x=>x.left>=fen).sort((a, b)=>a.time<b.time ? 1 : a.time>b.time ? -1 : 0).slice(0, 50);
             },
             // ---- 1016-N：待处理（第一期 ⑧）----
             // 打开待处理页时读池子，顺便看一遍候选还在不在（import/pending.js 的 check）

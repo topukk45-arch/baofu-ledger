@@ -4,7 +4,8 @@
 // 和 core.js 同样的写法：浏览器里是全局变量 JiwenImportPlan，Node 里直接 require。不碰页面、存储。
 //
 // 改动（edits），都按单号键（route 给每一行的 key）存：
-//   rows[key]  = { exclude, cat, mode: 'normal'|'flow'|'skip', split, pick: 'new' | 'drop' | { record } | { row } }
+//   rows[key]  = { exclude, cat, mode: 'normal'|'flow'|'skip', split, pick: 'new' | 'drop' | { record } | { row }, asRefund: { record } | { row } }
+//     asRefund（1.1，1016-Z2）：一笔收入「当作退款，挂到某一笔」（AA 收回的钱、跨月退款、换渠道赔付），挂到账本里的一条支出或这一批的一笔支出
 //   cpCats[清洗后的对方] = 分类          未分类按对方归组，一组选一次
 //   newCats[分类名] = { on, into, picked }  新建分类：建不建、不建就并到哪个已有分类；picked = 你在下拉里手动选过「并到」（1016-J：只有它存对照）
 //   receipt    收款按天合并（默认 true）
@@ -31,7 +32,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Z1';
+  var VERSION = '1016-Z2';
   // 1.1（1016-Z）异常金额提醒的参考值。都是先拍的数，标「待真实数据调」：用真实账单跑过以后再定（目标是每次导入只提醒几笔）
   var AMOUNT = {
     RATIO: 5,              // 比这个分类平时大多数单笔（第 80 百分位）高 5 倍以上……（待真实数据调）
@@ -136,6 +137,7 @@
     // 多笔合一：确认了某种凑法 → 这几笔合并到那条手记；同组没用上的、选了「都不是」的 → 新增
     var msums = matched.multiSums || [], byKeyRef = {};
     rows.forEach(function (d) { if (d.src === 'row') byKeyRef[d.file + ':' + d.row] = d; });
+    var inGroup0 = {}; (matched.summaries || []).forEach(function (g) { (g.items || []).forEach(function (r) { inGroup0[r.file + ':' + r.row] = true; }); });
     msums.forEach(function (g) {
       var e = sumsE[g.id];
       if (e === undefined || e === null) return;
@@ -164,6 +166,11 @@
         } else if (e.pick.record && !refundish(it)) {
           if (!pickedRecords[e.pick.record] && (it.cands || []).some(function (c) { return c.record === e.pick.record; })) { d.group = 'merge'; d.into = e.pick.record; d.reason = '待你确认里选了和这条手记合并'; pickedRecords[e.pick.record] = d.key; }
         } else if (e.pick.record || e.pick.row) { d.group = 'refund'; d.refundTo = e.pick; d.reason = '待你确认里选了挂到这笔原单'; }
+      }
+      // 1.1（1016-Z2）：收入当作退款挂到某一笔（分类、口径跟原单走；退款总额不超过原单由页面上挑候选时管）
+      if (e.asRefund && d.pio === 'income' && (d.group === 'add' || d.group === 'neutral') && !inGroup0[d.file + ':' + d.row]) {
+        d.group = 'refund'; d.refundTo = e.asRefund.record ? { record: e.asRefund.record } : { row: e.asRefund.row }; d.mode = 'normal'; d.asRefund = true;
+        d.reason = '你把它当作退款，挂到了一笔支出上';
       }
       if (e.exclude && (d.group === 'add' || d.group === 'neutral' || d.group === 'refund')) { d.group = 'excluded'; d.reason = '你勾掉了'; }
       if (e.mode && (d.group === 'add' || d.group === 'neutral')) d.mode = e.mode;

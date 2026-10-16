@@ -9,6 +9,7 @@
 //   套话不当标题；存储那行改成「可用存储空间」。
 // 1016-L：结果页「撤销这次导入」；openLogs() 是「设置 → 导入记录」（最近 10 次，每次右侧「撤销」），也画在这一页里；
 //   撤销先弹确认框（undo.js 的摘要），撤完停在导入记录，顶上「已撤销，删了 x 条、还原了 y 条」；撤销中返回键不关页面。
+// 1016-Z2（1.1）：收入行详情里「当作退款，挂到某一笔」（这一批的支出或账本里的支出，JiwenImportStore.refundTargets 查），没见过的交易类型多一个「当退款挂到原单」。
 // 1016-Z1（1.1）：按对方归组那张卡每组带一句规律说明「某某 · 5 笔 · 共 53 元 · 工作日中午 12 点左右 · 每笔 12–14 元 → 选个分类」。
 // 1016-Z（1.1）：确认页「金额要你看一眼」：比这个分类平时高很多的、单笔特别大的列出来，点开改（参考值在 plan.js 的 AMOUNT，待真实数据调）。
 // 1016-Y（1.1）：按你的规则归的那笔在详情里改分类时问「只改这一条 / 以后都改」；按对方选的分类、从合并里学到满 2 次的都存成规则，结果页写学到几条。
@@ -488,7 +489,7 @@
       typeRows.forEach(function (t) {
         var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.type;
         r.appendChild(el('span', 'grow', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔，共 ' + yuan(t.fen) + ' 元'));
-        r.appendChild(select([['', '照收支导入（放进其他）'], ['normal', '照收支导入'], ['transfer', '当转账（不计入）'], ['skip', '跳过']], S.types[k] || '',
+        r.appendChild(select([['', '照收支导入（放进其他）'], ['normal', '照收支导入'], ['transfer', '当转账（不计入）'], ['refund', '当退款挂到原单'], ['skip', '跳过']], S.types[k] || '',
           function (v) { if (v) S.types[k] = v; else delete S.types[k]; rerun(); }, 'imp-type-sel'));
         c.appendChild(r);
       });
@@ -800,7 +801,7 @@
   function openSheet(key) {
     var d = rowByKey(key); if (!d) return;
     var sh = dom.sheet; sh.innerHTML = '';
-    sh.dataset.key = key;
+    sh.dataset.key = key; sh.dataset.mode = '';
     var skipRow = d.group === 'neutral' || d.mode === 'skip';
     sh.appendChild(el('h4', null, (skipRow ? '' : (d.type === 'expense' ? '−' : '+')) + yuan(d.fen) + ' · ' + (S.plan.groupNames[d.group])));
     var kv = function (k, v) { if (!v) return; var r = el('div', 'kv'); r.appendChild(el('span', null, k)); r.appendChild(el('span', null, v)); sh.appendChild(r); };
@@ -839,6 +840,12 @@
     }
     if (d.canExclude) { var x = btn('勾掉（不导入）', 'imp-btn', function () { setEdit(key, { exclude: true }); }); x.id = 'impExclude'; acts.appendChild(x); }
     if (d.canRestore) { var rs = btn('恢复', 'imp-btn', function () { setEdit(key, { exclude: null, pick: null }); }); rs.id = 'impRestore'; acts.appendChild(rs); }
+    // 1.1（1016-Z2）：收入「当作退款，挂到某一笔」（AA 收回的钱、跨月退款、换渠道赔付，跨来源也能挂）
+    var e0 = S.edits.rows[key] || {};
+    if (d.pio === 'income' && (d.group === 'add' || d.group === 'neutral') && !d.summary && !(d.item && d.item.group)) {
+      var ar = btn('当作退款，挂到某一笔', 'imp-btn', function () { openRefundPick(key); }); ar.id = 'impAsRefund'; acts.appendChild(ar);
+    }
+    if (d.asRefund && e0.asRefund) { var nr0 = btn('不挂了（照收入导入）', 'imp-btn', function () { setEdit(key, { asRefund: null }); }); nr0.id = 'impAsRefundOff'; acts.appendChild(nr0); }
     if (d.canSplit) { var sp = btn('拆开（改为新增）', 'imp-btn', function () { setEdit(key, { split: true }); }); sp.id = 'impSplit'; acts.appendChild(sp); }
     if (d.bucket0 === 'merge' && !d.canSplit) { var un = btn('不拆了（照旧合并）', 'imp-btn', function () { setEdit(key, { split: null }); }); un.id = 'impUnsplit'; acts.appendChild(un); }
     sh.appendChild(acts);
@@ -901,6 +908,44 @@
     dom.sheetMask.style.display = 'flex';
   }
   function closeSheet() { if (dom) dom.sheetMask.style.display = 'none'; }
+  // 1016-Z2：挑一笔支出把这笔收入挂上去：这一批里的支出（时间更早、金额不小于它）+ 账本里的支出（主页面查：180 天内、时间更早、还没退完的够挂）
+  function openRefundPick(key) {
+    var d = rowByKey(key); if (!d) return;
+    var sh = dom.sheet; sh.innerHTML = ''; sh.dataset.key = key; sh.dataset.mode = 'refundpick';
+    sh.appendChild(el('h4', null, '把这笔 +' + yuan(d.fen) + ' 挂到哪一笔上？'));
+    sh.appendChild(el('div', 'imp-soft', '挂上以后当作那笔的退款：分类、口径跟着那笔，那笔的支出减掉这些（比如 AA 收回的钱、跨月退款、换个渠道的赔付）。'));
+    var list = el('div'); list.id = 'impRefundPick'; sh.appendChild(list);
+    var pick = function (to) { S.edits.rows[key] = Object.assign({}, S.edits.rows[key] || {}, { asRefund: to }); replan(); openSheet(key); };
+    var used = {};      // 这一批里已经挂了多少（分）
+    S.plan.rows.forEach(function (r) { if (r.group === 'refund' && r.refundTo && r.refundTo.row && r.key !== key) { var k0 = r.refundTo.row.file + ':' + r.refundTo.row.row; used[k0] = (used[k0] || 0) + r.fen; } });
+    var batch = S.plan.rows.filter(function (r) {
+      return r.src === 'row' && r.pio === 'expense' && (r.group === 'add' || r.group === 'merge') && r.time <= d.time && r.fen - (used[r.file + ':' + r.row] || 0) >= d.fen;
+    }).sort(function (a, b) { return a.time < b.time ? 1 : a.time > b.time ? -1 : 0; }).slice(0, 30);
+    if (batch.length) list.appendChild(el('div', 'imp-line', '这一批里的'));
+    batch.forEach(function (r) {
+      var row = el('div', 'imp-row-opt imp-rp-row'); row.dataset.row = r.file + ':' + r.row;
+      row.appendChild(el('span', 'grow', fmtTime(r.time) + ' · ' + (APP[r.app] || '') + ' · ' + (r.title || r.cp || '') + ' · ' + yuan(r.fen)));
+      row.appendChild(btn('挂到这笔', 'imp-btn imp-rp-pick', function () { pick({ row: { file: r.file, row: r.row } }); }));
+      list.appendChild(row);
+    });
+    var lw = el('div', 'imp-soft', '正在查账本里的…'); list.appendChild(lw);
+    var my = runId;
+    Promise.resolve().then(function () { return store().refundTargets({ time: d.time, fen: d.fen }); }).then(function (xs) {
+      if (my !== runId || !S || sh.dataset.key !== key || sh.dataset.mode !== 'refundpick') return;
+      lw.remove();
+      if (xs.length) list.appendChild(el('div', 'imp-line', '账本里的'));
+      xs.forEach(function (m) {
+        var row = el('div', 'imp-row-opt imp-rp-rec'); row.dataset.id = m.id;
+        row.appendChild(el('span', 'grow', fmtTime(m.time) + ' · ' + (m.cat || '未分类') + ' · ' + (m.remark || m.cp || '') + ' · ' + yuan(m.fen) + (m.left !== m.fen ? '（还能挂 ' + yuan(m.left) + '）' : '')));
+        row.appendChild(btn('挂到这笔', 'imp-btn imp-rp-pick', function () { pick({ record: m.id }); }));
+        list.appendChild(row);
+      });
+      if (!xs.length && !batch.length) list.appendChild(el('div', 'imp-soft', '没找到能挂的支出（要比这笔早、金额不少于它、180 天以内）。'));
+    }, function () { lw.textContent = '查账本出错了'; });
+    var bk = btn('‹ 返回', 'imp-btn', function () { openSheet(key); }); bk.id = 'impRefundPickBack'; bk.style.marginTop = '12px'; bk.style.width = '100%';
+    sh.appendChild(bk);
+    dom.sheetMask.style.display = 'flex';
+  }
 
   // ---------- 底部按钮、复制 ----------
   var BUCKET_LINE = [['add', '新增'], ['merge', '和手记合并'], ['neutral', '不计入'], ['refund', '退款'], ['pending', '待处理'],

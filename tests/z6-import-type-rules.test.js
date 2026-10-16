@@ -24,13 +24,13 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
 (async () => {
   // ===== 1. write.js：只存选了的、不重复存已有的 =====
   {
-    const ctx = { batch: 'b1', at: '2026-12-20T10:00', types: { 'wechat|群收款': 'transfer', 'wechat|某虚构类型': 'normal', 'wechat|坏的': 'refund' }, statuses: { 'wechat|某虚构状态': 'skip' } };
+    const ctx = { batch: 'b1', at: '2026-12-20T10:00', types: { 'wechat|群收款': 'transfer', 'wechat|某虚构类型': 'normal', 'wechat|坏的': 'bogus', 'wechat|某退款类型': 'refund' }, statuses: { 'wechat|某虚构状态': 'skip' } };
     const info = { cats: ['未分类'], typeRules: [{ app: 'wechat', type: '某虚构类型', as: 'skip' }] };
     const p = { rows: [], sections: { newCats: [] }, counts: {} };
     let ws = null;
     try { ws = W.build({ parsed: { files: [] }, matched: { items: [] }, info, manualById: {} }, p, ctx); } catch (e) { console.log('    build 出错：' + e.message); }
-    ok(ws && same(ws.typesAdd, [{ app: 'wechat', type: '群收款', as: 'transfer' }, { app: 'wechat', status: '某虚构状态', as: 'skip' }]),
-      '1 typesAdd：选了的存、已有规则的不重复、「当退款」这一版不存 ' + JSON.stringify(ws && ws.typesAdd));
+    ok(ws && same(ws.typesAdd, [{ app: 'wechat', type: '某退款类型', as: 'refund' }, { app: 'wechat', type: '群收款', as: 'transfer' }, { app: 'wechat', status: '某虚构状态', as: 'skip' }]),
+      '1 typesAdd：选了的存、已有规则的不重复、不认识的处理方式不存（1016-Z2 起「当退款」也存）' + JSON.stringify(ws && ws.typesAdd));
     ok(ws && same(ws.log.rulesAdded.type, ws.typesAdd), '1 导入记录 rulesAdded.type 和 typesAdd 一样');
   }
 
