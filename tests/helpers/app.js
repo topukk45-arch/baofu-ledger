@@ -5,6 +5,7 @@
 //     stay 为真时停在结果页（不点「回到账本」）
 //   t.ask()：提示框开着时返回 { title, msg }，否则 null；t.askOk() / t.askCancel() 点按钮
 //   t.dump()：库里全部键值（导入前 / 撤销前备份不算）
+//   t.back()：按一次返回键（先等过 App 的防连按）
 // 账单、手记全是虚构的。
 const { JSDOM, VirtualConsole } = require('jsdom');
 const IDB = require('./idb');
@@ -68,6 +69,8 @@ async function boot(o) {
     await IDB.idle(w);
     return res;
   };
+  // 返回键：App 在一次返回后 120ms 内不理下一次（防连按），关提示框也可能算一次；等过这段再按
+  t.back = async () => { await new Promise(r => setTimeout(r, 160)); t.backFn(); await IDB.idle(w); };
   t.logs = async () => t.st().importsRead();
   t.dump = async () => { await IDB.idle(w); const db = await IDB.dumpDb(t.phone); const out = {}; Object.keys(db).sort().forEach(k => { if (!/_bk_/.test(k)) out[k] = db[k]; }); return out; };
   return t;

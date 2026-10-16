@@ -41,7 +41,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   $('devLogsBtn').click();
   await t.until(() => $('impLogs'));
   ok(/还没有导入记录/.test($('impLogs').textContent) && $('impTitle').textContent === '导入记录', '1 还没导过：写明没有导入记录');
-  t.backFn(); await t.idle();
+  await t.back();
   ok($('impPage').style.display === 'none' && !t.exited, '1 返回键关掉导入记录，不退出 App');
 
   // ===== 2. 结果页「撤销这次导入」=====
@@ -64,7 +64,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   ok($('impUndoNotice').textContent === '已撤销，删了 2 条、还原了 2 条' && $('impTitle').textContent === '导入记录' && $('impLogs'), '2 撤完停在导入记录，顶上提示：' + ($('impUndoNotice') && $('impUndoNotice').textContent));
   ok(same(await t.dump(), D0), '2 撤完和导入前逐字节一样');
   ok(t.st().backups().some(b => b.kind === 'undo'), '2 撤销前备份了一份');
-  t.backFn(); await t.idle();
+  await t.back();
   ok($('impPage').style.display === 'none', '2 返回键关掉');
 
   // ===== 3. 设置 → 导入记录：新的在上，每次右侧「撤销」；中间那次要先撤之后的 =====
@@ -89,7 +89,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   await t.until(() => $('impUndoNotice') && $('impLogs'));
   ok(/^已撤销 2 次导入，删了 2 条、还原了 \d+ 条$/.test($('impUndoNotice').textContent), '3 连着撤两次，提示写明：' + $('impUndoNotice').textContent);
   ok(same(await t.dump(), D1) && /还没有导入记录/.test($('impLogs').textContent), '3 两次都撤了，和导入前逐字节一样，列表空了');
-  t.backFn(); await t.idle();
+  await t.back();
 
   // ===== 4. 账本在确认框开着时变了：拒绝，账本不动 =====
   await t.importFiles([['微信C.csv', bill([wx({ time: T(12, 1), cp: '某虚构文具', fen: 800 })])]]);
@@ -110,7 +110,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   await t.askOk();
   await t.until(() => $('impUndoNotice') && $('impLogs'));
   ok(/删了 1 条/.test($('impUndoNotice').textContent) && t.recs().some(r => r.id === 'm9'), '4 再点一次撤掉了，后来记的那笔还在');
-  t.backFn(); await t.idle();
+  await t.back();
 
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);

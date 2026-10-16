@@ -102,7 +102,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   }
   // 候选被删 → 提示建议作为新增 → 作为新增（选分类）
   {
-    t.backFn(); await t.idle();
+    await t.back();
     { const s = t.w.loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.filter(r => r.id !== 'm2'); t.w.saveStore(s, A.ID); await t.idle(); }
     t.w.JiwenImportUI.openPending();
     await t.until(() => d.querySelectorAll('.imp-pend').length === 3);
@@ -136,7 +136,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
     ok(T2.findPrefix('wechat', 'RW', 5).some(x => x.batch === L1.b), '7 再登记了退款记号');
     ok((await t.st().pendingRead()).length === 0, '7 池子空了');
   }
-  t.backFn(); await t.idle();
+  await t.back();
   // 撤销第一批（要先撤第二批：退款挂在第一批的记录上）→ 回到导入前（m2 是你自己删的，不回来）
   {
     await t.w.eval('loadImportUI')();
@@ -159,7 +159,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
     ok(/这 2 笔都不要了/.test(t.ask().msg), '9 全部不要了：先问一句');
     await t.askOk();
     await t.until(() => $('impPendHead') && /没有待处理/.test($('impPendHead').textContent));
-    t.backFn(); await t.idle();
+    await t.back();
     const r = await t.importFiles([['微信1.csv', bill(F1)]], null, { noGo: true });
     ok(r.plan.counts.pending === 0 && r.plan.counts.add === 0, '9 再导同一份文件：不要了的不再出现，也没有新增');
   }

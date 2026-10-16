@@ -430,6 +430,9 @@
         .stat-cal-head span { font-size:16px; font-weight:bold; color:var(--c-text); }
         #statMonthLabel { cursor:pointer; padding:4px 12px; border-radius:9px; border:1px solid var(--c-border); }
         #statMonthLabel:active { background:var(--c-chip); }
+        .stat-pend-banner { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 10px; margin-bottom:10px; border:1px solid var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-text); }
+        .stat-pend-banner span { flex:1; }
+        .stat-pend-banner button { border:none; background:none; color:var(--c-primary-deep); text-decoration:underline; font-size:12.5px; padding:0; cursor:pointer; }
         /* 年月选择器 */
         .ym-year-row { display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:14px; }
         /* 等高盒：月网格与年网格都是 12 格，切层级时弹窗高度不跳变。
@@ -1300,7 +1303,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-O</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1016-P</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -8825,9 +8828,37 @@ ${detail}
             }
             renderStatCalendar();
         }
+        // 1016-P：统计页顶上的待处理横幅「本月还有 N 笔导入账单待确认，共 x 元 [去处理]」。
+        //   只在开发开关开着时读待处理池（开关关着时什么都不读、不显示）；这个月没有待处理就不显示。首页不加红点
+        var __pendBannerSeq=0;   // var：统计页可能在这行执行前就渲染
+        function renderPendBanner(){
+            const my=++__pendBannerSeq, old=$('statPendBanner');
+            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            let t=null;
+            if(on){ try{ t=impTarget(); }catch(_){ t=null; } }
+            if(!t){ if(old) old.remove(); return; }
+            const month=`${statYear}-${pad(statMonth+1)}`;
+            impGetJson(t.e, impPendKey(t.e.id, t.aid)).then(o=>{
+                if(my!==__pendBannerSeq) return;
+                let n=0, fen=0;
+                ((o && Array.isArray(o.items)) ? o.items : []).forEach(x=>{ if(x && String(x.t||'').slice(0, 7)===month){ n++; fen+=Number(x.amt)||0; } });
+                let b=$('statPendBanner');
+                if(!n){ if(b) b.remove(); return; }
+                if(!b){
+                    b=document.createElement('div'); b.id='statPendBanner'; b.className='stat-pend-banner';
+                    const pane=$('statPaneFlow'); pane.insertBefore(b, pane.firstChild);
+                }
+                b.textContent='';
+                const tx=document.createElement('span'); tx.textContent=`本月还有 ${n} 笔导入账单待确认，共 ${(fen/100).toFixed(2)} 元`;
+                const go=document.createElement('button'); go.type='button'; go.id='statPendGo'; go.textContent='去处理';
+                go.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.openPending()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '待处理')); });
+                b.appendChild(tx); b.appendChild(go);
+            }).catch(()=>{ if(my===__pendBannerSeq){ const b=$('statPendBanner'); if(b) b.remove(); } });
+        }
 
         function renderStatCalendar(){
             $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
+            renderPendBanner();
             // 【P4】统计页此前的形状与当初 renderBill 的性能坑同源：
             //   statRecords() 每次都把整个 store（含所有存档）重新 JSON.parse，
             //   而日净额、当月汇总、分类占比、当日明细四处各自把全表 parseRecTime 遍历一遍。
