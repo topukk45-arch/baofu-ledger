@@ -4,7 +4,7 @@
 // 和 core.js 同样的写法：浏览器里是全局变量 JiwenImportPlan，Node 里直接 require。不碰页面、存储。
 //
 // 改动（edits），都按单号键（route 给每一行的 key）存：
-//   rows[key]  = { exclude, cat, mode: 'normal'|'flow'|'skip', split, pick: 'new' | 'drop' | { record } | { row }, asRefund: { record } | { row } }
+//   rows[key]  = { exclude, cat, mode: 'normal'|'flow'|'skip', split, pay, pick: 'new' | 'drop' | { record } | { row }, asRefund: { record } | { row } }
 //     asRefund（1.1，1016-Z2）：一笔收入「当作退款，挂到某一笔」（AA 收回的钱、跨月退款、换渠道赔付），挂到账本里的一条支出或这一批的一笔支出
 //   cpCats[清洗后的对方] = 分类          未分类按对方归组，一组选一次
 //   newCats[分类名] = { on, into, picked }  新建分类：建不建、不建就并到哪个已有分类；picked = 你在下拉里手动选过「并到」（1016-J：只有它存对照）
@@ -14,6 +14,7 @@
 //   sums[多笔合一的组 id] = 第几种凑法（数字）| 'none'    （1016-C）不改就一直待处理
 //   ruleFix[关键词] = 新分类   （1.1，1016-Y）你的规则归的分类在确认页被改掉、选了「以后都改」：这条规则命中的行都改，写入时改规则
 //   nearPay    （1.1，1016-X）金额相近、分类对得上自动合并的那几条手记，一键改成实付金额（默认 false：手记金额不动）
+//              1017-D 起每一笔也能自己定：rows[key].pay = true（改成实付）/ false（按手记金额），没定的跟 nearPay 走；「分开记」就是 rows[key].split
 //
 // 1016-C：
 //   待处理按手记 / 按账单归组（sections.pendGroups）：一组里一条手记被选走了，同组里只能配它的账单自动改成新增；
@@ -86,6 +87,8 @@
   function plan(input, edits) {
     edits = edits || {};
     var E = edits.rows || {}, cpCats = edits.cpCats || {}, ncE = edits.newCats || {}, pettyE = edits.petty || {}, sumsE = edits.sums || {};
+    // 1017-D：金额差一点的，哪几笔改成实付：这一笔自己定过（rows[key].pay）就按它，没定过跟「全部改成实付」（edits.nearPay）走
+    var payOf = function (d) { var e = E[d.key]; return e && e.pay !== undefined ? !!e.pay : !!edits.nearPay; };
     var ruleFixE = edits.ruleFix || {};
     var receiptOn = edits.receipt !== false;
     var parsed = input.parsed, matched = input.matched, info = input.info || {}, manualById = input.manualById || {};
@@ -308,7 +311,7 @@
           if (d.file !== fi || d.pio !== io || d.fen === null) return;
           var k;
           if (d.group === 'add' || d.group === 'neutral') k = d.mode === 'skip' ? 'neutral' : d.mode === 'flow' ? 'newFlow' : 'newNormal';
-          else if (d.group === 'merge') { k = 'merge'; var m = manualById[d.into]; if (m && !d.viaSum && !(edits.nearPay && d.why === 'near' && d.into === d.item.into)) mergeDelta += m.fen - d.fen; }
+          else if (d.group === 'merge') { k = 'merge'; var m = manualById[d.into]; if (m && !d.viaSum && !(d.why === 'near' && d.into === d.item.into && payOf(d))) mergeDelta += m.fen - d.fen; }
           else k = d.group;
           parts[k].n += d.units; parts[k].fen += d.fen;
         });
@@ -343,7 +346,10 @@
     sec.petty = (matched.suspects || []).map(function (x) { var k = x.app + '|' + x.cp + '|' + x.month; return { key: k, app: x.app, cp: x.cp, month: x.month, n: x.count, fen: x.fen, on: !!pettyE[k] }; });
     // 1.1（1016-X）：金额相近、分类对得上自动合并的（多半是立减、红包）：手记比实付多多少；确认页可一键改成实付
     var nm = rows.filter(function (d) { return d.src === 'row' && d.group === 'merge' && d.why === 'near' && d.into === d.item.into && manualById[d.into]; });
-    sec.nearMerged = nm.length ? { n: nm.length, fen: nm.reduce(function (s0, d) { return s0 + (manualById[d.into].fen - d.fen); }, 0), pay: !!edits.nearPay,
+    //   1017-D：每一笔能自己定改不改成实付（pays[key]）；pay = 这几笔都改成实付；payFen = 改成实付的那几笔差多少
+    var nmPays = {}; nm.forEach(function (d) { nmPays[d.key] = payOf(d); });
+    sec.nearMerged = nm.length ? { n: nm.length, fen: nm.reduce(function (s0, d) { return s0 + (manualById[d.into].fen - d.fen); }, 0), pay: nm.every(payOf),
+                                   pays: nmPays, payN: nm.filter(payOf).length, payFen: nm.filter(payOf).reduce(function (s0, d) { return s0 + (manualById[d.into].fen - d.fen); }, 0),
                                    keys: nm.map(function (d) { return d.key; }) } : null;
     sec.newCats = newCatsIn.map(function (c) { var p = ncPlan[c.name]; return { name: c.name, count: c.count, on: p.on, into: p.into, picked: p.picked, defaultOn: !!c.defaultOn }; });
     sec.cpGroups = Object.keys(cpg).map(function (k) {

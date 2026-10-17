@@ -151,7 +151,7 @@
       if (ci !== undefined && c.set.cp === undefined) c.set.cp = ci;
       c.set.batch = batch;
       // 1.1（1016-X）：金额相近自动合并的，确认页选了「改成实付」：手记金额改成账单的（原值记进导入记录，撤销时还原）
-      if (d.why === 'near' && d.item && d.into === d.item.into && p.sections && p.sections.nearMerged && p.sections.nearMerged.pay) c.set.money = money(d.fen);
+      if (d.why === 'near' && d.item && d.into === d.item.into && p.sections && p.sections.nearMerged && (p.sections.nearMerged.pays ? p.sections.nearMerged.pays[d.key] : p.sections.nearMerged.pay)) c.set.money = money(d.fen);   // 1017-D：一笔一笔定
       c.nos.push(noOf(d.key));
       // 第二期（1016-Z6）：合并进去的账单本身记一份（账单详情里「拆开」时用它新建记录）：来源、单号、金额、时间、收支、备注、对方、支付方式、原始分类
       var rw = rowOf(d), bl = { app: d.app, no: noOf(d.key)[1], fen: d.fen, time: d.time, type: d.type, remark: remarkOf(d) };

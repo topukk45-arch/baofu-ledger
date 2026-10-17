@@ -153,6 +153,14 @@
     '.pc-full{background:var(--c-surface);border:1px solid var(--c-border);border-radius:10px;padding:8px 10px;margin:6px 0;}',
     '.pc-ver{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;margin:6px 0 8px;color:var(--c-text-soft);}',
     '.pc-ver .ok{color:var(--st-ok);}.pc-ver .no{color:var(--st-bad);font-weight:bold;}',
+    // 1017-D：金额差一点的一笔一笔处理：左上角勾选框（48px），底部「分开记 / 改成实付」；差额用琥珀色（红色只留给真有出入的）
+    '.pc-ver .near{color:var(--st-pend);font-weight:bold;}',
+    '.imp-near-item{position:relative;}.imp-near-item .pc{padding-left:52px;}',
+    '.imp-near-ck{position:absolute;left:2px;top:10px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:1;}',
+    '.imp-near-ck input{width:22px;height:22px;margin:0;accent-color:var(--c-primary);-webkit-appearance:checkbox;appearance:auto;}',
+    '.imp-near-act{display:flex;gap:8px;margin-top:8px;}.imp-near-act .ui-btn{flex:1 1 0;min-height:48px;white-space:nowrap;padding:0 8px;font-size:15px;}',
+    '.imp-near-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;padding:8px 10px;border-radius:10px;background:var(--c-bg);}',
+    '.imp-near-bulk .imp-soft{flex:1 1 100%;margin:0;}.imp-near-bulk .ui-btn{flex:1 1 0;min-height:48px;}',
     '.pc-pick{display:block;width:100%;min-height:48px;border-radius:10px;border:1.5px solid var(--st-main);background:transparent;color:var(--st-main);font-size:15px;font-weight:bold;font-family:inherit;cursor:pointer;}',
     '.pc.on .pc-pick{background:var(--st-ok);border-color:var(--st-ok);color:#fff;}.pc-pick:disabled{opacity:.45;}',
     '.pc-none{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:48px;margin-top:8px;border-radius:10px;border:1.5px solid var(--st-skip);background:transparent;color:var(--st-skip);font-size:15px;font-family:inherit;cursor:pointer;}',
@@ -610,7 +618,7 @@
   }
   function verdictEl(list) {
     var v = el('div', 'pc-ver');
-    list.forEach(function (x) { var sp = el('span', x.ok === true ? 'ok' : x.ok === false ? 'no' : ''); sp.textContent = (x.ok === true ? '✓ ' : x.ok === false ? '✗ ' : '') + x.t; v.appendChild(sp); });
+    list.forEach(function (x) { var sp = el('span', x.ok === true ? 'ok' : x.ok === false ? 'no' : x.ok === 'near' ? 'near' : ''); sp.textContent = (x.ok === true ? '✓ ' : x.ok === false ? '✗ ' : x.ok === 'near' ? '≈ ' : '') + x.t; v.appendChild(sp); });
     return v;
   }
   // o：{ lab, sum（一句话）, manual, showManual, bills:[行], picked, dim, also, early, cls, pickText, pickCls, i, onPick, noPick, verdict }
@@ -727,7 +735,11 @@
     var add = function (step, id, done, label, keys, o) { var x = { id: id, done: done, label: label, keys: keys || [] }; if (o) Object.keys(o).forEach(function (k) { x[k] = o[k]; }); it[step].push(x); };
     var rl = function (k) { return rowLabel(rowByKey(k)); };
     s.sums.forEach(function (g) { add('match', 'sum:' + g.id, g.chosen !== null, '几笔加起来：' + g.keys.map(rl).join('、'), g.keys); });
-    if (s.nearMerged) add('match', 'near', !!V.near || !!E.nearPay, '金额差一点的 ' + s.nearMerged.n + ' 笔', s.nearMerged.keys, { look: !E.nearPay });
+    // 1017-D：金额差一点的一笔一件：自己定了改不改成实付（或「全部改成实付」）算已选，点开看过算看过；「分开记」的挪走、留在已处理
+    if (s.nearMerged) s.nearMerged.keys.forEach(function (k) {
+      var own = !!(E.rows[k] && E.rows[k].pay !== undefined) || !!E.nearPay;
+      add('match', 'near:' + k, own || !!V['near:' + k] || !!V.near, rl(k) + ' · ' + nearDiffText(k), [k], { look: !own });
+    });
     s.pendGroups.forEach(function (g) { if (g.kind !== 'byBill') { var ps = pgState(g); add('match', 'pg:' + g.id, ps.done, g.text, g.keys, { part: ps.part }); } });
     pendSingles(p).forEach(function (d) { add(refundishRow(d) ? 'refund' : 'match', 'ps:' + d.key, picked(d.key) || d.group !== 'pending', rowLabel(d), [d.key]); });
     s.transfers.forEach(function (t) { var ts = trState(t); add('refund', 'tr:' + t.id, ts.done, '转账往来 ' + t.from.slice(5) + (t.to !== t.from ? '–' + t.to.slice(5) : '') + ' · ' + t.n + ' 笔', t.keys, { part: ts.part }); });
@@ -792,6 +804,7 @@
     if (kind === 'cp' && E.cpCats[k]) return function () { delete E.cpCats[k]; delete S.view.seen['cp:' + k]; };
     if (kind === 'nc' && E.newCats[k]) return function () { delete E.newCats[k]; };
     if (kind === 'petty' && E.petty[k]) return function () { delete E.petty[k]; };
+    if (kind === 'near' && E.rows[k] && (E.rows[k].split || E.rows[k].pay !== undefined)) return function () { var e = E.rows[k]; delete e.split; delete e.pay; if (!Object.keys(e).length) delete E.rows[k]; };
     if ((kind === 'ps' || kind === 'lc') && E.rows[k] && (E.rows[k].pick || E.rows[k].cat)) return function () { var e = E.rows[k]; delete e.pick; if (kind === 'lc') delete e.cat; if (!Object.keys(e).length) delete E.rows[k]; delete S.view.seen['keep:' + k]; };
     if (kind === 'ty' && S.types[k]) return function () { delete S.types[k]; S.needRerun = true; };
     if (kind === 'st' && S.statuses[k]) return function () { delete S.statuses[k]; S.needRerun = true; };
@@ -1332,22 +1345,56 @@
       out.amounts = ac;
     }
     // 1.1（1016-X）：金额相近、分类对得上，自动当作记过的
+    // 1017-D：一笔一笔处理：每张配对卡左上角勾选框、底部「不是同一笔，分开记」「改成实付」；勾几对一起处理；原来的按钮改叫「全部改成实付」
     if (s.nearMerged) {
       var nc0 = el('div', 'imp-card'); nc0.id = 'impNear';
-      nc0.appendChild(el('h4', null, '金额差一点的，当作你记过的（' + s.nearMerged.n + ' 笔）'));
-      nc0.appendChild(el('div', 'imp-line', s.nearMerged.n + ' 笔账单和手记日期挨着、分类一样，只是账单少一点（多半是立减、红包），已和手记合并。' +
-        (s.nearMerged.pay ? '手记金额会改成实付。' : '手记比实付多 ' + yuan(s.nearMerged.fen) + ' 元，金额按手记的。')));
-      nc0.querySelector('h4').appendChild(mk(!!S.view.seen.near || !!S.edits.nearPay, true));
-      nc0.addEventListener('click', function () { if (!S.view.seen.near) { S.view.seen.near = true; render(); } });
-      var nb0 = btn(s.nearMerged.pay ? '还是按手记金额' : '一键改成实付金额', 'imp-btn', function (e) { e.stopPropagation(); S.view.seen.near = true; S.edits.nearPay = !S.edits.nearPay; replan(); });
-      nb0.id = 'impNearPay'; nb0.style.marginTop = '8px';
-      // 1017-UI8：每一笔一张配对卡（只看）；多了先列 3 笔
+      var nm = s.nearMerged, E0 = S.edits;
+      nc0.appendChild(el('h4', null, '金额差一点的，当作你记过的（' + nm.n + ' 笔）'));
+      nc0.appendChild(el('div', 'imp-line', '账单比你记的少一点（多半是立减、红包），先当作同一笔合并了。一对一对看：不是同一笔就「分开记」（手记不动，账单作为新增），是的话可以「改成实付」。' +
+        (nm.pay ? '手记金额会改成实付。' : nm.payN ? '已有 ' + nm.payN + ' 笔改成实付，其余手记比实付多 ' + yuan(nm.fen - nm.payFen) + ' 元，金额按手记的。' : '手记比实付多 ' + yuan(nm.fen) + ' 元，金额按手记的。')));
+      var nSel = S.view.nearSel = S.view.nearSel || {};
+      Object.keys(nSel).forEach(function (k) { if (nm.keys.indexOf(k) < 0) delete nSel[k]; });
+      var selKeys = nm.keys.filter(function (k) { return nSel[k]; });
+      var setRow = function (k, f) { var e = E0.rows[k] = E0.rows[k] || {}; f(e); if (!Object.keys(e).length) delete E0.rows[k]; };
+      if (nm.keys.length > 1) {
+        var bk = el('div', 'imp-near-bulk'); bk.id = 'impNearBulk';
+        bk.appendChild(el('div', 'imp-soft', selKeys.length ? '已勾 ' + selKeys.length + ' 对' : '勾上几对，可以一起处理'));
+        var bs0 = btn('勾上的分开记', 'ui-btn', function (e) { e.stopPropagation(); selKeys.forEach(function (k) { setRow(k, function (x) { x.split = true; delete x.pay; }); delete nSel[k]; }); replan(); });
+        var bp0 = btn('勾上的改成实付', 'ui-btn primary', function (e) { e.stopPropagation(); selKeys.forEach(function (k) { setRow(k, function (x) { x.pay = true; }); delete nSel[k]; }); replan(); });
+        bs0.id = 'impNearBulkSplit'; bp0.id = 'impNearBulkPay'; bs0.disabled = bp0.disabled = !selKeys.length;
+        bk.appendChild(bs0); bk.appendChild(bp0); nc0.appendChild(bk);
+      }
+      // 1017-UI8：每一笔一张配对卡；多了先列 3 笔
       var nOpen = !!S.view.more.near;
-      s.nearMerged.keys.forEach(function (k, i) {
+      nm.keys.forEach(function (k, i) {
         var d = rowByKey(k), m = d && S.manualById[d.into]; if (!m || (i >= 3 && !nOpen)) return;
-        nc0.appendChild(pairCard({ manual: m, bills: [d], noPick: true, cls: 'imp-near-pc' }));
+        var paid = !!nm.pays[k];
+        var wrap = el('div', 'imp-near-item'); wrap.dataset.item = 'near:' + k; wrap.dataset.key = k;
+        var ckl = el('label', 'imp-near-ck'), ck = document.createElement('input'); ck.type = 'checkbox'; ck.checked = !!nSel[k]; ck.setAttribute('aria-label', '勾上这一对');
+        ck.addEventListener('change', function () { if (ck.checked) nSel[k] = true; else delete nSel[k]; render(); });
+        ckl.appendChild(ck); ckl.addEventListener('click', function (e) { e.stopPropagation(); });
+        var vd = verdict(m, [d]).map(function (x) { return /^手记多 /.test(x.t) ? { t: x.t, ok: 'near' } : x; });
+        var pc = pairCard({ manual: m, bills: [d], noPick: true, cls: 'imp-near-pc', verdict: vd });
+        pc.addEventListener('click', function (e) { if (e.target.closest('button')) return; if (!S.view.seen['near:' + k]) { S.view.seen['near:' + k] = true; setTimeout(render, 0); } });
+        var own = !!(E0.rows[k] && E0.rows[k].pay !== undefined) || !!E0.nearPay;
+        pc.querySelector('.pc-lab') && pc.firstChild && pc.insertBefore(mk(own || !!S.view.seen['near:' + k], !own), pc.firstChild);
+        var act = el('div', 'imp-near-act');
+        var sp = btn('不是同一笔，分开记', 'ui-btn imp-near-split', function (e) { e.stopPropagation(); setRow(k, function (x) { x.split = true; delete x.pay; }); delete nSel[k]; replan(); });
+        var py = btn(paid ? '✓ 已改成实付' : '改成实付', 'ui-btn imp-near-pay' + (paid ? '' : ' primary'), function (e) {
+          e.stopPropagation(); var want = !paid;
+          setRow(k, function (x) { if (want === !!E0.nearPay) delete x.pay; else x.pay = want; });
+          replan();
+        });
+        act.appendChild(sp); act.appendChild(py); pc.appendChild(act);
+        wrap.appendChild(ckl); wrap.appendChild(pc); nc0.appendChild(wrap);
       });
-      if (s.nearMerged.keys.length > 3) nc0.appendChild(moreBtn('near', s.nearMerged.keys.length - 3, '笔'));
+      if (nm.keys.length > 3) nc0.appendChild(moreBtn('near', nm.keys.length - 3, '笔'));
+      var nb0 = btn(nm.pay ? '全部按手记金额' : '全部改成实付', 'imp-btn', function (e) {
+        e.stopPropagation(); E0.nearPay = !nm.pay;
+        nm.keys.forEach(function (k) { if (E0.rows[k]) setRow(k, function (x) { delete x.pay; }); });
+        replan();
+      });
+      nb0.id = 'impNearPay'; nb0.style.marginTop = '8px';
       nc0.appendChild(nb0);
       out.near = nc0;
     }
@@ -1671,6 +1718,7 @@
   //   这条手记你在别处亲手选过：先问一句「已经配给了某某，改配到这里吗？」，确认了才改，那边让出来；只是建议（没人选过）的直接配。
   //   被让出的那笔：回到待你确认，或者候选都被用了就自动作为新增，浮出提示一句
   function sumById(id) { return (S.matched.multiSums || []).filter(function (g) { return g.id === id; })[0] || null; }
+  function nearDiffText(k) { var d = rowByKey(k), m = d && S.manualById[d.into]; return m ? '手记多 ' + yuan(m.fen - d.fen) : ''; }   // 1017-D
   function rowLabel(d) { return d ? fmtTime(d.time) + ' ' + (cpShow(d.title || d.cp) || '—') + ' ' + yuan(d.fen) : ''; }
   function sumLabel(id) {
     var g = (S.plan.sections.sums || []).filter(function (x) { return x.id === id; })[0];
@@ -2117,7 +2165,8 @@
       if (res.ws.learnedN) card.appendChild(el('div', 'imp-soft imp-res-learned', '从合并里学到了 ' + res.ws.learnedN + ' 条规则（同一个对方合并上 2 次以上、分类一致），以后直接用。'));
       if (res.ws.rulesChange && res.ws.rulesChange.length) card.appendChild(el('div', 'imp-soft imp-res-rulefix', '改了你的 ' + res.ws.rulesChange.length + ' 条规则：' + res.ws.rulesChange.map(function (x) { return x.kw + ' → ' + x.to; }).join('，')));
       var nmr = S.plan && S.plan.sections && S.plan.sections.nearMerged;
-      if (nmr) card.appendChild(el('div', 'imp-soft imp-res-near', nmr.pay ? nmr.n + ' 笔金额差一点的手记已改成实付金额。' : nmr.n + ' 笔手记比实付多 ' + yuan(nmr.fen) + ' 元，多半是立减。'));
+      if (nmr) card.appendChild(el('div', 'imp-soft imp-res-near', nmr.pay ? nmr.n + ' 笔金额差一点的手记已改成实付金额。'
+        : (nmr.n - nmr.payN) + ' 笔手记比实付多 ' + yuan(nmr.fen - nmr.payFen) + ' 元，多半是立减。' + (nmr.payN ? '另外 ' + nmr.payN + ' 笔已改成实付金额。' : '')));
     }
     wrap.appendChild(card);
     if (c.pending) {
