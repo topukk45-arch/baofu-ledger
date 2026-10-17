@@ -1411,7 +1411,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-P</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-Q</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -4376,7 +4376,8 @@
                 recs[i]=n;
                 const made=[], orders=[];
                 (Array.isArray(c.bills) ? c.bills : []).forEach(b=>{
-                    const r={ id:genId(), time:b.time, money:round2(b.fen/100), cat:'未分类', remark:b.remark||'', type:b.type==='income' ? 'income' : 'expense', src:{ app:b.app }, batch:lg.b };
+                    // 1017-Q：账单那条默认用手记的分类（原来落未分类）；手记的分类不在分类列表里了才落未分类
+                    const r={ id:genId(), time:b.time, money:round2(b.fen/100), cat:(n.cat && (a.cats||[]).includes(n.cat)) ? n.cat : '未分类', remark:b.remark||'', type:b.type==='income' ? 'income' : 'expense', src:{ app:b.app }, batch:lg.b };
                     if(Number.isInteger(b.cp)) r.cp=b.cp;
                     if(Number.isInteger(b.pm)) r.pm=b.pm;
                     if(b.oc) r.oc=b.oc;
@@ -10252,11 +10253,11 @@ ${detail}
             if(rec.src.merged && devImportOn()){
                 const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='detailSplit'; b.textContent='拆开'; b.style.marginTop='6px';
                 b.addEventListener('click', ()=>{
-                    customConfirm(`把这条和${app}账单拆开：你记的这条改回合并前的样子（你后来改过的不动），账单另记一条（分类先放「未分类」）。\n\n确定拆开吗？`, async ()=>{
+                    customConfirm(`把这条和${app}账单拆开：你记的这条改回合并前的样子（你后来改过的不动），账单另记一条（分类和你记的这条一样）。\n\n确定拆开吗？`, async ()=>{
                         try{
                             const r=await window.JiwenImportStore.splitMerge(rec.id);
                             $('detailMask').style.display='none';
-                            customAlert(r.added ? `拆开了：你记的那条还原了，账单另记了 ${r.added} 条（分类是「未分类」，可以去改）。` : '拆开了：你记的那条还原了。这次导入是旧版本做的，没存账单本身，下次再导同一份账单时它会作为新增出现。', '拆开');
+                            customAlert(r.added ? `拆开了：你记的那条还原了，账单另记了 ${r.added} 条（分类和你记的那条一样，不对可以去改）。` : '拆开了：你记的那条还原了。这次导入是旧版本做的，没存账单本身，下次再导同一份账单时它会作为新增出现。', '拆开');
                         }catch(err){
                             const c=err && (err.code || err.message);
                             customAlert(c==='nolog' ? '找不到合并它的那次导入记录了（只保留最近 10 次），拆不开。' : '没拆成，账本没动：' + c, '拆开');

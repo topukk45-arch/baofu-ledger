@@ -2799,7 +2799,8 @@
     dom.body.innerHTML = '';
     if (notice) { var nt = el('div', 'imp-card imp-line imp-ok', notice); nt.id = 'impPendNotice'; dom.body.appendChild(nt); }
     var loading = el('div', 'imp-soft', '正在读待处理…'); dom.body.appendChild(loading);
-    return store().pendingCheck().then(function (list) {
+    return Promise.all([store().pendingCheck(), ensureClassify()]).then(function (r) {
+      var list = r[0];
       if (my !== runId || !S) return;
       loading.remove();
       S.pend = list;
@@ -2808,6 +2809,31 @@
       if (my !== runId || !S) return;
       loading.textContent = '读不出待处理：' + (e && (e.code || e.message) || e);
     });
+  }
+  // 1017-Q：「作为新增」的分类用分类推荐预选（你的规则 → 内置词表 → 分类对照，推不出的落未分类）。
+  //   分类推荐（classify.js、merchants.js）平时只在后台线程里用，打开待处理页时才载入主页面；载不上就照旧都落未分类
+  var clsLoading = null;
+  function ensureClassify() {
+    if (window.JiwenImportClassify && window.JiwenImportMerchants) return Promise.resolve(true);
+    if (clsLoading) return clsLoading;
+    var one = function (src) { return new Promise(function (res) { var sc = document.createElement('script'); sc.src = src; sc.onload = function () { res(true); }; sc.onerror = function () { sc.remove(); res(false); }; document.head.appendChild(sc); }); };
+    clsLoading = (window.JiwenImportMerchants ? Promise.resolve(true) : one('import/merchants.js')).then(function () { return window.JiwenImportClassify ? true : one('import/classify.js'); })
+      .then(function () { var okk = !!(window.JiwenImportClassify && window.JiwenImportMerchants); if (!okk) clsLoading = null; return okk; });
+    return clsLoading;
+  }
+  // 每一笔推荐到哪个已有分类（推不出、要新建的都算未分类）：{ 键: { cat, reason } }
+  function pendSuggest(list) {
+    var C = window.JiwenImportClassify, out = {};
+    if (!C || !S || !S.info) return out;
+    var xs = list.filter(function (x) { return !x.refund; });
+    if (!xs.length) return out;
+    try {
+      var info = S.info, cats = info.cats || [];
+      var r = C.classify(xs.map(function (x) { return { app: x.item.app, cp: x.item.cp, desc: x.item.d, kind: '', io: x.item.io }; }),
+        { cats: cats, rules: info.catRules, maps: info.catMaps, merchants: window.JiwenImportMerchants, isNewUser: false });
+      xs.forEach(function (x, i) { var rc = r.recs[i]; if (rc && !rc.newCat && rc.cat && rc.cat !== '未分类' && cats.indexOf(rc.cat) >= 0) out[x.key] = { cat: rc.cat, reason: rc.reason }; });
+    } catch (_) {}
+    return out;
   }
   function renderPending(list) {
     var head = el('div', 'imp-card'); head.id = 'impPendHead';
@@ -2829,6 +2855,7 @@
     head.appendChild(ptip);
     dom.body.appendChild(head);
     var cats = ['未分类'].concat(((S.info && S.info.cats) || []).filter(function (c) { return c !== '未分类'; }));
+    var sug = pendSuggest(list);
     list.slice().sort(function (a, b) { return a.item.t < b.item.t ? 1 : a.item.t > b.item.t ? -1 : 0; }).forEach(function (x) {
       var it = x.item, c = el('div', 'imp-card imp-pend'); c.dataset.key = x.key;
       pcards.push({ node: c, fen: it.amt, texts: [it.cp, cpShow(it.cp), it.d, it.rm, x.why].concat(x.cands.map(function (cd) { return cd.rec && cd.rec.remark; })) });
@@ -2857,7 +2884,9 @@
       if (!x.refund) {
         se = el('select', 'imp-pend-cat');
         cats.forEach(function (n) { var o = el('option', null, n); o.value = n; se.appendChild(o); });
+        if (sug[x.key]) se.value = sug[x.key].cat;
         var lb = el('div', 'imp-soft', '分类 '); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '6px'; lb.style.flex = '1 1 100%'; var sw = wrapSel(se, (it.cp || '—') + ' · ' + yuan(it.amt) + ' 元'); sw.style.flex = '1'; lb.appendChild(sw); acts.appendChild(lb);
+        if (sug[x.key]) { var sh0 = el('div', 'imp-soft imp-pend-sug', '按推荐先选了「' + sug[x.key].cat + '」（' + sug[x.key].reason + '），不对就改'); sh0.style.flex = '1 1 100%'; acts.appendChild(sh0); }
       }
       var nb = btn(x.refund ? '作为新增（只算结余）' : '作为新增', 'imp-btn imp-pend-new', function () {
         act([{ key: x.key, do: 'new', cat: se ? se.value : '未分类' }], '已作为新增记进账本');

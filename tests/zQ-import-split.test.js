@@ -1,6 +1,6 @@
 // 第二期（1016-Z6）账单详情里拆开合并（jsdom 跑整个 App，真导真拆真撤）。node zQ-import-split.test.js [index.html]
 // 详情里一行浅色「来自微信账单」/「已和微信账单合并」，手记不显示；合并过的（开着开发开关）有「拆开」：
-// 手记还原成合并前的样子，账单另记一条（未分类、带那次的批次号，单号改登记到它）；再导同一份账单一条不新增；撤销那次导入后和导入前逐字节一样；
+// 手记还原成合并前的样子，账单另记一条（1017-Q 起分类用手记的、带那次的批次号，单号改登记到它）；再导同一份账单一条不新增；撤销那次导入后和导入前逐字节一样；
 // 旧版本的导入记录没存账单：只还原手记、单号拿掉，再导时那笔作为新增出现；开关关着没有「拆开」。账单、手记全是虚构的。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
@@ -39,7 +39,7 @@ const M1 = { id: 'm1', time: '2026-10-05T08:30', money: 30, type: 'expense', cat
   await t.until(() => t.ask()); const msg = t.ask().msg; await t.askOk();
   const m1 = t.recs().find(r => r.id === 'm1'), nb = t.recs().find(r => r.money === 30 && r.id !== 'm1');
   ok(/拆开了/.test(msg) && same(m1, M1), '2 拆开：你记的那条完全还原成合并前');
-  ok(nb && nb.cat === '未分类' && nb.time === '2026-10-05T12:10' && nb.src.app === 'wechat' && nb.batch === lg0.b && nb.remark === '午饭', '2 账单另记一条：未分类、账单时间、来源、那次的批次号');
+  ok(nb && nb.cat === M1.cat && M1.cat !== '未分类' && nb.time === '2026-10-05T12:10' && nb.src.app === 'wechat' && nb.batch === lg0.b && nb.remark === '午饭', '2 账单另记一条：分类用手记的（1017-Q 起，原来落未分类）、账单时间、来源、那次的批次号');
   const T1 = await t.st().ordersRead();
   ok(T1.get('wechat', BL[0].no).id === nb.id, '2 单号改登记到新的那条');
   const [lg1] = await t.logs();
