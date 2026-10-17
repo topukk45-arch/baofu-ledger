@@ -173,12 +173,14 @@ const after1 = await t.dump();
 // ===== 3. 恢复到导入前：逐字节一样 =====
 {
   const r = await t.st().restoreLast();
-  ok(same(await t.dump(), before) && t.st().backups().length === 0, '3 恢复到导入前：账本、单号表、待处理池和导入前逐字节一样 ' + r.records);
+  // 1017-O：用过的那份不删（还能再恢复），恢复前先备份一份「恢复前」
+  ok(same(await t.dump(), before) && same(t.st().backups().map(b => b.kind), ['import', 'restore']), '3 恢复到导入前：账本、单号表、待处理池和导入前逐字节一样；导入前那份留着，多一份恢复前 ' + r.records);
   ok(t.recs().length === RECS.length && t.recs().find(x => x.id === 'm4').time === '2026-03-05T08:30', '3 手记的时间也回来了');
 }
 
 // ===== 4. 写到一半失败：全部回滚 =====
 {
+  const nb0 = t.st().backups().length;
   for (const [name, setup] of [
     ['备份写不进去', () => breakPut(k => /_bk_/.test(k), 'quota')],
     ['整理完、写之前出错', () => { t.w.__impFailAt = 'beforeSave'; }],
@@ -189,7 +191,7 @@ const after1 = await t.dump();
     const r = await t.importFiles(FILES1, null, { beforeGo: setup });
     restorePut(); t.w.__impFailAt = null;
     await t.idle();
-    ok(r.alert && !r.result && same(await t.dump(), before) && t.st().backups().length === 0, '4 ' + name + '：提示失败，账本、单号表和写入前逐字节一样，备份也删了 ' + (r.alert || ''));
+    ok(r.alert && !r.result && same(await t.dump(), before) && t.st().backups().length === nb0, '4 ' + name + '：提示失败，账本、单号表和写入前逐字节一样，备份也删了 ' + (r.alert || ''));
   }
   const r = await t.importFiles(FILES1);
   ok(r.result && t.recs().length === RECS.length + r.result.r.added, '4 失败以后再导：正常写进去');

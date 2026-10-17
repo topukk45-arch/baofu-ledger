@@ -333,6 +333,15 @@
         .ui-btn.primary { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); color:var(--c-on-primary);
             border-color:transparent; font-weight:bold; box-shadow:0 3px 10px rgba(var(--c-shadow-rgb),0.35); }
         .ui-btn.danger { color:var(--c-neg); }
+        /* 1017-O：危险操作的确认按钮（覆盖、删除、清空、撤销、恢复、批量改）：警示色实心，文案写清做什么 */
+        .ui-btn.warn { background:var(--c-neg); color:#fff; border-color:transparent; font-weight:bold; box-shadow:0 3px 10px rgba(181,72,46,0.3); }
+        /* 底部面板里的说明文字：左对齐、分段，第一段是结论，后面一条一条写影响 */
+        .ui-msg { text-align:left; font-size:15px; line-height:1.6; color:var(--c-text); }
+        .ui-msg p { margin:0 0 8px; }
+        .ui-msg ul { margin:0 0 8px; padding-left:20px; }
+        .ui-msg li { margin:2px 0; }
+        .ui-msg .ui-msg-soft { font-size:13px; color:var(--c-text-soft); }
+        .ui-msg .ui-msg-warn { color:var(--c-neg); font-weight:bold; }
         .ui-btn.small { font-size:14px; padding:8px 14px; }
         .ui-btn.block { display:block; width:100%; }
         .ui-btn[disabled] { opacity:.45; cursor:not-allowed; box-shadow:none; }
@@ -1402,7 +1411,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-N</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-O</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1572,7 +1581,7 @@
                     <input type="file" id="importFile" accept=".json" style="display:none">
                     <!-- 1015-A：账单导入还在开发，入口默认藏着；设置页底部版本号连点 5 次才出现（只在这台手机上） -->
                     <button class="set-item" id="devImportBtn" style="display:none"><span>导入（开发中）</span><span class="set-arrow">›</span></button>
-                    <button class="set-item" id="devRestoreBtn" style="display:none"><span>恢复到导入前（开发中）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="devRestoreBtn" style="display:none"><span>恢复备份（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devLogsBtn" style="display:none"><span>导入记录（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devRulesBtn" style="display:none"><span>管理导入规则（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
@@ -3748,12 +3757,29 @@
         }
         // ===== 1016-F：写入（账单导入第一期 ⑥b）=====
         // 导入前备份：现有备份格式（和「导出存档」一样的字段）+ _arch（存档设置原样，恢复时逐字节还原用）。
-        //   存在本机库里 imp_<账号>_<存档号>_bk_<时间>，最多留 3 份；不进备份、不进云备份，存档删了跟着删
-        const IMP_BK_MAX=3;
+        //   存在本机库里 imp_<账号>_<存档号>_bk_<时间>，不进备份、不进云备份，存档删了跟着删。
+        //   一份是一整套：账本（含 AI 标记）、存档设置（分类、预算、模板、importRules、对方 / 支付方式名单……）、单号表、待处理池、导入记录。
+        // 1017-O：备份按种类分开放、各留几份（原来几种共用 3 份，连撤两次就把导入前那份挤掉了）：
+        //   import 导入前（键 …_bk_<时间>）/ undo 撤销前（…_u，1016-K）/ ai AI 修改前（…_a，1017-G）/ restore 恢复前（…_r，1017-O）。
+        //   12 万条一份约 22MB，全满时约 7 份；每次写前看剩余空间，放不下就不做那件事（照旧提示）。
+        //   新备份先写进去，那件事做成了才删同种里最旧的（做失败了删掉新的、旧的照留）。
+        //   …_bk_M：备份目录（每份的种类、时间、是哪一次操作之前、有几条记录），和备份同一个事务写；没有目录的旧备份打开时现读。
+        const IMP_BK_SLOTS={ import:3, undo:2, ai:1, restore:1 };
+        const IMP_BK_MAX=3;      // 老的「共用 3 份」只剩 restoreLast 的说明里用；份数看 IMP_BK_SLOTS
+        const IMP_BK_SUF={ import:'', undo:'_u', ai:'_a', restore:'_r' };
         function impBkPrefix(id, aid){ return `imp_${id}_${aid}_bk_`; }
-        function impBkKeys(id, aid){ const p=impBkPrefix(id, aid); return [...__ledgerKeys].filter(k=>k.indexOf(p)===0).sort(); }
-        // kind：'import' 导入前（键 …_bk_<时间>）/ 'undo' 撤销前（1016-K，键 …_bk_<时间>_u）/ 'ai' AI 修改前（1017-G，键 …_bk_<时间>_a），共用最多 3 份的位置
-        const IMP_BK_KIND={ import:'导入前备份', undo:'撤销前备份', ai:'AI 修改前备份' };
+        function impBkMetaKey(id, aid){ return impBkPrefix(id, aid)+'M'; }
+        const IMP_BK_RE=/^([0-9a-z]+)(_[uar])?$/;
+        function impBkKindOf(k){ return /_u$/.test(k) ? 'undo' : /_a$/.test(k) ? 'ai' : /_r$/.test(k) ? 'restore' : 'import'; }
+        function impBkTime(id, aid, k){ const m=IMP_BK_RE.exec(k.slice(impBkPrefix(id, aid).length)); return m ? parseInt(m[1], 36) : 0; }
+        // 这个存档的备份键（旧的在前；目录键不算）
+        function impBkKeys(id, aid){
+            const p=impBkPrefix(id, aid);
+            return [...__ledgerKeys].filter(k=>k.indexOf(p)===0 && IMP_BK_RE.test(k.slice(p.length)))
+                .sort((x, y)=>impBkTime(id, aid, x)-impBkTime(id, aid, y) || (x<y ? -1 : x>y ? 1 : 0));
+        }
+        // kind：见上面；IMP_BK_KIND 是备份里写的 kind（恢复时认这几种）
+        const IMP_BK_KIND={ import:'导入前备份', undo:'撤销前备份', ai:'AI 修改前备份', restore:'恢复前备份' };
         async function impMakeBackup(t, batch, kind){
             const store=loadStore(t.e.id), a=store.archives[t.name];
             const ex=await impExportFields(t.e.id, t.name, true);
@@ -3761,6 +3787,43 @@
             return JSON.stringify({ app:'记问', kind:IMP_BK_KIND[kind] || IMP_BK_KIND.import, user:nameOf(t.e.id), accountId:t.e.id, archive:t.name, aid:t.aid, batch,
                 cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], ...impArchFields(a), data:a.records, ...ex,
                 _arch:arch, exportedAt:new Date().toLocaleString() });
+        }
+        async function impBkMetaRead(t){
+            try{ const raw=asRaw(await idbGet(impBkMetaKey(t.e.id, t.aid))); const o=raw ? JSON.parse(raw) : null; return o && o.list && typeof o.list==='object' ? o.list : {}; }
+            catch(_){ return {}; }
+        }
+        // 1017-O：做一份备份并写进去（先看剩余空间）。meta：{ what（是哪一次操作之前，大白话）, b（那次操作的批次号）}
+        //   返回 { key, drop }：drop 是那件事做成以后要删的同种旧备份（impBkDone），做失败了调 impBkFail 删掉这份
+        async function impBkSave(t, kind, batch, meta, extraNeed){
+            const bk=await impMakeBackup(t, batch, kind);
+            const free=await impFreeBytes(), need=Math.ceil(bk.length*2*1.2 + (extraNeed||0));
+            if(free!==null && free<need) throw impErr('nospace', { need, free });
+            if(window.__impFailAt==='backup') throw impErr('test');
+            const p=impBkPrefix(t.e.id, t.aid);
+            let ts=Date.now(), key;
+            do { key=p+ts.toString(36)+IMP_BK_SUF[kind]; ts++; } while(__ledgerKeys.has(key));
+            const same=impBkKeys(t.e.id, t.aid).filter(k=>impBkKindOf(k)===kind);
+            const drop=same.slice(0, Math.max(0, same.length-(IMP_BK_SLOTS[kind]-1)));
+            const idx=await impBkMetaRead(t), live=new Set(impBkKeys(t.e.id, t.aid));
+            Object.keys(idx).forEach(k=>{ if(!live.has(k)) delete idx[k]; });
+            const a=loadStore(t.e.id).archives[t.name];
+            idx[key]=Object.assign({ kind, t:ts-1, n:(a.records||[]).length }, meta||{});
+            await idbBatch([['put', key, bk], ['put', impBkMetaKey(t.e.id, t.aid), JSON.stringify({ v:1, list:idx })]]);
+            return { key, drop, bytes:bk.length*2 };
+        }
+        async function impBkDone(t, saved){
+            if(!saved || !saved.drop.length) return;
+            try{
+                const idx=await impBkMetaRead(t); saved.drop.forEach(k=>delete idx[k]);
+                await idbBatch(saved.drop.map(k=>['del', k]).concat([['put', impBkMetaKey(t.e.id, t.aid), JSON.stringify({ v:1, list:idx })]]));
+            }catch(_){}
+        }
+        async function impBkFail(t, saved){
+            if(!saved) return;
+            try{
+                const idx=await impBkMetaRead(t); delete idx[saved.key];
+                await idbBatch([['del', saved.key], ['put', impBkMetaKey(t.e.id, t.aid), JSON.stringify({ v:1, list:idx })]]);
+            }catch(_){}
         }
         // 剩余空间：拿不到（浏览器不支持）就不拦
         async function impFreeBytes(){
@@ -3913,25 +3976,52 @@
             await saveStoreDurable(store, user, ()=>pairs);
             return { added:made.length, changed:chg.length, ids:made.map(r=>r.id) };
         }
-        // 恢复到上一次导入前：原地替换（不重新编号），账本、单号表、待处理池、导入记录和导入前逐字节一样
-        async function impRestoreFrom(t, key){
+        // 恢复一份备份：原地替换（不重新编号），账本、存档设置、单号表、待处理池、导入记录和做那份备份时逐字节一样。
+        //   1017-O：用过的那份不删（还能再恢复一次）；恢复前先备份一份「恢复前」（恢复错了能回来，放不下就不恢复）；
+        //   恢复本身一个事务，失败什么都不改、刚做的「恢复前」也删掉
+        async function impReadBackup(t, key){
             const raw=await idbGet(key);
             if(typeof raw!=='string') throw impErr('nobackup');
-            const bk=JSON.parse(raw);
+            let bk=null; try{ bk=JSON.parse(raw); }catch(_){}
             if(!bk || !Object.values(IMP_BK_KIND).includes(bk.kind) || bk.aid!==t.aid || !bk._arch || !Array.isArray(bk.data)) throw impErr('badbackup');
-            const store=loadStore(t.e.id);
-            const a={}; Object.keys(bk._arch).forEach(k=>{ a[k] = k==='records' ? bk.data : bk._arch[k]; });
-            if(!('records' in a)) a.records=bk.data;
-            store.archives[t.name]=a;
-            // 导入数据：这个存档现有的全删（导入前备份不算），再照备份写回
-            const p=impArchPrefix(t.e.id, t.aid), bp=impBkPrefix(t.e.id, t.aid), pairs=new Map();
-            [...__ledgerKeys, ...t.e.extra.keys()].forEach(k=>{ if(k.indexOf(p)===0 && k.indexOf(bp)!==0) pairs.set(k, null); });
-            if(bk.orders) Object.keys(bk.orders).forEach(app=>Object.keys(bk.orders[app]).forEach(mon=>{ pairs.set(impOrdKey(t.e.id, t.aid, app, mon), JSON.stringify(bk.orders[app][mon])); }));
-            if(Array.isArray(bk.pending) && bk.pending.length) pairs.set(impPendKey(t.e.id, t.aid), JSON.stringify({ v:1, items:bk.pending }));
-            if(Array.isArray(bk.imports) && bk.imports.length) pairs.set(impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:bk.imports }));
-            pairs.set(key, null);        // 用过的这份删掉，再点就恢复到更早一次导入之前
-            await saveStoreDurable(store, t.e.id, ()=>[...pairs]);
-            return { records:bk.data.length, at:bk.exportedAt, batch:bk.batch||'' };
+            return bk;
+        }
+        async function impRestoreFrom(t, key, opts){
+            opts=opts||{};
+            const bk=await impReadBackup(t, key);
+            if(opts.ver!==undefined && opts.ver!==t.e.ver) throw impErr('stale');
+            const what=(IMP_BK_KIND[impBkKindOf(key)]||'备份').replace(/备份$/, '');
+            const saved=opts.noSafety ? null : await impBkSave(t, 'restore', '', { what:'恢复 ' + new Date(impBkTime(t.e.id, t.aid, key)).toLocaleString() + ' 的' + what + '备份' });
+            try{
+                const store=loadStore(t.e.id);
+                const a={}; Object.keys(bk._arch).forEach(k=>{ a[k] = k==='records' ? bk.data : bk._arch[k]; });
+                if(!('records' in a)) a.records=bk.data;
+                store.archives[t.name]=a;
+                // 导入数据：这个存档现有的全删（备份和备份目录不算），再照备份写回
+                const p=impArchPrefix(t.e.id, t.aid), bp=impBkPrefix(t.e.id, t.aid), pairs=new Map();
+                [...__ledgerKeys, ...t.e.extra.keys()].forEach(k=>{ if(k.indexOf(p)===0 && k.indexOf(bp)!==0) pairs.set(k, null); });
+                if(bk.orders) Object.keys(bk.orders).forEach(app=>Object.keys(bk.orders[app]).forEach(mon=>{ pairs.set(impOrdKey(t.e.id, t.aid, app, mon), JSON.stringify(bk.orders[app][mon])); }));
+                if(Array.isArray(bk.pending) && bk.pending.length) pairs.set(impPendKey(t.e.id, t.aid), JSON.stringify({ v:1, items:bk.pending }));
+                if(Array.isArray(bk.imports) && bk.imports.length) pairs.set(impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:bk.imports }));
+                if(window.__impFailAt==='restoreSave') throw impErr('test');
+                await saveStoreDurable(store, t.e.id, ()=>[...pairs]);
+            }catch(err){ await impBkFail(t, saved); throw err; }
+            await impBkDone(t, saved);
+            return { records:bk.data.length, at:bk.exportedAt, batch:bk.batch||'', safety:saved ? saved.key : '' };
+        }
+        // 1017-O：恢复这份备份会改掉什么（只读；给确认面板写影响）：现在的账本 / 导入记录 vs 备份里的
+        function impBackupDiff(cur, bk){
+            const now=new Map((cur.records||[]).map(r=>[r.id, r])), was=new Map((bk.data||[]).map(r=>[r.id, r]));
+            const out={ records:was.size, now:now.size, goneMan:0, goneImp:0, back:0, changed:0, logsGone:0, aiGone:0, logsBack:0, pendNow:(cur.pending||[]).length, pendBk:(bk.pending||[]).length,
+                        catsChange:JSON.stringify(cur.cats||[])!==JSON.stringify(bk._arch && bk._arch.cats || bk.cats || []),
+                        rulesChange:JSON.stringify(cur.importRules||null)!==JSON.stringify(bk._arch && bk._arch.importRules || null),
+                        budgetsChange:JSON.stringify(cur.budgets||{})!==JSON.stringify(bk._arch && bk._arch.budgets || {}) };
+            now.forEach((r, id)=>{ const w=was.get(id); if(!w){ if(r.src || r.batch) out.goneImp++; else out.goneMan++; } else if(JSON.stringify(w)!==JSON.stringify(r)) out.changed++; });
+            was.forEach((r, id)=>{ if(!now.has(id)) out.back++; });
+            const lb=new Set((bk.imports||[]).map(l=>l.b)), ln=new Set((cur.logs||[]).map(l=>l.b));
+            (cur.logs||[]).forEach(l=>{ if(!lb.has(l.b)){ if(l.kind==='ai') out.aiGone++; else out.logsGone++; } });
+            (bk.imports||[]).forEach(l=>{ if(!ln.has(l.b)) out.logsBack++; });
+            return out;
         }
         // ---- 1016-K：撤销要的存档样子（交给 import/undo.js）和照撤完的样子写回 ----
         async function impUndoState(t){
@@ -4096,17 +4186,14 @@
                 const clock=()=>(window.performance && typeof performance.now==='function') ? performance.now() : Date.now();
                 const t0=clock(), ms={};
                 prog && prog('backup', 0, 1);
-                const bk=await impMakeBackup(t, ws.batch, 'import');
-                const free=await impFreeBytes(), need=Math.ceil(bk.length*2*1.2 + ws.records.length*400 + ws.orders.length*100);
-                if(free!==null && free<need) throw impErr('nospace', { need, free });
-                if(window.__impFailAt==='backup') throw impErr('test');
-                const bkKey=impBkPrefix(t.e.id, t.aid)+Date.now().toString(36);
-                const old=impBkKeys(t.e.id, t.aid), drop=old.slice(0, Math.max(0, old.length-(IMP_BK_MAX-1)));
-                await idbBatch([['put', bkKey, bk]].concat(drop.map(k=>['del', k])));
+                const lw=ws.log || {}, apps=(lw.apps||[]).map(x=>x==='wechat' ? '微信' : x==='alipay' ? '支付宝' : x).join('、');
+                const saved=await impBkSave(t, 'import', ws.batch, { b:ws.batch, what:'导入' + (apps ? apps + '账单' : '账单') + (lw.from ? '（' + String(lw.from).slice(0, 10) + ' 至 ' + String(lw.to||'').slice(0, 10) + '）' : '') + (ws.only ? '（只对账）' : '') },
+                    ws.records.length*400 + ws.orders.length*100);
                 ms.backup=Math.round(clock()-t0);
                 let r;
                 try{ r=await impApplyWrite(t, ws, prog); }
-                catch(err){ try{ await idbBatch([['del', bkKey]]); }catch(_){} throw err; }
+                catch(err){ await impBkFail(t, saved); throw err; }
+                await impBkDone(t, saved);
                 ms.total=Math.round(clock()-t0);
                 prog && prog('done', 1, 1);
                 if(t.e.id===currentUser && t.name===currentArchive){
@@ -4114,12 +4201,12 @@
                     try{ odScheduleSync(); }catch(_){}
                 }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
-                return Object.assign(r, { batch:ws.batch, ms, backupBytes:bk.length*2 });
+                return Object.assign(r, { batch:ws.batch, ms, backupBytes:saved.bytes });
             },
             // 本机的导入前备份（新的在后）：[{ key, at, batch, records }]（只读键名和开头，不整个解析）
             backups(archive){
                 const t=impTarget(archive);
-                return impBkKeys(t.e.id, t.aid).map(k=>({ key:k, t:parseInt(k.slice(impBkPrefix(t.e.id, t.aid).length), 36), kind:/_u$/.test(k) ? 'undo' : /_a$/.test(k) ? 'ai' : 'import' }));
+                return impBkKeys(t.e.id, t.aid).map(k=>({ key:k, t:impBkTime(t.e.id, t.aid, k), kind:impBkKindOf(k) }));
             },
             // ---- 1016-K：撤销（第一期 ⑦a）----
             // 撤销方案（只读）：import/undo.js 算，带上算的时候账本的版本号。batch：要撤的批次号
@@ -4137,14 +4224,12 @@
                 const t=impTarget(opts.archive!==undefined ? opts.archive : p && p.archive);
                 if(!p || !p.ok || !p.after) throw impErr('badplan');
                 if(p.ver!==t.e.ver) throw impErr('stale');
-                const bk=await impMakeBackup(t, p.target, 'undo');
-                const free=await impFreeBytes(), need=Math.ceil(bk.length*2*1.2);
-                if(free!==null && free<need) throw impErr('nospace', { need, free });
-                const bkKey=impBkPrefix(t.e.id, t.aid)+Date.now().toString(36)+'_u';
-                const old=impBkKeys(t.e.id, t.aid), drop=old.slice(0, Math.max(0, old.length-(IMP_BK_MAX-1)));
-                await idbBatch([['put', bkKey, bk]].concat(drop.map(k=>['del', k])));
+                const lgs=(p.chain||[]).length, tgt=((await impGetJson(t.e, impLogKey(t.e.id, t.aid)))||{ list:[] }).list.filter(l=>l.b===p.target)[0];
+                const tgtWhat=tgt ? (tgt.kind==='ai' ? String(tgt.at||'').replace('T', ' ') + ' 那次 AI 修改' : String(tgt.at||'').replace('T', ' ') + ' 那次导入') : '一次导入';
+                const saved=await impBkSave(t, 'undo', p.target, { b:p.target, what:'撤销 ' + tgtWhat + (lgs>1 ? '（连同之后的 ' + (lgs-1) + ' 次）' : '') });
                 try{ await impApplyUndo(t, p.after); }
-                catch(err){ try{ await idbBatch([['del', bkKey]]); }catch(_){} throw err; }
+                catch(err){ await impBkFail(t, saved); throw err; }
+                await impBkDone(t, saved);
                 if(t.e.id===currentUser && t.name===currentArchive){
                     try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
@@ -4233,12 +4318,8 @@
                 });
                 if(!chg.length) throw impErr('nothing');
                 const b='a'+Date.now().toString(36);
-                const bk=await impMakeBackup(t, b, 'ai');
-                const free=await impFreeBytes(), need=Math.ceil(bk.length*2*1.2);
-                if(free!==null && free<need) throw impErr('nospace', { need, free });
-                const bkKey=impBkPrefix(t.e.id, t.aid)+Date.now().toString(36)+'_a';
-                const oldBk=impBkKeys(t.e.id, t.aid), drop=oldBk.slice(0, Math.max(0, oldBk.length-(IMP_BK_MAX-1)));
-                await idbBatch([['put', bkKey, bk]].concat(drop.map(k=>['del', k])));
+                const ofLog=logs.filter(l=>l.kind!=='ai' && l.b===o.of)[0];
+                const saved=await impBkSave(t, 'ai', b, { b, what:'按 AI 的建议改 ' + chg.length + ' 条记录' + (ofLog ? '（' + String(ofLog.at||'').replace('T', ' ') + ' 那次导入的）' : '') });
                 const d=new Date(), cl=(a.cps||[]).length, pl=(a.pms||[]).length;
                 logs.push({ kind:'ai', of:o.of, b, at:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`, apps:[], from:'', to:'',
                             add:[], h:[], chg, cpLen:cl, pmLen:pl, cpEnd:cl, pmEnd:pl, catsAdded:[], rulesAdded:{ cat:[], type:[] } });
@@ -4246,7 +4327,8 @@
                 try{
                     if(window.__impFailAt==='aiSave') throw impErr('test');
                     await saveStoreDurable(store, t.e.id, ()=>[[impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:cleanLog })]]);
-                }catch(err){ try{ await idbBatch([['del', bkKey]]); }catch(_){} throw err; }
+                }catch(err){ await impBkFail(t, saved); throw err; }
+                await impBkDone(t, saved);
                 if(t.e.id===currentUser && t.name===currentArchive){
                     try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
@@ -4358,11 +4440,39 @@
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return r;
             },
+            // 恢复最新的一份（「恢复前」那种不算）。界面上用 backupList / restoreBackup 选一份
             async restoreLast(archive){
                 const t=impTarget(archive);
-                const ks=impBkKeys(t.e.id, t.aid);
+                const ks=impBkKeys(t.e.id, t.aid).filter(k=>impBkKindOf(k)!=='restore');
                 if(!ks.length) throw impErr('nobackup');
-                const r=await impRestoreFrom(t, ks[ks.length-1]);
+                return this.restoreBackup(ks[ks.length-1], { archive });
+            },
+            // 1017-O：现存的每一份备份（新的在前）：{ key, kind, t, what, n（恢复后账本有几条）}。目录里没有的旧备份现读一遍
+            async backupList(archive){
+                const t=impTarget(archive);
+                const idx=await impBkMetaRead(t), out=[];
+                for(const k of impBkKeys(t.e.id, t.aid).reverse()){
+                    let m=idx[k];
+                    if(!m || typeof m.n!=='number'){
+                        try{ const bk=await impReadBackup(t, k); m={ n:bk.data.length, b:bk.batch||'', what:'' }; }catch(_){ m={ n:null, what:'', bad:true }; }
+                    }
+                    out.push({ key:k, kind:impBkKindOf(k), t:impBkTime(t.e.id, t.aid, k), what:m.what||'', b:m.b||'', n:m.n, bad:!!m.bad });
+                }
+                return { list:out, now:((t.e.archs.get(t.aid)||{ recs:[] }).recs||[]).length, ver:t.e.ver };
+            },
+            // 恢复这份会改掉什么（只读）
+            async backupDiff(key, archive){
+                const t=impTarget(archive);
+                const bk=await impReadBackup(t, key);
+                const st=await impUndoState(t);
+                return Object.assign(impBackupDiff({ records:st.records, logs:st.logs, pending:st.pending, cats:st.cats, importRules:st.importRules, budgets:st.budgets }, bk), { ver:t.e.ver });
+            },
+            // 恢复这份备份：opts { ver（看影响时的账本版本，变了就拒绝）}
+            async restoreBackup(key, opts){
+                opts=opts||{};
+                const t=impTarget(opts.archive);
+                if(impBkKeys(t.e.id, t.aid).indexOf(key)<0) throw impErr('nobackup');
+                const r=await impRestoreFrom(t, key, { ver:opts.ver });
                 if(t.e.id===currentUser && t.name===currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return r;
@@ -6378,21 +6488,100 @@ ${detail}
         $('devImportBtn').addEventListener('click', () => {
             loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
         });
-        // 1016-F：恢复到上一次导入前（导入前自动备份的那份；这一版还没有撤销）
-        $('devRestoreBtn').addEventListener('click', () => {
-            let list=[];
-            try{ list=window.JiwenImportStore.backups(); }catch(_){}
-            if(!list.length){ customAlert('这个存档还没有导入前的备份（每次导入前会自动备份一份，最多留 3 份）。', '恢复到导入前'); return; }
-            const last=list[list.length-1], when=new Date(last.t).toLocaleString(), what=last.kind==='undo' ? '撤销' : last.kind==='ai' ? 'AI 修改' : '导入';
-            customConfirm(`这份是「${what}前」的备份：恢复到 ${when} 那次${what}之前的样子，账本、单号表、待处理一起还原。\n\n那次${what}之后的所有修改（包括手记）都会没有。确定吗？`, async () => {
-                try{
-                    const r=await window.JiwenImportStore.restoreLast();
-                    customAlert(`已恢复，现在有 ${r.records} 条记录。` + (list.length>1 ? `\n\n还有 ${list.length-1} 份更早的导入前备份，再点一次会恢复到更早那次导入之前。` : ''), '恢复到导入前');
-                }catch(err){
-                    customAlert(err && err.message==='quota' ? '存储空间不够，没有恢复，账本没动。' : '恢复失败，账本没动：' + (err && (err.code || err.message) || err), '恢复到导入前');
-                }
-            }, '恢复到导入前');
-        });
+        // 1017-O：恢复备份（原来叫「恢复到导入前」，只能恢复最新那份）：底部面板列出现存的每一份（种类、时间、是哪一次操作之前、
+        //   恢复后有几条），点一份 → 确认面板写清影响（之后的几次导入、手记的几条会没有……），「恢复这份备份，覆盖现在的账本」警示色在上、「再看看」在下。
+        //   恢复前先自动备份一份「恢复前」，恢复错了能回来
+        const BK_KIND_NAME={ import:'导入前', undo:'撤销前', ai:'AI 修改前', restore:'恢复前' };
+        function bkWhen(t){ const d=new Date(t); return `${d.getMonth()+1}月${d.getDate()}日 ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+        function bkDelta(n, now){ return n===null || n===undefined ? '' : (n===now ? '和现在一样多' : n>now ? `比现在多 ${n-now} 条` : `比现在少 ${now-n} 条`); }
+        let bkBusy=false;
+        function openBackupList(){
+            if(!window.JiwenImportStore || !window.JiwenSheet) return;
+            const S=window.JiwenSheet;
+            S.open({ title:'恢复备份', sub:'导入、AI 修改、撤销、恢复之前都会自动备份一份，存在这台手机上。', onDismiss(){},
+                body(box){
+                    const ld=document.createElement('div'); ld.className='ui-msg'; ld.textContent='正在读备份…'; box.appendChild(ld);
+                    window.JiwenImportStore.backupList().then(r=>{
+                        if(!S.isOpen()) return;
+                        box.textContent='';
+                        if(!r.list.length){
+                            const e=document.createElement('div'); e.className='ui-msg'; e.id='bkEmpty';
+                            e.innerHTML='<p>这个存档还没有备份。</p><p class="ui-msg-soft">每次导入、AI 修改、撤销、恢复之前会自动备份一份：导入前留 3 份，撤销前留 2 份，AI 修改前、恢复前各留 1 份。</p>';
+                            box.appendChild(e); return;
+                        }
+                        const wrap=document.createElement('div'); wrap.className='ui-stack'; wrap.id='bkList';
+                        r.list.forEach(x=>{
+                            const b=document.createElement('button'); b.type='button'; b.className='ui-choice bk-item'; b.dataset.key=x.key; b.dataset.kind=x.kind;
+                            const h=document.createElement('b'); h.textContent=(BK_KIND_NAME[x.kind]||'') + '备份 · ' + bkWhen(x.t);
+                            const w=document.createElement('span'); w.textContent=x.bad ? '这份备份读不出来，不能恢复' : (x.what ? x.what + '之前' : '那次操作之前');
+                            const n=document.createElement('span'); n.className='ui-msg-soft'; n.textContent=x.n===null ? '' : `恢复后账本 ${x.n} 条（${bkDelta(x.n, r.now)}）`;
+                            b.appendChild(h); b.appendChild(w); if(n.textContent) b.appendChild(n);
+                            if(x.bad) b.disabled=true;
+                            b.addEventListener('click', ()=>openBackupConfirm(x, r.now));
+                            wrap.appendChild(b);
+                        });
+                        box.appendChild(wrap);
+                    }).catch(err=>{ if(S.isOpen()) ld.textContent='读不出备份：' + (err && (err.code || err.message) || err); });
+                },
+                foot(box, done){
+                    const c=document.createElement('button'); c.type='button'; c.className='ui-btn block'; c.id='bkListClose'; c.textContent='关闭';
+                    c.addEventListener('click', ()=>done());
+                    box.appendChild(c);
+                } });
+        }
+        function openBackupConfirm(x, now){
+            const S=window.JiwenSheet;
+            S.open({ title:'恢复这份备份？', sub:(BK_KIND_NAME[x.kind]||'') + '备份 · ' + bkWhen(x.t) + (x.what ? ' · ' + x.what + '之前' : ''), onDismiss(){ openBackupList(); }, busy:()=>bkBusy,
+                body(box){
+                    const m=document.createElement('div'); m.className='ui-msg'; m.id='bkConfirmMsg'; m.textContent='正在算恢复以后会变什么…'; box.appendChild(m);
+                    window.JiwenImportStore.backupDiff(x.key).then(d=>{
+                        if(!S.isOpen()) return;
+                        x.ver=d.ver;
+                        const li=[];
+                        if(d.goneMan) li.push(`你手记的 ${d.goneMan} 条会没有`);
+                        if(d.goneImp) li.push(`导入进来的 ${d.goneImp} 条会没有`);
+                        if(d.back) li.push(`现在没有的 ${d.back} 条会回来`);
+                        if(d.changed) li.push(`${d.changed} 条记录会变回当时的样子（分类、金额、备注、时间等）`);
+                        if(d.logsGone || d.aiGone) li.push('这之后的' + [d.logsGone ? ` ${d.logsGone} 次导入` : '', d.aiGone ? ` ${d.aiGone} 次 AI 修改` : ''].filter(Boolean).join('、') + '会没有，导入记录里也不再有');
+                        if(d.logsBack) li.push(`导入记录里会多回 ${d.logsBack} 次（能接着撤销）`);
+                        if(d.pendNow!==d.pendBk) li.push(`待处理从 ${d.pendNow} 笔变成 ${d.pendBk} 笔`);
+                        if(d.catsChange) li.push('分类列表变回当时的样子');
+                        if(d.budgetsChange) li.push('预算变回当时的样子');
+                        if(d.rulesChange) li.push('导入规则变回当时的样子');
+                        m.textContent='';
+                        const p1=document.createElement('p'); p1.textContent=`恢复以后账本有 ${d.records} 条（现在 ${d.now} 条，${bkDelta(d.records, d.now)}）。`; m.appendChild(p1);
+                        if(li.length){ const ul=document.createElement('ul'); li.forEach(t=>{ const e=document.createElement('li'); e.textContent=t; ul.appendChild(e); }); m.appendChild(ul); }
+                        else { const p=document.createElement('p'); p.textContent='和现在的账本一模一样，恢复了也不会变。'; m.appendChild(p); }
+                        const p2=document.createElement('p'); p2.className='ui-msg-soft'; p2.textContent='单号表、待处理、导入记录、分类、预算、名单都一起还原。恢复之前会先自动备份一份现在的样子（「恢复前」），恢复错了可以再恢复回来。'; m.appendChild(p2);
+                        const ok=document.getElementById('bkConfirmOk'); if(ok) ok.disabled=false;
+                    }).catch(err=>{ if(S.isOpen()) m.textContent='这份备份读不出来，不能恢复：' + (err && (err.code || err.message) || err); });
+                },
+                foot(box, done){
+                    const col=document.createElement('div'); col.className='ui-stack';
+                    const ok=document.createElement('button'); ok.type='button'; ok.className='ui-btn warn block'; ok.id='bkConfirmOk'; ok.textContent='恢复这份备份，覆盖现在的账本'; ok.disabled=true;
+                    const no=document.createElement('button'); no.type='button'; no.className='ui-btn block'; no.id='bkConfirmNo'; no.textContent='再看看';
+                    ok.addEventListener('click', async ()=>{
+                        if(bkBusy) return;
+                        bkBusy=true; ok.disabled=no.disabled=true; ok.textContent='正在恢复…';
+                        let msg;
+                        try{
+                            const r=await window.JiwenImportStore.restoreBackup(x.key, { ver:x.ver });
+                            msg=`已恢复，现在有 ${r.records} 条记录。恢复前的样子另存了一份「恢复前」备份，在「恢复备份」里能找回来。`;
+                        }catch(err){
+                            const c=err && (err.code || err.message);
+                            msg= c==='stale' ? '刚才账本有了变化，没有恢复。请重新打开「恢复备份」再看一遍影响。'
+                               : (c==='quota' || c==='nospace') ? '存储空间不够，没有恢复，账本没动。'
+                               : '恢复失败，账本没动：' + (c || err);
+                        }
+                        bkBusy=false; done();
+                        S.open({ title:'恢复备份', onDismiss(){}, body(b){ const e=document.createElement('div'); e.className='ui-msg'; e.id='bkDoneMsg'; e.textContent=msg; b.appendChild(e); },
+                            foot(b, d2){ const c=document.createElement('button'); c.type='button'; c.className='ui-btn block'; c.id='bkDoneClose'; c.textContent='知道了'; c.addEventListener('click', ()=>d2()); b.appendChild(c); } });
+                    });
+                    no.addEventListener('click', ()=>{ if(bkBusy) return; done(); openBackupList(); });
+                    col.appendChild(ok); col.appendChild(no); box.appendChild(col);
+                } });
+        }
+        $('devRestoreBtn').addEventListener('click', openBackupList);
         // 1016-Z3：「用记问打开」账单文件（安卓：文件管理 / 微信里「用其他应用打开」或「分享」，原生插件 OpenFile 接住、读成字节）。
         //   开发开关没开：只提示「导入功能还在测试中」，不进导入；开着：直接拿这个文件进导入页。还没进账号就先记着，进了账号再接着
         async function impTakeOpenedFile(){
