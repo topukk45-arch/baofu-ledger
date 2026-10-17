@@ -34,6 +34,13 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   ok($('askInput').style.display === 'block' && $('askOk').classList.contains('primary'), '1 输入框也在面板里');
   $('askCancel').click(); await t.idle();
   ok(!t.errs.length, '1 无报错 ' + t.errs.join('|'));
+  // ===== 2. 记账和账单（1017-T）=====
+  w.openEdit('m1'); $('deleteInEdit').click();
+  ok(/^2026-10-06 09:30 · 购物 · 36\.00 · 买书\n\n删掉的找不回来/.test($('askMsg').textContent) && $('askOk').textContent === '删除这条记录' && $('askOk').classList.contains('warn') && $('askCancel').textContent === '取消', '2 删除记录：写是哪一笔、「删除这条记录」警示色：' + $('askMsg').textContent);
+  ok(!/吗？/.test($('askMsg').textContent), '2 不再有孤零零的「确定吗？」');
+  await t.back();
+  ok(t.recs().length === 1 && $('editMask').style.display === 'flex', '2 返回键只关确认框：记录还在、修改弹窗还开着');
+  $('cancelEdit').click();
   console.log(`\n${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.log(e); console.log(`\n${pass} 通过，${fail + 1} 失败`); process.exit(1); });

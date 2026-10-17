@@ -94,7 +94,7 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     ok(rows.every(r=>['al-time','al-cat','al-remark','al-amt'].every(c=>r.querySelector('.'+c))), '每行固定四列');
     ok(rows[0].querySelector('.al-time').textContent==='10-04 16:30', '时间列格式 MM-DD HH:mm');
     ok(rows.map(r=>r.querySelector('.al-amt').textContent).sort().join(',')==='+4500.00,−3999.00', '金额带正负号与两位小数');
-    ok(t.$('askMsg').textContent==='将以下 2 条记录改为「只算结余」：', '标题句不再拼样例文字');
+    ok(t.$('askMsg').textContent==='把下面这 2 条记录改成「只算结余」（挂在上面的退款跟着改）。改完可以马上「撤销这次操作」。', '标题句不再拼样例文字');
     t.$('askOk').click();
     ok(t.recs().filter(r=>r.flow===true).map(r=>r.id).sort().join()==='lpi,lpo', '批量标为只算结余');
     ok(t.$('askList').style.display==='none', '完成弹窗不带清单');

@@ -170,7 +170,7 @@ function bootSync(records, extra){
     t.filterKw('信用卡');
     t.$('batchBar').querySelector('[data-act="batch"]').click();
     t.choose('标为不计入');
-    ok(t.$('askMsg').textContent.includes('将以下 2 条'), '确认框写明条数');
+    ok(t.$('askMsg').textContent.includes('把下面这 2 条') && t.$('askOk').textContent==='改这 2 条' && t.$('askOk').classList.contains('warn'), '确认框写明条数');
     t.$('askOk').click();
     ok(t.byId('a1').skip===true && t.byId('a2').skip===true, '批量标记成功');
     ok(!('skip' in t.byId('a3')), '未命中的不受影响');
@@ -182,7 +182,7 @@ function bootSync(records, extra){
     t2.filterKw('游戏充值');
     t2.$('batchBar').querySelector('[data-act="batch"]').click();
     t2.choose('改分类'); t2.choose('游戏');
-    ok(t2.$('askMsg').textContent.includes('将以下 20 条'), '跨页批量：20 条');
+    ok(t2.$('askMsg').textContent.includes('把下面这 20 条') && t2.$('askOk').textContent==='改这 20 条', '跨页批量：20 条');
     t2.$('askOk').click();
     ok(t2.recs().filter(r=>r.remark==='游戏充值').every(r=>r.cat==='游戏'), '20 条全部改为游戏');
     ok(t2.recs().filter(r=>r.cat==='游戏').length===20, '没有误改其他记录');

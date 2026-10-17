@@ -1415,7 +1415,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-S</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-T</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -8011,17 +8011,17 @@ ${detail}
                     customChoose('改成哪个分类？', getCats().map(c=>({ value:c, label:c })), (cat)=>{
                         const targets=list.filter(r=>r.cat!==cat);
                         if(!targets.length){ customAlert(`这 ${list.length} 条已经都是「${cat}」了。`); return; }
-                        customConfirm(`将以下 ${targets.length} 条记录的分类改为「${cat}」：`,
+                        customConfirm(`把下面这 ${targets.length} 条记录的分类改成「${cat}」（挂在上面的退款跟着改）。改完可以马上「撤销这次操作」。`,
                             ()=>applyBatch(targets.map(r=>r.id), { cat }), '批量改分类',
-                            { okText:'确认修改', list:targets });
+                            { okText:`改这 ${targets.length} 条`, list:targets, danger:true });
                     }, '选择分类', openBatchMenu, { layout:'list' });
                 } else {
                     const NAME={ normal:'计入', flow:'只算结余', skip:'不计入' };
                     const targets=list.filter(r=>recMode(r)!==act);   // 已经是目标口径的不重复改
                     if(!targets.length){ customAlert(`这 ${list.length} 条已经都是「${NAME[act]}」了。`); return; }
-                    customConfirm(`将以下 ${targets.length} 条记录改为「${NAME[act]}」：`,
+                    customConfirm(`把下面这 ${targets.length} 条记录改成「${NAME[act]}」（挂在上面的退款跟着改）。改完可以马上「撤销这次操作」。`,
                         ()=>applyBatch(targets.map(r=>r.id), { mode:act }), '批量修改统计口径',
-                        { okText:'确认修改', list:targets });
+                        { okText:`改这 ${targets.length} 条`, list:targets, danger:true });
                 }
             }, '批量操作', null, { layout:'list' });
         }
@@ -8872,7 +8872,7 @@ ${detail}
                 || editRemark.value.trim()!==(item.remark||'') || editCatSel!==(item.cat||'未分类')
                 || editTypeSel!==item.type || getModeChips($('editMode'))!==recMode(item);
             const go=()=>{ closeEditModal(); openRefund(id); };
-            if(dirty) customConfirm('这笔账单的修改还没保存。先放弃这些修改，去退款吗？', go, '去退款', { okText:'放弃修改去退款' });
+            if(dirty) customConfirm('这笔账单的修改还没保存。去退款的话，这些修改都不要了。', go, '去退款', { okText:'放弃修改去退款', danger:true, cancelText:'回去接着改' });
             else go();
         });
         $('editSaveTpl').addEventListener('click', ()=>{
@@ -9173,8 +9173,11 @@ ${detail}
             const me=cur.find(r=>r.id===id);
             const rs=me && me.type==='expense' ? refundsOf(cur, id) : [];
             // 删原账单：挂在上面的退款一起删，确认框里列出来（1010-J）
-            const msg = (me && isRefund(me)) ? '确定删除这笔退款吗？删除后原账单的「还能退」金额会恢复。'
-                : (rs.length ? `这笔账单有 ${rs.length} 笔退款（共 ${refundedTotal(cur,id).toFixed(2)}），会跟它一起删除。确定删除吗？` : '确定要删除这条记录吗？');
+            // 1017-T：底部面板里写清删的是哪一笔、会连带什么；按钮写「删除这条记录」，警示色
+            const what = me ? `${String(me.time||'').replace('T',' ')} · ${me.cat||'未分类'} · ${safeNum(me.money).toFixed(2)}${me.remark ? ' · '+String(me.remark).split('\n')[0].slice(0, 20) : ''}` : '';
+            const msg = (me && isRefund(me)) ? `${what}\n\n删除这笔退款以后，原账单的「还能退」金额会恢复。删掉的找不回来（除非用备份恢复）。`
+                : (rs.length ? `${what}\n\n这笔账单有 ${rs.length} 笔退款（共 ${refundedTotal(cur,id).toFixed(2)}），会跟它一起删除。删掉的找不回来（除非用备份恢复）。` : `${what}\n\n删掉的找不回来（除非用备份恢复）。`);
+            const okText = (me && isRefund(me)) ? '删除这笔退款' : (rs.length ? `删除这条和 ${rs.length} 笔退款` : '删除这条记录');
             customConfirm(msg, ()=>{
                 const data=getUserData().filter(r=>r.id!==id && !(isRefund(r) && r.refundOf===id));
                 // 删除写盘失败时记录其实仍在。这里用 silent 保存：抑制通用提示，只弹一条
@@ -9184,7 +9187,7 @@ ${detail}
                     return;
                 }
                 closeEditModal({ refresh:true });
-            }, '删除记录');
+            }, '删除记录', { danger:true, okText });
         });
         // 禁止点击遮罩外部关闭，仅按钮可关闭
         saveEdit.addEventListener('click', () => {
@@ -10270,7 +10273,7 @@ ${detail}
             if(rec.src.merged && devImportOn()){
                 const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='detailSplit'; b.textContent='拆开'; b.style.marginTop='6px';
                 b.addEventListener('click', ()=>{
-                    customConfirm(`把这条和${app}账单拆开：你记的这条改回合并前的样子（你后来改过的不动），账单另记一条（分类和你记的这条一样）。\n\n确定拆开吗？`, async ()=>{
+                    customConfirm(`把这条和${app}账单拆开：\n\n· 你记的这条改回合并前的样子（你后来改过的不动）\n· 账单另记一条（分类和你记的这条一样）\n\n拆开算进原来那次导入，撤销那次导入时一起撤。`, async ()=>{
                         try{
                             const r=await window.JiwenImportStore.splitMerge(rec.id);
                             $('detailMask').style.display='none';
@@ -10279,7 +10282,7 @@ ${detail}
                             const c=err && (err.code || err.message);
                             customAlert(c==='nolog' ? '找不到合并它的那次导入记录了（只保留最近 10 次），拆不开。' : '没拆成，账本没动：' + c, '拆开');
                         }
-                    }, '拆开', { okText:'拆开' });
+                    }, '拆开', { okText:'拆开这条', danger:true });
                 });
                 f.appendChild(b);
             }

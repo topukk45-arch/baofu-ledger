@@ -187,7 +187,8 @@ function bootSync(records, arcExtra){
   t.refund('buy', { part:40 }); t.$('askOk').click();
   t.refund('buy', { part:10 }); t.$('askOk').click();
   t.w.openEdit('buy'); t.$('deleteInEdit').click();
-  ok(t.$('askMsg').textContent==='这笔账单有 2 笔退款（共 50.00），会跟它一起删除。确定删除吗？', '确认文案：'+t.$('askMsg').textContent);
+  // 1017-T：确认框先写是哪一笔，再写会连带删的退款；按钮写清楚、警示色
+  ok(/\n\n这笔账单有 2 笔退款（共 50\.00），会跟它一起删除。/.test(t.$('askMsg').textContent) && t.$('askOk').textContent==='删除这条和 2 笔退款' && t.$('askOk').classList.contains('warn'), '确认文案：'+t.$('askMsg').textContent);
   t.$('askOk').click();
   ok(!t.recs().some(r=>r.id==='buy') && !t.refunds().length && t.recs().length===3, '原账单与退款一起删掉');
   ok(t.q('.ov-net')==='4970.00', '结余回到 5000-30：'+t.q('.ov-net'));
