@@ -1424,8 +1424,9 @@
           pick = { row: c.row };
         }
         var lb = el('span', 'grow');
-        if (i === 0 && allC.length > 1) lb.appendChild(el('span', 'imp-best', '最像'));
+        if (i === 0 && allC.length > 1 && !c.early) lb.appendChild(el('span', 'imp-best', '最像'));      // 1017-UI6：手记比账单早的不当「最像」
         lb.appendChild(document.createTextNode(label));
+        if (c.early) lb.appendChild(el('div', 'imp-also imp-early', '你记的比账单早 ' + c.early + ' 天' + (c.delay ? '，可能是延后扣款' : '')));
         r.appendChild(lb);
         var chosen = d.item && S.edits.rows[key] && S.edits.rows[key].pick && JSON.stringify(S.edits.rows[key].pick) === JSON.stringify(pick);
         // 退款类的候选是「挂到这笔原单」，其余是「和这条手记合并」

@@ -31,12 +31,12 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
 const diffZero = p => p.files.filter(f => !f.fatal).every(f => ['expense', 'income', 'neutral'].every(io => !f.diff[io] || !f.diff[io].header || f.diff[io].unreadable === 0));
 
 (async () => {
-  const RECS = [man('m1', 10, 1, 15, { cat: '早饭', remark: '豆浆油条' }), man('m2', 10, 20, 66)];
+  const RECS = [man('m1', 10, 5, 15, { cat: '早饭', remark: '豆浆油条' }), man('m2', 10, 20, 66)];
   const t = await A.boot({ html, www: WWW, seed: A.seedOf(RECS, ['未分类', '早饭', '吃饭', '购物', '其他']) });
   const D0 = await t.dump();
 
   // 两家各一份：微信 UTF-8 CSV、支付宝 GBK CSV（表头前面多两行说明）；里面有手记过的、交易关闭、等待付款、退款、分分捐
-  const W1 = [wx({ time: T(10, 3, 7, 50), cp: '某虚构早点', desc: '早餐', fen: 1500 }),                       // 手记 10-01 的 15 元，差 2 天
+  const W1 = [wx({ time: T(10, 3, 7, 50), cp: '某虚构小铺', desc: '/', fen: 1500 }),                       // 手记 10-05 的 15 元，差 2 天（1017-UI6 起手记比账单早的、分类冲突的不自动合并：这里是事后补记、账单推不出分类）
               wx({ time: T(10, 5), cp: '某虚构书店', fen: 3200 }),
               wx({ time: T(10, 6), cp: '某虚构超市', fen: 5000, status: '已退款¥10.00' }),
               wx({ time: T(10, 7), cp: '某虚构超市', kind: '某虚构超市-退款', io: 'income', fen: 1000, status: '已退款¥10.00', no: '5030000000' + String(++seq).padStart(19, '0') })]

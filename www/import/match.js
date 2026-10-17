@@ -40,7 +40,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-UI5';
+  var VERSION = '1017-UI6';
   var PARTIAL_MAX = 3;
   var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
@@ -125,6 +125,20 @@
     }
     var free = function (m) { return !mstate.has(m.id); };
     var exactAmts = function (b) { return b.net !== b.fen && b.net > 0 ? [b.fen, b.net] : [b.fen]; };
+    // 1017-UI6：账单推得出分类、和手记的不一样 = 分类冲突（推不出、未分类的不算冲突）
+    var billCat = function (b) { var r = b.it.rec || b.preRec; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; };
+    var catClash = function (b, m) { var c = billCat(b); return !!c && (m.cat || '未分类') !== c; };
+    var preClassify = function () {
+      var lc = new Map();
+      merges.forEach(function (x) { if (x.b.neutral) return; var k = C.cleanCp(x.b.r.cp); if (!k || !x.m.cat) return; var o = lc.get(k); if (!o) lc.set(k, o = {}); o[x.m.cat] = (o[x.m.cat] || 0) + 1; });
+      var lr = new Map();
+      lc.forEach(function (o, k) { var ks = Object.keys(o); if (ks.length === 1) lr.set(k, ks[0]); });
+      var bs = bills.filter(function (b) { return !b.done && !b.neutral; });
+      if (!bs.length) return;
+      var rs = C.classify(bs.map(function (b) { return { app: parsed.files[b.it.file].app, cp: b.r.cp, desc: b.r.desc, kind: b.r.kind, io: b.it.io }; }),
+        { cats: cats, rules: ctx.rules, learned: lr, borrowRows: [], merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps }).recs;
+      bs.forEach(function (b, i) { b.preRec = rs[i]; });
+    };
 
     // 拷一份 ④ 的结果，往上加字段
     var items = (routed && routed.items || []).map(function (it) { var o = {}; for (var k in it) o[k] = it[k]; o.flags = (it.flags || []).slice(); return o; });
@@ -174,6 +188,8 @@
     var multiSums = [];
     for (var d = 0; d <= EXACT_DAYS; d++) {
       if (d === 1) multiSums = groupCombos(comboList.concat(sameDay), function (m) { mstate.set(m.id, 'reserved'); reservedBy[m.id] = 'multisum'; }, 0);
+      // 1017-UI6：跨天的要看分类冲不冲突，先给剩下的账单推一次分类（用同一天合并里学到的；最后还会按全部合并重推一次）
+      if (d === 1) preClassify();
       // 这一层的边：账单 ↔ 手记（同收支、金额相同或等于净额、相差正好 d 天、手记还没用、不计入的只配不计入的手记）
       var edges = [];
       bills.forEach(function (b) {
@@ -183,6 +199,8 @@
         amts.forEach(function (fen) {
           var f = function (m, dd) {
             if (Math.abs(dd) !== d || !free(m) || seen.has(m.id)) return;
+            // 1017-UI6：跨天的只认「手记比账单晚」（事后补记），手记早的一律不自动合并；普通行分类冲突的也不自动合并（都进待你确认）
+            if (dd < 0 || (!b.neutral && catClash(b, m))) return;
             // 不计入的账单碰上同金额的普通手记：不合并，记下来让确认页提示一句
             if (b.neutral && m.mode !== 'skip') { (b.normalHits = b.normalHits || []).indexOf(m.id) < 0 && b.normalHits.push(m.id); return; }
             seen.add(m.id); edges.push([b, m]);
@@ -291,7 +309,7 @@
       if (!rc || rc === '未分类') return;
       var tol = Math.min(NEAR_FEN, Math.floor(b.fen * NEAR_RATE)), hits = [];
       if (tol <= 0) return;
-      scan(b.type, b.day, -EXACT_DAYS, EXACT_DAYS, b.fen + 1, b.fen + tol, function (m) { if (free(m) && m.cat === rc) hits.push(m); });
+      scan(b.type, b.day, 0, EXACT_DAYS, b.fen + 1, b.fen + tol, function (m) { if (free(m) && m.cat === rc) hits.push(m); });   // 1017-UI6：手记比账单早的不算
       if (hits.length !== 1) return;
       nearOk.set(b, hits[0]);
       nearBy.set(hits[0].id, (nearBy.get(hits[0].id) || 0) + 1);
@@ -322,10 +340,15 @@
         // 1016-G：账单不到手记的三分之一不算（1 元配不上 29 元）
         if (rc && rc !== '未分类') scan(b.type, b.day, 0, 0, b.fen + tol + 1, b.fen * PARTIAL_MAX, function (m) { if (free(m) && m.cat === rc) push('partial', m); });
       }
-      // 差 4–7 天、金额相同（或等于净额）
+      // 1017-UI6：3 天内金额相同、没能自动合并的——手记比账单早（early），或晚记但分类冲突（xcat）
       var amts = b.net !== b.fen && b.net > 0 ? [b.fen, b.net] : [b.fen];
       amts.forEach(function (fen) {
-        scan(b.type, b.day, -PEND_DAYS, -EXACT_DAYS - 1, fen, fen, function (m) { if (free(m)) push('days', m); });
+        scan(b.type, b.day, -EXACT_DAYS, -1, fen, fen, function (m) { if (free(m)) push('early', m); });
+        scan(b.type, b.day, 1, EXACT_DAYS, fen, fen, function (m) { if (free(m) && catClash(b, m)) push('xcat', m); });
+      });
+      // 差 4–7 天、金额相同（或等于净额）；手记比账单早的算 early
+      amts.forEach(function (fen) {
+        scan(b.type, b.day, -PEND_DAYS, -EXACT_DAYS - 1, fen, fen, function (m) { if (free(m)) push('early', m); });
         scan(b.type, b.day, EXACT_DAYS + 1, PEND_DAYS, fen, fen, function (m) { if (free(m)) push('days', m); });
       });
       if (cands.length) {
@@ -333,6 +356,10 @@
         it.cands = sortCands(b, cands);
         it.msg = { near: '有一条手记金额差不多（可能是立减、红包），请你确认', partial: '可能只付了一部分，其余用的别的方式，请你确认',
                    days: '有一条手记金额一样，但差了 4 到 7 天（可能是先用后付），请你确认', mixed: '有几条手记都可能是它，请你确认' }[it.why];
+        // 1017-UI6：手记比账单早的写明早几天；像延后扣款的（地铁、公交、先乘后付、免密、代扣这类词，或分类对得上）再说一句
+        var ec = it.cands.filter(function (c) { return c.early; })[0];
+        if (it.why === 'early' && ec) it.msg = '你记的比账单早 ' + ec.early + ' 天' + (ec.delay ? '，可能是延后扣款' : '') + '，请你确认';
+        else if (it.why === 'xcat') { var xm = cands[0].m; it.msg = '有一条手记金额一样、晚 ' + Math.abs(dayNo(xm.time) - b.day) + ' 天记的，但分类对不上（账单像「' + billCat(b) + '」，你记的是「' + (xm.cat || '未分类') + '」），请你确认'; }
       } else it.flags.push('missing');     // 漏记
     });
     // 第一轮里分不清的那几组：候选也按远近排
@@ -455,6 +482,8 @@
         else if (mstate.get(m.id) === 'used') { var u = usedBy[m.id]; why = '已经和 ' + (u ? md(u.r.time) + ' ' + yuan(u.fen) + ' 元那笔账单' : '别的账单') + '合并了'; }
         else if (mstate.get(m.id) === 'reserved' && (it.cands || []).every(function (c) { return c.record !== m.id; })) why = reservedBy[m.id] === 'multisum' ? '留给了「几笔加起来正好是一条手记」那一组' : '留给了「金额一样、分不清谁是谁」那一组';
         else if (b.neutral && m.mode !== 'skip') why = '不计入的账单只和同样不计入的手记配';
+        else if ((m.fen === b.fen || m.fen === b.net) && dd >= 1 && dayNo(m.time) < b.day) why = '你记的比账单早 ' + dd + ' 天：手记比账单早的不自动合并' + (b.neutral ? '' : '，已列为候选');
+        else if ((m.fen === b.fen || m.fen === b.net) && dd >= 1 && dd <= EXACT_DAYS && catClash(b, m)) why = '分类对不上（账单像「' + billCat(b) + '」，手记是「' + (m.cat || '未分类') + '」）：跨天的不自动合并，已列为候选';
         else if (m.fen === b.fen || m.fen === b.net) why = dd <= EXACT_DAYS ? '金额、日期都对得上，已列为候选' : '金额一样，但差了 ' + dd + ' 天（3 天内才自动合并，4–7 天的列为候选）';
         else if (b.personal) why = '转账、红包、扫码付给个人只做精确配对，金额差 ' + yuan(Math.abs(diff)) + ' 元不算';
         else if (Math.abs(diff) <= tol) why = dd <= EXACT_DAYS ? '金额差 ' + yuan(Math.abs(diff)) + ' 元，在容差内，已列为候选' : '金额差不多，但差了 ' + dd + ' 天（金额相近只看 3 天内）';
@@ -497,11 +526,18 @@
   function sortCands(b, cands) {
     var t = minOf(b.r.time), rc = b.it.rec && b.it.rec.layer !== 'none' && b.it.rec.cat && b.it.rec.cat !== '未分类' ? b.it.rec.cat : null;
     var catOk = function (m) { return rc && m.cat === rc ? 0 : 1; };
+    // 1017-UI6：手记比账单早一天以上的不当「最像」，排在最后
+    var early = function (m) { return dayNo(m.time) < b.day ? 1 : 0; };
+    var delayWord = DELAY_RE.test((b.r.cp || '') + ' ' + (b.r.desc || '') + ' ' + (b.r.kind || ''));
     return cands.slice().sort(function (x, y) {
-      return catOk(x.m) - catOk(y.m) || Math.abs(dayNo(x.m.time) - b.day) - Math.abs(dayNo(y.m.time) - b.day) || Math.abs(x.m.fen - b.fen) - Math.abs(y.m.fen - b.fen)
+      return early(x.m) - early(y.m) || catOk(x.m) - catOk(y.m) || Math.abs(dayNo(x.m.time) - b.day) - Math.abs(dayNo(y.m.time) - b.day) || Math.abs(x.m.fen - b.fen) - Math.abs(y.m.fen - b.fen)
         || Math.abs(minOf(x.m.time) - t) - Math.abs(minOf(y.m.time) - t) || (x.record < y.record ? -1 : x.record > y.record ? 1 : 0);
-    }).map(function (c) { return { record: c.record }; });
+    }).map(function (c) {
+      if (!early(c.m)) return { record: c.record };
+      return { record: c.record, early: b.day - dayNo(c.m.time), delay: delayWord || catOk(c.m) === 0 };
+    });
   }
+  var DELAY_RE = /地铁|公交|出行|先乘后付|免密|代扣|自动扣款/;
 
   // ---------- 多笔合一（1016-C）----------
   //   bills：第一轮配剩下的普通账单（不含个人转账）；同一天、同收支的手记里找金额正好等于几笔之和的。

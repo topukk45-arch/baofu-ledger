@@ -88,7 +88,7 @@ const intoUnique = res => { const s = new Set(); return res.items.every(it => it
 {
   const a = wx({ time: T(6, 10, 9, 0), cp: '某公交', fen: 300 }), b = wx({ time: T(6, 20, 9, 0), cp: '某公交', fen: 450 });
   const { res, by } = pipeline([{ app: 'wechat', txns: [a, b] }], [man('t1', 6, 6, 300, { cat: '其他' }), man('t2', 6, 12, 450, { cat: '其他' })]);
-  ok(by[a.no].bucket === 'pending' && by[a.no].why === 'days' && by[a.no].cands[0].record === 't1', '4 先乘后付差 4 天：进待处理，不新增');
+  ok(by[a.no].bucket === 'pending' && by[a.no].why === 'early' && by[a.no].cands[0].record === 't1' && by[a.no].cands[0].early === 4 && /你记的比账单早 4 天，可能是延后扣款/.test(by[a.no].msg), '4 先乘后付差 4 天（手记比账单早）：进待处理，不新增；写「你记的比账单早 4 天，可能是延后扣款」（1017-UI6 有意改：以前 why 是 days）');
   ok(by[b.no].bucket === 'add' && by[b.no].flags.includes('missing'), '4 差 8 天：算漏记新增');
   ok(conserved(res), '4 守恒');
 }

@@ -147,14 +147,14 @@ function norm(dump) {
 
 (async () => {
   // ===== 1. 分分捐追加、跨月搬回、依赖、新建分类、对照、勾掉、待处理、退款 → 倒序撤完逐字节一致 =====
-  const RECS = [man('m1', 9, 30, 15, { remark: '豆浆油条' }), man('m2', 10, 3, 22), man('m5', 10, 8, 30, { cat: '购物' }), man('m6', 11, 2, 18)];   // 1.1 起金额相近、分类对得上的会自动合并；这里要的是「待你确认」，分类故意不一样
+  const RECS = [man('m1', 10, 1, 15, { remark: '豆浆油条' }), man('m2', 10, 3, 22), man('m5', 10, 8, 30, { cat: '购物' }), man('m6', 11, 2, 18)];   // 1.1 起金额相近、分类对得上的会自动合并；这里要的是「待你确认」，分类故意不一样
   const pettyA = [];
   for (let d = 1; d <= 15; d++) pettyA.push(wx({ time: T(10, d, 6), kind: '分分捐', cp: '某虚构公益', desc: '/', fen: 1 }));
   const pettyB = pettyA.concat([...Array(16)].map((_, i) => wx({ time: T(10, 16 + i, 6), kind: '分分捐', cp: '某虚构公益', desc: '/', fen: 1 })));
   const ref1 = wx({ time: T(10, 10), cp: '某虚构超市', fen: 5000, status: '已退款¥10.00' });
   const ref2 = wx({ time: T(10, 11), cp: '某虚构超市', kind: '某虚构超市-退款', io: 'income', fen: 1000, status: '已退款¥10.00', no: wrno() });
   const drop = wx({ time: T(10, 12), cp: '某虚构摊', fen: 700 });
-  const A_WX = [wx({ time: T(10, 1, 7, 40), cp: '某虚构早点', desc: '早餐', fen: 1500 }), wx({ time: T(10, 3, 12), cp: '某虚构面馆', desc: '午餐', fen: 2200 }),
+  const A_WX = [wx({ time: T(9, 30, 23, 40), cp: '某虚构早点', desc: '早餐', fen: 1500 }), wx({ time: T(10, 3, 12), cp: '某虚构面馆', desc: '午餐', fen: 2200 }),
                 wx({ time: T(10, 8), cp: '某虚构饭店', fen: 2800 }), wx({ time: T(10, 9), cp: '滴滴出行', desc: '快车', fen: 2300 }), ref1, ref2, drop].concat(pettyA);
   const A_ALI = [1, 2, 3].map(d => ali({ time: T(10, 4 + d), cp: '某虚构诊所' + d, kind: '医疗健康', fen: 6000 + d })).concat([ali({ time: T(10, 20), status: '交易关闭', fen: 999 })]);
   const FILES_A = [['微信A.csv', bill('wechat', A_WX)], ['支付宝A.csv', bill('alipay', A_ALI)]];
@@ -165,8 +165,8 @@ function norm(dump) {
   const rA = await t.importFiles(FILES_A, editA);
   {
     const recs = t.recs(), m1 = recs.find(r => r.id === 'm1'), pet = recs.find(r => r.src && r.src.sum === 'petty');
-    ok(rA.result && m1.time === '2026-10-01T07:40' && m1.src && m1.src.merged && pet.money === 0.15 && t.arch().cats.includes('医疗健康') && t.arch().importRules.map.length === 1,
-      '1 第 1 次：9-30 的手记合并到 10-01，分分捐 0.15，建了「医疗健康」，存了对照 ' + (rA.alert || ''));
+    ok(rA.result && m1.time === '2026-09-30T23:40' && m1.src && m1.src.merged && pet.money === 0.15 && t.arch().cats.includes('医疗健康') && t.arch().importRules.map.length === 1,
+      '1 第 1 次：10-01 补记的手记合并到 9-30 那笔账单（1017-UI6 起手记比账单早的不自动合并，这里改成事后补记），分分捐 0.15，建了「医疗健康」，存了对照 ' + (rA.alert || ''));
     ok(rA.plan.counts.pending >= 1 && rA.plan.counts.excluded === 1, '1 第 1 次有待处理和勾掉的');
   }
   const DA = await t.dump();
@@ -195,8 +195,8 @@ function norm(dump) {
     const { p } = await t.undo(lA.b);
     const s = p.steps[0];
     ok(s.deleted > 0 && s.restored >= 2 && s.catsDropped.includes('医疗健康') && s.mapsRemoved === 1 && s.pending >= 1 && !s.legacy, '1 撤第 1 次：摘要 ' + JSON.stringify({ d: s.deleted, r: s.restored, c: s.catsDropped, m: s.mapsRemoved, p: s.pending }));
-    const Dn = await t.dump(), sepKey = Object.keys(Dn).find(k => /2026-09$/.test(k));
-    ok(t.recs().find(r => r.id === 'm1').time === '2026-09-30T08:30' && sepKey && Dn[sepKey].indexOf('"m1"') >= 0 && Dn[sepKey] === D0[sepKey], '1 跨月的手记搬回 9 月的月份块');
+    const Dn = await t.dump(), sepKey = Object.keys(Dn).find(k => /2026-10$/.test(k));
+    ok(t.recs().find(r => r.id === 'm1').time === '2026-10-01T08:30' && sepKey && Dn[sepKey].indexOf('"m1"') >= 0 && Dn[sepKey] === D0[sepKey], '1 跨月的手记搬回 10 月的月份块');
     ok(same(await t.dump(), D0), '1 倒序撤完：账本、单号表、待处理池、导入记录和导入前逐字节一样');
   }
   // 撤完再导同一份文件：确认页和第一次一模一样（勾掉的又会出现）

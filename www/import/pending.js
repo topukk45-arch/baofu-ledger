@@ -18,7 +18,7 @@
   // 候选是「原单」（挂退款）的：收入、原因是这几种（其余的候选都是手记，选了就合并）
   var REFUND_WHY = ['refundcands', 'fx', 'overrefund', 'multiinterp'];
   var WHY_TEXT = {
-    near: '金额相近，可能是同一笔', days: '日期差 4–7 天，可能是同一笔', partial: '可能只付了一部分，其余用的别的方式',
+    near: '金额相近，可能是同一笔', days: '日期差 4–7 天，可能是同一笔', early: '你记的比账单早，可能是延后扣款', xcat: '金额一样、晚几天记的，但分类对不上', partial: '可能只付了一部分，其余用的别的方式',
     ambiguous: '金额一样的有几条，分不清是哪一条', mixed: '可能是同一笔', multisum: '几笔加起来可能是一条手记',
     refundcands: '退款没找到原单，账本里有几笔可能是', fx: '可能是跨境退款（汇率差）', overrefund: '退款加起来比原单多',
     multiinterp: '多次退款对不准', fullnorefund: '这笔已全额退款，退款不在当时的文件里',

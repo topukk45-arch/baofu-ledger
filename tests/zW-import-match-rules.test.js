@@ -109,6 +109,43 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   ok(r3.item(Z).cands.map(c => c.record).join() === 'z2,z1', '2 账单推不出分类：照相差天数排：' + r3.item(Z).cands.map(c => c.record).join());
 }
 
+// ===== 3. 1017-UI6 手记比账单早一天以上不自动合并；晚记的分类冲突才进待你确认 =====
+{
+  // X：3-8 11:10 某面馆 扫码 4.00；手记 a：3-5 00:56 出行 4.00「公交」→ 不自动合并，进待你确认，写早 3 天
+  const X = wx({ time: T(3, 8, 11, 10), kind: '扫二维码付款', cp: '某虚构面馆', desc: '/', fen: 400 });
+  const r = run([{ app: 'wechat', txns: [X] }], [man('a', 3, 5, 400, { hm: '00:56', cat: '出行', remark: '公交' })]);
+  const it = r.item(X);
+  ok(it.bucket === 'pending' && it.why === 'early' && it.cands[0].record === 'a' && it.cands[0].early === 3 && /你记的比账单早 3 天/.test(it.msg), '7 手记比账单早 3 天：不自动合并（手记时间不会被挪走），进待你确认：' + it.msg);
+  // Y：3-8 某地铁先乘后付 4.00；手记 b：3-6 出行 4.00 → 待你确认，「可能是延后扣款」
+  const Y = wx({ time: T(3, 8, 9), cp: '某虚构地铁', desc: '先乘后付', fen: 400 });
+  const r2 = run([{ app: 'wechat', txns: [Y] }], [man('b', 3, 6, 400, { cat: '出行' })]);
+  ok(r2.item(Y).bucket === 'pending' && r2.item(Y).cands[0].delay && /你记的比账单早 2 天，可能是延后扣款/.test(r2.item(Y).msg), '7 先乘后付：写「可能是延后扣款」：' + r2.item(Y).msg);
+  // Z：3-8 12:10 4.00；手记 c：3-8 12:00 4.00 → 同一天照常合并（先记后付）
+  const Z = wx({ time: T(3, 8, 12, 10), cp: '某虚构小铺', desc: '/', fen: 400 });
+  const r3 = run([{ app: 'wechat', txns: [Z] }], [man('c', 3, 8, 400, { hm: '12:00', cat: '出行' })]);
+  ok(r3.item(Z).bucket === 'merge' && r3.item(Z).into === 'c', '7 同一天、手记比账单早 10 分钟：照常合并');
+  // 手记晚 1–3 天：推不出分类的照旧自动合并；分类冲突的进待你确认；分类一样的合并
+  const L1 = wx({ time: T(3, 12, 12), cp: '某虚构小铺', desc: '/', fen: 1500 });
+  const r4 = run([{ app: 'wechat', txns: [L1] }], [man('l1', 3, 14, 1500, { cat: '购物' })]);
+  ok(r4.item(L1).bucket === 'merge' && r4.item(L1).into === 'l1' && r4.item(L1).days === 2, '7 手记晚 2 天、账单推不出分类：照旧自动合并（事后补记）');
+  const L2 = wx({ time: T(3, 12, 12), cp: '某虚构快餐店', desc: '米饭套餐', fen: 1500 });
+  const r5 = run([{ app: 'wechat', txns: [L2] }], [man('l2', 3, 13, 1500, { cat: '购物' })]);
+  ok(r5.item(L2).bucket === 'pending' && r5.item(L2).why === 'xcat' && /晚 1 天记的，但分类对不上（账单像「吃饭」，你记的是「购物」）/.test(r5.item(L2).msg), '7 手记晚 1 天、分类冲突：进待你确认：' + r5.item(L2).msg);
+  const r6 = run([{ app: 'wechat', txns: [L2] }], [man('l3', 3, 13, 1500, { cat: '吃饭' })]);
+  ok(r6.item(L2).bucket === 'merge' && r6.item(L2).into === 'l3', '7 手记晚 1 天、分类一样：自动合并');
+  // 金额差一点（1016-X）也一样：手记比账单早的不自动合并
+  const N = wx({ time: T(3, 20, 12), cp: '某虚构快餐店', desc: '米饭套餐', fen: 2800 });
+  const r7 = run([{ app: 'wechat', txns: [N] }], [man('n', 3, 19, 3000, { cat: '吃饭' })]);
+  ok(r7.item(N).bucket === 'pending' && !r7.item(N).nearFen, '7 金额差一点、分类一样，但手记早 1 天：不自动当作记过，进待你确认');
+  // 「为什么没配上」写明早几天
+  ok(/你记的比账单早 3 天/.test((it.trace.find(x => x.record === 'a') || {}).why || ''), '7 「为什么没配上」写明早几天');
+  // 不计入的：只看方向，不看分类
+  const W1 = wx({ time: T(3, 25, 10), kind: '零钱提现', cp: '某虚构银行', desc: '/', io: 'neutral', fen: 10000, status: '提现已到账' });
+  const r8 = run([{ app: 'wechat', txns: [W1] }], [man('w1', 3, 24, 10000, { cat: '其他', mode: 'skip' })]);
+  const r9 = run([{ app: 'wechat', txns: [W1] }], [man('w2', 3, 26, 10000, { cat: '其他', mode: 'skip' })]);
+  ok(r8.item(W1).bucket === 'neutral' && r9.item(W1).bucket === 'merge' && r9.item(W1).into === 'w2', '7 不计入的：手记早 1 天不合并（照常导入、不进待处理），晚 1 天照常合并（不看分类）');
+}
+
 console.log(`\n${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);
 })();

@@ -40,8 +40,15 @@ const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户', 
     const W = [wx({ time: T(10, 8, 10), kind: '零钱提现', cp: '某虚构银行(尾号0000)', desc: '/', io: 'neutral', fen: 10000, status: '提现已到账', remark: '服务费¥2.20' }),
                wx({ time: T(10, 9, 10), kind: '零钱提现', cp: '某虚构银行(尾号0000)', desc: '/', io: 'neutral', fen: 5000, status: '提现已到账', remark: '服务费¥0.00' })];
     const F = [['微信.csv', B.bill('wechat', W, { range: RANGE }).bytes]];
-    let fee = '';
-    const r = await t.importFiles(F, () => { fee = t.$('impFees') ? t.$('impFees').textContent : ''; }, { stay: true });
+    let fee = '', ov = '', tile = '';
+    const r = await t.importFiles(F, () => {
+      fee = t.$('impFees') ? t.$('impFees').textContent : '';
+      // 1017-UI6 核对：分步以后，服务费那一句和新建条数在「总览」上看得到（不靠自动跳步去找）
+      t.w.JiwenImportUI._goStep('overview');
+      const fe = t.d.getElementById('impFees'), tl = t.d.getElementById('impTiles');
+      ov = t.w.JiwenImportUI._state().view.step + '|' + (fe ? fe.textContent : ''); tile = tl ? tl.textContent : '';
+    }, { stay: true });
+    ok(/^overview\|零钱提现的服务费 1 笔，共 2\.20 元/.test(ov) && /新建\s*3\s*条/.test(tile), '2 总览上看得到：服务费那一句、新建 3 条（含服务费）：' + ov + ' / ' + tile);
     ok(/零钱提现的服务费 1 笔，共 2\.20 元，单独记成支出（分类「其他」/.test(fee), '2 确认页写明服务费单独记成支出：' + fee);
     ok(r.plan.records === 3, '2 新建 3 条（两笔提现 + 一笔服务费）');
     t.$('impBackToLedger').click(); await t.idle();

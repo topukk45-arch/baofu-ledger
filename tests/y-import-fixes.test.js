@@ -106,7 +106,7 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   const r = run([{ app: 'wechat', txns: [b] }], manual);
   const it = r.item(b);
   ok(it.bucket === 'pending' && it.cands.length === 5 && it.cands[0].record === 'best', '2 账单 19:08 19.80、手记 19:09 19.50：排第一（3–5 天外的排后面）');
-  ok(it.cands.map(c => c.record).join() === 'best,near3,far1,far2,far3', '2 其余按时间差、再按金额差排：' + it.cands.map(c => c.record).join());
+  ok(it.cands.map(c => c.record).join() === 'best,far1,far2,far3,near3', '2 其余按时间差、再按金额差排；手记比账单早的（near3 早 3 天）不当最像、排最后（1017-UI6 有意改）：' + it.cands.map(c => c.record).join());
 }
 
 // ===== 3. 按手记 / 按账单归组 =====
