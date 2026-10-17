@@ -155,6 +155,17 @@
     '.pc-ver .ok{color:var(--st-ok);}.pc-ver .no{color:var(--st-bad);font-weight:bold;}',
     // 1017-D：金额差一点的一笔一笔处理：左上角勾选框（48px），底部「分开记 / 改成实付」；差额用琥珀色（红色只留给真有出入的）
     '.pc-ver .near{color:var(--st-pend);font-weight:bold;}',
+    // 1017-E：搜索（确认页标题栏右边的按钮、待处理页顶上、挂退款的候选列表）
+    '#impPage .imp-search-btn{flex:0 0 48px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--c-primary-deep);cursor:pointer;padding:0;}',
+    '#impPage .imp-search-btn svg,.imp-sr-go svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}',
+    '.imp-search{display:block;box-sizing:border-box;width:100%;min-height:48px;padding:0 12px;border:1px solid var(--c-border-mid);border-radius:10px;background:var(--c-bg);color:var(--c-text);font-size:16px;font-family:inherit;}',
+    '.imp-search-tip{font-size:12px;color:var(--c-text-soft);margin:6px 2px 10px;line-height:1.5;}',
+    '.imp-sr{display:flex;gap:10px;align-items:center;min-height:56px;padding:8px 10px;margin-bottom:8px;border:1px solid var(--c-border);border-radius:10px;background:var(--c-bg);cursor:pointer;}',
+    '.imp-sr .grow{flex:1 1 auto;min-width:0;}.imp-sr-t{font-size:14px;}.imp-sr-t small{color:var(--c-text-soft);font-size:12px;margin-right:4px;}',
+    '.imp-sr-d{font-size:12px;color:var(--c-text-soft);}.imp-sr-to{font-size:12.5px;margin-top:2px;}',
+    '.imp-sr-to.pend{color:var(--st-pend);}.imp-sr-to.ok{color:var(--st-ok);}.imp-sr-to.skip{color:var(--st-skip);}',
+    '.imp-sr-amt{font-variant-numeric:tabular-nums;white-space:nowrap;}',
+    '.imp-search-none{padding:12px 4px;color:var(--c-text-soft);font-size:14px;}',
     '.imp-near-item{position:relative;}.imp-near-item .pc{padding-left:52px;}',
     '.imp-near-ck{position:absolute;left:2px;top:10px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:1;}',
     '.imp-near-ck input{width:22px;height:22px;margin:0;accent-color:var(--c-primary);-webkit-appearance:checkbox;appearance:auto;}',
@@ -189,7 +200,10 @@
     var back = btn('‹ 取消', 'imp-back', function () { headBack(); }); back.id = 'impBack';
     var tt = el('div', 'imp-title', '导入账单'); tt.id = 'impTitle';
     var sub = el('div', 'imp-sub'); sub.id = 'impArchive';
-    head.appendChild(back); head.appendChild(tt); head.appendChild(sub);
+    // 1017-E：确认页标题栏右边的搜索按钮（48px），只在确认页出现
+    var sb = btn('', 'imp-search-btn', function () { openSearch(); }); sb.id = 'impSearchBtn'; sb.setAttribute('aria-label', '在这次导入里搜'); sb.style.display = 'none';
+    sb.innerHTML = ICON_SEARCH;
+    head.appendChild(back); head.appendChild(tt); head.appendChild(sub); head.appendChild(sb);
     var body = el('div'); body.id = 'impBody';
     var steps = el('div', 'imp-steps'); steps.id = 'impSteps'; steps.style.display = 'none';      // 1017-UI2：分步进度
     page.appendChild(head); page.appendChild(steps); page.appendChild(body);
@@ -209,7 +223,7 @@
     box.appendChild(pt); box.appendChild(pb); box.appendChild(pc);
     pg.appendChild(box);
     [page, bar, file, sm, pg].forEach(function (x) { document.body.appendChild(x); });
-    dom = { page: page, body: body, bar: bar, go: go, recon: rc, cancel: cancel, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub, back: back, steps: steps };
+    dom = { search: sb, page: page, body: body, bar: bar, go: go, recon: rc, cancel: cancel, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub, back: back, steps: steps };
     if (window.ResizeObserver) try { new ResizeObserver(syncBar).observe(bar); } catch (_) {}
     return dom;
   }
@@ -236,7 +250,10 @@
   }
   // 有要丢掉的东西：选好了文件、正在算或算出了方案（结果页、选文件页没选文件时不算）
   function hasWork() { return !!S && (S.phase === 'confirm' || S.phase === 'progress'); }
-  function setHead(title, backText) { dom.title.textContent = title; dom.back.textContent = backText || '‹ 返回'; }
+  function setHead(title, backText) {
+    dom.title.textContent = title; dom.back.textContent = backText || '‹ 返回';
+    dom.search.style.display = S && S.phase === 'confirm' && !(S.view && S.view.recon) ? 'flex' : 'none';     // 1017-E：搜索只在确认页
+  }
   // 1016-UI7 / 1017-UI1：下拉框套一层，点了不弹系统自带的选择框，弹主程序的共用底部面板（JiwenSheet，和「筛选」同一套外观）；
   //   选分类的用筛选里那种分类块（「未分类」放第一个），别的选项一行一个；点一下就选中并关掉，选了照样给 select 赋值、发 change
   var CAT_SEL = { 'imp-into': 1, 'imp-cp-sel': 1, 'imp-row-cat': 1, 'imp-pend-cat': 1, 'imp-rule-cat': 1, 'imp-rule-newcat': 1, 'imp-map-cat': 1 };
@@ -1961,6 +1978,112 @@
     var rec = dr.pick && dr.pick.record, isRefund = d && (d.why === 'refundcands' || refundishRow(d));
     if (rec && !isRefund && !(cur.pick && cur.pick.record === rec)) withClaim(rec, { key: key }, go); else go();
   }
+  // ---------- 1017-E：搜索 ----------
+  //   按金额（1.6 和 1.60 都认，前面带 ¥、后面带「元」也行）、对方、商品说明、备注搜；只在页面上找，不改数据
+  var ICON_SEARCH = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+  function searchQ(q) {
+    q = String(q || '').trim(); if (!q) return null;
+    var t = q.replace(/[¥￥元\s]/g, '');
+    return { fen: /^\d+(\.\d{1,2})?$/.test(t) ? Math.round(parseFloat(t) * 100) : null, text: q.toLowerCase() };
+  }
+  function searchHit(sq, fen, texts) {
+    if (!sq) return true;
+    if (sq.fen !== null && fen === sq.fen) return true;
+    return texts.some(function (x) { return x && String(x).toLowerCase().indexOf(sq.text) >= 0; });
+  }
+  // 一笔账单现在的去处：{ t, cls（pend / ok / skip / ''）, step（要你定的在第几步，没有就 null）, group }
+  function searchDest(d) {
+    var its = S.view.items || {}, at = null, done = false;
+    MID.forEach(function (st) { if (at) return; (its[st] || []).forEach(function (x) { if (!at && x.keys.indexOf(d.key) >= 0) { at = st; done = x.done; } }); });
+    if (at) {
+      var inSteps = (S.view.steps || []).indexOf(at) >= 0, where = inSteps ? '第 ' + (S.view.steps.indexOf(at) + 1) + ' 步 · ' + STEP_NAME[at] : '总览';
+      var now0 = destOf([d.key]).t.replace(/^→ /, '').replace(/，挪到第.*$/, '');
+      return { t: where + ' · ' + (done ? '已定（' + now0 + '）' : '待你确认' + (d.group !== 'pending' ? '（现在：' + now0 + '）' : '')), cls: done ? 'ok' : 'pend', step: inSteps ? at : 'overview' };
+    }
+    var g = d.group, m = g === 'merge' && S.manualById[d.into];
+    if (g === 'merge') return { t: '已和 ' + (m ? (+m.time.slice(5, 7)) + '月' + (+m.time.slice(8, 10)) + '日' : '') + ' 的手记合并' + (d.viaSum ? '（几笔加起来）' : d.why === 'near' ? '（金额差一点）' : ''), cls: 'ok', step: null };
+    if (g === 'skip') return { t: '已跳过：' + (d.reason || ''), cls: 'skip', step: null };
+    if (g === 'excluded') return { t: '不导入：' + (d.reason || '你勾掉了'), cls: 'skip', step: null };
+    if (g === 'pending') return { t: '留在待处理' + (d.reason ? '：' + d.reason : ''), cls: 'pend', step: null };
+    if (g === 'neutral') return { t: '不计入', cls: '', step: null };
+    if (g === 'refund') return { t: '当作退款', cls: '', step: null };
+    if (g === 'error') return { t: '读不出来', cls: 'skip', step: null };
+    return { t: '新建 · ' + (d.cat || '未分类'), cls: '', step: null };
+  }
+  function searchRows(sq) {
+    if (!sq) return [];
+    return S.plan.rows.filter(function (d) {
+      if (d.src !== 'row') return false;
+      var m = d.into && S.manualById[d.into];
+      return searchHit(sq, d.fen, [d.cp, cpShow(d.cp), d.title, d.desc, d.remark, m && m.remark]);
+    }).sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; });
+  }
+  // 跳到那一行：在要你定的那一步就去那一步（定了的展开「已处理」），不在就到总览的明细里展开那一组；然后滚过去、闪一下
+  function searchJump(d) {
+    var ds = searchDest(d);
+    if (ds.step) {
+      var its = S.view.items[ds.step === 'overview' ? S.view.inline : ds.step] || [], x = its.filter(function (y) { return y.keys.indexOf(d.key) >= 0; })[0];
+      if (x) {
+        var kind = x.id.slice(0, x.id.indexOf(':') < 0 ? x.id.length : x.id.indexOf(':'));
+        S.view.more[kind] = true; if (kind === 'ps' || kind === 'pg') S.view.more.pend = true;
+        if (x.done) { S.view.fold = S.view.fold || {}; S.view.fold[cardOf(x.id, ds.step === 'overview' ? S.view.inline : ds.step)] = true; }
+      }
+      goStep(ds.step);
+    } else {
+      S.view.details = true; S.view.tag = null; S.view.open[d.group] = true;
+      var list = S.plan.groups[d.group] || [], i = list.indexOf(d);
+      if (i >= (S.view.shown[d.group] || PAGE)) S.view.shown[d.group] = i + 1;
+      goStep('overview');
+    }
+    var n = Array.prototype.filter.call(dom.body.querySelectorAll('[data-key],[data-item]'), function (y) { return y.dataset.key === d.key || (y.dataset.item && y.dataset.item.slice(y.dataset.item.indexOf(':') + 1) === d.key); })[0];
+    if (n && n.scrollIntoView) n.scrollIntoView({ block: 'center' });
+    flashKey(d.key);
+  }
+  function openSearch() {
+    if (!S || S.phase !== 'confirm' || !window.JiwenSheet) return;
+    var last = S.view.searchQ || '';
+    window.JiwenSheet.open({ title: '在这次导入里搜',
+      body: function (box, done) {
+        var inp = el('input', 'imp-search'); inp.type = 'search'; inp.id = 'impSearchInput'; inp.placeholder = '金额、对方、商品说明、备注'; inp.value = last;
+        box.appendChild(inp);
+        box.appendChild(el('div', 'imp-search-tip', '按金额（1.6 和 1.60 都认）、对方、商品说明、备注搜，不分步骤；只在页面上找，不改东西。'));
+        var res = el('div'); res.id = 'impSearchRes'; box.appendChild(res);
+        var paint = function () {
+          res.innerHTML = '';
+          var sq = searchQ(inp.value); S.view.searchQ = inp.value;
+          if (!sq) return;
+          var rs = searchRows(sq);
+          if (!rs.length) { res.appendChild(el('div', 'imp-search-none', '这次导入里没有「' + inp.value.trim() + '」（金额要写全，比如 1.6 或 1.60）。')); return; }
+          res.appendChild(el('div', 'imp-search-tip', '找到 ' + rs.length + ' 笔'));
+          rs.slice(0, 50).forEach(function (d) {
+            var ds = searchDest(d), r = el('div', 'imp-sr'); r.dataset.key = d.key;
+            var g = el('div', 'grow'), t = el('div', 'imp-sr-t'), nm0 = cpShow(d.cp) || cpShow(d.title) || '—', sub0 = d.title && cpShow(d.title) !== nm0 ? d.title : (d.desc && d.desc !== '/' ? d.desc : '');
+            t.appendChild(el('small', null, fmtTime(d.time))); t.appendChild(document.createTextNode(nm0));
+            g.appendChild(t);
+            if (sub0) g.appendChild(el('div', 'imp-sr-d', sub0));
+            g.appendChild(el('div', 'imp-sr-to ' + ds.cls, '→ ' + ds.t));
+            r.appendChild(g); r.appendChild(el('div', 'imp-sr-amt', yuan(d.fen))); r.appendChild(el('div', 'imp-soft', '›'));
+            r.addEventListener('click', function () { done(); searchJump(d); });
+            res.appendChild(r);
+          });
+          if (rs.length > 50) res.appendChild(el('div', 'imp-search-tip', '只列前 50 笔，写得再具体一点。'));
+        };
+        inp.addEventListener('input', paint);
+        paint();
+        setTimeout(function () { try { inp.focus(); } catch (_) {} }, 50);
+      },
+      foot: function (box, done) { var cl = btn('关闭', 'ui-btn block', function () { done(); }); cl.id = 'impSearchClose'; box.appendChild(cl); } });
+  }
+  // 页面上的一组行按搜索框过滤（只藏起来，不改数据）；搜不到时在 tipEl 里写一句
+  function searchBox(id, ph, rows, tipEl) {
+    var inp = el('input', 'imp-search'); inp.type = 'search'; inp.id = id; inp.placeholder = ph;
+    inp.addEventListener('input', function () {
+      var sq = searchQ(inp.value), n = 0;
+      rows().forEach(function (r) { var hit = searchHit(sq, r.fen, r.texts); r.node.style.display = hit ? '' : 'none'; if (hit) n++; });
+      if (tipEl) tipEl.textContent = sq ? (n ? '找到 ' + n + ' 笔' : '没有「' + inp.value.trim() + '」') : '';
+    });
+    return inp;
+  }
   // 改完底下那一行闪一下（明细里的那行、要你定的那一件）
   function flashKey(key) {
     var ns = Array.prototype.filter.call(dom.body.querySelectorAll('[data-key],[data-item]'), function (n) { return n.dataset.key === key || (n.dataset.item && n.dataset.item.slice(n.dataset.item.indexOf(':') + 1) === key); });
@@ -1987,6 +2110,9 @@
     sh.appendChild(el('h4', null, '把这笔 +' + yuan(d.fen) + ' 挂到哪一笔上？'));
     sh.appendChild(el('div', 'imp-soft', '挂上以后当作那笔的退款：分类、口径跟着那笔，那笔的支出减掉这些（比如 AA 收回的钱、跨月退款、换个渠道的赔付）。'));
     var bk = btn('‹ 回到这笔账单', 'imp-link', function () { SH.mode = ''; paintSheet(); }); bk.id = 'impRefundPickBack'; sh.appendChild(bk);
+    // 1017-E：候选列表上面加搜索框（金额、对方、商品说明、备注），只在页面上过滤
+    var rpRows = [], rtip = el('div', 'imp-search-tip'); rtip.id = 'impRefundPickTip';
+    sh.appendChild(searchBox('impRefundPickSearch', '搜金额、对方、备注', function () { return rpRows; }, rtip)); sh.appendChild(rtip);
     var list = el('div'); list.id = 'impRefundPick'; sh.appendChild(list);
     var pick = function (to) { SH.mode = ''; setDraft({ asRefund: to }); };
     var used = {};      // 这一批里已经挂了多少（分）
@@ -1999,7 +2125,7 @@
       var row = el('div', 'imp-row-opt imp-rp-row'); row.dataset.row = r.file + ':' + r.row;
       row.appendChild(el('span', 'grow', fmtTime(r.time) + ' · ' + (APP[r.app] || '') + ' · ' + (r.title || r.cp || '') + ' · ' + yuan(r.fen)));
       row.appendChild(btn('挂到这笔', 'imp-btn imp-rp-pick', function () { pick({ row: { file: r.file, row: r.row } }); }));
-      list.appendChild(row);
+      list.appendChild(row); rpRows.push({ node: row, fen: r.fen, texts: [r.cp, cpShow(r.cp), r.title, r.desc, r.remark] });
     });
     var lw = el('div', 'imp-soft', '正在查账本里的…'); list.appendChild(lw);
     var my = runId, me = SH;
@@ -2011,9 +2137,10 @@
         var row = el('div', 'imp-row-opt imp-rp-rec'); row.dataset.id = m.id;
         row.appendChild(el('span', 'grow', fmtTime(m.time) + ' · ' + (m.cat || '未分类') + ' · ' + (m.remark || m.cp || '') + ' · ' + yuan(m.fen) + (m.left !== m.fen ? '（还能挂 ' + yuan(m.left) + '）' : '')));
         row.appendChild(btn('挂到这笔', 'imp-btn imp-rp-pick', function () { pick({ record: m.id }); }));
-        list.appendChild(row);
+        list.appendChild(row); rpRows.push({ node: row, fen: m.fen, texts: [m.cp, m.remark, m.cat] });
       });
       if (!xs.length && !batch.length) list.appendChild(el('div', 'imp-soft', '没找到能挂的支出（要比这笔早、金额不少于它、180 天以内）。'));
+      var si = document.getElementById('impRefundPickSearch'); if (si && si.value) si.dispatchEvent(new Event('input'));
     }, function () { lw.textContent = '查账本出错了'; });
   }
 
@@ -2382,10 +2509,16 @@
     // 1016-UI2：「全部不要了」在底部操作栏（和「返回」一起），顶上只写共几笔
     head.appendChild(el('div', 'imp-soft', '每笔下面选：和哪条手记合并、作为新增，或者不要了。'));
     barSet([closeBtn(), all]);
+    // 1017-E：顶上搜索框，按金额、对方、商品说明搜（只在页面上过滤）
+    var ptip = el('div', 'imp-search-tip'); ptip.id = 'impPendSearchTip';
+    var pcards = [];
+    head.appendChild(searchBox('impPendSearch', '搜金额、对方、商品说明', function () { return pcards; }, ptip));
+    head.appendChild(ptip);
     dom.body.appendChild(head);
     var cats = ['未分类'].concat(((S.info && S.info.cats) || []).filter(function (c) { return c !== '未分类'; }));
     list.slice().sort(function (a, b) { return a.item.t < b.item.t ? 1 : a.item.t > b.item.t ? -1 : 0; }).forEach(function (x) {
       var it = x.item, c = el('div', 'imp-card imp-pend'); c.dataset.key = x.key;
+      pcards.push({ node: c, fen: it.amt, texts: [it.cp, cpShow(it.cp), it.d, it.rm, x.why].concat(x.cands.map(function (cd) { return cd.rec && cd.rec.remark; })) });
       // 1017-UI10：点上面这两行看详情（和筛选同一套底部面板，只看，底部只有「关闭」）
       var info = el('div', 'imp-tap imp-pend-info'); info.style.cursor = 'pointer';
       info.appendChild(el('div', 'imp-line', fmtTime(it.t) + ' · ' + (APP[it.app] || it.app) + ' · ' + (cpShow(it.cp) || '—') + ' · ' + (it.io === 'income' ? '+' : '−') + yuan(it.amt)));
