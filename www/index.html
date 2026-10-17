@@ -1415,7 +1415,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-T</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-U</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -5400,10 +5400,10 @@
                 del.title='从列表移走（数据不会删除，可在下方找回）';
                 del.onclick=(e)=>{
                     e.stopPropagation();
-                    customConfirm(`把「${acc.name}」从列表移走？\n\n账本数据不会删除，之后点下方「已移走的账号」就能找回。`, ()=>{
+                    customConfirm(`把「${acc.name}」从登录列表移走。\n\n账本数据不会删除，之后点下方「已移走的账号」就能找回。`, ()=>{
                         try{ setAccountHidden(acc.id, true); }catch(_){ customAlert('保存失败，请重试。'); }
                         renderRecentUsers();
-                    }, '移走账号');
+                    }, '移走账号', { okText:'从列表移走' });
                 };
                 chip.appendChild(del);
             }
@@ -5601,7 +5601,9 @@
         $('delArchive').addEventListener('click', () => {
             const store=loadStore();
             if(Object.keys(store.archives).length<=1){ customAlert('至少保留一个存档！'); return; }
-            customConfirm(`确定删除存档「${currentArchive}」吗？此操作不可恢复。`, ()=>{
+            // 1017-U：写清楚会删掉什么（记录几条、导入记录和导入前备份），按钮「删除这个存档」警示色
+            const n0=(store.archives[currentArchive] && store.archives[currentArchive].records || []).length;
+            customConfirm(`删除存档「${currentArchive}」：里面的 ${n0} 条记录、分类、预算、模板，还有导入记录、单号表、待处理、导入前的备份都会一起删掉，找不回来。\n\n别的存档不受影响；要留底可以先在设置里「导出存档」。云盘上已有的备份文件不删。`, ()=>{
                 const s=loadStore();
                 const delName=currentArchive;
                 delete s.archives[delName];
@@ -5613,7 +5615,7 @@
                 currentArchive=Object.keys(s.archives)[0];
                 s.last=currentArchive; saveStoreSafe(s);
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
-            }, '删除存档');
+            }, '删除存档', { danger:true, okText:'删除这个存档' });
         });
 
         $('exportBtn').addEventListener('click', async () => {
@@ -5983,7 +5985,7 @@
                 if(ol && ol.uri) uri=ol.uri;
                 else { const res=await plugin.pickFile({ mode:'open' }); if(!res || !res.uri) return; uri=res.uri; }
             }catch(_){ return; }
-            customConfirm('从云端的单号表文件恢复这个存档的单号表：按记录内容一条条认回来，认不出来的当作没导过。\n\n只在这个存档还没有单号表时恢复，已经有的不覆盖。确定吗？', async () => {
+            customConfirm('从云端的单号表文件恢复这个存档的单号表：按记录内容一条条认回来，认不出来的当作没导过。\n\n只在这个存档还没有单号表时恢复，已经有的不覆盖。', async () => {
                 try{
                     const r=await plugin.readText({ uri });
                     const out=await impOrdersRestoreFromCloud(r && r.text);
@@ -5992,17 +5994,17 @@
                     const c=err && (err.code || err.message);
                     customAlert(c==='notempty' ? '这个存档已经有单号表了，没有覆盖。' : c==='badfile' ? '这个文件不是记问的单号表。' : '没恢复成，什么都没改：' + c, '恢复单号表');
                 }
-            }, '恢复单号表');
+            }, '恢复单号表', { okText:'从云盘恢复单号表' });
         });
         if($('odDisconnectBtn')){
             $('odDisconnectBtn').addEventListener('click', () => {
-                customConfirm('取消后不会删除云盘上已有的文件，只是停止自动同步，需要的话可以重新连接。确定取消吗？', () => {
+                customConfirm('停止把这个存档自动备份到云盘。云盘上已有的文件不删，需要的话可以重新连接。', () => {
                     const plugin = odPlugin();
                     const link = odGetLink();
                     if(plugin && link && link.uri){ plugin.forget({ uri: link.uri }).catch(()=>{}); }
                     odClearLink(currentUser, currentArchive);
                     odRefreshStatusUI();
-                }, '取消自动同步');
+                }, '取消自动同步', { okText:'停止自动同步', cancelText:'继续同步' });
             });
         }
 
@@ -6990,7 +6992,7 @@ ${detail}
             if(a.cats.length<=1){ customAlert('至少保留一个分类！'); return; }
             const used=a.records.filter(r=>r.cat===name).length;
             const tip=used>0?`有 ${used} 条记录使用该分类，删除后将归为「未分类」。`:'';
-            customConfirm(`确定删除分类「${name}」吗？${tip}`, ()=>{
+            customConfirm(`删除分类「${name}」。${tip ? '\n\n'+tip : ''}`, ()=>{
                 const s=loadStore(); const ar=curArchive(s);
                 ar.cats=ar.cats.filter(c=>c!==name);
                 if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
@@ -7002,7 +7004,7 @@ ${detail}
                 impRulesDropCat(ar, name);
                 saveStoreSafe(s);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
-            }, '删除分类');
+            }, '删除分类', { danger:true, okText:`删除分类「${name}」` });
         }
 
         // 【1013-G】只拷当前存档的记录数组（浅拷贝），不用把整个 store 都拼出来
@@ -11078,13 +11080,13 @@ ${detail}
             const n=daysSel.size;
             if(!n) return;
             // 二次确认：批量删除不可撤销，不能一下就没了
-            customConfirm(`确定删除选中的 ${n} 个日子吗？此操作不可撤销。`, ()=>{
+            customConfirm(`删除选中的 ${n} 个日子，删掉的找不回来。`, ()=>{
                 const left=loadDays().filter(d=>!daysSel.has(d.id));
                 saveDays(left);
                 exitSelectMode();      // 内部会 renderDaysList
                 renderDaysCard();      // 入口卡同步
                 customAlert(`已删除 ${n} 个日子`);
-            }, '批量删除');
+            }, '批量删除', { danger:true, okText:`删除这 ${n} 个日子` });
         });
 
         function renderDaysList(){
@@ -11194,12 +11196,12 @@ ${detail}
             const id=dayEditId;
             if(!id) return;
             const rec=loadDays().find(d=>d.id===id);
-            customConfirm(`确定删除「${rec?rec.name:''}」吗？`, ()=>{
+            customConfirm(`删除日子「${rec?rec.name:''}」，删掉的找不回来。`, ()=>{
                 const list=loadDays().filter(d=>d.id!==id);
                 if(!saveDays(list)) return;
                 closeDayDialog();
                 renderDaysAll();
-            }, '删除日子');
+            }, '删除日子', { danger:true, okText:'删除这个日子' });
         });
 
         // 数据变更后统一刷新两处视图（入口卡 + 管理页，管理页没显示时刷了也无害）

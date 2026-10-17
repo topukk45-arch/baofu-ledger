@@ -41,6 +41,15 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   await t.back();
   ok(t.recs().length === 1 && $('editMask').style.display === 'flex', '2 返回键只关确认框：记录还在、修改弹窗还开着');
   $('cancelEdit').click();
+  // ===== 3. 设置和存档（1017-U）=====
+  w.deleteCat('购物');
+  ok(/^删除分类「购物」。\n\n有 1 条记录使用该分类，删除后将归为「未分类」。$/.test($('askMsg').textContent) && $('askOk').textContent === '删除分类「购物」' && $('askOk').classList.contains('warn'), '3 删除分类：写几条会变未分类、按钮写分类名、警示色');
+  $('askCancel').click(); await t.idle();
+  { const st = w.loadStore(A.ID); st.archives['另一个'] = { cats: ['未分类'], records: [] }; w.saveStore(st, A.ID); await t.idle(); }
+  $('delArchive').click();
+  ok(/^删除存档「默认存档」：里面的 1 条记录、分类、预算、模板，还有导入记录、单号表、待处理、导入前的备份都会一起删掉，找不回来。/.test($('askMsg').textContent) && $('askOk').textContent === '删除这个存档' && $('askOk').classList.contains('warn'), '3 删除存档：写清会删掉什么、「删除这个存档」警示色');
+  $('askCancel').click(); await t.idle();
+  ok(Object.keys(w.loadStore(A.ID).archives).length === 2 && t.recs().length === 1, '3 点取消：什么都没删');
   console.log(`\n${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.log(e); console.log(`\n${pass} 通过，${fail + 1} 失败`); process.exit(1); });
