@@ -2384,9 +2384,10 @@
   function renderLogs(logs, pend) {
     pend = pend || [];
     var nb = {}; pend.forEach(function (x) { nb[x.b] = (nb[x.b] || 0) + 1; });
-    var c = el('div', 'imp-card imp-push'); c.id = 'impLogs';     // 1016-UI2：记录少时整块落到下面，「撤销」够得着
+    // 1016-UI2：有记录时整块落到下面，「撤销」够得着；1017-R：没有记录时（空状态）从顶上往下排，不沉到底、上面不留一大片空白
+    var c = el('div', logs.length ? 'imp-card imp-push' : 'imp-card imp-empty'); c.id = 'impLogs';
     c.appendChild(el('h4', null, '最近的导入（只保留 10 次）'));
-    if (!logs.length) c.appendChild(el('div', 'imp-soft', '这个存档还没有导入记录。'));
+    if (!logs.length) { c.appendChild(el('div', 'imp-soft', '这个存档还没有导入记录。')); c.appendChild(el('div', 'imp-soft', '导入一次账单以后，每次都会记在这里（最近 10 次），能看详情、能撤销。')); }
     logs.forEach(function (l) {
       var r = el('div', 'imp-row-opt imp-log'); r.dataset.batch = l.b;
       var g = el('div', 'grow');
@@ -2585,6 +2586,8 @@
     var c0 = el('div', 'imp-card'); c0.id = 'impAiReviewHead';
     c0.appendChild(el('div', 'imp-line', 'AI 提了 ' + (items.length + R.r.bad.length) + ' 条，能用的 ' + usable.length + ' 条' + (R.r.bad.length ? '，没看懂 ' + R.r.bad.length + ' 行（放在最后）' : '') + '。'));
     c0.appendChild(el('div', 'imp-soft', '默认都不勾，勾上的才改；只改分类、备注、口径和标记，不新建、不删除、不改金额和时间。改之前自动备份，能在「设置 → 导入记录」里整批撤销。'));
+    // 1017-R：一条能用的都没有（空状态）：写清楚为什么、怎么办，跟在顶上那块后面往下排
+    if (!items.length) { var e0 = el('div', 'imp-soft imp-ai-empty', R.r.bad.length ? '没有能直接改的建议。没看懂的几行放在下面，写了原因；可以让 AI 按导出时说的格式重写一遍再粘贴。' : 'AI 没提修改建议，这一批看起来没问题。'); e0.id = 'impAiEmpty'; c0.appendChild(e0); }
     b.appendChild(c0);
     ['cat', 'remark', 'mode', 'flag'].forEach(function (f) {
       var list = items.filter(function (x) { return x.field === f; });
@@ -2733,6 +2736,7 @@
     var c1 = el('div', 'imp-card'); c1.id = 'impRulesCat';
     c1.appendChild(el('h4', null, '分类规则（' + rules.cat.length + '）'));
     c1.appendChild(el('div', 'imp-soft', '交易对方里有这个词，就归到这个分类。导入时你选过的、从合并里学到的都在这里；只管以后的导入。'));
+    if (!rules.cat.length) c1.appendChild(el('div', 'imp-soft', '还没有。可以在最下面加一条，或者导入时在「按对方选分类」里选过就会记在这里。'));
     rules.cat.forEach(function (r, i) {
       var row = el('div', 'imp-row-opt imp-rule-row'); row.dataset.kw = r.kw;
       row.appendChild(el('span', 'grow', '「' + r.kw + '」→'));
@@ -2777,7 +2781,8 @@
     });
     b.appendChild(c3);
     // 1016-UI2：「加一条分类规则」单独一块放在最下面（拇指够得着）
-    var c4 = el('div', 'imp-card imp-push'); c4.id = 'impRuleAddCard';
+    // 1017-R：一条规则都没有（空状态）时跟在上面几块后面往下排，不硬顶到底
+    var c4 = el('div', rules.cat.length || rules.map.length || rules.type.length ? 'imp-card imp-push' : 'imp-card'); c4.id = 'impRuleAddCard';
     c4.appendChild(el('h4', null, '加一条分类规则')); c4.appendChild(add); b.appendChild(c4);
     dom.page.scrollTop = 0;
   }
@@ -2837,7 +2842,7 @@
   }
   function renderPending(list) {
     var head = el('div', 'imp-card'); head.id = 'impPendHead';
-    if (!list.length) { head.appendChild(el('div', 'imp-line', '没有待处理的账单了。')); dom.body.appendChild(head); return; }
+    if (!list.length) { head.appendChild(el('div', 'imp-line', '没有待处理的账单了。')); head.appendChild(el('div', 'imp-soft', '导入时拿不准的账单会先放在这里，等你来定。')); head.classList.add('imp-empty'); dom.body.appendChild(head); return; }
     var fen = list.reduce(function (s, x) { return s + (x.item.amt || 0); }, 0);
     head.appendChild(el('div', 'imp-line', '共 ' + list.length + ' 笔，' + yuan(fen) + ' 元。导入时拿不准，没进账本，在这里定。'));
     var all = btn('全部不要了', 'ui-btn danger', function () {

@@ -71,6 +71,10 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   ok(inBar('impBarClose') && $('impLogs').classList.contains('imp-push'), '9 导入记录：底部有「返回」，记录少时整块落到下面');
   ok($('impLogsPending') && $('impLogs').compareDocumentPosition($('impLogsPending')) & 4, '9 导入记录：待处理入口在记录下面');
   t.w.JiwenImportUI.openRules();
+  // 1017-R：一条规则都没有（空状态）时「加一条」跟着往下排、不硬顶到底；有规则时照旧单独一块放在下面
+  ok(inBar('impBarClose') && $('impRuleAddCard') && $('impRuleAddCard').contains($('impRuleAddBtn')) && !$('impRuleAddCard').classList.contains('imp-push'), '10 规则页（空的）：底部有「返回」，「加一条分类规则」跟在上面几块后面');
+  await t.st().rulesSave({ cat: [{ kw: '某虚构词', cat: t.arch().cats.filter(c => c !== '未分类')[0] }], type: [] });
+  t.w.JiwenImportUI.openRules();
   ok(inBar('impBarClose') && $('impRuleAddCard') && $('impRuleAddCard').contains($('impRuleAddBtn')) && $('impRuleAddCard').classList.contains('imp-push'), '10 规则页：底部有「返回」，「加一条分类规则」单独一块放在下面');
   // 1016-UI7 / 1017-UI1：下拉框不弹系统自带的选择框，点了弹主程序的共用底部面板（和「筛选」同一套 class）；选分类用分类块，单选
   const ns = $('impRuleNewCat'), wrap = ns.parentNode;
