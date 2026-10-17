@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-G</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-H</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3600,6 +3600,8 @@
                 if(x.only===true) o.only=true;      // 1016-Q：只对账（只补了勾选的几笔）
                 // 1017-G：AI 修改（不是导入）：改的是哪一次导入的记录
                 if(x.kind==='ai'){ o.kind='ai'; if(typeof x.of==='string' && IMP_BATCH_RE.test(x.of)) o.of=x.of; }
+                // 1017-H：这次导入交给 AI 检查时的导出时间（最近 5 次），AI 回复里的导出时间要是其中之一才认
+                if(Array.isArray(x.aiAt)){ const aa=x.aiAt.filter(v=>typeof v==='string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v)).slice(-5); if(aa.length) o.aiAt=aa; }
                 // 1016-Y：这次改了你已有的哪几条规则（关键词、原来的分类、改成的分类），撤销时改回去
                 if(Array.isArray(x.rulesChanged)){
                     const rc=x.rulesChanged.filter(r=>r && typeof r.kw==='string' && r.kw && typeof r.from==='string' && typeof r.to==='string').map(r=>({ kw:r.kw.slice(0, 32), from:r.from, to:r.to }));
@@ -4131,6 +4133,44 @@
                 }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return { chain:p.chain.slice(), totals:p.totals };
+            },
+            // ---- 1017-H：AI 检查导入结果：导出 ----
+            // 这次导入写进账本的记录，按导入记录里的顺序编临时号（新增的在前、改过的以前的记录在后），同一批每次编号一样；
+            //   删掉了的那一笔号留空（gone）。只读。返回 { batch, at（那次导入的时间）, cats, rows:[{ n, id, time, fen, type, cat, mode, dest, cp, desc, remark, oc, gone }], aiAt }
+            async aiExportRows(batch, archive){
+                const t=impTarget(archive);
+                const log=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
+                const lg=((log && log.list) || []).filter(l=>l.kind!=='ai' && l.b===batch).pop();
+                if(!lg) throw impErr('nolog');
+                const a=ledgerAssembleArchive(t.e, t.aid), cps=a.cps||[];
+                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, byId=new Map(recs.map(r=>[r.id, r]));
+                const ids=[], kind={};
+                (lg.add||[]).forEach(id=>{ if(!(id in kind)){ ids.push(id); kind[id]={ add:true }; } });
+                (lg.chg||[]).forEach(c=>{ if(!(c.id in kind)){ ids.push(c.id); kind[c.id]={ chg:c }; } });
+                const rows=ids.map((id, i)=>{
+                    const r=byId.get(id), n=i+1;
+                    if(!r) return { n, id, gone:true };
+                    const c=kind[id].chg, w=c && c.was || {};
+                    let dest=kind[id].add ? (r.refundOf ? '新建（退款）' : '新建') : ('src' in w) ? '和账单合并' : ('refundOf' in w) ? '退款改挂' : ('money' in w) ? '汇总记录（追加了几笔）' : '改过';
+                    // 合并进去的账单金额和这条记录不一样：写明「金额差一点」（导入记录里存着合并进去的账单，1016-Z6 起）
+                    const bf=(c && Array.isArray(c.bills) ? c.bills : []).reduce((x, b)=>x+(b.fen||0), 0), rf=Math.round(safeNum(r.money)*100);
+                    if(('src' in w) && bf && bf!==rf) dest+='（金额差一点：账单 '+(bf/100).toFixed(2)+'）';
+                    return { n, id, time:r.time||'', fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', mode:recMode(r), dest,
+                             cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', desc:'', remark:r.remark||'', oc:r.oc||'' };
+                });
+                return { batch, at:lg.at||'', cats:(a.cats||[]).slice(), rows, aiAt:(lg.aiAt||[]).slice() };
+            },
+            // 记下这一批交给 AI 时的导出时间（最近 5 次；AI 回复里的导出时间要对得上才认）。只改导入记录这一项
+            async aiExportMark(batch, at, archive){
+                const t=impTarget(archive);
+                const log=await impGetJson(t.e, impLogKey(t.e.id, t.aid)), list=((log && log.list) || []).map(l=>Object.assign({}, l));
+                let hit=null; for(let i=list.length-1;i>=0 && !hit;i--) if(list[i].kind!=='ai' && list[i].b===batch) hit=list[i];
+                if(!hit) throw impErr('nolog');
+                hit.aiAt=(Array.isArray(hit.aiAt) ? hit.aiAt : []).filter(v=>v!==at).concat([at]).slice(-5);
+                const a=ledgerAssembleArchive(t.e, t.aid);
+                const clean=impCleanLog(list, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
+                await impWrite(t.e, t.key, [[impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:clean })]]);
+                return hit.aiAt.slice();
             },
             // ---- 1016-Z2：「当作退款，挂到某一笔」的候选（只读）：账本里的支出，时间不晚于这笔、180 天以内、还没退完的够挂；新的在前，最多 50 条
             refundTargets(q, archive){
@@ -6225,7 +6265,7 @@ ${detail}
                 s.onload=()=>resolve(); s.onerror=()=>{ s.remove(); reject(new Error('导入模块没加载上')); };
                 document.head.appendChild(s);
             });
-            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/write.js')).then(()=>one('import/undo.js')).then(()=>one('import/route.js')).then(()=>one('import/pending.js')).then(()=>one('import/vendor/tiny-inflate.js')).then(()=>one('import/unzip.js')).then(()=>one('import/ui.js')).then(()=>{
+            __importUiLoading=loadImportModule().then(()=>one('import/plan.js')).then(()=>one('import/write.js')).then(()=>one('import/undo.js')).then(()=>one('import/route.js')).then(()=>one('import/pending.js')).then(()=>one('import/vendor/tiny-inflate.js')).then(()=>one('import/unzip.js')).then(()=>one('import/ai.js')).then(()=>one('import/ui.js')).then(()=>{
                 if(!window.JiwenImportUI) throw new Error('导入模块不完整');
                 return window.JiwenImportUI;
             });

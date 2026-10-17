@@ -189,7 +189,7 @@ async function openEntry(t) {
   ok(t.$('devImportMask').style.display === 'flex', '自检弹窗打开');
   await until(() => !outText(t).startsWith('正在'));
 }
-const UI_FILES = 'import/import.js,import/plan.js,import/write.js,import/undo.js,import/route.js,import/pending.js,import/vendor/tiny-inflate.js,import/unzip.js,import/ui.js';   // 1016-F 加 write.js，1016-K 加 undo.js，1016-N 加 route.js、pending.js（route.js 是纯计算，待处理页「不要了」要用它算退款记号），1016-Z8 加解压压缩包要的 tiny-inflate.js、unzip.js
+const UI_FILES = 'import/import.js,import/plan.js,import/write.js,import/undo.js,import/route.js,import/pending.js,import/vendor/tiny-inflate.js,import/unzip.js,import/ai.js,import/ui.js';   // 1016-F 加 write.js，1016-K 加 undo.js，1016-N 加 route.js、pending.js（route.js 是纯计算，待处理页「不要了」要用它算退款记号），1016-Z8 加解压压缩包要的 tiny-inflate.js、unzip.js，1017-H 加 AI 检查导入结果的 ai.js
 
 // ===== 5. 兜底①：没有 Worker（jsdom 本来就没有）→ 主线程算，结果一样 =====
 {

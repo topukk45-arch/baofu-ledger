@@ -114,7 +114,7 @@ const before = await t.snapshot();
 {
   await t.openImport();
   ok(t.$('impPage').style.display === 'block' && t.$('impArchive').textContent.includes('默认存档'), '1 开发入口打开导入页，写明导入到哪个存档');
-  ok(t.log.filter(p => p.startsWith('import/')).join(',') === 'import/import.js,import/plan.js,import/write.js,import/undo.js,import/route.js,import/pending.js,import/vendor/tiny-inflate.js,import/unzip.js,import/ui.js', '1 打开时才载入导入页的九个文件（1016-N 加 route.js、pending.js，1016-Z8 加 tiny-inflate.js、unzip.js）：' + t.log.filter(p => p.startsWith('import/')).join(','));
+  ok(t.log.filter(p => p.startsWith('import/')).join(',') === 'import/import.js,import/plan.js,import/write.js,import/undo.js,import/route.js,import/pending.js,import/vendor/tiny-inflate.js,import/unzip.js,import/ai.js,import/ui.js', '1 打开时才载入导入页的十个文件（1016-N 加 route.js、pending.js，1016-Z8 加 tiny-inflate.js、unzip.js，1017-H 加 ai.js）：' + t.log.filter(p => p.startsWith('import/')).join(','));
   await t.pick(FILES);
   const S = t.S(), want = direct(FILES);
   ok(S && S.phase === 'confirm' && t.$('impProg').style.display === 'none', '1 跑完进度，打开确认页');

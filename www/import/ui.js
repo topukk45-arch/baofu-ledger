@@ -19,6 +19,8 @@
 // 1016-Y（1.1）：按你的规则归的那笔在详情里改分类时问「只改这一条 / 以后都改」；按对方选的分类、从合并里学到满 2 次的都存成规则，结果页写学到几条。
 // 1016-X（1.1）：金额相近、分类对得上的自动合并，确认页一张卡（可一键改成实付），结果页写「N 笔手记比实付多 x 元，多半是立减」。
 // 1016-U：文件卡上写「上次微信导到 YYYY-MM-DD，这之后的才是新的」（按导入记录算，每个来源各算各的）。
+// 1017-H：AI 检查导入结果——导出：结果页「接下来可以」里「交给 AI 再检查一遍」、导入记录每次右侧「AI 检查」→ 导出页（三个开关、分段、先看全文再复制 / 分享），
+//   全文由 import/ai.js 拼（临时编号、批次号、导出时间、打码）；跳过 / 待处理的那几笔只在结果页那一刻能带上。
 // 1016-T：结果页「接下来可以」：去看统计、按过去几个月设预算（现在先到预算页）、补一笔期初余额（主页面的 JiwenImportNext）。
 // 1016-S：选文件页有「微信怎么导出」「支付宝怎么导出」两页文字教程（截图位置先占位），返回键回到选文件。
 // 1016-Q：确认页写「这段时间漏记了 N 笔，共 x 元」；底部「只对账」进勾选清单，「补进 K 笔」只写勾选的（write.js 的 onlyKeys）。
@@ -155,6 +157,13 @@
     '.pc-ver .ok{color:var(--st-ok);}.pc-ver .no{color:var(--st-bad);font-weight:bold;}',
     // 1017-D：金额差一点的一笔一笔处理：左上角勾选框（48px），底部「分开记 / 改成实付」；差额用琥珀色（红色只留给真有出入的）
     '.pc-ver .near{color:var(--st-pend);font-weight:bold;}',
+    // 1017-H：交给 AI 检查（导出页）
+    '.imp-ai-opt{display:flex;align-items:center;gap:10px;min-height:48px;padding:4px 2px;margin-bottom:8px;cursor:pointer;font-size:15px;}',
+    '.imp-ai-opt input{width:22px;height:22px;margin:0;flex:0 0 22px;accent-color:var(--c-primary);-webkit-appearance:checkbox;appearance:auto;}',
+    '.imp-ai-opt small{display:block;color:var(--c-text-soft);font-size:12px;}',
+    '#impAiText{display:block;box-sizing:border-box;width:100%;min-height:260px;padding:10px;border:1px solid var(--c-border-mid);border-radius:10px;background:var(--c-bg);color:var(--c-text);font-size:13px;line-height:1.5;font-family:inherit;resize:vertical;}',
+    '.imp-ai-parts{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}.imp-ai-parts .imp-btn.on{border-color:var(--c-primary);color:var(--c-primary-deep);font-weight:bold;}',
+    '.imp-log-acts{display:flex;gap:8px;}',
     // 1017-E：搜索（确认页标题栏右边的按钮、待处理页顶上、挂退款的候选列表）
     '#impPage .imp-search-btn{flex:0 0 48px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--c-primary-deep);cursor:pointer;padding:0;}',
     '#impPage .imp-search-btn svg,.imp-sr-go svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}',
@@ -243,6 +252,7 @@
   // 1017-UI2：顶上「‹ 取消」= 退出这次导入（有方案时先问一句）；只对账清单里是「‹ 返回」回总览；教程里回选文件
   function headBack() {
     if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;
+    if (S && S.phase === 'aiexport') { aiExportBack(); return; }
     if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }
     if (S && S.phase === 'guide') { S.phase = 'pick'; renderPick(); return; }
     if (hasWork()) { askExit(function () { close(); }); return; }
@@ -312,6 +322,7 @@
     if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;   // 写入 / 撤销中不让退出（写完或失败会自己回来）
     if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }   // 只对账清单 → 回到总览
     if (S && S.phase === 'guide') { S.phase = 'pick'; renderPick(); return; }          // 教程 → 回到选文件
+    if (S && S.phase === 'aiexport') { aiExportBack(); return; }                          // 1017-H：导出页 → 回到结果页 / 导入记录
     // 1017-UI2：分步确认页：返回键回上一步；第 1 步再按才回选文件（先问一句）；还在算的时候按返回也先问一句
     if (S && S.phase === 'confirm') { var i = stepIndex(); if (i > 0) { goStep(S.view.steps[i - 1]); return; } askExit(backToPick); return; }
     if (S && S.phase === 'progress') { askExit(backToPick); return; }
@@ -2308,6 +2319,9 @@
     nx.appendChild(el('h4', null, '接下来可以'));
     var nr = el('div', 'ui-stack');
     var goNext = function (k) { return function () { close(); var N = window.JiwenImportNext; if (N && N[k]) N[k](); }; };
+    // 1017-H：交给 AI 再检查一遍（这时还能带上跳过、待处理的那几笔）
+    var n0 = btn('交给 AI 再检查一遍 ›', 'ui-btn block', function () { openAiExport(res.ws.batch, { from: 'result', extra: aiExtraRows() }); }); n0.id = 'impNextAi';
+    nr.appendChild(n0);
     var n1 = btn('去看统计 ›', 'ui-btn block', goNext('stats')); n1.id = 'impNextStats';
     var n2 = btn('按过去几个月设预算 ›', 'ui-btn block', goNext('budget')); n2.id = 'impNextBudget';
     var n3 = btn('补一笔期初余额 ›', 'ui-btn block', goNext('opening')); n3.id = 'impNextOpening';
@@ -2377,7 +2391,11 @@
           ['改了规则', (l.rulesChanged || []).length ? (l.rulesChanged || []).length + ' 条' : ''], ['编号', l.b]], 'impLogDetailClose');
       });
       var u = btn('撤销', 'imp-btn imp-log-undo', function () { undoBatch(l.b); }); u.style.minWidth = '64px';
-      r.appendChild(u);
+      // 1017-H：「AI 检查」（这时只导写进账本的那几笔）
+      var acts = el('div', 'imp-log-acts');
+      if (l.kind !== 'ai') { var ab = btn('AI 检查', 'imp-btn imp-log-ai', function () { openAiExport(l.b, { from: 'logs' }); }); ab.style.minWidth = '64px'; acts.appendChild(ab); }
+      acts.appendChild(u);
+      r.appendChild(acts);
       c.appendChild(r);
     });
     dom.body.appendChild(c);
@@ -2388,6 +2406,98 @@
       var pb = btn('待处理 ' + pend.length + ' 笔，去处理 ›', 'ui-btn block', function () { openPending(); }); pb.id = 'impLogsPending'; pb.style.marginTop = '6px';
       pc.appendChild(pb); dom.body.appendChild(pc);
     }
+  }
+  // ---------- 1017-H：交给 AI 检查（导出）----------
+  function stamp(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
+  // 结果页那一刻：没进账本的（跳过、待处理、勾掉的），排在写进账本的后面
+  function aiExtraRows() {
+    var name = { skip: '跳过：', pending: '待处理：', excluded: '不导入：' };
+    return ((S.plan && S.plan.rows) || []).filter(function (d) { return d.src === 'row' && name[d.group]; })
+      .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; })
+      .map(function (d) { return { time: d.time, fen: d.fen, type: d.type === 'income' ? 'income' : 'expense', cat: '', mode: d.mode || 'normal', dest: name[d.group] + cut(String(d.reason || '').replace(/[，,].*$/, ''), 24),
+                                   cp: d.cp || '', desc: d.desc && d.desc !== '/' ? d.desc : (d.title || ''), remark: d.remark || '', oc: d.kind || '' }; });
+  }
+  function openAiExport(batch, o) {
+    o = o || {};
+    build();
+    var my = ++runId, prev = S;
+    S = { phase: 'aiexport', view: {}, ai: { batch: batch, from: o.from || 'logs', prev: o.from === 'result' ? prev : null, extra: o.extra || [], cp: true, remark: true, mask: true, part: 0, at: stamp(new Date()) } };
+    hideSteps(); closePicker(); closeSheet();
+    setHead('交给 AI 检查', '‹ 返回');
+    dom.page.style.display = 'block'; dom.prog.style.display = 'none';
+    barSet([btn('返回', 'ui-btn', function () { aiExportBack(); })]);
+    dom.body.innerHTML = '';
+    var loading = el('div', 'imp-soft', '正在整理这一批…'); dom.body.appendChild(loading);
+    return store().aiExportRows(batch).then(function (d) {
+      if (my !== runId || !S || S.phase !== 'aiexport') return;
+      var n = d.rows.length;
+      S.ai.data = { batch: d.batch, at: S.ai.at, cats: d.cats, rows: d.rows.concat(S.ai.extra.map(function (x, i) { return Object.assign({ n: n + i + 1 }, x); })) };
+      renderAiExport();
+    }, function (e) {
+      if (my !== runId || !S) return;
+      loading.textContent = '整理不出来：' + (e && e.code === 'nolog' ? '找不到这次导入的记录（可能已经撤销了）' : (e && (e.code || e.message) || e));
+    });
+  }
+  function aiExportBack() {
+    var a = S && S.ai;
+    if (a && a.from === 'result' && a.prev && a.prev.result) { S = a.prev; renderResult(); return; }
+    openLogs();
+  }
+  function renderAiExport() {
+    var a = S.ai, b = dom.body, A = window.JiwenImportAI; b.innerHTML = '';
+    var out = A.exportText(a.data, { cp: a.cp, remark: a.remark, mask: a.mask });
+    if (a.part >= out.parts.length) a.part = 0;
+    var c0 = el('div', 'imp-card'); c0.id = 'impAiIntro';
+    c0.appendChild(el('div', 'imp-line', '把这一批整理成一段文字，你复制到自己用的 AI（比如 Claude）里，让它找分错的分类、可能重复的、可能漏配的、金额差一点的。记问自己不联网，也不会替你发出去。'));
+    c0.appendChild(el('div', 'imp-soft', '共 ' + out.total + ' 笔' + (out.parts.length > 1 ? '，太长分成 ' + out.parts.length + ' 段（一段最多 ' + A.AI_MAX_ROWS + ' 笔），一段一段发' : '') + (a.extra.length ? '；跳过、待处理的 ' + a.extra.length + ' 笔也带上了（只给 AI 看，改不了）' : '') + '。'));
+    b.appendChild(c0);
+    // 三个开关
+    var c1 = el('div', 'imp-card'); c1.id = 'impAiOpts';
+    c1.appendChild(el('h4', null, '发什么'));
+    var opt = function (key, id, text, sub) {
+      var l = el('label', 'imp-ai-opt'), ck = document.createElement('input'); ck.type = 'checkbox'; ck.id = id; ck.checked = !!a[key];
+      ck.addEventListener('change', function () { a[key] = ck.checked; renderAiExport(); });
+      var t = el('span', 'grow', text); if (sub) t.appendChild(el('small', null, sub));
+      l.appendChild(ck); l.appendChild(t); c1.appendChild(l);
+    };
+    opt('cp', 'impAiCp', '发对方名', '个人对方（带 *、转账、红包）打码时写成「个人」');
+    opt('remark', 'impAiRemark', '发备注和商品说明');
+    opt('mask', 'impAiMask', '手机号、长串数字、邮箱打码', '11 位手机号留前 3 后 4，15 位以上数字只留后 4 位，邮箱只留第一个字');
+    var only = btn('只发金额、分类、日期', 'imp-btn', function () { a.cp = false; a.remark = false; renderAiExport(); }); only.id = 'impAiMinimal'; only.style.width = '100%'; only.style.marginTop = '6px';
+    c1.appendChild(only);
+    b.appendChild(c1);
+    // 全文（先看再发）
+    var c2 = el('div', 'imp-card'); c2.id = 'impAiPreview';
+    c2.appendChild(el('h4', null, '要发出去的全文'));
+    if (out.parts.length > 1) {
+      var ps = el('div', 'imp-ai-parts');
+      out.parts.forEach(function (x, i) { var pb = btn('第 ' + (i + 1) + ' 段（#' + x.from + '–#' + x.to + '）', 'imp-btn' + (i === a.part ? ' on' : ''), function () { a.part = i; renderAiExport(); }); pb.dataset.part = i; ps.appendChild(pb); });
+      c2.appendChild(ps);
+    }
+    var ta = document.createElement('textarea'); ta.id = 'impAiText'; ta.readOnly = true; ta.value = out.parts[a.part].text;
+    c2.appendChild(ta);
+    c2.appendChild(el('div', 'imp-soft', '发出去的就是上面这些字。AI 回复以后，把它的回复整段复制下来，回到「设置 → 导入记录」这一次的「AI 检查」里粘贴（下一版做）。'));
+    b.appendChild(c2);
+    var text = out.parts[a.part].text;
+    var mark = function () { return store().aiExportMark(a.batch, a.data.at); };
+    var cp = btn(out.parts.length > 1 ? '复制第 ' + (a.part + 1) + ' 段' : '复制全文', 'ui-btn primary ui-full', function () {
+      mark().then(function () { return copyText(text); }).then(function (okc) {
+        alertMsg(okc ? '已复制，去粘贴给 AI 吧。' : '复制没成功，请长按上面的文本框全选复制。', okc ? '复制成功' : '复制未成功');
+      }, function (e) { alertMsg('没记下这次导出：' + (e && (e.code || e.message) || e), '交给 AI 检查'); });
+    }); cp.id = 'impAiCopy';
+    var sh = btn('分享', 'ui-btn', function () {
+      mark().then(function () {
+        if (navigator.share) return navigator.share({ text: text }).then(function () {}, function () {});
+        return copyText(text).then(function (okc) { alertMsg(okc ? '这里不能直接分享，已复制到剪贴板。' : '这里不能分享，请长按上面的文本框复制。', '分享'); });
+      }, function (e) { alertMsg('没记下这次导出：' + (e && (e.code || e.message) || e), '交给 AI 检查'); });
+    }); sh.id = 'impAiShare';
+    var bk = btn('返回', 'ui-btn', function () { aiExportBack(); }); bk.id = 'impAiBack';
+    barSet([cp, bk, sh]);
+    dom.page.scrollTop = 0;
+  }
+  function copyText(text) {
+    try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { return true; }, function () { fallbackCopy(text); return false; }); } catch (_) {}
+    fallbackCopy(text); return Promise.resolve(false);
   }
   // ---------- 第二期：管理导入规则 ----------
   // 你的分类规则（关键词 → 分类，关键词越长越先用）、分类对照（推荐分类 → 你的分类）、类型规则（没见过的交易类型 / 状态怎么处理）。
