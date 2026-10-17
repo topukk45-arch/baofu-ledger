@@ -37,8 +37,11 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   Object.defineProperty(input, 'files', { value: [new t.w.File([B.bill('wechat', [wx(5, 2300), wx(6, 1500)], { range: RANGE }).bytes], '微信.csv')], configurable: true });
   input.dispatchEvent(new t.w.Event('change'));
   await t.until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 30000);
+  // 1017-UI2：确认页分步了；第 1 步底部「取消 / 下一步」；总览主按钮单独一行在上，「上一步 / 只对账」在最下面（返回类放最下面）
+  ok(inBar('impCancel') && inBar('impNext') && !$('impBar').contains(t.d.getElementById('impGo')), '4 第 1 步：底部「取消 / 下一步」');
+  t.w.JiwenImportUI._goStep('overview');
   const kids = [...$('impBar').children];
-  ok(inBar('impGo') && inBar('impRecon') && inBar('impCancel') && kids[kids.length - 1] === $('impGo') && $('impGo').classList.contains('ui-full'), '4 确认页：取消、只对账一行，主按钮单独一行在最下面');
+  ok(kids[0] === $('impGo') && $('impGo').classList.contains('ui-full') && inBar('impPrev') && inBar('impRecon') && kids.indexOf($('impPrev')) > 0, '4 总览：主按钮单独一行在上，「上一步 / 只对账」在最下面');
   ok($('impBack').textContent === '‹ 取消', '4 确认页顶上还是「‹ 取消」');
   if (!$('impRecon').disabled) {
     $('impRecon').click();
@@ -56,7 +59,7 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   if ($('impTrace')) ok(!/开发用/.test($('impTrace').textContent) && /为什么没配上/.test($('impTrace').textContent) && !$('impTrace').classList.contains('open'), '6 「为什么没配上手记」默认收起，不写「开发用」');
   $('impSheetClose').click();
   // 结果页
-  $('impGo').click();
+  A.clickGo(t.w);
   await t.until(() => $('impResult'), 30000);
   ok(inBar('impBackToLedger') && inBar('impUndoThis') && $('impResult').contains($('impResPending')), '7 结果页：「撤销这次导入」「回到账本」在底部操作栏，「还有 N 笔待处理」是按钮');
   // 待处理页

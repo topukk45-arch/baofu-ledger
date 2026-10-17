@@ -2,6 +2,7 @@
 // jsdom 里跑整个 App：开发入口 → 选文件 → 线程里依次 parse、route、match（假 Worker 跑真的 worker.js）→ 确认页。
 // 核对页面上的数字和直接算的一样、差额合计 0 分；在页面上改东西以后汇总跟着变；点导入后账本、单号表、备份逐字节不变；
 // 返回键（含进度中）、取消、明细分页、认不出的文件、笔数对不上。账单、手记全是虚构的。
+const H = require('./helpers/app');   // 1017-UI2：确认页分步了，按编号找东西时走到那一步；导入 / 取消多点一下确认
 const fs = require('fs'), path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const IDB = require('./helpers/idb');
@@ -65,7 +66,7 @@ async function boot(o) {
         Filesystem: { writeFile: async x => { w.__files.push(x.data); return {}; } },
         App: { addListener(ev, fn) { if (ev === 'backButton') t.backFn = fn; return { remove() {} }; }, exitApp() { t.exited = true; } } } };
     } });
-  const w = dom.window, d = w.document, $ = id => d.getElementById(id);
+  const w = dom.window, d = w.document, $ = H.stepGet(w);
   const errs = []; w.addEventListener('error', e => errs.push(e.message));
   Object.assign(t, { dom, w, d, $, errs, ls: w.localStorage, idle: () => IDB.idle(w) });
   await IDB.idle(w);
@@ -80,9 +81,10 @@ async function boot(o) {
     Object.defineProperty(input, 'files', { value: list, configurable: true });
     input.dispatchEvent(new w.Event('change'));
     if (wait) await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 15000);
+    if (wait) t.w.JiwenImportUI._goStep('check');   // 1017-UI2：从第 1 步开始看（等按钮时走到了总览）
   };
   t.go = () => $('impGo').textContent;
-  t.chip = g => { const c = d.querySelector('#impSummary .imp-chip[data-group="' + g + '"]'); return c ? +c.querySelector('b').textContent : 0; };
+  t.chip = g => { t.$('impSummary'); const c = d.querySelector('#impSummary .imp-chip[data-group="' + g + '"]'); return c ? +c.querySelector('b').textContent : 0; };
   t.select = (sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('change')); };
   t.snapshot = async () => {
     const db = await IDB.dumpDb(t.phone);
@@ -119,13 +121,16 @@ const before = await t.snapshot();
   ok(JSON.stringify(S.plan.counts) === JSON.stringify(want.counts) && S.plan.importN === want.importN && S.plan.mergeM === want.mergeM, '1 页面上的方案和直接算的一样：' + JSON.stringify(S.plan.counts));
   ok(t.go() === `新建 ${want.records} 条记录，合并 ${want.mergeM} 笔` && !t.$('impGo').disabled, '1 底部按钮：' + t.go());
   ok(['add', 'merge', 'pending', 'neutral', 'skip'].every(g => t.chip(g) === want.counts[g]) && t.chip('refund') === want.counts.refund, '1 汇总一行的数字对得上');
-  const cards = [...t.d.querySelectorAll('#impFiles .imp-card')];
+  t.UI()._goStep('check');   // 1017-UI2：文件卡（来源、时间范围、笔数核对）在第 1 步「核对」
+  let cards = [...t.d.querySelectorAll('#impFiles .imp-card')];
   ok(cards.length === 3 && cards[0].textContent.includes('微信 · 2026-03-01 至 2026-03-31 · 共 11 笔') && cards[1].textContent.includes('支付宝'), '1 每个文件一张卡：来源、时间范围、笔数');
   ok(cards[0].querySelector('.imp-check').className.includes('imp-ok') && cards[0].querySelector('.imp-check').textContent.includes('一致'), '1 笔数核对：一致');
-  cards[0].querySelector('.imp-diff-toggle').click();
+  t.UI()._goStep('overview');   // 1017-UI2：差额拆开在最后一步「总览」
+  t.d.querySelector('#impFiles .imp-card .imp-diff-toggle').click();
   const dl = t.d.querySelector('#impFiles .imp-card .imp-diff-expense').textContent;
   ok(dl.startsWith('账单支出 ') && dl.includes('和手记合并 60.00') && dl.includes('待你确认 28.00') && dl.endsWith('合计差 0.00'), '1 差额拆开：' + dl);
   ok(t.d.querySelector('#impFiles .imp-diff-income').textContent.includes('退款 10.00'), '1 收入那边拆出退款');
+  t.UI()._goStep('check'); cards = [...t.d.querySelectorAll('#impFiles .imp-card')];
   ok(cards[2].textContent.includes('认不出这个文件') && cards[2].textContent.includes('读到的表头：交易时间，收/支，金额，说明'), '1 认不出的文件：显示读到的表头');
   cards[2].querySelector('.imp-copy').click(); await until(() => t.UI()._lastCopy);
   const cp = t.UI()._lastCopy;
@@ -178,7 +183,7 @@ const before = await t.snapshot();
 
 // ===== 3. 不点导入、直接取消：什么都不改（1016-F 起点导入会真写，见 z-import-write）=====
 {
-  t.$('impCancel').click();
+  H.clickCancel(t.w);
   ok(t.$('impPage').style.display === 'none' && t.$('impBar').style.display === 'none', '3 取消：导入页关掉');
   await t.idle();
   const after = await t.snapshot();
@@ -195,9 +200,16 @@ const before = await t.snapshot();
   ok(t.$('impSheetMask').style.display === 'flex', '4 打开一行的详情');
   t.backFn();
   ok(t.$('impSheetMask').style.display === 'none' && t.$('impPage').style.display === 'block', '4 返回键先关详情，导入页还在');
-  await new Promise(r => setTimeout(r, 150));     // 返回键防抖
-  t.backFn();
-  ok(t.$('impPage').style.display === 'none' && !t.UI()._state(), '4 再按返回：导入页关掉（等于取消）');
+  // 1017-UI2 起确认页分步：返回键一步一步往回退，第 1 步再按先问「退出这次导入？」，点「退出」才回到选文件页（原来是直接关掉导入页）
+  const steps = t.S().view.steps.length;
+  for (let i = 1; i < steps; i++) { await new Promise(r => setTimeout(r, 150)); t.backFn(); }
+  ok(t.S().view.step === 'check' && t.$('impPage').style.display === 'block', '4 再按返回：一步一步退回第 1 步，导入页还在');
+  await new Promise(r => setTimeout(r, 150)); t.backFn();
+  ok(t.$('uiSheetMask').classList.contains('open') && t.$('uiSheetTitle').textContent === '退出这次导入？' && t.S().phase === 'confirm', '4 第 1 步再按返回：先问一句，什么都没丢');
+  t.$('impExitOk').click();
+  ok(t.$('impPage').style.display === 'block' && t.$('impPick') && t.S().phase === 'pick' && !t.S().plan, '4 点「退出」：回到选文件页，这次的方案不要了');
+  await new Promise(r => setTimeout(r, 150)); t.backFn();
+  ok(t.$('impPage').style.display === 'none' && !t.UI()._state(), '4 选文件页再按返回：导入页关掉');
   ok(!t.exited, '4 没有退出 App');
   // 进度中按返回：停掉线程
   await new Promise(r => setTimeout(r, 150));
@@ -209,18 +221,24 @@ const before = await t.snapshot();
   await t.pick(FILES, false);
   await until(() => release && t.$('impProg').style.display === 'flex');
   ok(t.$('impProg').style.display === 'flex' && t.$('impProgText').textContent.includes('查以前导入过的'), '4 进度停在「查以前导入过的…」');
+  // 1017-UI2：文件选好了还在算的时候按返回，也先问一句；点「退出」才停掉、回到选文件页（原来是直接关掉导入页）
   t.backFn();
-  ok(t.$('impPage').style.display === 'none' && t.$('impProg').style.display === 'none', '4 进度中按返回：进度和导入页都关掉');
+  ok(t.$('uiSheetMask').classList.contains('open') && t.$('uiSheetTitle').textContent === '退出这次导入？', '4 进度中按返回：先问一句');
+  t.$('impExitOk').click();
+  ok(t.$('impProg').style.display === 'none' && t.$('impPick') && t.S().phase === 'pick', '4 点「退出」：进度关掉，回到选文件页');
   ok(t.FW.created.slice(0, Math.max(nw, t.FW.created.length)).every(x => x.terminated), '4 线程停掉了（terminate）');
   release(); await new Promise(r => setTimeout(r, 200));
-  ok(t.$('impPage').style.display === 'none' && t.$('impBar').style.display === 'none', '4 后面的计算回来了也不会再把页面打开');
+  ok(t.S().phase === 'pick' && t.$('impPick') && t.$('impBar').style.display === 'flex' && !t.$('impGo'), '4 后面的计算回来了也不会再打开确认页');
+  t.UI().close();
   t.w.JiwenImportStore.knownFor = real;
   // 取消以后再导一次：正常
   await new Promise(r => setTimeout(r, 150));
   await t.openImport(); await t.pick(FILES);
   ok(t.S().phase === 'confirm' && t.go().startsWith('新建 '), '4 取消以后再导一次：正常');
   t.$('impBack').click();
-  ok(t.$('impPage').style.display === 'none', '4 顶上「‹ 取消」关掉导入页');
+  ok(t.$('impPage').style.display === 'block' && t.$('uiSheetMask').classList.contains('open'), '4 顶上「‹ 取消」：有方案时先问一句（1017-UI2）');
+  t.$('impExitOk').click();
+  ok(t.$('impPage').style.display === 'none', '4 点「退出」才关掉导入页');
   ok(!t.errs.length, '4 无报错 ' + t.errs.join('|'));
 }
 
@@ -230,9 +248,9 @@ const before = await t.snapshot();
   await t.pick([['支付宝.csv', B.bill('alipay', rail, { range: RANGE, statsOverride: { total: 9 } }).bytes]]);
   const chk = t.d.querySelector('#impFiles .imp-check');
   ok(chk.className.includes('imp-bad') && chk.textContent.includes('对不上') && t.$('impGo').disabled, '5 笔数对不上：那一行变红，导入按钮不可点');
-  t.$('impGo').click();
+  H.clickGo(t.w);
   ok(t.$('askMask').style.display !== 'flex', '5 点了也没反应');
-  t.$('impCancel').click();
+  H.clickCancel(t.w);
 }
 
 // ===== 6. 明细分页 =====
@@ -248,7 +266,7 @@ const before = await t.snapshot();
   ok(rows() === 100, '6 点「再显示」：100 行');
   t.d.querySelector('.imp-more[data-group="add"]').click();
   ok(rows() === total && !t.d.querySelector('.imp-more[data-group="add"]'), '6 再点：全部显示，按钮没了');
-  t.$('impCancel').click();
+  H.clickCancel(t.w);
   ok(!t.errs.length && !t.jsErr.length, '5-6 无报错 ' + t.errs.concat(t.jsErr).join('|'));
 }
 
@@ -328,7 +346,7 @@ const before = await t.snapshot();
   // 存储文案
   await until(() => t.$('impStorage').textContent.includes('本应用可用上限'));
   ok(t.$('impStorage').textContent.includes('本应用可用上限约 2.0 GB') && !t.$('impStorage').textContent.includes('手机上还能用'), '7 存储那行写「本应用可用上限约 x GB」（1016-G）');
-  t.$('impCancel').click();
+  H.clickCancel(t.w);
   ok(!t.errs.length && !t.jsErr.length, '7 无报错 ' + t.errs.concat(t.jsErr).join('|'));
 }
 

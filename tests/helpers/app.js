@@ -17,6 +17,23 @@ const CATS = ['未分类', '吃饭', '购物', '转账', '工资', '红包', '�
 const seedOf = (recs, cats, extra) => Object.assign({ accounts: JSON.stringify([{ id: ID, name: '小明' }]), accounts_v: '1', app_logged_in_user: ID, app_dev_import: '1',
   ['store_' + ID]: JSON.stringify({ archives: { '默认存档': Object.assign({ cats: cats || CATS, records: recs }, extra || {}) }, last: '默认存档', accountName: '小明' }), ['app_time_repaired_' + ID]: '1' });
 
+// 1017-UI2 起确认页分步了：按编号找确认页上的东西时，当前这一步没有就到别的步骤里找（只是「走到那一步」，不改要检查的东西）；
+//   哪一步都没有就回到原来那一步、返回 null。导入按钮 impGo 在最后一步「总览」。
+function stepGet(w) {
+  const d = w.document, raw = id => d.getElementById(id);
+  return id => {
+    let e = raw(id); if (e) return e;
+    const UI = w.JiwenImportUI, S = UI && UI._state();
+    if (!S || S.phase !== 'confirm' || !S.view || S.view.recon || !S.view.steps) return null;
+    const cur = S.view.step;
+    for (const k of S.view.steps.slice()) { if (k === cur) continue; UI._goStep(k); e = raw(id); if (e) return e; }
+    UI._goStep(cur); return null;
+  };
+}
+// 1017-UI2：导入要在总览点「新建 X 条记录…」，再在确认面板点「确认导入」；取消要在退出确认里点「退出」
+function clickGo(w) { const $ = stepGet(w); $('impGo').click(); const ok = w.document.getElementById('impConfirmOk'); if (ok) ok.click(); }
+function clickCancel(w) { const $ = stepGet(w); const c = $('impCancel'); if (c) c.click(); const q = w.document.getElementById('impExitOk'); if (q) q.click(); }
+
 async function boot(o) {
   const t = { log: [] };
   const vc = new VirtualConsole(); vc.forwardTo(console, { jsdomErrors: 'none' });
@@ -36,7 +53,7 @@ async function boot(o) {
         App: { addListener(ev, fn) { if (ev === 'backButton') t.backFn = fn; return { remove() {} }; }, exitApp() { t.exited = true; } } } };
       if (o.before) o.before(w, t);
     } });
-  const w = dom.window, d = w.document, $ = id => d.getElementById(id);
+  const w = dom.window, d = w.document, $ = stepGet(w);
   const errs = []; w.addEventListener('error', e => errs.push(e.message));
   Object.assign(t, { dom, w, d, $, errs, until, idle: () => IDB.idle(w) });
   await IDB.idle(w);
@@ -58,14 +75,15 @@ async function boot(o) {
     input.dispatchEvent(new w.Event('change'));
     await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 30000);
     const S = t.S();
+    w.JiwenImportUI._goStep('check');      // 1017-UI2：和真人一样从第 1 步开始看（等按钮时走到了总览）
     if (edit) { edit(S); w.JiwenImportUI._replan(); }
     const plan = S.plan;
-    if (opts.noGo || !plan.canImport) { if (!opts.stay) $('impCancel').click(); return { plan, S }; }
-    $('impGo').click();
+    if (opts.noGo || !plan.canImport) { if (!opts.stay) clickCancel(w); return { plan, S }; }
+    clickGo(w);
     await until(() => $('impResult') || $('askMask').style.display === 'flex', 60000);
     const res = { plan, S, result: S.result, alert: $('askMask').style.display === 'flex' ? $('askMsg').textContent : null };
     if (res.alert) $('askOk').click();
-    if (!opts.stay) { if ($('impResult')) $('impBackToLedger').click(); else $('impCancel').click(); }
+    if (!opts.stay) { if ($('impResult')) $('impBackToLedger').click(); else clickCancel(w); }
     await IDB.idle(w);
     return res;
   };
@@ -76,4 +94,4 @@ async function boot(o) {
   return t;
 }
 
-module.exports = { boot, until, seedOf, ID, CATS };
+module.exports = { boot, until, seedOf, ID, CATS, stepGet, clickGo, clickCancel };

@@ -3,6 +3,7 @@
 // 一、纯计算（classify / plan / write）：三种来源、同名同义优先、你的规则和从合并里学的不被盖、没动过的默认不存、手动改行不存、目标是这批新建的分类。
 // 二、jsdom 里真导：第一次并到 → 存档里有 → 第二次直接落、不再问；没选的照样问；备份、云备份往返；恢复到导入前；分类改名、删除。
 // 账单、手记全是虚构的。
+const H = require('./helpers/app');   // 1017-UI2：确认页分步了，按编号找东西时走到那一步；导入 / 取消多点一下确认
 const fs = require('fs'), path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const IDB = require('./helpers/idb');
@@ -133,7 +134,7 @@ async function boot(o) {
         OneDriveLink: { writeText: async x => { w.__cloud.push(x.text); return {}; }, pickFile: async () => ({}), forget: async () => {}, checkAccess: async () => ({ ok: true }) },
         App: { addListener(ev, fn) { if (ev === 'backButton') t.backFn = fn; return { remove() {} }; }, exitApp() { t.exited = true; } } } };
     } });
-  const w = dom.window, d = w.document, $ = id => d.getElementById(id);
+  const w = dom.window, d = w.document, $ = H.stepGet(w);
   const errs = []; w.addEventListener('error', e => errs.push(e.message));
   Object.assign(t, { dom, w, d, $, errs, idle: () => IDB.idle(w) });
   await IDB.idle(w);
@@ -150,20 +151,22 @@ async function boot(o) {
     Object.defineProperty(input, 'files', { value: files.map(([name, bytes]) => new w.File([bytes], name)), configurable: true });
     input.dispatchEvent(new w.Event('change'));
     await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
+    w.JiwenImportUI._goStep('check');   // 1017-UI2：从第 1 步开始看（等按钮时走到了总览）
     const S = t.S();
     if (edit) { await edit(S); await until(() => $('impGo') && $('impBar').style.display === 'flex'); }
     const plan = S.plan;
-    if (opts.noGo || !plan.canImport) { const r = { plan, S }; $('impCancel').click(); return r; }
-    $('impGo').click();
+    if (opts.noGo || !plan.canImport) { const r = { plan, S }; H.clickCancel(w); return r; }
+    H.clickGo(w);
     await until(() => $('impResult') || $('askMask').style.display === 'flex', 60000);
     const res = { plan, S, result: S.result, alert: $('askMask').style.display === 'flex' ? $('askMsg').textContent : null };
     if (res.alert) $('askOk').click();
-    if ($('impResult')) $('impBackToLedger').click(); else $('impCancel').click();
+    if ($('impResult')) $('impBackToLedger').click(); else H.clickCancel(w);
     await t.idle();
     return res;
   };
   // 在确认页「新建分类」那块的下拉里选「并到 X」（走真的页面事件）
   t.pickInto = (name, into) => {
+    $('impNewCats');      // 1017-UI2：走到「分类」那一步
     const row = d.querySelector('#impNewCats [data-cat="' + name + '"]');
     const se = row && row.querySelector('select');
     if (!se) throw new Error('新建分类里没有「' + name + '」');

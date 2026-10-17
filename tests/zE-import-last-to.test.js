@@ -32,7 +32,7 @@ const lastTo = t => [...t.d.querySelectorAll('.imp-last-to')].map(x => x.textCon
   await t.importFiles(NOV, S => {}, { noGo: true, stay: true });
   t.$('impRecon').click();
   t.d.querySelector('.imp-recon-row input').click();
-  t.$('impGo').click();
+  A.clickGo(t.w);
   await t.until(() => t.$('impResult'));
   t.$('impBackToLedger').click(); await t.idle();
   await t.importFiles(NOV, () => { txt = lastTo(t); }, { noGo: true });

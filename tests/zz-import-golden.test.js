@@ -2,6 +2,7 @@
 // 用固定的虚构手记 + 固定的虚构账单真导一遍，取账单列表（全部分页）、分类汇总、统计页、当日明细、导出的备份文件，
 // 和 fixtures/import-golden.json 里存的标准答案逐字节比。记录编号、批次号这类每次不一样的换成按出现顺序的占位。
 // 改了导入的行为、标准答案该变的时候：UPDATE_GOLDEN=1 node zz-import-golden.test.js 重新生成，提交前看一眼 diff。
+const H = require('./helpers/app');   // 1017-UI2：确认页分步了，按编号找东西时走到那一步；导入 / 取消多点一下确认
 const fs = require('fs'), path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const IDB = require('./helpers/idb');
@@ -63,7 +64,7 @@ async function snap() {
       w.Capacitor = { isNativePlatform: () => true, Plugins: { Filesystem: { writeFile: async x => { w.__files.push(x.data); return {}; } },
         App: { addListener(ev, fn) { if (ev === 'backButton') backFn = fn; return { remove() {} }; }, exitApp() {} } } };
     } });
-  const w = dom.window, d = w.document, $ = id => d.getElementById(id);
+  const w = dom.window, d = w.document, $ = H.stepGet(w);
   await IDB.idle(w);
   await until(() => backFn, 2000);
   d.querySelector('.tab-btn[data-tab="settings"]').click();
@@ -73,12 +74,13 @@ async function snap() {
   Object.defineProperty(input, 'files', { value: BILLS.map(([name, app, txns]) => new w.File([B.bill(app, txns, { range: { from: '2026-10-01 00:00:00', to: '2026-10-31 23:59:59' } }).bytes], name)), configurable: true });
   input.dispatchEvent(new w.Event('change'));
   await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
+  w.JiwenImportUI._goStep('check');   // 1017-UI2：从第 1 步开始看（等按钮时走到了总览）
   // 固定的确认页操作：多笔合一确认、转账往来都标成不计入
   const S = w.JiwenImportUI._state();
   (S.matched.multiSums || []).forEach(g => { if (g.suggest !== null) S.edits.sums[g.id] = g.suggest; });
   (S.plan.sections.transfers || []).forEach(x => x.keys.forEach(k => { S.edits.rows[k] = { mode: 'skip' }; }));
   w.JiwenImportUI._replan();
-  $('impGo').click();
+  H.clickGo(w);
   await until(() => $('impResult'), 60000);
   $('impBackToLedger').click();
   await IDB.idle(w);

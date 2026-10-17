@@ -3,6 +3,7 @@
 // 新建分类删还是留；撤完再导确认页和第一次一样（勾掉的又出现）；写到一半失败什么都不改；撤销前备份能恢复；账本变了拒绝；
 // 中间撤一次：名单以外和「从没导过这次」一样，全部撤完逐字节一致；留下的名字被后来的导入用上算依赖；
 // 随机导入若干次的性质测试（倒序全撤、中间撤再全撤）。账单、手记全是虚构的。
+const H = require('./helpers/app');   // 1017-UI2：确认页分步了，按编号找东西时走到那一步；导入 / 取消多点一下确认
 const fs = require('fs'), path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const FIDB = require('fake-indexeddb');
@@ -61,7 +62,7 @@ async function boot(o) {
         Filesystem: { writeFile: async x => { w.__files.push(x.data); return {}; } },
         App: { addListener(ev, fn) { if (ev === 'backButton') t.backFn = fn; return { remove() {} }; }, exitApp() {} } } };
     } });
-  const w = dom.window, d = w.document, $ = id => d.getElementById(id);
+  const w = dom.window, d = w.document, $ = H.stepGet(w);
   const errs = []; w.addEventListener('error', e => errs.push(e.message));
   Object.assign(t, { dom, w, d, $, errs, idle: () => IDB.idle(w) });
   await IDB.idle(w);
@@ -80,16 +81,17 @@ async function boot(o) {
     Object.defineProperty(input, 'files', { value: files.map(([name, bytes]) => new w.File([bytes], name)), configurable: true });
     input.dispatchEvent(new w.Event('change'));
     await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 30000);
+    w.JiwenImportUI._goStep('check');   // 1017-UI2：从第 1 步开始看（等按钮时走到了总览）
     const S = t.S();
     const first = snap(S.plan);
     if (edit) { edit(S); w.JiwenImportUI._replan(); }
     const plan = S.plan;
-    if (opts.noGo || !plan.canImport) { $('impCancel').click(); return { plan, S, first }; }
-    $('impGo').click();
+    if (opts.noGo || !plan.canImport) { H.clickCancel(w); return { plan, S, first }; }
+    H.clickGo(w);
     await until(() => $('impResult') || $('askMask').style.display === 'flex', 60000);
     const res = { plan, S, first, result: S.result, alert: $('askMask').style.display === 'flex' ? $('askMsg').textContent : null };
     if (res.alert) $('askOk').click();
-    if ($('impResult')) $('impBackToLedger').click(); else $('impCancel').click();
+    if ($('impResult')) $('impBackToLedger').click(); else H.clickCancel(w);
     await t.idle();
     return res;
   };

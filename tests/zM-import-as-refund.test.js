@@ -21,7 +21,7 @@ const man = (id, mo, d, money, cat) => ({ id, time: `2026-${p2(mo)}-${p2(d)}T08:
 const diffZero = p => p.files.filter(f => !f.fatal).every(f => ['expense', 'income', 'neutral'].every(io => !f.diff[io] || !f.diff[io].header || f.diff[io].unreadable === 0));
 // 展开明细，点开某一行的详情
 async function openRow(t, key) {
-  const S = t.S(); S.view.details = true; ['add', 'neutral', 'refund'].forEach(g => { S.view.open[g] = true; }); t.w.JiwenImportUI._replan();
+  const S = t.S(); S.view.details = true; ['add', 'neutral', 'refund'].forEach(g => { S.view.open[g] = true; }); t.w.JiwenImportUI._goStep('overview');   // 1017-UI2：明细在最后一步「总览」
   const r = [...t.d.querySelectorAll('#impBody .al-row')].find(x => x.dataset.key === key);
   if (r) r.click();
   await t.until(() => t.$('impSheetMask').style.display === 'flex' && t.$('impSheet').dataset.key === key);
@@ -47,7 +47,7 @@ async function openRow(t, key) {
     ok(d.group === 'refund' && d.refundTo && d.refundTo.row && diffZero(t.S().plan), '1 挂上了：这笔进「退款」组，差额照样差 0 分');
     ok(!!t.$('impAsRefundOff'), '1 详情里能「不挂了」');
     t.$('impSheetClose').click();
-    t.$('impGo').click();
+    A.clickGo(t.w);
     await t.until(() => t.$('impResult'));
     t.$('impBackToLedger').click(); await t.idle();
     const o = t.recs().find(r => r.money === 400), rf = t.recs().find(r => r.money === 300);
@@ -76,7 +76,7 @@ async function openRow(t, key) {
     await t.until(() => t.d.querySelector('.imp-rp-rec'));
     t.d.querySelector('.imp-rp-rec .imp-rp-pick').click();
     t.$('impSheetClose').click();
-    t.$('impGo').click();
+    A.clickGo(t.w);
     await t.until(() => t.$('impResult'));
     t.$('impBackToLedger').click(); await t.idle();
     const rf = t.recs().find(r => r.money === 50);
@@ -87,6 +87,7 @@ async function openRow(t, key) {
   {
     const t = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
     await t.importFiles([['微信.csv', B.bill('wechat', [wx({ time: T(10, 9), kind: '某虚构新退款类型', io: 'income', fen: 800 })], { range: RANGE }).bytes]], S => {
+      t.$('impTypes');   // 1017-UI2：走到放「没见过的交易类型」的那一步
       const sel = t.d.querySelector('.imp-type-sel');
       ok(sel && [...sel.options].some(o => o.value === 'refund' && /当退款/.test(o.textContent)), '3 没见过的交易类型多一个「当退款挂到原单」');
     }, { noGo: true });

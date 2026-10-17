@@ -58,7 +58,7 @@ const snapRows = p => p.rows.filter(d => d.src === 'row').map(d => [d.key, d.gro
   ok($('impTitle').textContent === '导入确认' && /^新建/.test($('impGo').textContent), '1 「‹ 返回」回到确认页，按钮恢复');
   $('impRecon').click();
   ok(row(new1.no).checked, '1 再进来勾选还在');
-  $('impGo').click();
+  A.clickGo(t.w);
   await t.until(() => $('impResult'));
   ok(/只对账：补进了 1 条记录/.test($('impResult').textContent) && /其余什么都没改/.test($('impResult').textContent) && !/对不上/.test($('impResult').textContent), '1 结果页：补进了 1 条，其余没改');
   $('impBackToLedger').click(); await t.idle();

@@ -60,7 +60,7 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
     ok(rowsKeptOk, '2 选过的「群收款」重算后还在，显示选的「当转账」');
     ok(t.S().plan.groups.neutral.filter(x => x.kind === '群收款').length === 2, '2 两笔群收款挪进不计入');
   }
-  $('impGo').click();
+  A.clickGo(t.w);
   await t.until(() => $('impResult'));
   $('impBackToLedger').click(); await t.idle();
   {

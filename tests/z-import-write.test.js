@@ -3,6 +3,7 @@
 // 写进去的和确认页对得上、合计守恒；合并的手记分类 / 备注 / 金额不变；重复导入没有新增；写到一半失败全部回滚；
 // 恢复到导入前逐字节一样；没有单号表时按指纹兜底；两家全额退款两种顺序净额 0；合并记录跨文件追加；备份往返不丢字段；
 // 2000 行有进度；12 万条账本的导入前备份要多久。账单、手记全是虚构的。
+const H = require('./helpers/app');   // 1017-UI2：确认页分步了，按编号找东西时走到那一步；导入 / 取消多点一下确认
 const fs = require('fs'), path = require('path');
 const { JSDOM, VirtualConsole } = require('jsdom');
 const FIDB = require('fake-indexeddb');
@@ -64,7 +65,7 @@ async function boot(o) {
         Filesystem: { writeFile: async x => { w.__files.push(x.data); return {}; } },
         App: { addListener(ev, fn) { if (ev === 'backButton') t.backFn = fn; return { remove() {} }; }, exitApp() { t.exited = true; } } } };
     } });
-  const w = dom.window, d = w.document, $ = id => d.getElementById(id);
+  const w = dom.window, d = w.document, $ = H.stepGet(w);
   const errs = []; w.addEventListener('error', e => errs.push(e.message));
   Object.assign(t, { dom, w, d, $, errs, idle: () => IDB.idle(w) });
   await IDB.idle(w);
@@ -82,16 +83,17 @@ async function boot(o) {
     Object.defineProperty(input, 'files', { value: files.map(([name, bytes]) => new w.File([bytes], name)), configurable: true });
     input.dispatchEvent(new w.Event('change'));
     await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
+    w.JiwenImportUI._goStep('check');   // 1017-UI2：从第 1 步开始看（等按钮时走到了总览）
     const S = t.S();
     if (edit) { edit(S); w.JiwenImportUI._replan(); }
     const plan = S.plan;
-    if (opts.noGo || !plan.canImport) { const r = { plan, S }; $('impCancel').click(); return r; }
+    if (opts.noGo || !plan.canImport) { const r = { plan, S }; H.clickCancel(w); return r; }
     if (opts.beforeGo) opts.beforeGo();
-    $('impGo').click();
+    H.clickGo(w);
     await until(() => $('impResult') || $('askMask').style.display === 'flex', 60000);
     const res = { plan, S, result: S.result, alert: $('askMask').style.display === 'flex' ? $('askMsg').textContent : null };
     if (res.alert) $('askOk').click();
-    if ($('impResult')) $('impBackToLedger').click(); else $('impCancel').click();
+    if ($('impResult')) $('impBackToLedger').click(); else H.clickCancel(w);
     await t.idle();
     return res;
   };
@@ -294,7 +296,8 @@ function recModeOf(r) { return r.skip ? 'skip' : r.flow ? 'flow' : 'normal'; }
   const tb = await boot({ seed: seedOf([]) });
   const big = Array.from({ length: 2000 }, (_, i) => wx({ time: T(8, 1 + (i % 28), 8 + (i % 12), i % 60), cp: '虚构店' + (i % 50), fen: 100 + i }));
   const seen = new Set(); let ticks = 0, alive = true;
-  const beat = () => { if (!alive) return; ticks++; seen.add(tb.$('impProgText') && tb.$('impProgText').textContent); setTimeout(beat, 0); };
+  // 1017-UI2：写入时的进度显示在导入确认面板里（impConfirmStatus），进度框（impProgText）照旧也看
+  const beat = () => { if (!alive) return; ticks++; seen.add(tb.$('impProgText') && tb.$('impProgText').textContent); seen.add(tb.d.getElementById('impConfirmStatus') && tb.d.getElementById('impConfirmStatus').textContent); setTimeout(beat, 0); };
   const r = await tb.importFiles([['big.csv', bill('wechat', big)]], null, { beforeGo: () => { ticks = 0; setTimeout(beat, 0); } });
   alive = false;
   ok(r.result && r.result.ws.counts.add === 2000 && tb.recs().length === 2000, '9 2000 行写进去');

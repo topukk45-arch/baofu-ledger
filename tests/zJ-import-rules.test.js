@@ -42,6 +42,7 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
   {
     const t = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
     await t.importFiles(bill([wx({ time: T(10, 4), cp: '某虚构小卖部', desc: '/', fen: 800 }), wx({ time: T(10, 5), cp: '某虚构小卖部', desc: '/', fen: 900 })]), S => {
+      t.$('impCpGroups');   // 1017-UI2：走到「分类」那一步
       const row = t.d.querySelector('#impCpGroups .imp-row-opt[data-cp="某虚构小卖部"] select');
       ok(!!row && /记成你的规则/.test(t.$('impCpGroups').textContent), '2 按对方选分类那张卡写明选了会记成规则');
       select(t, row, '杂项');
@@ -59,7 +60,7 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
     // 展开明细「新增」组，点开第一笔书店的详情
     {
       const S = t.S(), key = S.plan.rows.find(d => d.src === 'row' && d.cp === '某虚构书店').key;
-      S.view.details = true; S.view.open.add = true; t.w.JiwenImportUI._replan();
+      S.view.details = true; S.view.open.add = true; t.w.JiwenImportUI._goStep('overview');   // 1017-UI2：明细在最后一步「总览」
       const r = [...t.d.querySelectorAll('#impBody .al-row')].find(x => x.dataset.key === key);
       if (r) r.click();
     }
@@ -72,7 +73,7 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
     ok(/按你的规则「某虚构书店 → 购物」归的/.test(asked) && t.$('askOk').textContent !== '' , '3 改按规则归的分类：先问一句 ' + choice);
     ok(choice === 'all' ? same(cats, ['杂项', '杂项']) : same(cats, ['杂项', '购物']), '3 ' + (choice === 'all' ? '以后都改：同一条规则归的两笔都改' : '只改这一条：另一笔还是规则的分类') + ' ' + JSON.stringify(cats));
     t.$('impSheetClose').click();
-    t.$('impGo').click();
+    A.clickGo(t.w);
     await t.until(() => t.$('impResult'));
     const rc = t.$('impResult').textContent;
     t.$('impBackToLedger').click(); await t.idle();

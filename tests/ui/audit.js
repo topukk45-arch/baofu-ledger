@@ -248,7 +248,11 @@ async function run(cfg, port, browser) {
   const IMP = '#impPage, #impBar, #impSheetMask, #impProg';
   const ASK = '#askMask';
   const click = (page, sel) => page.click(sel, { timeout: 8000 });
-  const waitImpConfirm = page => page.waitForFunction(() => { const g = document.getElementById('impGo'); return g && /^(新建 \d+ 条记录|存下待处理)/.test(g.textContent) && document.getElementById('impBar').style.display === 'flex'; }, null, { timeout: 60000 });
+  // 1017-UI2 起确认页分步：算完停在第 1 步「核对」
+  const waitImpConfirm = page => page.waitForFunction(() => { const S = window.JiwenImportUI && window.JiwenImportUI._state(); return S && S.phase === 'confirm' && S.plan && document.getElementById('impBar').style.display === 'flex'; }, null, { timeout: 60000 });
+  const goStep = (page, k) => page.evaluate(k => window.JiwenImportUI._goStep(k), k);
+  // 导入：走到总览点主按钮，确认面板里点「确认导入」
+  const doImport = async page => { await goStep(page, 'overview'); await click(page, '#impGo'); await page.waitForSelector('#impConfirmOk', { timeout: 15000 }); await click(page, '#impConfirmOk'); await page.waitForSelector('#impResult', { timeout: 60000 }); };
   const askOpen = page => page.waitForFunction(() => document.getElementById('askMask').style.display === 'flex', null, { timeout: 15000 });
   const askClose = async (page, ok) => { await click(page, ok ? '#askOk' : '#askCancel'); await page.waitForTimeout(250); };
   const tab = async (page, t) => { await click(page, `.tab-btn[data-tab="${t}"]`); await page.waitForTimeout(400); };
@@ -311,9 +315,15 @@ async function run(cfg, port, browser) {
     await click(page, '#devImportBtn'); await page.waitForSelector('#impPick');
     await page.setInputFiles('#impFile', richBills());
     await waitImpConfirm(page);
-    await measure(page, 'imp-confirm', { scope: IMP, primary: ['#impGo', '#impRecon', '#impCancel'], more: true });
+    // 每一步量一遍（第 1 步核对 → 要你定的几步 → 总览）
+    const steps = await page.evaluate(() => window.JiwenImportUI._state().view.steps.slice());
+    for (const k of steps) {
+      await goStep(page, k); await page.waitForTimeout(200);
+      await measure(page, 'imp-step-' + k, { scope: IMP, primary: ['#impNext', '#impGo', '#impPrev', '#impCancel', '#impRecon'], more: true, note: '第 ' + (steps.indexOf(k) + 1) + ' 步 / 共 ' + steps.length + ' 步' });
+    }
     // 下拉框的选择面板（1016-UI7 起不弹系统自带的；1017-UI1 起是主程序的共用底部面板）：一个非分类的、一个选分类的
-    for (const [sel, nm] of [['#impTypes .imp-sel', 'imp-picker'], ['#impCpGroups .imp-sel, #impNewCats .imp-sel', 'imp-picker-cat']]) {
+    await goStep(page, 'cat');
+    for (const [sel, nm] of [['#impTypes .imp-sel', 'imp-picker'], ['#impCpGroups .imp-cp-row, #impNewCats .imp-sel', 'imp-picker-cat']]) {
       if (!(await page.$(sel))) continue;
       await page.evaluate(sel => { const w = document.querySelector(sel); w.scrollIntoView({ block: 'center' }); w.click(); }, sel);
       await page.waitForTimeout(400);
@@ -321,15 +331,14 @@ async function run(cfg, port, browser) {
       await page.evaluate(() => document.getElementById('uiSheetCancel').click());
       await page.waitForTimeout(200);
     }
-    // 每一块单独截一张
-    const blocks = await page.evaluate(() => [...document.querySelectorAll('#impBody > .imp-card, #impBody > div > .imp-card, #impDetails')].map(c => c.id || (c.dataset.file !== undefined ? 'file' + c.dataset.file : '')).filter(Boolean));
-    for (const id of blocks) {
-      if (SHOTS) {
-        await page.evaluate(id => { const e = document.getElementById(id) || document.querySelector(`[data-file="${id.slice(4)}"]`); const p = document.getElementById('impPage'); if (e) p.scrollTop = e.offsetTop - 60; }, id);
-        await page.waitForTimeout(100);
-        await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-imp-confirm-block-${id}.png`) });
-      }
-    }
+    // 退出确认（顶上「‹ 取消」）
+    await click(page, '#impBack'); await page.waitForTimeout(400);
+    await measure(page, 'imp-exit-sheet', { scope: '#uiSheetMask', primary: ['#impExitStay', '#impExitOk'], scrollTop: false });
+    await click(page, '#impExitStay'); await page.waitForTimeout(300);
+    // 导入确认面板（点「再看看」回总览）
+    await goStep(page, 'overview'); await click(page, '#impGo'); await page.waitForTimeout(400);
+    await measure(page, 'imp-confirm-sheet', { scope: '#uiSheetMask', primary: ['#impConfirmOk', '#impConfirmBack'], scrollTop: false });
+    await click(page, '#impConfirmBack'); await page.waitForTimeout(300);
     // 明细展开
     await page.evaluate(() => document.getElementById('impDetailsToggle').click());
     await page.evaluate(() => { const h = document.querySelector('.imp-gh[data-group="pending"]') || document.querySelector('.imp-gh'); if (h) h.click(); });
@@ -348,13 +357,16 @@ async function run(cfg, port, browser) {
       await page.evaluate(() => { document.getElementById('impSheetMask').style.display = 'none'; });
     }
     // 只对账
+    await goStep(page, 'overview');
     await click(page, '#impRecon'); await page.waitForTimeout(300);
     await page.evaluate(() => { const c = document.querySelector('.imp-recon-row input'); if (c) c.click(); });
     await measure(page, 'imp-recon', { scope: IMP, primary: ['#impGo', '#impRecon'] });
+    await click(page, '#impGo'); await page.waitForTimeout(400);
+    await measure(page, 'imp-recon-sheet', { scope: '#uiSheetMask', primary: ['#impConfirmOk', '#impConfirmBack'], scrollTop: false });
+    await click(page, '#impConfirmBack'); await page.waitForTimeout(200);
     await click(page, '#impRecon'); await page.waitForTimeout(300);
     // 导入
-    await click(page, '#impGo');
-    await page.waitForSelector('#impResult', { timeout: 60000 });
+    await doImport(page);
     await measure(page, 'imp-result', { scope: IMP, primary: ['#impBackToLedger', '#impUndoThis'], more: true });
     // 待处理页
     if (await page.$('#impResPending')) {
@@ -398,7 +410,7 @@ async function run(cfg, port, browser) {
     await click(page, '#devImportBtn'); await page.waitForSelector('#impPick');
     await page.setInputFiles('#impFile', richBills(9));
     await waitImpConfirm(page);
-    await click(page, '#impGo'); await page.waitForSelector('#impResult', { timeout: 60000 });
+    await doImport(page);
     await click(page, '#impBackToLedger'); await page.waitForTimeout(600);
     await measure(page, 'ledger-remind', { primary: ['#impRemindGo', '#impRemindOff'], note: '月初导入提醒' });
     await page.close();

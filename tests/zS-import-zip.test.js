@@ -55,7 +55,7 @@ const hex = a => Buffer.from(a).toString('hex'), h = s => new Uint8Array(Buffer.
   $('askInput').value = '246801'; await t.askOk();
   await t.until(() => t.S() && t.S().phase === 'confirm' && t.S().parsed && $('impBar').style.display === 'flex', 20000);
   ok(t.S().parsed.files.map(f => f.name).sort().join(',') === '微信支付账单(20261001-20261031).xlsx,支付宝交易明细(20261001-20261031).csv' && t.S().parsed.files.every(f => f.stats.countOk), '2 两个压缩包都解开了：照常读出两份账单、笔数核对一致');
-  $('impCancel').click(); await t.idle();
+  A.clickCancel(t.w); await t.idle();
   // ===== 3. 点取消：不导这个压缩包；没密码的直接解 =====
   await pick([['加密.zip', Z('aes128-alipay')], ['没密码.zip', Z('plain-both')]]);
   await t.until(() => t.ask());
@@ -63,7 +63,7 @@ const hex = a => Buffer.from(a).toString('hex'), h = s => new Uint8Array(Buffer.
   // 等这一次真算完（上一次关掉以后按钮上的字还在，不能只看字）
   await t.until(() => t.S() && t.S().phase === 'confirm' && t.S().parsed && $('impBar').style.display === 'flex', 20000);
   ok(t.S().parsed.files.length === 2 && t.S().parsed.files.every(f => !f.fatal), '3 有密码的点了取消：不导它；没密码的直接解出两份照常算');
-  $('impCancel').click(); await t.idle();
+  A.clickCancel(t.w); await t.idle();
   await pick([['加密.zip', Z('aes128-alipay')]]);
   await t.until(() => t.ask());
   await t.askCancel();
