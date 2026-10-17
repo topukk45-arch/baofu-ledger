@@ -150,6 +150,12 @@
         if (opt && inOpt[d.file + ':' + d.row]) { d.group = 'merge'; d.into = opt.record; d.viaSum = g.id; d.reason = '这几笔加起来正好是这条手记，合并'; pickedRecords[opt.record] = d.key; }
         else if (opt || e === 'none') { d.group = 'add'; d.reason = e === 'none' ? '多笔合一选了「都不是」，作为新增' : '同组里别的几笔合并了，这笔作为新增'; d.autoNew = true; }
       });
+      // 1017-UI4：跨天的选法里，账单可能不在这一组（这条手记 3 天内另一笔金额正好相等的账单）：选了就把它合并过来
+      if (opt && opt.kind === 'far') opt.bills.forEach(function (b) {
+        var x = byKeyRef[b.file + ':' + b.row];
+        if (!x || x.item.msum === g.id || (x.group !== 'add' && x.group !== 'pending')) return;
+        x.group = 'merge'; x.into = opt.record; x.viaSum = g.id; x.reason = '多笔合一那组里选了它，和这条手记合并'; pickedRecords[opt.record] = x.key;
+      });
     });
     rows.forEach(function (d) {
       if (d.src !== 'row') return;
@@ -279,7 +285,7 @@
       d.canCat = (g === 'add' || g === 'neutral' || g === 'pending') && d.catFrom !== 'orig';
       d.canMode = g === 'add' || g === 'neutral';
       d.canSplit = g === 'merge' && d.bucket0 === 'merge';
-      d.canPick = d.bucket0 === 'pending' && !d.autoNew && !(d.item.msum && sumsE[d.item.msum] !== undefined && sumsE[d.item.msum] !== null);
+      d.canPick = d.bucket0 === 'pending' && !(d.autoNew && d.item.msum) && !d.viaSum && !(d.item.msum && sumsE[d.item.msum] !== undefined && sumsE[d.item.msum] !== null);
       d.canRestore = g === 'excluded' && !!(E[d.key] && (E[d.key].exclude || E[d.key].pick === 'drop'));
     });
 
@@ -381,10 +387,10 @@
                keys: rows.filter(function (d) { return d.src === 'row' && d.item.msum === g.id; }).map(function (d) { return d.key; }),
                options: g.options.map(function (o) {
                  var m = manualById[o.record];
-                 return { record: o.record, fen: o.fen, kind: o.kind, keys: o.bills.map(function (b) { var x = byKeyRef[b.file + ':' + b.row]; return x ? x.key : null; }),
+                 return { record: o.record, fen: o.fen, kind: o.kind, days: o.days || 0, keys: o.bills.map(function (b) { var x = byKeyRef[b.file + ':' + b.row]; return x ? x.key : null; }),
                           manual: m ? { time: m.time, cat: m.cat, fen: m.fen } : null,
                           text: (o.bills.length === 1 ? '这笔 ' + yuan(o.fen) + ' 元正好是你记的那条' : '这 ' + o.bills.length + ' 笔加起来正好是你记的 ' + yuan(o.fen) + ' 元')
-                                + (m ? '（' + md(m.time) + ' ' + (m.cat || '未分类') + (o.bills.length === 1 ? ' · ' + yuan(m.fen) : '') + '）' : '') };
+                                + (m ? '（' + md(m.time) + ' ' + (m.cat || '未分类') + (o.bills.length === 1 ? ' · ' + yuan(m.fen) : '') + '）' : '') + (o.kind === 'far' ? '，差 ' + o.days + ' 天' : '') };
                }) };
     });
     // ---- 转账往来：只认交易类型；相邻两笔隔不到 3 天串成一段；一段里有转出也有转入才列 ----

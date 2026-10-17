@@ -60,6 +60,8 @@
     '.imp-line{font-size:14px;line-height:1.7;overflow-wrap:anywhere;}',
     '.imp-soft{font-size:12.5px;color:var(--c-text-soft);line-height:1.6;overflow-wrap:anywhere;}',
     '.imp-ok{color:var(--c-pos);}.imp-bad{color:var(--c-neg);font-weight:bold;}',
+    '.imp-toast{position:fixed;left:16px;right:16px;bottom:calc(var(--imp-bar,80px) + 12px);z-index:40;display:none;align-items:center;min-height:48px;padding:8px 14px;border-radius:12px;background:var(--c-primary-deep);color:#fff;font-size:14px;box-shadow:0 6px 18px rgba(0,0,0,.18);}',
+    '.imp-also{color:#b4660e;font-size:12px;margin-top:2px;}.imp-far-box{margin-top:6px;}',
     '.imp-chips{display:flex;flex-wrap:wrap;gap:8px;}',
     '.imp-chip{display:inline-flex;align-items:center;gap:4px;min-height:48px;border:1px solid var(--c-border-mid);background:var(--c-surface);color:var(--c-text);border-radius:24px;padding:4px 14px;font-size:14px;cursor:pointer;font-family:inherit;}',
     '.imp-chip b{color:var(--c-primary-deep);}',
@@ -1050,12 +1052,22 @@
           box.appendChild(el('div', 'imp-line', g.chosen === 'none' ? '已选「都不是」：这几笔作为新增' : '已合并：' + g.options[g.chosen].text));
           box.appendChild(btn('撤回', 'imp-link imp-sum-undo', function () { delete S.edits.sums[g.id]; replan(); }));
         } else {
-          if (g.suggest === null) box.appendChild(el('div', 'imp-soft', '有 ' + g.options.length + ' 种凑法，请你选一种：'));
+          var nMain = g.options.filter(function (o) { return o.kind !== 'far'; }).length;
+          if (g.suggest === null && nMain > 1) box.appendChild(el('div', 'imp-soft', '有 ' + nMain + ' 种凑法，请你选一种：'));
+          // 1017-UI4：跨天的选法排最后、默认收起（同一天的配法你不要时，跨天的也看得到）
+          var farN = g.options.filter(function (o) { return o.kind === 'far'; }).length, farOpen = !!S.view.more['far:' + g.id], farBox = null;
           g.options.forEach(function (o, i) {
-            var r = el('div', 'imp-sub-row');
-            r.appendChild(el('span', 'grow', o.text + '：' + o.keys.map(function (k) { var d = rowByKey(k); return d ? fmtTime(d.time) + ' ' + (d.title || '—') + ' ' + yuan(d.fen) : ''; }).join('；')));
-            var b = btn(g.suggest === i ? '合并' : '就是这个', g.suggest === i ? 'imp-btn gold' : 'imp-btn', function () { S.edits.sums[g.id] = i; replan(); });
-            b.className += ' imp-sum-pick'; b.dataset.i = i; r.appendChild(b); box.appendChild(r);
+            if (o.kind === 'far' && !farBox) {
+              var ft = btn(farOpen ? '收起跨天的选法' : '还有 ' + farN + ' 种跨天的选法 ▸', 'imp-link imp-far-toggle', function () { S.view.more['far:' + g.id] = !farOpen; render(); });
+              box.appendChild(ft);
+              farBox = el('div', 'imp-far-box'); farBox.style.display = farOpen ? '' : 'none'; box.appendChild(farBox);
+            }
+            var r = el('div', 'imp-sub-row' + (o.kind === 'far' ? ' imp-far-opt' : ''));
+            var lb = el('span', 'grow', o.text + '：' + o.keys.map(function (k) { var d = rowByKey(k); return d ? fmtTime(d.time) + ' ' + (d.title || '—') + ' ' + yuan(d.fen) : ''; }).join('；'));
+            var also = alsoOf(o.record, { sum: g.id }); if (also) lb.appendChild(el('div', 'imp-also', also));
+            r.appendChild(lb);
+            var b = btn(g.suggest === i ? '合并' : '就是这个', g.suggest === i ? 'imp-btn gold' : 'imp-btn', function () { withClaim(o.record, { sum: g.id }, function () { S.edits.sums[g.id] = i; replan(); }); });
+            b.className += ' imp-sum-pick'; b.dataset.i = i; r.appendChild(b); (o.kind === 'far' ? farBox : box).appendChild(r);
           });
           var nb = btn('都不是', 'imp-btn imp-sum-none', function () { S.edits.sums[g.id] = 'none'; replan(); }); box.appendChild(nb);
         }
@@ -1266,6 +1278,68 @@
   }
 
   // ---------- 一行的详情：在这里改 ----------
+  // ---------- 1017-UI4：一条手记只能配一笔 ----------
+  //   这条手记你在别处亲手选过：先问一句「已经配给了某某，改配到这里吗？」，确认了才改，那边让出来；只是建议（没人选过）的直接配。
+  //   被让出的那笔：回到待你确认，或者候选都被用了就自动作为新增，浮出提示一句
+  function sumById(id) { return (S.matched.multiSums || []).filter(function (g) { return g.id === id; })[0] || null; }
+  function rowLabel(d) { return d ? fmtTime(d.time) + ' ' + (d.title || d.cp || '—') + ' ' + yuan(d.fen) : ''; }
+  function sumLabel(id) {
+    var g = (S.plan.sections.sums || []).filter(function (x) { return x.id === id; })[0];
+    return g ? g.keys.map(function (k) { return rowLabel(rowByKey(k)); }).join('、') : '';
+  }
+  function claimOf(record, here) {
+    var E = S.edits, out = null;
+    Object.keys(E.rows).forEach(function (k) { var p = E.rows[k].pick; if (!out && k !== here.key && p && p.record === record) out = { key: k }; });
+    Object.keys(E.sums).forEach(function (id) {
+      var i = E.sums[id], g = sumById(id);
+      if (!out && id !== here.sum && typeof i === 'number' && g && g.options[i] && g.options[i].record === record) out = { sum: id };
+    });
+    return out;
+  }
+  // 这条手记还可能是哪几笔的（给「这条手记也可能是某某的」）
+  function alsoOf(record, here) {
+    var out = [];
+    S.plan.rows.forEach(function (d) {
+      if (d.key === here.key || d.src !== 'row' || d.bucket0 !== 'pending' || (d.item && d.item.msum) || !(d.cands || []).some(function (c) { return c.record === record; })) return;
+      out.push(rowLabel(d) + ' 那笔');
+    });
+    (S.plan.sections.sums || []).forEach(function (g) {
+      if (g.id === here.sum || !g.options.some(function (o) { return o.record === record; })) return;
+      out.push('「' + sumLabel(g.id) + '」那组');
+    });
+    return out.length ? '这条手记也可能是 ' + out.slice(0, 2).join('、') + (out.length > 2 ? ' 等 ' + out.length + ' 处' : '') + '的' : '';
+  }
+  function withClaim(record, here, apply) {
+    var o = claimOf(record, here);
+    if (!o) { apply(); return; }
+    var who = o.key ? rowLabel(rowByKey(o.key)) + ' 那笔' : '「' + sumLabel(o.sum) + '」那组';
+    var go = function () {
+      if (o.key) { var e = S.edits.rows[o.key]; delete e.pick; if (!Object.keys(e).length) delete S.edits.rows[o.key]; }
+      else delete S.edits.sums[o.sum];
+      apply();
+      var keys = o.key ? [o.key] : ((S.plan.sections.sums || []).filter(function (x) { return x.id === o.sum; })[0] || { keys: [] }).keys;
+      var toNew = keys.some(function (k) { var d = rowByKey(k); return d && d.group === 'add'; });
+      toast(who + '让出了这条手记，' + (toNew ? '改成新增' : '回到待你确认'), keys[0]);
+    };
+    if (!window.JiwenSheet) { go(); return; }
+    window.JiwenSheet.open({ title: '改配到这里？', onDismiss: function () {},
+      body: function (box) { var t = el('div', 'imp-line', '这条手记已经配给了 ' + who + '，改配到这里吗？'); t.id = 'impClaimMsg'; t.style.fontSize = '15px'; box.appendChild(t); },
+      foot: function (box, done) {
+        var col = el('div', 'ui-stack');
+        var yes = btn('改配到这里', 'ui-btn primary block', function () { done(); go(); }); yes.id = 'impClaimOk';
+        var no = btn('不改', 'ui-btn block', function () { done(); }); no.id = 'impClaimNo';
+        col.appendChild(yes); col.appendChild(no); box.appendChild(col);
+      } });
+  }
+  // 底部浮出一句提示，几秒后消失
+  var toastTimer = null;
+  function toast(text, key) {
+    if (!dom) return;
+    var t = document.getElementById('impToast');
+    if (!t) { t = el('div', 'imp-toast'); t.id = 'impToast'; dom.page.appendChild(t); }
+    t.textContent = text; t.dataset.key = key || ''; t.style.display = 'flex';
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.style.display = 'none'; }, 4000);
+  }
   function rowByKey(key) { var r = null; S.plan.rows.forEach(function (d) { if (d.key === key) r = d; }); return r; }
   function setEdit(key, patch) {
     var e = S.edits.rows[key] || {};
@@ -1356,9 +1430,10 @@
         var chosen = d.item && S.edits.rows[key] && S.edits.rows[key].pick && JSON.stringify(S.edits.rows[key].pick) === JSON.stringify(pick);
         // 退款类的候选是「挂到这笔原单」，其余是「和这条手记合并」
         var isRefund = d.why === 'refundcands' || !!c.row;
-        var b = btn(chosen ? '已选' : (isRefund ? '挂到这笔' : '和这条合并'), chosen ? 'imp-btn gold' : 'imp-btn', function () { setEdit(key, { pick: pick }); });
+        var b = btn(chosen ? '已选' : (isRefund ? '挂到这笔' : '和这条合并'), chosen ? 'imp-btn gold' : 'imp-btn', function () { if (isRefund) setEdit(key, { pick: pick }); else withClaim(c.record, { key: key }, function () { setEdit(key, { pick: pick }); }); });
         b.className += ' imp-pick';
-        if (!isRefund && used[c.record] && !chosen) b.disabled = true;      // 这条手记已经和别的账单合并了
+        if (!isRefund && used[c.record] && !chosen && !claimOf(c.record, { key: key })) b.disabled = true;      // 这条手记已经和别的账单合并了（你亲手选的除外：点了先问）
+        var also = !isRefund && alsoOf(c.record, { key: key }); if (also) lb.appendChild(el('div', 'imp-soft imp-also', also));
         r.appendChild(b); sh.appendChild(r);
       });
     }

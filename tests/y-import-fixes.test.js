@@ -451,15 +451,16 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     const f = four(), other = wx({ time: T(10, 13, 9), cp: '某虚构书店', fen: 400 });
     const r = run([{ app: 'wechat', txns: f.concat([other]) }], hand);
     const g = r.matched.multiSums.find(x => x.options.some(o => o.record === 'g4'));
-    ok(g && g.options.length === 2 && g.suggest === null && g.options.some(o => o.kind === 'samecp' && o.bills.length === 4) && g.options.some(o => o.kind === 'single' && o.bills.length === 1),
-      '16-2 隔天另一笔 4 元也能配这条补记的手记：合并卡片里两种凑法都在，不带默认');
-    ok(f.concat([other]).every(x => r.item(x).bucket === 'pending' && r.item(x).why === 'multisum'), '16-2 5 笔都留在待处理，手记没被隔天那笔先拿走');
+    // 1017-UI4 有意改：同一天有配法（4 笔加起来），隔天那笔不再和它并列；只作为「跨天的选法」排最后（默认收起）
+    ok(g && g.options.length === 2 && g.suggest === 0 && g.options[0].kind === 'samecp' && g.options[0].bills.length === 4 && g.options[1].kind === 'far' && g.options[1].days === 1 && g.options[1].bills.length === 1,
+      '16-2 隔天另一笔 4 元：同一天 4 笔加起来排第一（只有这一种同一天的，带建议），隔天那笔列成跨天的选法排最后');
+    ok(f.every(x => r.item(x).bucket === 'pending' && r.item(x).why === 'multisum') && r.item(other).why !== 'multisum', '16-2 4 笔留在待处理，手记没被隔天那笔先拿走；隔天那笔不在组里');
     const pa = r.plan({ sums: { [g.id]: g.options.findIndex(o => o.kind === 'samecp') } });
     ok(f.every(x => rowOf(pa, r.key(x)).group === 'merge') && rowOf(pa, r.key(other)).group === 'add' && noReuse(pa) && diffOk(pa), '16-2 选「4 笔加起来」：4 笔合并，那笔 4 元新增');
     const ps = r.plan().sections.sums.find(x => x.id === g.id);
     ok(ps.options.some(o => /^这笔 4\.00 元正好是你记的那条/.test(o.text)) && ps.options.some(o => /^这 4 笔加起来正好是你记的 4\.00 元/.test(o.text)), '16-H 只有 1 笔的凑法写「这笔 4.00 元正好是你记的那条」，不说「1 笔加起来」');
-    const pb = r.plan({ sums: { [g.id]: g.options.findIndex(o => o.kind === 'single') } });
-    ok(rowOf(pb, r.key(other)).group === 'merge' && f.every(x => rowOf(pb, r.key(x)).group === 'add') && noReuse(pb) && diffOk(pb), '16-2 选「那一笔 4 元」：它合并，4 笔新增');
+    const pb = r.plan({ sums: { [g.id]: g.options.findIndex(o => o.kind === 'far') } });
+    ok(rowOf(pb, r.key(other)).group === 'merge' && f.every(x => rowOf(pb, r.key(x)).group === 'add') && noReuse(pb) && diffOk(pb), '16-2 否掉同一天的、选跨天那一笔 4 元：它合并，4 笔新增');
   }
   {
     const f = four(), same = wx({ time: T(10, 12, 12, 0), cp: '某虚构书店', fen: 400 });
