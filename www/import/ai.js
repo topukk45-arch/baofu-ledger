@@ -24,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-I';
+  var VERSION = '1017-K';
   var AI_MAX_ROWS = 300;          // 一段最多几行（太长有的 AI 会截断；以后好调）
   var HEAD = '记问修改建议 v1';    // AI 回复代码块的第一行要原样抄这几个字 + 批次 + 导出时间
   var MODE_NAME = { normal: '计入', flow: '只算结余', skip: '不计入' };
@@ -161,11 +161,15 @@
       var it = { n: n, id: row.id, field: field, why: why, line: l, gone: !!row.gone };
       if (field === 'cat') {
         if (cats.indexOf(value) < 0) { badLine(l, '分类「' + value + '」不在你的分类里'); return; }
+        if (row.refund) { badLine(l, '退款的分类跟着原来那笔走，不能单独改'); return; }
+        if (row.hasRefunds) { badLine(l, '有退款挂在这笔上，分类要和退款一起改，去账单里改'); return; }
         if (!row.gone && row.cat === value) { badLine(l, '已经是「' + value + '」了'); return; }
         it.value = value; it.cur = row.cat;
       } else if (field === 'mode') {
         var m = MODE_OF[value];
         if (!m) { badLine(l, '口径只能是计入、只算结余、不计入'); return; }
+        if (row.refund) { badLine(l, '退款的口径跟着原来那笔走，不能单独改'); return; }
+        if (row.hasRefunds) { badLine(l, '有退款挂在这笔上，口径要和退款一起改，去账单里改'); return; }
         if (!row.gone && row.mode === m) { badLine(l, '已经是「' + value + '」了'); return; }
         it.value = m; it.cur = row.mode;
       } else if (field === 'remark') {
@@ -189,6 +193,28 @@
     return { ok: true, items: items, bad: bad, outside: outside, head: lines[0] };
   }
 
-  return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, HEAD: HEAD, MODE_NAME: MODE_NAME, MODE_OF: MODE_OF, FLAG_OF: FLAG_OF, REMARK_MAX: REMARK_MAX,
+  // ---------- 1017-K 勾上的几条 → 每条记录要改的字段 ----------
+  //   items：parseReply 的 items 里勾上的（已删的不算）；rows：{ 号: aiExportRows 的行 }；remarkMode：{ 'n|remark': 'replace' }（默认加在后面）
+  //   → [{ id, set:{ cat | remark | skip | flow | aiFlag（null = 去掉这个字段）} }]，同一条记录的几项并在一起
+  function changesOf(items, rows, remarkMode) {
+    var by = {}, order = [];
+    (items || []).forEach(function (it) {
+      if (!it || it.gone || !it.id) return;
+      var row = rows[it.n] || {}, c = by[it.id];
+      if (!c) { c = by[it.id] = { id: it.id, set: {} }; order.push(it.id); }
+      if (it.field === 'cat') c.set.cat = it.value;
+      else if (it.field === 'mode') { c.set.skip = it.value === 'skip' ? true : null; c.set.flow = it.value === 'flow' ? true : null; }
+      else if (it.field === 'remark') {
+        var cur = row.remark || '', rep0 = remarkMode && remarkMode[it.n + '|remark'] === 'replace';
+        c.set.remark = rep0 || !cur ? it.value : cur + '；' + it.value;
+      } else if (it.field === 'flag') {
+        var f = { k: it.value, why: String(it.why || '').slice(0, 200) }; if (it.refId) f.ref = it.refId;
+        c.set.aiFlag = f;
+      }
+    });
+    return order.map(function (id) { return by[id]; });
+  }
+
+  return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, changesOf: changesOf, HEAD: HEAD, MODE_NAME: MODE_NAME, MODE_OF: MODE_OF, FLAG_OF: FLAG_OF, REMARK_MAX: REMARK_MAX,
            mask: mask, personal: personal, exportText: exportText, replyHead: replyHead, parseReply: parseReply };
 });

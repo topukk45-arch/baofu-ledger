@@ -2390,14 +2390,25 @@
     logs.forEach(function (l) {
       var r = el('div', 'imp-row-opt imp-log'); r.dataset.batch = l.b;
       var g = el('div', 'grow');
-      g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · ' + appNames(l.apps) + (l.only ? ' · 只对账' : '')));
       var nAdd = (l.add || []).length, nChg = (l.chg || []).length;
-      g.appendChild(el('div', 'imp-soft', '账单 ' + String(l.from || '').slice(0, 10) + ' 至 ' + String(l.to || '').slice(0, 10)
-        + ' · 新建 ' + nAdd + ' 条' + (nChg ? ' · 改了 ' + nChg + ' 条以前的记录' : '') + (nb[l.b] ? ' · 待处理 ' + nb[l.b] + ' 笔' : '')));
+      // 1017-K：AI 修改（不是导入）：写改了哪一次导入的几条、各改了什么
+      var ofL = l.kind === 'ai' ? logs.filter(function (x) { return x.b === l.of && x.kind !== 'ai'; })[0] : null;
+      var aiWhat = function () { var f = { cat: 0, remark: 0, mode: 0, aiFlag: 0 }; (l.chg || []).forEach(function (c) { var w = c.was || {}; if ('cat' in w) f.cat++; if ('remark' in w) f.remark++; if ('skip' in w || 'flow' in w) f.mode++; if ('aiFlag' in w) f.aiFlag++; });
+        return [['cat', '分类'], ['remark', '备注'], ['mode', '口径'], ['aiFlag', '标记']].filter(function (x) { return f[x[0]]; }).map(function (x) { return x[1] + ' ' + f[x[0]] + ' 条'; }).join('、'); };
+      if (l.kind === 'ai') {
+        g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · AI 修改'));
+        g.appendChild(el('div', 'imp-soft', '按 AI 的建议改了 ' + nChg + ' 条记录（' + aiWhat() + '）' + (ofL ? ' · 是 ' + String(ofL.at || '').replace('T', ' ').slice(5) + ' 那次导入的' : '')));
+      } else {
+        g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · ' + appNames(l.apps) + (l.only ? ' · 只对账' : '')));
+        g.appendChild(el('div', 'imp-soft', '账单 ' + String(l.from || '').slice(0, 10) + ' 至 ' + String(l.to || '').slice(0, 10)
+          + ' · 新建 ' + nAdd + ' 条' + (nChg ? ' · 改了 ' + nChg + ' 条以前的记录' : '') + (nb[l.b] ? ' · 待处理 ' + nb[l.b] + ' 笔' : '')));
+      }
+      if (l.kind === 'ai') r.classList.add('imp-log-aimod');
       r.appendChild(g);
       // 1017-UI10：点这一次看详情（只看，底部只有「关闭」；撤销还在右边）
       g.style.cursor = 'pointer'; g.classList.add('imp-log-info');
       g.addEventListener('click', function () {
+        if (l.kind === 'ai') { viewSheet('这一次 AI 修改', [['修改时间', String(l.at || '').replace('T', ' ')], ['改的是', ofL ? String(ofL.at || '').replace('T', ' ') + ' 那次导入的记录' : '那次导入已经不在记录里了'], ['改了', nChg + ' 条记录（' + aiWhat() + '）'], ['编号', l.b]], 'impLogDetailClose'); return; }
         var ra = l.rulesAdded || {}, rn = ['cat', 'map', 'type'].reduce(function (n, k) { return n + ((ra[k] || []).length); }, 0);
         viewSheet('这一次导入', [['导入时间', String(l.at || '').replace('T', ' ')], ['来源', appNames(l.apps) + (l.only ? '（只对账）' : '')], ['账单', String(l.from || '').slice(0, 10) + ' 至 ' + String(l.to || '').slice(0, 10)],
           ['新建', (l.add || []).length + ' 条'], ['改了以前的记录', (l.chg || []).length ? (l.chg || []).length + ' 条' : ''], ['待处理', nb[l.b] ? nb[l.b] + ' 笔' : ''], ['存了规则', rn ? rn + ' 条' : ''],
@@ -2543,16 +2554,17 @@
           store().aiExportRows(a.batch).then(function (d) {
             var r = window.JiwenImportAI.parseReply(text, { batch: a.batch, aiAt: d.aiAt, cats: d.cats, rows: d.rows });
             if (!r.ok) { msg.textContent = AI_WHY[r.why] || '读不出来。'; return; }
-            done(); openAiReview(r, d);
+            var ver = null; try { ver = store().archiveInfo().ver; } catch (_) {}
+            done(); openAiReview(r, d, ver);
           }, function (e) { msg.textContent = '读不出这次导入：' + (e && (e.code || e.message) || e); });
         }); go.id = 'impAiPasteGo';
         var no = btn('取消', 'ui-btn block', function () { done(); }); no.id = 'impAiPasteCancel';
         col.appendChild(go); col.appendChild(no); box.appendChild(col);
       } });
   }
-  function openAiReview(r, d) {
+  function openAiReview(r, d, ver) {
     var byN = {}; d.rows.forEach(function (x) { byN[x.n] = x; });
-    S.ai.review = { r: r, rows: byN, cats: d.cats, sel: {}, remarkMode: {}, badOpen: false };
+    S.ai.review = { r: r, rows: byN, cats: d.cats, sel: {}, remarkMode: {}, badOpen: false, ver: ver === null ? undefined : ver };
     S.phase = 'aireview';
     renderAiReview();
   }
@@ -2672,9 +2684,23 @@
         col.appendChild(ok0); col.appendChild(no); box.appendChild(col);
       } });
   }
+  // 1017-K：写进账本（一个事务，写前备份「AI 修改前」）；写完到导入记录，顶上写改了几条，「AI 修改」那一次能撤销
   function aiApply(sel) {
-    var st = store();
-    if (!st.aiApply) { alertMsg('这一版还不能写进账本（下一版做）。你勾的这些先记在这一页上。', 'AI 的修改建议'); return; }
+    var R = S.ai.review, changes = window.JiwenImportAI.changesOf(sel, R.rows, R.remarkMode);
+    if (!changes.length) return;
+    S.phase = 'writing'; progress('正在改…', 1, 2);
+    store().aiApply({ of: S.ai.batch, changes: changes }, { ver: R.ver }).then(function (r) {
+      dom.prog.style.display = 'none';
+      openLogs('已按 AI 的建议改了 ' + r.changed + ' 条记录。改错了可以在下面「AI 修改」那一次点「撤销」（你后来又改过的不会动）。');
+    }, function (e) {
+      dom.prog.style.display = 'none'; if (S) S.phase = 'aireview';
+      var c = e && (e.code || e.message);
+      alertMsg(c === 'gone' ? '有一条记录已经被删了，这次什么都没改。请重新粘贴一次 AI 的回复。'
+        : c === 'stale' ? '账本在这期间变了，这次什么都没改。请重新粘贴一次 AI 的回复。'
+        : c === 'nolog' ? '找不到这次导入的记录（可能已经撤销了），什么都没改。'
+        : c === 'quota' || c === 'nospace' ? '存储空间不够，放不下修改前的备份，什么都没改。'
+        : '没改成，账本没动：' + (c || e), 'AI 的修改建议');
+    });
   }
   // ---------- 第二期：管理导入规则 ----------
   // 你的分类规则（关键词 → 分类，关键词越长越先用）、分类对照（推荐分类 → 你的分类）、类型规则（没见过的交易类型 / 状态怎么处理）。
@@ -2882,8 +2908,10 @@
           dom.prog.style.display = 'none';
           if (S) S.phase = back0;
           var t = r.totals || {};
-          var del = (t.deleted || 0) + (t.userRefunds || 0), rest = (t.restored || 0) + (t.sums || 0) + (t.links || 0);
-          openLogs('已撤销' + (r.chain.length > 1 ? ' ' + r.chain.length + ' 次导入' : '') + '，删了 ' + del + ' 条、还原了 ' + rest + ' 条');
+          var del = (t.deleted || 0) + (t.userRefunds || 0), rest = (t.restored || 0) + (t.sums || 0) + (t.links || 0) + (t.aiRestored || 0);
+          var kept = t.kept ? '（' + t.kept + ' 处你后来改过的没动）' : '';
+          if (t.aiRestored && r.chain.length === 1 && !del) openLogs('已撤销这次 AI 修改，改回了 ' + t.aiRestored + ' 条' + kept);
+          else openLogs('已撤销' + (r.chain.length > 1 ? ' ' + r.chain.length + ' 次' + (t.aiRestored ? '（含 AI 修改）' : '导入') : '') + '，删了 ' + del + ' 条、还原了 ' + rest + ' 条' + kept);
         }, function (e) { fail(e, '撤销失败'); });
       }, '撤销导入', { okText: '撤销' });
     }, function (e) { fail(e, '算撤销方案时出错'); });

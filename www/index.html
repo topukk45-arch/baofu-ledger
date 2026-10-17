@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-J</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-K</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -4147,6 +4147,7 @@
                 const ids=[], kind={};
                 (lg.add||[]).forEach(id=>{ if(!(id in kind)){ ids.push(id); kind[id]={ add:true }; } });
                 (lg.chg||[]).forEach(c=>{ if(!(c.id in kind)){ ids.push(c.id); kind[c.id]={ chg:c }; } });
+                const refunded=new Set(); recs.forEach(r=>{ if(r.refundOf) refunded.add(r.refundOf); });
                 const rows=ids.map((id, i)=>{
                     const r=byId.get(id), n=i+1;
                     if(!r) return { n, id, gone:true };
@@ -4160,7 +4161,7 @@
                     if(kind[id].add){ const k=(lg.add||[]).indexOf(id), h=Array.isArray(lg.h) ? lg.h[k] : ''; edited=!!h && impRecHash(r)!==h; }
                     else if(c && c.now) edited=Object.keys(c.now).some(f=>{ const v=(f in r && r[f]!==undefined) ? (r[f]!==null && typeof r[f]==='object' ? JSON.stringify(r[f]) : r[f]) : null; return v!==c.now[f]; });
                     return { n, id, time:r.time||'', fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', mode:recMode(r), dest,
-                             cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', desc:'', remark:r.remark||'', oc:r.oc||'', edited, aiFlag:r.aiFlag||null };
+                             cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', desc:'', remark:r.remark||'', oc:r.oc||'', edited, aiFlag:r.aiFlag||null, refund:!!r.refundOf, hasRefunds:refunded.has(id) };
                 });
                 return { batch, at:lg.at||'', cats:(a.cats||[]).slice(), rows, aiAt:(lg.aiAt||[]).slice() };
             },
@@ -4175,6 +4176,65 @@
                 const clean=impCleanLog(list, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
                 await impWrite(t.e, t.key, [[impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:clean })]]);
                 return hit.aiAt.slice();
+            },
+            // ---- 1017-K：AI 检查导入结果：写进账本 ----
+            // changes：import/ai.js 的 changesOf 算的 [{ id, set:{ cat | remark | skip | flow | aiFlag（null = 去掉）} }]；of：改的是哪一次导入
+            //   先备份一份「AI 修改前」（和导入前、撤销前的共用 3 份；放不下就不改），再一个事务写：改记录、导入记录里加一条 kind ai（chg 记 was / now）。
+            //   不进单号表、不动待处理池、不存分类规则、名单长度不变。有一条记录不在了（删了）就整批不改（gone）
+            async aiApply(o, opts){
+                opts=opts||{};
+                const t=impTarget(opts.archive);
+                if(opts.ver!==undefined && opts.ver!==t.e.ver) throw impErr('stale');
+                const changes=(o && Array.isArray(o.changes) ? o.changes : []).filter(c=>c && typeof c.id==='string' && c.set && typeof c.set==='object');
+                if(!changes.length) throw impErr('nothing');
+                const log0=await impGetJson(t.e, impLogKey(t.e.id, t.aid)), logs=((log0 && log0.list) || []).slice();
+                if(!logs.some(l=>l.kind!=='ai' && l.b===o.of)) throw impErr('nolog');
+                const store=loadStore(t.e.id), a=store.archives[t.name], recs=a.records, at=new Map(recs.map((r, i)=>[r.id, i]));
+                const FIELDS=['cat','remark','skip','flow','aiFlag'];
+                const cur=(r, k)=>(k in r && r[k]!==undefined) ? (r[k]!==null && typeof r[k]==='object' ? JSON.stringify(r[k]) : r[k]) : null;
+                const chg=[];
+                changes.forEach(c=>{
+                    const i=at.get(c.id);
+                    if(i===undefined) throw impErr('gone', { id:c.id });
+                    const old=recs[i], n=Object.assign({}, old), was={}, now={};
+                    Object.keys(c.set).forEach(k=>{
+                        if(!FIELDS.includes(k)) return;
+                        let v=c.set[k];
+                        if(k==='cat'){ if(typeof v!=='string' || !a.cats.includes(v)) return; }
+                        if(k==='remark'){ if(typeof v!=='string') return; v=v.slice(0, 5000); }
+                        if(k==='skip' || k==='flow'){ v=v===true ? true : null; }
+                        if(k==='aiFlag' && v!==null){ const f=impCleanAiFlag(v, id=>at.has(id) ? id : null); if(!f) return; v=f; }
+                        was[k]=cur(old, k);
+                        if(v===null) delete n[k]; else n[k]=v;
+                        now[k]=cur(n, k);
+                    });
+                    if(!Object.keys(was).length) return;
+                    if(n.skip && n.flow) delete n.flow;
+                    recs[i]=n;
+                    chg.push({ id:c.id, was, now, nos:[] });
+                });
+                if(!chg.length) throw impErr('nothing');
+                const b='a'+Date.now().toString(36);
+                const bk=await impMakeBackup(t, b, 'ai');
+                const free=await impFreeBytes(), need=Math.ceil(bk.length*2*1.2);
+                if(free!==null && free<need) throw impErr('nospace', { need, free });
+                const bkKey=impBkPrefix(t.e.id, t.aid)+Date.now().toString(36)+'_a';
+                const oldBk=impBkKeys(t.e.id, t.aid), drop=oldBk.slice(0, Math.max(0, oldBk.length-(IMP_BK_MAX-1)));
+                await idbBatch([['put', bkKey, bk]].concat(drop.map(k=>['del', k])));
+                const d=new Date(), cl=(a.cps||[]).length, pl=(a.pms||[]).length;
+                logs.push({ kind:'ai', of:o.of, b, at:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`, apps:[], from:'', to:'',
+                            add:[], h:[], chg, cpLen:cl, pmLen:pl, cpEnd:cl, pmEnd:pl, catsAdded:[], rulesAdded:{ cat:[], type:[] } });
+                const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, cl, pl);
+                try{
+                    if(window.__impFailAt==='aiSave') throw impErr('test');
+                    await saveStoreDurable(store, t.e.id, ()=>[[impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:cleanLog })]]);
+                }catch(err){ try{ await idbBatch([['del', bkKey]]); }catch(_){} throw err; }
+                if(t.e.id===currentUser && t.name===currentArchive){
+                    try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
+                    try{ odScheduleSync(); }catch(_){}
+                }
+                odOrdersSync(t.e.id, t.name).catch(()=>{});
+                return { b, changed:chg.length };
             },
             // ---- 1016-Z2：「当作退款，挂到某一笔」的候选（只读）：账本里的支出，时间不晚于这笔、180 天以内、还没退完的够挂；新的在前，最多 50 条
             refundTargets(q, archive){

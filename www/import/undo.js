@@ -27,7 +27,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-G';
+  var VERSION = '1017-K';
   var OBJ_KEYS = ['src', 'aiFlag'];   // chg 里这些字段的原值 / 新值存的是 JSON 文本（1017-G 加 AI 标记）
 
   function hasher() {
@@ -110,7 +110,7 @@
                 added: (log.add || []).length, deleted: 0, gone: 0, changed: [], userRefunds: [],
                 restored: 0, mergeGone: 0, kept: [], sums: 0, links: 0,
                 catsDropped: [], catsKept: [], rulesRemoved: 0, typesRemoved: 0, mapsRemoved: 0,
-                orders: 0, pending: 0, pendBack: 0, rulesRestored: 0, names: null };
+                orders: 0, pending: 0, pendBack: 0, rulesRestored: 0, names: null, ai: log.kind === 'ai', aiRestored: 0 };
     var at = new Map(); S.records.forEach(function (r, k) { at.set(r.id, k); });
     var del = new Set();
     // 新增的
@@ -136,7 +136,8 @@
       keptHere.forEach(function (k) { sum.kept.push({ id: c.id, field: k, time: r.time || '', money: r.money, now: curVal(r, k) }); });
       var isSum = c.was && ('money' in c.was) && !('time' in c.was);
       var isLink = c.was && ('refundOf' in c.was);
-      if (isLink) sum.links++; else if (isSum) sum.sums++; else sum.restored++;
+      if (log.kind === 'ai') sum.aiRestored++;            // 1017-K：AI 改过的记录（分类、备注、口径、标记）改回去
+      else if (isLink) sum.links++; else if (isSum) sum.sums++; else sum.restored++;
     });
     // 你挂在这批新增记录上的退款：一起删
     S.records.forEach(function (r) { if (!del.has(r.id) && r.refundOf && del.has(r.refundOf)) { sum.userRefunds.push(brief(r)); del.add(r.id); } });
@@ -220,11 +221,11 @@
               orders: Object.assign({}, state.orders || {}), pending: (state.pending || []).slice(), logs: state.logs.slice() };
     var chain = d.chain.map(function (k) { return state.logs[k].b; }).reverse();
     var steps = chain.map(function (x) { return undoOne(S, x); });
-    var totals = { deleted: 0, gone: 0, changed: 0, userRefunds: 0, restored: 0, kept: 0, sums: 0, links: 0, catsDropped: 0, catsKept: 0,
+    var totals = { deleted: 0, gone: 0, changed: 0, userRefunds: 0, restored: 0, aiRestored: 0, kept: 0, sums: 0, links: 0, catsDropped: 0, catsKept: 0,
                    rules: 0, orders: 0, pending: 0, pendBack: 0, legacy: false };
     steps.forEach(function (s) {
       totals.deleted += s.deleted; totals.gone += s.gone + s.mergeGone; totals.changed += s.changed.length; totals.userRefunds += s.userRefunds.length;
-      totals.restored += s.restored; totals.kept += s.kept.length; totals.sums += s.sums; totals.links += s.links;
+      totals.restored += s.restored; totals.aiRestored += s.aiRestored; totals.kept += s.kept.length; totals.sums += s.sums; totals.links += s.links;
       totals.catsDropped += s.catsDropped.length; totals.catsKept += s.catsKept.length;
       totals.rules += s.rulesRemoved + s.typesRemoved + s.mapsRemoved + s.rulesRestored; totals.orders += s.orders; totals.pending += s.pending; totals.pendBack += s.pendBack;
       if (s.legacy) totals.legacy = true;
@@ -233,22 +234,32 @@
   }
 
   // 给确认框的大白话摘要（⑦b 的界面另做，这里先给开发开关里的临时按钮用）
+  var FIELD_NAME = { cat: '分类', remark: '备注', skip: '口径', flow: '口径', aiFlag: '标记', time: '时间', money: '金额', src: '来源', cp: '对方', batch: '批次' };
   var WHY = { ai: 'AI 修改了这批的记录', same: '合并或追加了同一条记录', refund: '有退款挂在这批的记录上', names: '用到了这批新加的对方名或支付方式', cat: '用到了这批新建的分类', marker: '用到了这批登记的退款记号', pending: '处理了这批留下的待处理' };
   function describe(p) {
     if (!p || !p.ok) return '找不到这次导入的记录。';
     var t = p.totals, out = [];
+    var isAi = function (b) { var s0 = p.steps.filter(function (x) { return x.b === b; })[0]; return !!(s0 && s0.ai); };
     if (p.chain.length > 1) {
-      out.push('要先撤销之后的 ' + (p.chain.length - 1) + ' 次导入，从新到旧连着撤：');
+      var aiN = p.chain.slice(0, -1).filter(isAi).length, impN = p.chain.length - 1 - aiN;
+      out.push('要先撤销之后的 ' + (impN ? impN + ' 次导入' : '') + (impN && aiN ? '、' : '') + (aiN ? aiN + ' 次 AI 修改' : '') + '，从新到旧连着撤：');
       p.chain.slice(0, -1).forEach(function (b) {
         var s = p.steps.filter(function (x) { return x.b === b; })[0];
         var w = (p.why[b] || []).map(function (x) { return WHY[x.why]; }).filter(function (x, k, a) { return a.indexOf(x) === k; }).join('、');
         out.push('· ' + (s.at || b).replace('T', ' ') + '（' + w + '）');
       });
     }
-    out.push('删掉 ' + t.deleted + ' 条导入的记录，还原 ' + t.restored + ' 条合并过的手记' + (t.sums ? '，汇总记录还原 ' + t.sums + ' 条' : '') + (t.links ? '，退款改挂还原 ' + t.links + ' 条' : '') + '。');
+    // 1017-K：只撤一次 AI 修改：只说改回几条
+    if (isAi(p.target) && p.chain.length === 1) out.push('把 AI 改过的 ' + t.aiRestored + ' 条记录改回去（分类、备注、口径、标记）。');
+    else {
+      out.push('删掉 ' + t.deleted + ' 条导入的记录，还原 ' + t.restored + ' 条合并过的手记' + (t.sums ? '，汇总记录还原 ' + t.sums + ' 条' : '') + (t.links ? '，退款改挂还原 ' + t.links + ' 条' : '') + '。');
+      if (t.aiRestored) out.push('AI 改过的 ' + t.aiRestored + ' 条记录改回去。');
+    }
     if (t.changed) out.push('其中 ' + t.changed + ' 条你导入后改过，照样删掉。');
     if (t.userRefunds) out.push('你挂在这些记录上的退款 ' + t.userRefunds + ' 条一起删掉。');
-    if (t.kept) out.push('合并的手记里有 ' + t.kept + ' 处你导入后改过，保留你改的。');
+    // 1017-K：撤 AI 修改时写「其中 N 处你后来又改过」并列出是哪几处；撤导入照旧
+    if (t.kept && isAi(p.target) && p.chain.length === 1) out.push('其中 ' + t.kept + ' 处你后来又改过，保留你改的：' + p.steps.reduce(function (a, s0) { return a.concat(s0.kept); }, []).slice(0, 5).map(function (k) { return String(k.time || '').slice(5, 16).replace('T', ' ') + ' ' + (FIELD_NAME[k.field] || k.field); }).join('、') + (t.kept > 5 ? '……' : '') + '。');
+    else if (t.kept) out.push('合并的手记里有 ' + t.kept + ' 处你导入后改过，保留你改的。');
     if (t.gone) out.push(t.gone + ' 条已经被你删掉了，跳过。');
     if (t.catsDropped || t.catsKept) out.push('新建的分类删 ' + t.catsDropped + ' 个' + (t.catsKept ? '，' + t.catsKept + ' 个还在用，留下' : '') + '。');
     if (t.rules) out.push('删掉（或改回）' + t.rules + ' 条规则和对照。');
