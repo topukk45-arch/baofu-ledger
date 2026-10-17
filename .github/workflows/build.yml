@@ -59,7 +59,13 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          # 1017：下载依赖偶尔失败（2c7d9af 那次 Maven Central 临时报「找不到」gson、asm 这些明明有的包），
+          # 失败了等 30 秒、强制重新查依赖再试一次；第二次还失败才算失败
+          ./gradlew assembleDebug --no-daemon || {
+            echo "::warning title=编译重试::第一次编译失败，30 秒后重新下载依赖再试一次"
+            sleep 30
+            ./gradlew assembleDebug --no-daemon --refresh-dependencies
+          }
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v4
