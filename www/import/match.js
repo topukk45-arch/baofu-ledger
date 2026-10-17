@@ -31,6 +31,7 @@
 //   转账、红包、扫码付给个人：只做精确配对（不做金额相近、部分付款、多笔合一）。个人 = 微信「转账」「扫二维码付款」各种「微信红包」、
 //     支付宝「转账红包」，或者对方名带 *、清洗后不超过 5 个字、除了 * 只有汉字（像「*小玲」「张*」）。
 //   候选排序：日期只用来筛；候选按时间差（分钟）再按金额差排，第一条是「最像」的（1017-UI5 起先看分类，见 sortCands）。
+// 1017-A：金额相近（1016-X）的自动合并只限手记同一天或晚 1 天；晚 2–3 天的进待你确认（「金额差 x 元、晚 N 天记的」）。金额正好相等的跨天配对不变。
 //   全额退款（④ 里两条都跳过的那对）：不参与配对；原单上记下 3 天内同金额的手记（hintCands），
 //     确认页在所有配对（含你在确认页上选的合并）做完以后，这些手记没被别的账单合并掉的，才挂一句弱提醒，不占手记名额。
 (function (root, factory) {
@@ -40,11 +41,12 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-UI6';
+  var VERSION = '1017-A';
   var PARTIAL_MAX = 3;
   var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
   var FAR_MAX = 5;
+  var NEAR_AUTO_DAYS = 1;   // 1017-A：金额相近的自动合并只认手记同一天或晚 1 天
   var BUCKETS = ['add', 'merge', 'skip', 'neutral', 'refund', 'pending', 'error'];
 
   function classifier() {
@@ -302,6 +304,7 @@
     //   账单推荐的分类（推不出、未分类的不算）和手记的分类一样。账单比手记高的仍进待处理。
     //   为了不抢错：这笔账单只有这一条手记符合、这条手记也只被这一笔账单看中，才合并；不然照旧进待处理。
     //   合并时手记金额不改（确认页可一键改成实付）；差额进结果页「N 笔手记比实付多 x 元，多半是立减」
+    //   1017-A：找还是 3 天内找（「只有这一条」也按 3 天算），但只有同一天或手记晚 1 天的才自动合并；晚 2–3 天的进待你确认
     var nearOk = new Map(), nearBy = new Map();
     bills.forEach(function (b) {
       if (b.done || b.neutral || b.personal) return;
@@ -311,7 +314,10 @@
       if (tol <= 0) return;
       scan(b.type, b.day, 0, EXACT_DAYS, b.fen + 1, b.fen + tol, function (m) { if (free(m) && m.cat === rc) hits.push(m); });   // 1017-UI6：手记比账单早的不算
       if (hits.length !== 1) return;
-      nearOk.set(b, hits[0]);
+      // 1017-A：金额相近的自动合并只限同一天或手记晚 1 天；晚 2–3 天的不合并，进待你确认（还是占着「只有这一条」的名额，不让别的账单抢）
+      var lateD = dayNo(hits[0].time) - b.day;
+      if (lateD > NEAR_AUTO_DAYS) b.nearLate = { m: hits[0], days: lateD };
+      else nearOk.set(b, hits[0]);
       nearBy.set(hits[0].id, (nearBy.get(hits[0].id) || 0) + 1);
     });
     var nearMerged = [];
@@ -358,7 +364,9 @@
                    days: '有一条手记金额一样，但差了 4 到 7 天（可能是先用后付），请你确认', mixed: '有几条手记都可能是它，请你确认' }[it.why];
         // 1017-UI6：手记比账单早的写明早几天；像延后扣款的（地铁、公交、先乘后付、免密、代扣这类词，或分类对得上）再说一句
         var ec = it.cands.filter(function (c) { return c.early; })[0];
-        if (it.why === 'early' && ec) it.msg = '你记的比账单早 ' + ec.early + ' 天' + (ec.delay ? '，可能是延后扣款' : '') + '，请你确认';
+        if (it.why === 'near' && b.nearLate && it.cands[0] && it.cands[0].record === b.nearLate.m.id)
+          it.msg = '金额差 ' + ((b.nearLate.m.fen - b.fen) / 100).toFixed(2) + ' 元、晚 ' + b.nearLate.days + ' 天记的，请你确认';
+        else if (it.why === 'early' && ec) it.msg = '你记的比账单早 ' + ec.early + ' 天' + (ec.delay ? '，可能是延后扣款' : '') + '，请你确认';
         else if (it.why === 'xcat') { var xm = cands[0].m; it.msg = '有一条手记金额一样、晚 ' + Math.abs(dayNo(xm.time) - b.day) + ' 天记的，但分类对不上（账单像「' + billCat(b) + '」，你记的是「' + (xm.cat || '未分类') + '」），请你确认'; }
       } else it.flags.push('missing');     // 漏记
     });
