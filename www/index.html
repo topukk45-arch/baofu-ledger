@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-K</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-L</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -9640,20 +9640,48 @@ ${detail}
                 if(my!==__pendBannerSeq) return;
                 let n=0, fen=0;
                 ((o && Array.isArray(o.items)) ? o.items : []).forEach(x=>{ if(x && String(x.t||'').slice(0, 7)===month){ n++; fen+=Number(x.amt)||0; } });
+                // 1017-L：这个月带 AI 标记的记录
+                const flagged=getUserData().filter(r=>r.aiFlag && typeof r.time==='string' && r.time.slice(0, 7)===month);
                 let b=$('statPendBanner');
-                if(!n){ if(b) b.remove(); return; }
+                if(!n && !flagged.length){ if(b) b.remove(); return; }
                 if(!b){
                     b=document.createElement('div'); b.id='statPendBanner'; b.className='stat-pend-banner';
                     const pane=$('statPaneFlow'); pane.insertBefore(b, pane.firstChild);
                 }
                 b.textContent='';
-                const tx=document.createElement('span'); tx.textContent=`本月还有 ${n} 笔导入账单待确认，共 ${(fen/100).toFixed(2)} 元`;
-                const go=document.createElement('button'); go.type='button'; go.id='statPendGo'; go.textContent='去处理';
-                go.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.openPending()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '待处理')); });
-                b.appendChild(tx); b.appendChild(go);
+                if(n){
+                    const tx=document.createElement('span'); tx.textContent=`本月还有 ${n} 笔导入账单待确认，共 ${(fen/100).toFixed(2)} 元`;
+                    const go=document.createElement('button'); go.type='button'; go.id='statPendGo'; go.textContent='去处理';
+                    go.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.openPending()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '待处理')); });
+                    b.appendChild(tx); b.appendChild(go);
+                }
+                if(flagged.length){
+                    const tx2=document.createElement('span'); tx2.id='statAiFlags'; tx2.textContent=`有 ${flagged.length} 条 AI 标记待看`;
+                    const go2=document.createElement('button'); go2.type='button'; go2.id='statAiFlagsGo'; go2.textContent='去看';
+                    go2.addEventListener('click', ()=>openAiFlagList(month));
+                    b.appendChild(tx2); b.appendChild(go2);
+                }
             }).catch(()=>{ if(my===__pendBannerSeq){ const b=$('statPendBanner'); if(b) b.remove(); } });
         }
 
+        // 1017-L：这个月带 AI 标记的记录列成一张底部面板（只看），点一条打开账单详情（在那里能「知道了，去掉标记」）
+        function openAiFlagList(month){
+            const all=getUserData(), list=all.filter(r=>r.aiFlag && typeof r.time==='string' && r.time.slice(0, 7)===month).sort((a, b)=>a.time<b.time ? -1 : 1);
+            if(!window.JiwenSheet || !list.length) return;
+            window.JiwenSheet.open({ title:'AI 标记待看（' + list.length + ' 条）',
+                body(box, done){
+                    list.forEach(r=>{
+                        const row=document.createElement('div'); row.className='sf-item ai-flag-row'; row.dataset.id=r.id; row.style.minHeight='48px'; row.style.cursor='pointer';
+                        const top=document.createElement('div'); top.className='sf-top';
+                        top.textContent=`${r.time.slice(5, 16).replace('T', ' ')} · ${r.cat||'未分类'} · ${safeNum(r.money).toFixed(2)}`;
+                        const why=document.createElement('div'); why.style.fontSize='12.5px'; why.style.color='var(--c-text-soft)'; why.textContent=aiFlagText(r, all);
+                        row.appendChild(top); row.appendChild(why);
+                        row.addEventListener('click', ()=>{ done(); openDetail(r.id); });
+                        box.appendChild(row);
+                    });
+                },
+                foot(box, done){ const c=document.createElement('button'); c.type='button'; c.className='ui-btn block'; c.id='aiFlagListClose'; c.textContent='关闭'; c.addEventListener('click', ()=>done()); box.appendChild(c); } });
+        }
         function renderStatCalendar(){
             $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
             renderPendBanner();
@@ -9953,6 +9981,7 @@ ${detail}
                 + modeTag(rec, true) + refundedTag(rec, refundedMap(all));
             paintDetailRefund(rec, all);
             paintDetailSource(rec);
+            paintDetailAiFlag(rec, all);
             const rk=(rec.remark||'').trim();
             $('detailRemark').textContent = rk || '（无备注）';
             detailCurId=id;
@@ -9988,6 +10017,40 @@ ${detail}
                 });
                 f.appendChild(b);
             }
+        }
+        // 1017-L：AI 标记（「AI 检查导入结果」打的）：详情里一行「AI 觉得可能和 X 月 X 日那笔重复」+ 理由，「知道了，去掉标记」。
+        //   标记只有用过开发开关里的 AI 检查才会有，有就显示（不看开关）；去掉标记就是改这一条记录（不算 AI 修改，撤销那次 AI 修改时这一项按「你后来改过」不动）
+        function aiFlagText(rec, all){
+            const f=rec.aiFlag; if(!f) return '';
+            const o=f.ref ? (all||getUserData()).find(r=>r.id===f.ref) : null;
+            const when=o ? `${+o.time.slice(5,7)} 月 ${+o.time.slice(8,10)} 日那笔（${safeNum(o.money).toFixed(2)}）` : '';
+            return f.k==='dup' ? (when ? `AI 觉得可能和 ${when}重复` : 'AI 觉得这笔可能记重复了')
+                               : (when ? `AI 觉得可能漏配：和 ${when}有关` : 'AI 觉得这笔可能漏配了（和你记的某条手记是同一笔）');
+        }
+        function paintDetailAiFlag(rec, all){
+            let f=$('detailAiField');
+            if(!rec.aiFlag){ if(f) f.remove(); return; }
+            if(!f){
+                f=document.createElement('div'); f.className='field'; f.id='detailAiField';
+                const remarkField=$('detailRemark').parentNode; remarkField.parentNode.insertBefore(f, remarkField.nextSibling);
+            }
+            f.textContent='';
+            const lab=document.createElement('label'); lab.className='field-label'; lab.textContent='AI 标记'; f.appendChild(lab);
+            const box=document.createElement('div'); box.className='detail-val'; box.style.display='block';
+            const v=document.createElement('div'); v.id='detailAiFlag'; v.style.color='var(--c-neg)'; v.textContent=aiFlagText(rec, all); box.appendChild(v);
+            if(rec.aiFlag.why){ const w=document.createElement('div'); w.id='detailAiWhy'; w.style.color='var(--c-text-soft)'; w.style.fontSize='12.5px'; w.style.marginTop='4px'; w.textContent='理由：'+rec.aiFlag.why; box.appendChild(w); }
+            f.appendChild(box);
+            const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='detailAiClear'; b.textContent='知道了，去掉标记'; b.style.marginTop='6px';
+            b.addEventListener('click', ()=>{
+                const data=getUserData(), i=data.findIndex(r=>r.id===rec.id);
+                if(i<0){ customAlert('这条记录不存在了'); return; }
+                const next=Object.assign({}, data[i]); delete next.aiFlag;
+                data[i]=next;
+                if(!saveUserData(data)) return;
+                try{ refreshAllViews(); }catch(_){}
+                openDetail(rec.id);
+            });
+            f.appendChild(b);
         }
         // 一笔关联记录的一行：时间 / 备注 / 金额（详情与修改弹窗共用）
         function refundLineHtml(r, sign){
