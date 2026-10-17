@@ -24,7 +24,7 @@ async function openRow(t, key) {
   const S = t.S(); S.view.details = true; ['add', 'neutral', 'refund'].forEach(g => { S.view.open[g] = true; }); t.w.JiwenImportUI._goStep('overview');   // 1017-UI2：明细在最后一步「总览」
   const r = [...t.d.querySelectorAll('#impBody .al-row')].find(x => x.dataset.key === key);
   if (r) r.click();
-  await t.until(() => t.$('impSheetMask').style.display === 'flex' && t.$('impSheet').dataset.key === key);
+  await t.until(() => (t.d.getElementById('impSheet') && t.d.getElementById('uiSheetMask').classList.contains('open')) && t.$('impSheet').dataset.key === key);
 }
 
 (async () => {
@@ -43,10 +43,10 @@ async function openRow(t, key) {
     const rows = [...t.d.querySelectorAll('.imp-rp-row')];
     ok(rows.length === 1 && /某虚构饭店|聚餐/.test(rows[0].textContent) && /400\.00/.test(rows[0].textContent), '1 候选：这一批里那笔 400');
     rows[0].querySelector('.imp-rp-pick').click();
+    ok(!!t.$('impAsRefundOff'), '1 详情里能「不挂了」');
+    t.$('impSheetOk').click();      // 1017-UI10：详情里的改动点「确定」才生效
     const d = t.S().plan.rows.find(x => x.key === kb);
     ok(d.group === 'refund' && d.refundTo && d.refundTo.row && diffZero(t.S().plan), '1 挂上了：这笔进「退款」组，差额照样差 0 分');
-    ok(!!t.$('impAsRefundOff'), '1 详情里能「不挂了」');
-    t.$('impSheetClose').click();
     A.clickGo(t.w);
     await t.until(() => t.$('impResult'));
     t.$('impBackToLedger').click(); await t.idle();
@@ -68,14 +68,13 @@ async function openRow(t, key) {
     await t.until(() => t.d.querySelector('.imp-rp-rec') || /没找到/.test(t.$('impRefundPick').textContent));
     const ids = [...t.d.querySelectorAll('.imp-rp-rec')].map(x => x.dataset.id);
     ok(same(ids, ['e1']), '2 账本里的候选：200 的那笔；30 的不够挂、3 月的超过 180 天，都不列 ' + JSON.stringify(ids));
-    t.d.querySelector('.imp-rp-rec .imp-rp-pick').click();
+    t.d.querySelector('.imp-rp-rec .imp-rp-pick').click(); t.$('impSheetOk').click();
     ok(t.S().plan.rows.find(x => x.key === k).group === 'refund', '2 挂上了');
-    t.$('impAsRefundOff').click();
+    await openRow(t, k); t.$('impAsRefundOff').click(); t.$('impSheetOk').click();
     ok(t.S().plan.rows.find(x => x.key === k).group !== 'refund', '2 「不挂了」：恢复成收入');
-    t.$('impAsRefund').click();
+    await openRow(t, k); t.$('impAsRefund').click();
     await t.until(() => t.d.querySelector('.imp-rp-rec'));
-    t.d.querySelector('.imp-rp-rec .imp-rp-pick').click();
-    t.$('impSheetClose').click();
+    t.d.querySelector('.imp-rp-rec .imp-rp-pick').click(); t.$('impSheetOk').click();
     A.clickGo(t.w);
     await t.until(() => t.$('impResult'));
     t.$('impBackToLedger').click(); await t.idle();

@@ -64,15 +64,15 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
       const r = [...t.d.querySelectorAll('#impBody .al-row')].find(x => x.dataset.key === key);
       if (r) r.click();
     }
-    await t.until(() => t.$('impSheetMask').style.display === 'flex');
+    await t.until(() => (t.d.getElementById('impSheet') && t.d.getElementById('uiSheetMask').classList.contains('open')));
     select(t, t.d.querySelector('#impSheet .imp-row-cat'), '杂项');
     await t.until(() => t.ask());
     asked = t.ask().msg;
     if (choice === 'all') await t.askOk(); else await t.askCancel();
+    t.$('impSheetOk').click();      // 1017-UI10：详情里的改动点「确定」才生效
     cats = t.S().plan.rows.filter(d => d.cp === '某虚构书店').map(d => d.cat).sort();
     ok(/按你的规则「某虚构书店 → 购物」归的/.test(asked) && t.$('askOk').textContent !== '' , '3 改按规则归的分类：先问一句 ' + choice);
     ok(choice === 'all' ? same(cats, ['杂项', '杂项']) : same(cats, ['杂项', '购物']), '3 ' + (choice === 'all' ? '以后都改：同一条规则归的两笔都改' : '只改这一条：另一笔还是规则的分类') + ' ' + JSON.stringify(cats));
-    t.$('impSheetClose').click();
     A.clickGo(t.w);
     await t.until(() => t.$('impResult'));
     const rc = t.$('impResult').textContent;

@@ -55,7 +55,7 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   const item = t.d.querySelector('.imp-list .imp-item');
   ok(item && item.querySelector('.al-row') && item.querySelector('.imp-why'), '6 明细：一行和下面的说明合成一块（.imp-item）');
   item.querySelector('.imp-why').click();
-  ok($('impSheetMask').style.display === 'flex' && $('impSheetClose') && $('impSheetClose').parentNode.className.includes('imp-sheet-foot'), '6 点说明那一行也能打开详情，「关闭」贴在详情底部');
+  ok(t.d.getElementById('impSheet') && t.d.getElementById('uiSheetMask').classList.contains('open') && $('impSheetClose') && $('impSheetClose').closest('#uiSheetFoot'), '6 点说明那一行也能打开详情，「关闭」（1017-UI10 起是「取消」）贴在详情底部（共用面板的底栏）');
   if ($('impTrace')) ok(!/开发用/.test($('impTrace').textContent) && /为什么没配上/.test($('impTrace').textContent) && !$('impTrace').classList.contains('open'), '6 「为什么没配上手记」默认收起，不写「开发用」');
   $('impSheetClose').click();
   // 结果页

@@ -57,14 +57,13 @@ const TX = () => [
     const pr = q('.imp-pend-row') || q('#impPendGroups .imp-sub-row');
     const pk = pr.dataset.key;
     ok(!!pk && q('.imp-pend-row'), '2 有单独一笔待你确认的行');
-    q('.imp-pend-row').click(); raw('impPickClear').click();
+    q('.imp-pend-row').click(); raw('impPickClear').click(); raw('impSheetOk').click();      // 1017-UI10：点「确定」才生效
     const mk2 = () => q('.imp-pend-row[data-key="' + pk + '"] .imp-mark');
     ok(mk2().dataset.st === 'ok' && !(S().edits.rows[pk] && S().edits.rows[pk].pick), '2 明确点了「还是待确认」：也算定了（改动里不多东西）');
-    raw('impPickNew').click();
+    q('.imp-pend-row[data-key="' + pk + '"]').click(); raw('impPickNew').click(); raw('impSheetOk').click();
     ok(mk2().dataset.st === 'ok' && S().edits.rows[pk].pick === 'new', '2 改成作为新增：已选');
     UI._state().edits.rows[pk] && delete UI._state().edits.rows[pk].pick; delete UI._state().edits.rows[pk]; UI._replan();
     ok(mk2().dataset.st === 'pend', '2 撤回（改动去掉）：变回待选，不会一直「已定」');
-    t.d.getElementById('impSheetClose') && t.d.getElementById('impSheetClose').click();
     // ===== 3. 转账往来：部分已定 1/3；其余都保持计入 → 已选；改回计入 → 改动去掉、变回待选 =====
     UI._goStep('refund');
     const tb = () => q('#impTransfers [data-tr]');

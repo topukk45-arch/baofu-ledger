@@ -361,7 +361,7 @@ async function run(cfg, port, browser) {
     await measure(page, 'imp-confirm-details', { scope: IMP, primary: ['#impGo'], scrollTop: false });
     // 行详情（一笔待处理的）
     const hasPend = await page.evaluate(() => { const r = document.querySelector('.imp-list[data-group="pending"] .al-row') || document.querySelector('.imp-list .al-row'); if (r) { r.click(); return true; } return false; });
-    if (hasPend) { await page.waitForTimeout(300); await measure(page, 'imp-row-sheet', { scope: '#impSheetMask', primary: ['#impPickNew', '#impSheetClose'], scrollTop: false }); await click(page, '#impSheetClose'); }
+    if (hasPend) { await page.waitForTimeout(300); await measure(page, 'imp-row-sheet', { scope: '#uiSheetMask', primary: ['#impSheetOk', '#impSheetClose'], scrollTop: false }); await click(page, '#impSheetClose'); }
     // 当作退款，挂到某一笔（找一笔收入）
     const hasInc = await page.evaluate(() => { const rows = window.JiwenImportUI._state().plan.rows.filter(r => r.pio === 'income' && (r.group === 'add' || r.group === 'neutral') && !r.summary); return rows.length ? rows[0].key : null; });
     if (hasInc) {

@@ -151,25 +151,25 @@ const before = await t.snapshot();
   const oddRow = [...t.d.querySelectorAll('.imp-list[data-group="add"] .al-row')].find(r => r.textContent.includes('某某'));
   ok(!!oddRow, '2 展开「新增」能看到那一行');
   oddRow.click();
-  ok(t.$('impSheetMask').style.display === 'flex' && t.$('impSheet').textContent.includes('某某'), '2 点一行打开详情');
+  ok((t.d.getElementById('impSheet') && t.d.getElementById('uiSheetMask').classList.contains('open')) && t.$('impSheet').textContent.includes('某某'), '2 点一行打开详情');
   t.select(t.d.querySelector('#impSheet .imp-row-cat'), '购物');
+  t.$('impSheetOk').click();      // 1017-UI10：详情里的改动点「确定」才生效
+  const reopen = () => { const S0 = t.S(); Object.keys(S0.plan.groups).forEach(g => { S0.view.open[g] = true; }); t.w.JiwenImportUI._goStep('overview'); [...t.d.querySelectorAll('.imp-list[data-group] .al-row')].find(x => x.textContent.includes('某某')).click(); };
   ok(t.S().plan.groups.add.find(d => d.cp === '某某').cat === '购物' && ![...t.$('impCpGroups') ? t.$('impCpGroups').querySelectorAll('.imp-row-opt') : []].some(r => r.dataset.cp === '某某'), '2 详情里改分类：这行变成购物，不再出现在按对方选分类里');
-  t.$('impExclude').click();
+  reopen(); t.$('impExclude').click(); t.$('impSheetOk').click();
   ok(t.S().plan.importN === N0 - 1 && t.go() === `新建 ${t.S().plan.records} 条记录，合并 ${M0} 笔` && t.chip('excluded') === 1, '2 勾掉一笔：按钮变成 ' + t.go());
   ok(t.d.querySelector('#impFiles .imp-diff-expense').textContent.includes('你勾掉的 50.00') && t.d.querySelector('#impFiles .imp-diff-expense').textContent.endsWith('合计差 0.00'), '2 差额里多出「你勾掉的」，合计照样差 0');
-  t.$('impRestore').click();
+  reopen(); t.$('impRestore').click(); t.$('impSheetOk').click();
   ok(t.S().plan.importN === N0, '2 恢复：按钮回到 ' + t.go());
-  t.$('impSheetClose').click();
   // 待你确认：选合并对象
-  t.$('impG-pending').click();
+  if (!t.S().view.open.pending) t.$('impG-pending').click();
   const nk = t.S().plan.groups.pending.find(d => d.cp === '某餐厅').key;
   const nr = [...t.d.querySelectorAll('.imp-list[data-group="pending"] .al-row')].find(r => r.dataset.key === nk);
   nr.click();
   const pickBtn = t.d.querySelector('#impSheet .imp-pick');
   ok(pickBtn && pickBtn.textContent === '选这个', '2 待你确认的详情里列出候选手记（1017-UI8 起按钮统一叫「选这个」）');
-  pickBtn.click();
+  pickBtn.click(); t.$('impSheetOk').click();
   ok(t.S().plan.mergeM === M0 + 1 && t.chip('merge') === M0 + 1 && t.go().endsWith(`合并 ${M0 + 1} 笔`), '2 选了合并对象：合并 +1');
-  t.$('impSheetClose').click();
   // 新建分类勾上
   const nc = t.$('impNewCats').querySelector('input'); nc.click();
   ok(t.S().plan.groups.add.filter(d => d.cat === '交通出行').length === 4, '2 勾上新建「交通出行」：那 4 笔跟着变');
@@ -197,9 +197,9 @@ const before = await t.snapshot();
   await t.pick(FILES);
   t.$('impDetailsToggle').click(); t.$('impG-add').click();
   t.d.querySelector('.imp-list[data-group="add"] .al-row').click();
-  ok(t.$('impSheetMask').style.display === 'flex', '4 打开一行的详情');
+  ok((t.d.getElementById('impSheet') && t.d.getElementById('uiSheetMask').classList.contains('open')), '4 打开一行的详情');
   t.backFn();
-  ok(t.$('impSheetMask').style.display === 'none' && t.$('impPage').style.display === 'block', '4 返回键先关详情，导入页还在');
+  ok(!(t.d.getElementById('impSheet') && t.d.getElementById('uiSheetMask').classList.contains('open')) && t.$('impPage').style.display === 'block', '4 返回键先关详情，导入页还在');
   // 1017-UI2 起确认页分步：返回键一步一步往回退，第 1 步再按先问「退出这次导入？」，点「退出」才回到选文件页（原来是直接关掉导入页）
   const steps = t.S().view.steps.length;
   for (let i = 1; i < steps; i++) { await new Promise(r => setTimeout(r, 150)); t.backFn(); }

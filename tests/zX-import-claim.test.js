@@ -51,11 +51,12 @@ const Y = wx({ time: T(5, 12, 0), cp: '某虚构食堂', desc: '套餐', fen: 30
   q('.imp-pend-row[data-key="' + zk + '"]').click();
   const pb = Array.from(raw('impSheet').querySelectorAll('.imp-pick')).find(b => !b.disabled);
   ok(pb && /这条手记也可能是/.test(raw('impSheet').textContent), '2 Z 的详情里 c 能点（你亲手选的不会直接变灰），也写了也可能是别处的');
-  pb.click();
+  pb.click(); raw('impSheetOk').click();      // 1017-UI10：详情里点「确定」才生效，要让出手记的这时候问
   ok(q('#uiSheetMask.open') && /这条手记已经配给了 .*那组，改配到这里吗？/.test(raw('impClaimMsg').textContent), '3 已经亲手配给了别处：先问「已经配给了某某，改配到这里吗？」：' + (raw('impClaimMsg') || {}).textContent);
   raw('impClaimNo').click();
   ok(S().edits.sums[g.id] === fi && !(S().edits.rows[zk] && S().edits.rows[zk].pick), '3 点「不改」：两边都不动');
-  Array.from(raw('impSheet').querySelectorAll('.imp-pick')).find(b => !b.disabled).click();
+  q('.imp-pend-row[data-key="' + zk + '"]').click();
+  Array.from(raw('impSheet').querySelectorAll('.imp-pick')).find(b => !b.disabled).click(); raw('impSheetOk').click();
   raw('impClaimOk').click();
   const zr = S().plan.rows.find(d => d.key === zk), x1 = S().plan.rows.find(d => d.key === keyOf(X1));
   ok(S().edits.sums[g.id] === undefined && zr.group === 'merge' && zr.into === 'c' && x1.group === 'pending', '3 确认了才改：Z 配 c，那组让出来、回到待处理');
