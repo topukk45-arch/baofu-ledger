@@ -387,8 +387,8 @@
         .to-top.show { opacity:1; pointer-events:auto; }
         .to-top:active { transform:scale(0.92); }
 
-        /* 清除筛选浮钮：与回到顶部同款圆钮，位于其正上方；仅在筛选生效时浮现。
-           与滚动位置无关——只要当前在记账页且有筛选条件就显示。 */
+        /* 清除筛选浮钮：与回到顶部同款圆钮，位于其正上方；仅在筛选生效（或不在第 1 页）时浮现。
+           1017-N 起和统计页 ✕ 一样：有动作（滑动、翻页、改筛选）才出现，停下 1.5 秒淡出（fabWake），不常驻挡记录。 */
         .clear-filter-fab { position:fixed; right:16px; z-index:910;
             bottom:calc(176px + env(safe-area-inset-bottom));
             width:44px; height:44px; border-radius:50%; border:1px solid var(--c-border-mid);
@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-M</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-N</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2231,6 +2231,22 @@
         let currentTab = 'ledger';
 
         const PAGE_SIZE = 15;   // 每页条数
+
+        // 【1017-N】右下角的圆钮（账单页清筛选 ✕、账单页和统计页的回到顶部 ↑、统计页回到本月 ✕）
+        //   一律照统计页 ✕ 的老规矩（1010-K2）：有动作才出现（滑动、翻页、改筛选、翻月），停下 1.5 秒淡出；
+        //   淡出后 pointer-events:none，不挡下面的记录。手指按在圆钮上时不淡出，松开再重新计时。
+        const FAB_IDLE=1500;
+        function fabWake(el, on){
+            if(!el) return;
+            clearTimeout(el._fabT);
+            el.classList.toggle('show', !!on);
+            if(on) el._fabT=setTimeout(()=>el.classList.remove('show'), FAB_IDLE);
+        }
+        function fabHold(el){
+            if(!el) return;
+            el.addEventListener('pointerdown', ()=>clearTimeout(el._fabT));
+            ['pointerup','pointercancel'].forEach(ev=>el.addEventListener(ev, ()=>{ if(el.classList.contains('show')) fabWake(el, true); }));
+        }
         let curPage = 1;
 
         const DEFAULT_CATS = ['未分类', '餐饮', '购物', '转账', '工资', '红包', '其他'];
@@ -7384,10 +7400,10 @@ ${detail}
             window.syncFilterFab = function(){
                 const active = hasActiveSearch() || (filterCat.value && filterCat.value!=='__all');
                 fab.classList.toggle('active-filter', active);
-                // 主页面「清除/重置」浮钮：记账页且「有筛选生效 或 不在第 1 页」时浮现（与滚动位置无关）。
+                // 主页面「清除/重置」浮钮：记账页且「有筛选生效 或 不在第 1 页」时浮现（1017-N 起停下 1.5 秒淡出、滑动时再出来）。
                 // 翻页也是「偏离默认视图」的一种，点 ✕ 一并回到第 1 页 + 清筛选（clearAllFilters 已含 curPage=1）。
                 const cf=$('clearFilterFab');
-                if(cf) cf.classList.toggle('show', (active || curPage>1) && currentTab==='ledger');
+                if(cf) fabWake(cf, (active || curPage>1) && currentTab==='ledger');   // 1017-N：停下 1.5 秒淡出
             };
 
             // 打开：先把已提交状态灌进控件作为草稿起点，再渲染分类标签（高亮草稿分类），滑入
@@ -9552,8 +9568,11 @@ ${detail}
                 } else {
                     show = false;
                 }
-                btn.classList.toggle('show', show);
+                fabWake(btn, show);   // 1017-N：滑动时出现，停下 1.5 秒淡出
+                // 账单页滑动时 ✕ 也跟着出现、停下一起淡出
+                if(currentTab==='ledger' && window.syncFilterFab) window.syncFilterFab();
             }
+            fabHold(btn); fabHold($('clearFilterFab')); fabHold($('statTodayFab'));
             window.addEventListener('scroll', onScroll, {passive:true});
             btn.addEventListener('click', ()=>{
                 // 记账页：落到账单标题处（其下方就是翻页条），方便随手翻页——而非滚到整页最顶的「日子」卡片。
@@ -10134,19 +10153,15 @@ ${detail}
         // 「回到本月」浮钮：在统计页、且看的不是本月时显示
         // 【1010-K2】常驻会挡住下面的金额：改成「有动作才出现，停下 1.5 秒淡出」。
         //   出现：翻月 / 统计页任何重绘（点日期、切页签）/ 滑动页面；隐藏后 pointer-events:none，不挡点击。
-        //   0.5 秒太短，手指挪到右下角时按钮已经没了，所以取 1.5 秒；要调就改 STAT_FAB_IDLE。
-        const STAT_FAB_IDLE=1500;
-        let statFabTimer=null;
+        //   0.5 秒太短，手指挪到右下角时按钮已经没了，所以取 1.5 秒；要调就改 FAB_IDLE。
+        //   【1017-N】这条规矩挪到了 fabWake()，账单页的 ✕ 和两页的 ↑ 都照它走。
         function statAway(){
             const now=new Date();
             return statYear!==undefined && (statYear!==now.getFullYear() || statMonth!==now.getMonth());
         }
         function syncStatTodayFab(){
             const f=$('statTodayFab'); if(!f) return;
-            clearTimeout(statFabTimer);
-            const on = currentTab==='stats' && statAway();
-            f.classList.toggle('show', on);
-            if(on) statFabTimer=setTimeout(()=>f.classList.remove('show'), STAT_FAB_IDLE);
+            fabWake(f, currentTab==='stats' && statAway());
         }
         window.addEventListener('scroll', ()=>{ if(currentTab==='stats' && statAway()) syncStatTodayFab(); }, { passive:true });
         $('statTodayFab').addEventListener('click', ()=>{
