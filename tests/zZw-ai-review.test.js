@@ -48,7 +48,7 @@ const F = [['微信.csv', B.bill('wechat', TX, { range: RANGE }).bytes]];
   $('impAiPasteGo').click(); await t.until(() => $('impAiPasteMsg').textContent);
   ok(/另一次导入的/.test($('impAiPasteMsg').textContent) && q('#uiSheetMask.open'), '1 批次号对不上：写原因、整份不认、面板还开着');
   $('impAiPaste').value = '我觉得都挺好。'; $('impAiPasteGo').click(); await t.until(() => /没找到/.test($('impAiPasteMsg').textContent));
-  ok(/没找到 ```记问/.test($('impAiPasteMsg').textContent), '1 没有代码块：写原因');
+  ok(/没找到记问的修改建议，请把 AI 的整段回复复制过来/.test($('impAiPasteMsg').textContent), '1 没有代码块也没有开头那一行：写原因');
   $('impAiPaste').value = REPLY; $('impAiPasteGo').click();
   await t.until(() => $('impAiReviewHead'));
   ok(t.S().phase === 'aireview' && !q('#uiSheetMask.open'), '2 读出来了：进「AI 的修改建议」页');

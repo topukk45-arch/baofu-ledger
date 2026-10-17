@@ -128,16 +128,45 @@
     while ((m = re.exec(text))) out.push(m[1]);
     return out;
   }
+  // 1017-P：一行的写法放宽：行首空格、「- 」「* 」「• 」列表符号、全角 ｜ ＃ 都认；开头那一行外面包了 ** 或 ` 也认
+  function normLine(l) {
+    return String(l).replace(/｜/g, '|').replace(/＃/g, '#').trim().replace(/^(?:[-*•·]\s+)+/, '').trim();
+  }
+  var HEAD_RE = /^记问修改建议\s*v1\s*批次\s*(\S+)\s*导出\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*$/;
+  var ITEM_RE = /^#?\s*\d+\s*\|/;
+  function headOf(l) { return HEAD_RE.exec(l.replace(/^[`*]+|[`*]+$/g, '').trim()); }
+  // 只按前 3 个竖线切成 4 段：第 3 个竖线后面的全部算理由（理由里带 | 不会错位）
+  function cellsOf(l) {
+    var out = [], rest = l;
+    for (var i = 0; i < 3; i++) { var k = rest.indexOf('|'); if (k < 0) break; out.push(rest.slice(0, k).trim()); rest = rest.slice(k + 1); }
+    out.push(rest.trim());
+    return out;
+  }
+  // 没有 ```记问 围栏（在 AI 客户端点「复制代码」只复制到里面那几行）：在整段文字里找开头那一行，
+  //   从下一行起逐行读「#号 | 改什么 | 改成什么 | 理由」，遇到不是这种格式的行或 ``` 就停；空行跳过；一份里可以有几段
+  function looseLines(text) {
+    var out = [], reading = false;
+    text.split('\n').forEach(function (raw) {
+      var l = normLine(raw);
+      if (headOf(l)) { out.push(l.replace(/^[`*]+|[`*]+$/g, '').trim()); reading = true; return; }
+      if (!reading) return;
+      if (!l) return;
+      if (/^```/.test(l)) { reading = false; return; }
+      if (ITEM_RE.test(l)) out.push(l); else reading = false;
+    });
+    return out;
+  }
   function parseReply(text, ctx) {
     text = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
     ctx = ctx || {};
-    var bs = blocks(text);
-    if (!bs.length) return { ok: false, why: 'noblock' };
-    var outside = Math.max(0, text.split('\n').filter(function (l) { return l.trim(); }).length - bs.reduce(function (n, b) { return n + b.split('\n').filter(function (l) { return l.trim(); }).length + 2; }, 0));
-    var lines = [];
-    bs.forEach(function (b) { b.split('\n').forEach(function (l) { if (l.trim()) lines.push(l.trim()); }); });
+    var bs = blocks(text), lines = [], total = text.split('\n').filter(function (l) { return l.trim(); }).length;
+    if (bs.length) bs.forEach(function (b) { b.split('\n').forEach(function (l) { l = normLine(l); if (l) lines.push(l); }); });
+    else lines = looseLines(text);
+    if (!lines.length) return { ok: false, why: 'noblock' };
+    var outside = Math.max(0, total - lines.length - (bs.length ? bs.length * 2 : 0));
+    if (lines[0]) lines[0] = lines[0].replace(/^[`*]+|[`*]+$/g, '').trim();
     // 第一行：批次号、导出时间
-    var hm = /^记问修改建议\s*v1\s*批次\s*(\S+)\s*导出\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*$/.exec(lines[0] || '');
+    var hm = HEAD_RE.exec(lines[0] || '');
     if (!hm) return { ok: false, why: 'nohead', line: lines[0] || '' };
     if (hm[1] !== ctx.batch) return { ok: false, why: 'batch', got: hm[1], want: ctx.batch };
     if ((ctx.aiAt || []).indexOf(hm[2]) < 0) return { ok: false, why: 'time', got: hm[2], want: (ctx.aiAt || []).slice() };
@@ -146,10 +175,10 @@
     var badLine = function (l, why) { bad.push({ line: l, why: why }); };
     lines.slice(1).forEach(function (l) {
       if (/^记问修改建议/.test(l)) { if (l === lines[0]) return; badLine(l, '另一次导出的回复'); return; }   // 分几段回复的，每段开头那一行重复出现，跳过
-      var cells = l.replace(/｜/g, '|').split('|').map(function (x) { return x.trim(); });
+      var cells = cellsOf(l);
       if (cells.length < 3) { badLine(l, '格式不对（要「#号 | 改什么 | 改成什么 | 理由」）'); return; }
       var nm = /^#?\s*(\d+)$/.exec(cells[0]);
-      var fieldRaw = cells[1], value = cells[2], why = cells.slice(3).join(' | ').trim();
+      var fieldRaw = cells[1], value = cells[2], why = (cells[3] || '').trim();
       if (!nm) {
         var na0 = NOT_ALLOWED.filter(function (x) { return x[0].test(cells[0] + fieldRaw); })[0];
         badLine(l, na0 ? na0[1] : '开头不是「#号」'); return;
