@@ -27,6 +27,7 @@
 //   多笔合一：第一轮配剩下的账单，先看几笔加起来是不是正好等于同一天的一条手记（按分精确相等，先于金额相近 / 部分付款）：
 //     a. 同一天、同一对方（清洗后）的全部剩下的账单，笔数不限；
 //     b. 同一天、2–3 笔不同对方的账单，推荐分类一样（未分类不算）或者都在 1 小时内。
+//     c.（1017-C）同一天、同一对方的 2 笔，前后 1 小时内、小的那笔不超过金额相近的容差（差额正好是另一笔小钱，比如兑换券 + 配送费）。
 //     命中的进待处理（why 'multisum'），手记留住；整组的说明放在 multiSums 里：只有一种凑法的带默认建议，几种凑法的不带默认。
 //   转账、红包、扫码付给个人：只做精确配对（不做金额相近、部分付款、多笔合一）。个人 = 微信「转账」「扫二维码付款」各种「微信红包」、
 //     支付宝「转账红包」，或者对方名带 *、清洗后不超过 5 个字、除了 * 只有汉字（像「*小玲」「张*」）。
@@ -34,6 +35,8 @@
 // 1017-A：金额相近（1016-X）的自动合并只限手记同一天或晚 1 天；晚 2–3 天的进待你确认（「金额差 x 元、晚 N 天记的」）。金额正好相等的跨天配对不变。
 // 1017-B：金额相近的，同一天、手记比付款早超过 1 小时也不自动合并（「你记的比付款早 N 小时」）；手记正好 00:00 的当作没写具体时间，不拦。
 //   金额正好相等的同一天配对照旧（先记后付、先付后记都算）。
+// 1017-C：差额正好是另一笔小钱：同一对方的两笔、前后 1 小时内、小的那笔不超过金额相近的容差，加起来正好是同一天的一条手记 → 也当「几笔加起来」
+//   （照旧只建议、点了才合并），不再拿大的那笔当金额相近；同一对方 / 同一平台的凑法排前面。
 //   全额退款（④ 里两条都跳过的那对）：不参与配对；原单上记下 3 天内同金额的手记（hintCands），
 //     确认页在所有配对（含你在确认页上选的合并）做完以后，这些手记没被别的账单合并掉的，才挂一句弱提醒，不占手记名额。
 (function (root, factory) {
@@ -43,7 +46,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-B';
+  var VERSION = '1017-C';
   var PARTIAL_MAX = 3;
   var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
@@ -568,7 +571,9 @@
       var type = list[0].type, day = list[0].day, ms = (idx[type] && idx[type].get(day) || []).filter(function (m) { return free(m) && m.mode !== 'skip'; });
       if (!ms.length || list.length < 2) return;
       var byFen = new Map(); ms.forEach(function (m) { var a = byFen.get(m.fen); if (!a) byFen.set(m.fen, a = []); a.push(m); });
-      function hit(bs, kind) { var sum = bs.reduce(function (s, b) { return s + b.fen; }, 0), m = byFen.get(sum); if (m) m.forEach(function (x) { combos.push({ m: x, bs: bs, kind: kind }); }); }
+      // 1017-C：同一条手记、同一组账单的凑法只列一次（同一对方当天只有这两笔时，a 已经列过）
+      var dupOf = function (x, bs) { return combos.some(function (c) { return c.m === x && c.bs.length === bs.length && bs.every(function (b) { return c.bs.indexOf(b) >= 0; }); }); };
+      function hit(bs, kind, pri) { var sum = bs.reduce(function (s, b) { return s + b.fen; }, 0), m = byFen.get(sum); if (m) m.forEach(function (x) { if (dupOf(x, bs)) return; var c = { m: x, bs: bs, kind: kind }; if (pri !== undefined) c.pri = pri; combos.push(c); }); }
       // a. 同一对方的全部
       var byCp = new Map();
       // 1016-I：一个对方名是另一个的开头（至少 3 个字，平台名开头的不算）算同一对方：「某某排骨」和「某某排骨某某店」
@@ -590,13 +595,25 @@
         var ts = bs.map(function (b) { return minOf(b.r.time); });
         return Math.max.apply(null, ts) - Math.min.apply(null, ts) <= HOUR;
       };
+      // 1017-C：差额正好是另一笔小钱（兑换券 27 + 配送费 3 = 你记的 30）：同一对方的两笔、前后 1 小时内、小的那笔不超过金额相近的容差，
+      //   也当「几笔加起来」（上面 ok() 不收同一对方的两笔，同一对方当天还有别的单子时 a 也凑不上）。同一对方 / 同一平台的排前面
+      var smallAdd = function (bs) {
+        var lo = bs[0].fen <= bs[1].fen ? bs[0] : bs[1], hi = lo === bs[0] ? bs[1] : bs[0];
+        return Math.abs(minOf(bs[0].r.time) - minOf(bs[1].r.time)) <= HOUR && lo.fen > 0 && lo.fen <= Math.min(NEAR_FEN, Math.floor(hi.fen * NEAR_RATE));
+      };
+      var pfOf = function (b) { var x = PLATFORM_RE.exec(C.cleanCp(b.r.cp || '')); return x ? x[1] : null; };
+      var sameSrc = function (bs) { return bs.every(function (b) { return b.ccp && b.ccp === bs[0].ccp; }) || (!!pfOf(bs[0]) && bs.every(function (b) { return pfOf(b) === pfOf(bs[0]); })); };
       var fenSet = new Set(ms.map(function (m) { return m.fen; }));
       var maxM = Math.max.apply(null, ms.map(function (m) { return m.fen; }));
       var sorted = list.slice().sort(function (x, y) { return x.fen - y.fen || x.i - y.i; });
       for (var i = 0; i < sorted.length; i++) {
         for (var j = i + 1; j < sorted.length; j++) {
           var s2 = sorted[i].fen + sorted[j].fen; if (s2 > maxM) break;
-          if (fenSet.has(s2) && ok([sorted[i], sorted[j]])) hit([sorted[i], sorted[j]], 'combo');
+          if (fenSet.has(s2)) {
+            var pr = [sorted[i], sorted[j]];
+            if (ok(pr)) hit(pr, 'combo', sameSrc(pr) ? 0 : undefined);
+            else if (smallAdd(pr)) hit(pr, 'combo', 0);
+          }
           for (var k = j + 1; k < sorted.length; k++) {
             var s3 = s2 + sorted[k].fen; if (s3 > maxM) break;
             if (fenSet.has(s3) && ok([sorted[i], sorted[j], sorted[k]])) hit([sorted[i], sorted[j], sorted[k]], 'combo');
@@ -623,7 +640,7 @@
     var out = [];
     var rank = { samecp: 0, combo: 0, single: 1 };
     groups.forEach(function (cs) {
-      cs = cs.slice().sort(function (x, y) { return rank[x.kind] - rank[y.kind]; });   // 1017-UI4：几笔加起来的排前面，一笔账单的在后
+      cs = cs.slice().sort(function (x, y) { return rank[x.kind] - rank[y.kind] || (x.pri === undefined ? 1 : x.pri) - (y.pri === undefined ? 1 : y.pri); });   // 1017-C：同一对方 / 同一平台的凑法排前面   // 1017-UI4：几笔加起来的排前面，一笔账单的在后
       var id = 'S' + (idStart + out.length), bs = [];
       cs.forEach(function (c) { reserve(c.m); c.bs.forEach(function (b) { if (bs.indexOf(b) < 0) bs.push(b); }); });
       var one = cs.length === 1, single = cs.some(function (c) { return c.kind === 'single'; });

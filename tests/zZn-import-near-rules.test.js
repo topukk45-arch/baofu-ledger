@@ -1,5 +1,6 @@
 // 1017-A 起「金额差一点」的三条收紧（第四轮真机试用）。node zZn-import-near-rules.test.js [index.html]
 //   15（1017-A）：金额相近的自动合并只限同一天或手记晚 1 天；晚 2–3 天的进待你确认，写「金额差 x 元、晚 N 天记的」
+//   16（1017-C）：差额正好是另一笔小钱（同一对方、前后 1 小时内、不超过金额相近的容差）时，先当「几笔加起来」，不当金额相近
 //   17（1017-B）：金额相近的，同一天手记比付款早超过 1 小时也不自动合并，写「你记的比付款早 N 小时」；手记正好 00:00 的不拦
 // 解析 → 定去向 → 配对 → 方案，纯计算。账单、手记、对方、金额全是虚构的。
 const path = require('path');
@@ -16,8 +17,8 @@ let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); } };
 const T = (mo, d, h, mi) => ({ y: 2026, mo, d, h: h === undefined ? 12 : h, mi: mi || 0, s: 0 });
 const RANGE = { from: '2026-01-01 00:00:00', to: '2026-12-31 23:59:59' };
-const CATS = ['未分类', '吃饭', '购物', '出行', '游戏', '其他'];
-const RULES = [{ kw: '某虚构超市', cat: '购物' }, { kw: '某虚构面馆', cat: '吃饭' }, { kw: '某虚构游戏', cat: '游戏' }];
+const CATS = ['未分类', '吃饭', '购物', '出行', '游戏', '其他'];  // 吃饭 = 你说的「餐饮」
+const RULES = [{ kw: '某虚构超市', cat: '购物' }, { kw: '某虚构面馆', cat: '吃饭' }, { kw: '某虚构游戏', cat: '游戏' }, { kw: '某虚构外卖平台', cat: '吃饭' }, { kw: '某虚构便利店', cat: '吃饭' }];
 let seq = 0;
 const wno = () => '4200000000' + String(++seq).padStart(19, '0');
 const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户', desc: '虚构商品', io: 'expense', fen: 1000, pm: '零钱', status: '支付成功', mno: '', no: wno() }, o));
@@ -105,6 +106,59 @@ function run(txns, manual) {
   const b = wx({ time: T(3, 4, 21, 0), cp: '某虚构面馆', fen: 2800 });
   const it = run([b], [man('a', 3, 5, '08:00', 3000, '吃饭')]).item(b);
   ok(it.bucket === 'merge' && it.why === 'near' && it.days === 1, '17 手记晚 1 天（第二天早上补记）：照旧自动合并');
+}
+// ===== 16. 差额正好是另一笔小钱时，先当「几笔加起来」 =====
+{
+  // 你给的结构：手记 3-5 22:06 餐饮 30.00「夜宵」；账单 3-5 22:06 某平台 兑换券 27.00、22:10 同一平台 配送费 3.00。
+  // 复现条件：同一平台当天还有别的单子（12:00 午饭 15.00），以前「同一对方全部加起来」凑不上、同一对方的两笔又不试，27 被当成金额相近合并、3 成了新增
+  const L = wx({ time: T(3, 5, 12, 0), cp: '某虚构外卖平台', desc: '午饭', fen: 1500 });
+  const A = wx({ time: T(3, 5, 22, 6), cp: '某虚构外卖平台', desc: '兑换券', fen: 2700 });
+  const F = wx({ time: T(3, 5, 22, 10), cp: '某虚构外卖平台', desc: '配送费', fen: 300 });
+  const r = run([L, A, F], [man('m', 3, 5, '22:06', 3000, '吃饭', { remark: '夜宵' })]);
+  const g = r.matched.multiSums.find(x => x.options.some(o => o.record === 'm'));
+  ok(g && g.options.length === 1 && g.options[0].bills.length === 2 && g.suggest === 0, '16 27 + 3 = 30：列成「几笔加起来」，只有一种、带建议');
+  ok(r.item(A).bucket === 'pending' && r.item(A).why === 'multisum' && r.item(F).bucket === 'pending' && r.item(F).why === 'multisum', '16 两笔都在待你确认（只建议，不点不合并）');
+  ok(r.matched.stats.nearMerged === 0 && r.item(A).why !== 'near', '16 不再当金额相近合并');
+  ok(r.item(L).bucket === 'add', '16 当天别的单子照常新增');
+  const p0 = r.plan({});
+  ok(p0.rows.filter(d => d.group === 'merge').length === 0, '16 不点：不合并');
+  const p1 = r.plan({ sums: g ? { [g.id]: 0 } : {} });
+  ok([A, F].every(t => { const d = p1.rows.find(x => x.key === r.item(t).key); return d.group === 'merge' && d.into === 'm'; }), '16 点了：两笔都合并到这条手记');
+}
+{
+  // 差额找不到对应账单的照旧按金额相近处理
+  const L = wx({ time: T(3, 5, 12, 0), cp: '某虚构外卖平台', fen: 1500 });
+  const A = wx({ time: T(3, 5, 22, 6), cp: '某虚构外卖平台', fen: 2700 });
+  const r = run([L, A], [man('m', 3, 5, '22:06', 3000, '吃饭')]);
+  ok(r.item(A).bucket === 'merge' && r.item(A).why === 'near' && r.matched.multiSums.length === 0, '16 没有 3.00 那笔：照旧按金额相近合并');
+}
+{
+  // 小的那笔隔了 1 小时以上：不凑，照旧金额相近
+  const L = wx({ time: T(3, 5, 12, 0), cp: '某虚构外卖平台', fen: 1500 });
+  const A = wx({ time: T(3, 5, 21, 0), cp: '某虚构外卖平台', fen: 2700 });
+  const F = wx({ time: T(3, 5, 22, 10), cp: '某虚构外卖平台', fen: 300 });
+  const r = run([L, A, F], [man('m', 3, 5, '22:06', 3000, '吃饭')]);
+  ok(r.matched.multiSums.length === 0 && r.item(A).why === 'near' && r.item(F).bucket === 'add', '16 3.00 那笔隔了 70 分钟：不当几笔加起来，照旧');
+}
+{
+  // 两笔差不多大（15 + 15 = 30）：不算「另一笔小钱」，同一对方的两笔照旧不凑
+  const L = wx({ time: T(3, 5, 12, 0), cp: '某虚构外卖平台', fen: 1000 });
+  const A = wx({ time: T(3, 5, 22, 6), cp: '某虚构外卖平台', fen: 1500 });
+  const F = wx({ time: T(3, 5, 22, 10), cp: '某虚构外卖平台', fen: 1500 });
+  const r = run([L, A, F], [man('m', 3, 5, '22:06', 3000, '吃饭')]);
+  ok(r.matched.multiSums.length === 0, '16 15 + 15：小的那笔超过容差，不凑');
+}
+{
+  // 同一对方 / 同一平台的排前面：另有一笔别家的 3.00（1 小时内，以前就会凑）
+  const A = wx({ time: T(3, 5, 22, 6), cp: '某虚构外卖平台', fen: 2700 });
+  const X = wx({ time: T(3, 5, 22, 8), cp: '某虚构便利店', fen: 300 });
+  const F = wx({ time: T(3, 5, 22, 10), cp: '某虚构外卖平台', fen: 300 });
+  const L = wx({ time: T(3, 5, 12, 0), cp: '某虚构外卖平台', fen: 1500 });
+  const r = run([X, A, F, L], [man('m', 3, 5, '22:06', 3000, '吃饭')]);
+  const g = r.matched.multiSums[0];
+  const keyOf = t => ({ file: r.item(t).file, row: r.item(t).row });
+  const has = (o, t) => o.bills.some(b => b.row === keyOf(t).row);
+  ok(g && g.options.length === 2 && has(g.options[0], F) && has(g.options[1], X) && g.suggest === null, '16 两种凑法：同一平台的 27 + 3 排第一，别家的排第二，不带默认');
 }
 })();
 console.log(`${pass} 通过，${fail} 失败`);
