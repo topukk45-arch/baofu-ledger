@@ -6,6 +6,8 @@
 
 1013-D 起账本存在 IndexedDB，1013-G 起按月分块存。jsdom 没有 IndexedDB，测试用 [fake-indexeddb](https://github.com/dumbmatter/fakeIndexedDB)（纯 JS 实现，只在测试里用，不进 App）。
 
+1017 起：界面检查分支 `ui-review` 已合并进 main（10-17，快进到 2c7d9af），以后改界面、改功能都在 main 上做，测试也只在 main 上跑；界面量尺照旧用 `tests/ui/audit.js`。
+
 **所有测试数据都是虚构的**，不含任何真实账单。
 
 ## 运行
