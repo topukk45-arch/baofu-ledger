@@ -127,6 +127,17 @@
     '.imp-chosen .imp-ok-ico{color:var(--st-ok);font-weight:bold;}',
     '.imp-redo{flex:0 0 auto;min-height:48px;min-width:48px;padding:0 8px;border:none;background:none;color:var(--c-primary-dark);font-size:14px;font-weight:bold;font-family:inherit;text-decoration:underline;cursor:pointer;}',
     '.imp-keep{margin-top:8px;margin-left:8px;}',
+    // 1017-UI9：记录不能凭空消失
+    '.imp-count{font-size:13px;font-weight:normal;color:var(--c-text-soft);margin-left:6px;}',
+    '.imp-fold{display:flex;align-items:center;gap:8px;width:100%;min-height:48px;margin-top:8px;padding:0 4px;border:none;border-top:1px solid var(--c-border);background:none;font-family:inherit;font-size:14px;color:var(--c-text);cursor:pointer;}.imp-fold .grow{flex:1;}',
+    '.imp-fold-n{display:inline-flex;align-items:center;padding:5px 10px;border-radius:12px;font-weight:bold;color:var(--st-ok);background:rgba(58,122,46,.12);background:color-mix(in srgb,var(--st-ok) 12%,transparent);}',
+    '.imp-fold-box{margin-top:8px;}',
+    '.imp-done-row{display:flex;align-items:center;gap:8px;min-height:48px;padding:4px 0;border-bottom:1px dashed var(--c-border);}.imp-done-row .grow{flex:1;min-width:0;}',
+    '.imp-done-label{color:var(--c-text-soft);}.imp-moved .imp-done-label{text-decoration:line-through;}.imp-done-go{color:var(--c-text);font-size:14px;}',
+    '.imp-flash{animation:impFlash 1.5s ease;}@keyframes impFlash{0%,60%{background:var(--c-sel-bg);}100%{background:transparent;}}',
+    '.imp-toast-t{flex:1;}.imp-toast-view{flex:0 0 auto;min-height:48px;min-width:48px;padding:0 12px;margin-left:8px;border:none;border-radius:8px;background:rgba(255,255,255,.2);color:#fff;font-weight:bold;font-family:inherit;font-size:14px;}',
+    '.imp-chg{display:flex;gap:8px;align-items:center;min-height:48px;padding:6px 0;border-bottom:1px solid var(--c-border);}.imp-chg:last-child{border-bottom:none;}.imp-chg .grow{flex:1;min-width:0;}',
+    '.imp-chg-k{flex:0 0 auto;font-size:12px;padding:3px 7px;border-radius:8px;background:var(--c-chip);color:var(--c-text-soft);}',
     // 1017-UI8：配对卡
     '.imp-pc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}.imp-pc-title{font-weight:bold;color:var(--c-primary-deep);}',
     '.pc-me{background:var(--c-chip);border-radius:10px;padding:8px 10px;margin:6px 0 8px;}',
@@ -701,25 +712,168 @@
              s: Object.keys(S.seenStatuses).filter(function (k) { return S.statuses[k] || s.unknownStatuses.some(function (t) { return t.app + '|' + t.status === k; }); }) };
   }
   // 每一步有几件、定了几件（只看方案和改动，不看页面）
+  // 1017-UI9：每件带上名字（label）、它那几行（keys）和是不是「只看就行」（look）：挪走的、定了的能写明去处
   function stepItems(p) {
     var s = p.sections, E = S.edits, V = S.view.seen, it = { match: [], refund: [], cat: [], amount: [] };
     var picked = function (k) { return !!(E.rows[k] && E.rows[k].pick) || !!V['keep:' + k]; };     // 明确点了「还是待确认」也算定了
-    s.sums.forEach(function (g) { it.match.push({ id: 'sum:' + g.id, done: g.chosen !== null }); });
-    if (s.nearMerged) it.match.push({ id: 'near', done: !!V.near || !!E.nearPay });
-    s.pendGroups.forEach(function (g) { if (g.kind !== 'byBill') { var ps = pgState(g); it.match.push({ id: 'pg:' + g.id, done: ps.done, part: ps.part }); } });
-    pendSingles(p).forEach(function (d) { (refundishRow(d) ? it.refund : it.match).push({ id: 'ps:' + d.key, done: picked(d.key) }); });
-    s.transfers.forEach(function (t) { var ts = trState(t); it.refund.push({ id: 'tr:' + t.id, done: ts.done, part: ts.part }); });
-    s.refundHints.forEach(function (h) { it.refund.push({ id: 'rh:' + h.key, done: !!V['rh:' + h.key] }); });
-    if (s.receipt) it.refund.push({ id: 'receipt', done: !!V.receipt });
-    s.petty.forEach(function (x) { it.refund.push({ id: 'petty:' + x.key, done: x.key in E.petty }); });
-    s.newCats.forEach(function (x) { it.cat.push({ id: 'nc:' + x.name, done: x.name in E.newCats }); });
-    s.cpGroups.forEach(function (g) { it.cat.push({ id: 'cp:' + g.cp, done: g.cp in E.cpCats || !!V['cp:' + g.cp] }); });
-    lowConfRows(p).forEach(function (d) { it.cat.push({ id: 'lc:' + d.key, done: !!(E.rows[d.key] && E.rows[d.key].cat) || !!V['lc:' + d.key] }); });
+    var add = function (step, id, done, label, keys, o) { var x = { id: id, done: done, label: label, keys: keys || [] }; if (o) Object.keys(o).forEach(function (k) { x[k] = o[k]; }); it[step].push(x); };
+    var rl = function (k) { return rowLabel(rowByKey(k)); };
+    s.sums.forEach(function (g) { add('match', 'sum:' + g.id, g.chosen !== null, '几笔加起来：' + g.keys.map(rl).join('、'), g.keys); });
+    if (s.nearMerged) add('match', 'near', !!V.near || !!E.nearPay, '金额差一点的 ' + s.nearMerged.n + ' 笔', s.nearMerged.keys, { look: !E.nearPay });
+    s.pendGroups.forEach(function (g) { if (g.kind !== 'byBill') { var ps = pgState(g); add('match', 'pg:' + g.id, ps.done, g.text, g.keys, { part: ps.part }); } });
+    pendSingles(p).forEach(function (d) { add(refundishRow(d) ? 'refund' : 'match', 'ps:' + d.key, picked(d.key) || d.group !== 'pending', rowLabel(d), [d.key]); });
+    s.transfers.forEach(function (t) { var ts = trState(t); add('refund', 'tr:' + t.id, ts.done, '转账往来 ' + t.from.slice(5) + (t.to !== t.from ? '–' + t.to.slice(5) : '') + ' · ' + t.n + ' 笔', t.keys, { part: ts.part }); });
+    s.refundHints.forEach(function (h) { add('refund', 'rh:' + h.key, !!V['rh:' + h.key], '全额退款提醒：' + rl(h.key), [h.key], { look: true }); });
+    if (s.receipt) add('refund', 'receipt', !!V.receipt, '收款按天合并', [], {});
+    s.petty.forEach(function (x) { add('refund', 'petty:' + x.key, x.key in E.petty, '零碎扣款：' + x.cp + ' · ' + x.month, []); });
+    s.newCats.forEach(function (x) { add('cat', 'nc:' + x.name, x.name in E.newCats, '新建分类「' + x.name + '」', newCatKeys(p, x.name)); });
+    s.cpGroups.forEach(function (g) { add('cat', 'cp:' + g.cp, g.cp in E.cpCats || !!V['cp:' + g.cp], cpShow(g.cp) + ' · ' + g.n + ' 笔 · ' + yuan(g.fen), g.keys); });
+    lowConfRows(p).forEach(function (d) { add('cat', 'lc:' + d.key, !!(E.rows[d.key] && E.rows[d.key].cat) || !!V['lc:' + d.key], rowLabel(d), [d.key]); });
     var tk = typeKeys(s);
-    tk.t.forEach(function (k) { it.cat.push({ id: 'ty:' + k, done: !!S.types[k] }); });
-    tk.s.forEach(function (k) { it.cat.push({ id: 'st:' + k, done: !!S.statuses[k] }); });
-    s.amountChecks.forEach(function (x) { it.amount.push({ id: 'am:' + x.key, done: !!V['am:' + x.key] || !!E.rows[x.key] }); });
+    tk.t.forEach(function (k) { add('cat', 'ty:' + k, !!S.types[k], '没见过的交易类型「' + k.split('|')[1] + '」', []); });
+    tk.s.forEach(function (k) { add('cat', 'st:' + k, !!S.statuses[k], '没见过的状态「' + k.split('|')[1] + '」', []); });
+    s.amountChecks.forEach(function (x) { add('amount', 'am:' + x.key, !!V['am:' + x.key] || !!E.rows[x.key], rl(x.key), [x.key], { look: !E.rows[x.key] }); });
     return it;
+  }
+  // ---------- 1017-UI9：页面上的记录不能凭空消失 ----------
+  //   每一步记住出现过的每一件（S.view.ever）；重算以后不见了的照样留着，算进这一块的「已处理」，去处按它那几行现在的样子写。
+  //   每一块标题写「待选 x / 共 y」，底部「✓ 已处理 N 件 ▸」默认收起；挪走的每一行写去处，带「改 / 撤回」，跨步的点了跳过去
+  var CARD_OF = { sum: 'impSums', near: 'impNear', pg: 'impPendGroups', tr: 'impTransfers', rh: 'impRefundHints', receipt: 'impReceipt', petty: 'impPetty',
+                  nc: 'impNewCats', cp: 'impCpGroups', lc: 'impLowConf', ty: 'impTypes', st: 'impTypes', am: 'impAmounts' };
+  var TAP_KINDS = { cp: 1, lc: 1, am: 1, ps: 1, rh: 1 };
+  function cardOf(id, step) { var k = id.slice(0, id.indexOf(':') < 0 ? id.length : id.indexOf(':')); return k === 'ps' ? (step === 'refund' ? 'impPendRefunds' : 'impPendSingles') : CARD_OF[k]; }
+  function remember(items) {
+    var ev = S.view.ever = S.view.ever || {};
+    Object.keys(items).forEach(function (st) {
+      var m = ev[st] = ev[st] || {};
+      items[st].forEach(function (x) { m[x.id] = { id: x.id, label: x.label, keys: x.keys, look: !!x.look, step: st }; });
+    });
+  }
+  // 这一步里不见了的（重算以后不在了）
+  function gone(step, items) {
+    var now = {}; (items[step] || []).forEach(function (x) { now[x.id] = 1; });
+    var m = (S.view.ever || {})[step] || {};
+    return Object.keys(m).filter(function (id) { return !now[id]; }).map(function (id) { return m[id]; });
+  }
+  // 一行现在去哪了：{ t: 「→ …」, step: 要跳去的那一步（没有就是 null） }
+  function destOf(keys) {
+    var d = keys && keys.length ? rowByKey(keys[0]) : null;
+    if (!d) return { t: '→ 没有要定的了', step: null };
+    var more = keys.length > 1 ? '（共 ' + keys.length + ' 笔）' : '', g = d.group, t;
+    if (g === 'merge') { var m = S.manualById[d.into]; t = '→ 和 ' + (m ? mdhm(m.time) + ' ' + (m.cat || '') : '') + ' 的手记合并'; }
+    else if (g === 'neutral') t = '→ 挪到不计入组';
+    else if (g === 'excluded') t = '→ 不导入（勾掉了）';
+    else if (g === 'refund') t = '→ 当作退款';
+    else if (g === 'skip') t = '→ 跳过';
+    else if (g === 'pending') t = '→ 留在待处理';
+    else {
+      var nc = (S.plan.sections.newCats || []).filter(function (x) { return x.on && x.name === d.cat; })[0];
+      t = nc ? '→ 已归到新建的『' + d.cat + '』' : d.cat && d.cat !== '未分类' ? '→ 归到『' + d.cat + '』' : '→ 作为新增（未分类）';
+    }
+    // 跨步：这一行现在在哪一步要你定
+    var at = null, its = S.view.items || {};
+    MID.forEach(function (st) { if (!at && (its[st] || []).some(function (x) { return !x.done && x.keys.indexOf(d.key) >= 0; })) at = st; });
+    if (at && (S.view.steps || []).indexOf(at) < 0) at = null;       // 那几件放在总览里了（只剩 1 步时）
+    if (at) t += '，挪到第 ' + (S.view.steps.indexOf(at) + 1) + ' 步：' + STEP_NAME[at];
+    return { t: t + more, step: at };
+  }
+  // 这一件能直接撤回的改动（没有就是 null）
+  function undoOf(id) {
+    var E = S.edits, k = id.slice(id.indexOf(':') + 1), kind = id.slice(0, id.indexOf(':'));
+    if (kind === 'sum' && E.sums[k] !== undefined) return function () { delete E.sums[k]; };
+    if (kind === 'cp' && E.cpCats[k]) return function () { delete E.cpCats[k]; delete S.view.seen['cp:' + k]; };
+    if (kind === 'nc' && E.newCats[k]) return function () { delete E.newCats[k]; };
+    if (kind === 'petty' && E.petty[k]) return function () { delete E.petty[k]; };
+    if ((kind === 'ps' || kind === 'lc') && E.rows[k] && (E.rows[k].pick || E.rows[k].cat)) return function () { var e = E.rows[k]; delete e.pick; if (kind === 'lc') delete e.cat; if (!Object.keys(e).length) delete E.rows[k]; delete S.view.seen['keep:' + k]; };
+    if (kind === 'ty' && S.types[k]) return function () { delete S.types[k]; S.needRerun = true; };
+    if (kind === 'st' && S.statuses[k]) return function () { delete S.statuses[k]; S.needRerun = true; };
+    return null;
+  }
+  function applyUndo(fn) { fn(); if (S.needRerun) { S.needRerun = false; rerun(); } else replan(); }
+  // 一行「已处理」：名字 + 去处 + 改 / 撤回（跨步的「去看 ›」）
+  function doneRow(x, isGone, onEdit) {
+    var r = el('div', 'imp-done-row' + (isGone ? ' imp-moved' : '')); r.dataset.item = x.id;
+    var g = el('div', 'grow'); g.appendChild(el('div', 'imp-done-label', x.label));
+    var ds = destOf(x.keys); g.appendChild(el('div', 'imp-done-go', isGone ? ds.t : (x.look ? '→ 看过了' : ds.t)));
+    r.appendChild(g);
+    if (!isGone) r.appendChild(mk(true, x.look));
+    if (ds.step && ds.step !== S.view.step) r.appendChild(btn('去看 ›', 'imp-redo imp-done-jump', function () { goStep(ds.step); }));
+    else if (onEdit || x.keys.length) r.appendChild(btn('改', 'imp-redo imp-done-edit', function () { if (onEdit) onEdit(); else openSheet(x.keys[0]); }));
+    var u = undoOf(x.id); if (u) r.appendChild(btn('撤回', 'imp-redo imp-done-undo', function () { applyUndo(u); }));
+    return r;
+  }
+  // 卡片收尾：标题「待选 x / 共 y」；定了的挪进底部「已处理 N 件」（默认收起），不见了的也列在那里
+  function foldCard(c, step) {
+    var its = (S.view.items[step] || []).filter(function (x) { return cardOf(x.id, step) === c.id; });
+    var gs = gone(step, S.view.items).filter(function (x) { return cardOf(x.id, step) === c.id; });
+    var total = its.length + gs.length; if (!total) return;
+    var left0 = its.filter(function (x) { return !x.done; }).length, doneN = total - left0;
+    var h = c.querySelector('h4'); if (h) { var sp = el('span', 'imp-count', '待选 ' + left0 + ' / 共 ' + total); sp.dataset.left = left0; sp.dataset.total = total; h.appendChild(sp); }
+    if (!doneN || (its.length === 1 && !gs.length && c.querySelectorAll('[data-item]').length === 0)) return;
+    var open0 = !!(S.view.fold || {})[c.id];
+    var fb = el('div', 'imp-fold-box'); fb.style.display = open0 ? '' : 'none';
+    its.forEach(function (x) {
+      if (!x.done) return;
+      var node = Array.prototype.filter.call(c.querySelectorAll('[data-item]'), function (n) { return n.dataset.item === x.id; })[0];
+      // 点一下就能改的那类行（按对方、推荐看一眼、金额、待你确认、提醒）：换成「名字 → 去处 · 改 / 撤回」一行，「改」照旧打开原来的选择
+      if (node && TAP_KINDS[x.id.slice(0, x.id.indexOf(':'))]) {
+        if (node.parentNode) node.parentNode.removeChild(node);
+        var ed = function () { node.click(); }, dr = doneRow(x, false, ed);
+        // 留着原来那行的类名和数据（整行点了照旧打开原来的选择）
+        Array.prototype.forEach.call(node.classList, function (cn) { if (/^imp-(cp-row|pend-row|lowconf-row|amount-row|hint|tap)$/.test(cn)) dr.classList.add(cn); });
+        Object.keys(node.dataset).forEach(function (k) { if (k !== 'item') dr.dataset[k] = node.dataset[k]; });
+        dr.addEventListener('click', function (e) { if (e.target === dr || !e.target.closest('button')) ed(); });
+        fb.appendChild(dr);
+      }
+      else if (node) fb.appendChild(node); else fb.appendChild(doneRow(x, false));
+    });
+    gs.forEach(function (x) { fb.appendChild(doneRow(x, true)); });
+    var tg = btn('', 'imp-fold', function () { S.view.fold = S.view.fold || {}; S.view.fold[c.id] = !open0; render(); });
+    tg.appendChild(el('span', 'imp-fold-n', '✓ 已处理 ' + doneN + ' 件')); tg.appendChild(el('span', 'grow', '')); tg.appendChild(el('span', null, open0 ? '收起 ▴' : '展开看 ▸'));
+    var tail = c.lastElementChild && c.lastElementChild.classList.contains('imp-soft') ? c.lastElementChild : null;
+    c.insertBefore(tg, tail); c.insertBefore(fb, tail);
+  }
+  // 重算以后：刚定下 / 刚挪走的那一件浮出提示「某某 已归到『X』· 查看」
+  function changeToast(items) {
+    var prev = S.view.prevDone; S.view.prevDone = {};
+    var cur = {};
+    MID.forEach(function (st) { (items[st] || []).forEach(function (x) { cur[st + '|' + x.id] = x; S.view.prevDone[st + '|' + x.id] = x.done; }); });
+    if (!prev) return;
+    var hit = null, hitDone = null;      // 挪走的优先（「某某 已归到『X』」），没有再说刚定下的那件
+    Object.keys(prev).forEach(function (k) {
+      if (prev[k]) return;
+      var x = cur[k], st = k.slice(0, k.indexOf('|'));
+      if (x && x.done && !x.look) { if (!hitDone) hitDone = { x: x, st: st, gone: false }; }
+      else if (!x && !hit) { var e = ((S.view.ever || {})[st] || {})[k.slice(k.indexOf('|') + 1)]; if (e) hit = { x: e, st: st, gone: true }; }
+    });
+    hit = hit || hitDone;
+    if (!hit) return;
+    var ds = destOf(hit.x.keys);
+    toast(cut(hit.x.label, 18) + ' ' + ds.t.replace(/^→ /, ''), null, function () { S.view.fold = S.view.fold || {}; S.view.fold[cardOf(hit.x.id, hit.st)] = true; if (S.view.step !== hit.st) goStep(hit.st); else render(); flashItem(hit.x.id); });
+  }
+  function flashItem(id) {
+    var n = Array.prototype.filter.call(dom.body.querySelectorAll('[data-item]'), function (x) { return x.dataset.item === id; })[0]; if (!n) return;
+    if (n.scrollIntoView) n.scrollIntoView({ block: 'center' });
+    n.classList.add('imp-flash'); setTimeout(function () { n.classList.remove('imp-flash'); }, 1600);
+  }
+  // 总览「这次所有的改动（N 处）」：各步做过的每个选择（只看过的不算）和去处，加上在明细里单独改过的行
+  function changeList() {
+    var out = [], seenK = {};
+    MID.forEach(function (st) {
+      var m = (S.view.ever || {})[st] || {}, now = {};
+      (S.view.items[st] || []).forEach(function (x) { now[x.id] = x; });
+      Object.keys(m).forEach(function (id) {
+        var x = now[id], e = m[id];
+        if (x && (!x.done || x.look)) return;
+        out.push({ st: st, x: x || e, gone: !x }); (e.keys || []).forEach(function (k) { seenK[k] = 1; });
+      });
+    });
+    Object.keys(S.edits.rows).forEach(function (k) { if (!seenK[k] && rowByKey(k)) out.push({ st: null, x: { id: 'row:' + k, label: rowLabel(rowByKey(k)), keys: [k] } }); });
+    return out;
+  }
+  // 推荐成这个新分类的那几行（给「新建分类」写会归进去哪几组、挪走以后写去处）
+  function newCatKeys(p, name) {
+    return p.rows.filter(function (d) { var r = d.item && d.item.rec; return d.src === 'row' && r && r.newCat === name; }).map(function (d) { return d.key; });
   }
   // 改回默认就把改动去掉（变回待选）：口径改回这一行原来的；新建分类改回原来的勾法
   function setModeEdit(k, m) {
@@ -751,6 +905,7 @@
   function goStep(key) {
     if (!S || S.phase !== 'confirm') return;
     S.view.step = key; S.view.notice = null;
+    var tt = document.getElementById('impToast'); if (tt) tt.style.display = 'none';      // 换一步就把提示收掉
     dom.page.scrollTop = 0;
     render();
   }
@@ -769,6 +924,7 @@
     if (S.view.recon) { renderRecon(); return; }
     var p = S.plan, info = buildSteps(p);
     S.view.items = info.items; S.view.inline = info.inline;
+    remember(info.items);
     // 步数跟着方案变：多出 / 少了一步时提示一句，人留在当前这一步（当前这一步没事了也先留着，等你点下一步）
     var real = info.keys, prev = S.view.realKeys;
     if (prev && prev.join() !== real.join()) {
@@ -786,6 +942,7 @@
       keys.sort(function (a, b) { return STEP_ORDER.indexOf(a) - STEP_ORDER.indexOf(b); });
     }
     S.view.steps = keys;
+    changeToast(info.items);
     var i = keys.indexOf(S.view.step);
     var y = dom.page.scrollTop;
     var b = dom.body; b.innerHTML = '';
@@ -864,7 +1021,7 @@
     var list = info.items[step] || [];
     if (!list.length) { intro('这一步没有要定的了', '点「下一步」接着看。'); return; }
     var t = STEP_INTRO[step](list.length, left(list)); intro(t[0], t[1]);
-    stepCards(step, p, cards).forEach(function (c) { cardState(c); dom.body.appendChild(c); });
+    stepCards(step, p, cards).forEach(function (c) { cardState(c); foldCard(c, step); dom.body.appendChild(c); });
   }
   // 单独一笔拿不准的（待你确认）：点一行打开详情选配哪条 / 作为新增 / 不要了
   function pendCard(p, refund) {
@@ -877,7 +1034,7 @@
     rows.forEach(function (d, i) {
       if (i >= MORE_N && !more) return;
       // 1017-UI8：一笔一块。还没定的：账单 + 最像的那条手记一张配对卡（「选这个」就合并），其他候选、作为新增、不要了点开详情；定了的收成一行
-      var r = el('div', 'imp-row-opt imp-tap imp-pend-row'); r.dataset.key = d.key; r.style.display = 'block';
+      var r = el('div', 'imp-row-opt imp-tap imp-pend-row'); r.dataset.key = d.key; r.dataset.item = 'ps:' + d.key; r.style.display = 'block';
       var e0 = S.edits.rows[d.key] || {}, done0 = !!e0.pick || !!S.view.seen['keep:' + d.key] || d.group !== 'pending';
       var hd = el('div', 'imp-pc-head'); hd.appendChild(el('span', 'grow imp-soft', d.reason || '')); hd.appendChild(mk(done0)); r.appendChild(hd);
       var c0 = (d.cands || [])[0], m0 = c0 && c0.record && !refund ? S.manualById[c0.record] : null;
@@ -912,7 +1069,7 @@
     p.sections.newCats.forEach(function (n) { if (n.on && cats.indexOf(n.name) < 0) cats.push(n.name); });
     rows.forEach(function (d, i) {
       if (i >= MORE_N && !more) return;
-      var r = el('div', 'imp-row-opt imp-tap imp-lowconf-row'); r.dataset.key = d.key;
+      var r = el('div', 'imp-row-opt imp-tap imp-lowconf-row'); r.dataset.key = d.key; r.dataset.item = 'lc:' + d.key;
       var g = el('div', 'grow'); g.appendChild(el('div', null, fmtTime(d.time) + ' · ' + (d.title || d.cp || '—') + ' · ' + yuan(d.fen) + ' 元'));
       g.appendChild(el('div', 'imp-soft', '推荐「' + (d.item.rec.cat || d.item.rec.want || '未分类') + '」：' + d.item.rec.reason)); r.appendChild(g);
       r.appendChild(el('span', 'imp-val', (d.cat || '未分类') + ' ›'));
@@ -943,9 +1100,26 @@
     if (info.inline) {
       var list = info.items[info.inline], t = STEP_INTRO[info.inline](list.length, left(list));
       intro(t[0], t[1]);
-      stepCards(info.inline, p, cards).forEach(function (c) { cardState(c); b.appendChild(c); });
+      stepCards(info.inline, p, cards).forEach(function (c) { cardState(c); foldCard(c, info.inline); b.appendChild(c); });
     } else intro('都看过了，确认一下就能导入');
     b.appendChild(renderSummary(p));
+    // 1017-UI9：这次所有的改动（N 处）：各步做过的每个选择和去处，点「改」回那一步
+    var cl = changeList();
+    if (cl.length) {
+      var cc = el('div', 'imp-card'); cc.id = 'impChanges';
+      cc.appendChild(el('h4', null, '这次所有的改动（' + cl.length + ' 处）'));
+      var cmore = !!S.view.more.chg;
+      cl.forEach(function (c, i) {
+        if (i >= MORE_N && !cmore) return;
+        var r = el('div', 'imp-chg'); r.dataset.item = c.x.id;
+        r.appendChild(el('span', 'imp-chg-k', c.st ? '第 ' + ((S.view.steps.indexOf(c.st) + 1) || S.view.steps.length) + ' 步' : '明细'));
+        var g = el('div', 'grow'); g.appendChild(el('div', null, c.x.label)); g.appendChild(el('div', 'imp-soft', destOf(c.x.keys || []).t)); r.appendChild(g);
+        r.appendChild(btn('改', 'imp-redo imp-chg-edit', function () { if (c.st && S.view.steps.indexOf(c.st) >= 0) goStep(c.st); else if (c.x.keys && c.x.keys[0]) openSheet(c.x.keys[0]); }));
+        cc.appendChild(r);
+      });
+      if (cl.length > MORE_N) cc.appendChild(moreBtn('chg', cl.length - MORE_N, '处'));
+      b.appendChild(cc);
+    }
     b.appendChild(renderFiles(p, 'diff'));
     if (cards.notes) b.appendChild(cards.notes);
     b.appendChild(renderStorage(p));
@@ -1115,7 +1289,7 @@
       var c = el('div', 'imp-card'); c.id = 'impTypes';
       c.appendChild(el('h4', null, '没见过的交易类型 / 状态'));
       typeRows.forEach(function (t) {
-        var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.type;
+        var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.type; r.dataset.item = 'ty:' + k;
         r.appendChild(el('span', 'grow', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔，共 ' + yuan(t.fen) + ' 元'));
         r.appendChild(select([['', '照收支导入（放进其他）'], ['normal', '照收支导入'], ['transfer', '当转账（不计入）'], ['refund', '当退款挂到原单'], ['skip', '跳过']], S.types[k] || '',
           function (v) { if (v) S.types[k] = v; else delete S.types[k]; rerun(); }, 'imp-type-sel', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
@@ -1123,7 +1297,7 @@
         c.appendChild(r);
       });
       statusRows.forEach(function (t) {
-        var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.status;
+        var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.status; r.dataset.item = 'st:' + k;
         r.appendChild(el('span', 'grow', '状态「' + t.status + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
         r.appendChild(select([['', '导入（放进其他）'], ['import', '导入'], ['skip', '跳过']], S.statuses[k] || '',
           function (v) { if (v) S.statuses[k] = v; else delete S.statuses[k]; rerun(); }, 'imp-status-sel', '状态「' + t.status + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
@@ -1138,7 +1312,7 @@
       var ac = el('div', 'imp-card'); ac.id = 'impAmounts';
       ac.appendChild(el('h4', null, '金额要你看一眼（' + s.amountChecks.length + ' 笔）'));
       s.amountChecks.forEach(function (x) {
-        var r = el('div', 'imp-row-opt imp-tap imp-amount-row'); r.dataset.key = x.key; r.dataset.kind = x.kind;
+        var r = el('div', 'imp-row-opt imp-tap imp-amount-row'); r.dataset.key = x.key; r.dataset.kind = x.kind; r.dataset.item = 'am:' + x.key;
         r.appendChild(el('span', 'grow', (x.cp || '—') + ' · ' + yuan(x.fen) + ' 元 → ' + (x.cat || '未分类') + (x.kind === 'abnormal' ? '？' : '') + ' 理由：' + x.why));
         r.appendChild(mk(!!S.view.seen['am:' + x.key] || !!S.edits.rows[x.key], true));
         r.addEventListener('click', function () { S.view.seen['am:' + x.key] = true; openSheet(x.key); });
@@ -1180,7 +1354,7 @@
       var pc = el('div', 'imp-card'); pc.id = 'impPetty';
       pc.appendChild(el('h4', null, '疑似零碎扣款'));
       s.petty.forEach(function (x) {
-        var r = el('label', 'imp-row-opt imp-tap'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
+        var r = el('label', 'imp-row-opt imp-tap'); r.dataset.item = 'petty:' + x.key; var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
         cb.addEventListener('change', function () { if (cb.checked) S.edits.petty[x.key] = true; else delete S.edits.petty[x.key]; replan(); });     // 改回默认（不合并）就变回待选
         r.appendChild(cb); r.appendChild(el('span', 'grow', x.cp + ' · ' + x.month + ' · ' + x.n + ' 笔 · 共 ' + yuan(x.fen) + ' 元 · 合成一条'));
         r.appendChild(mk(x.key in S.edits.petty));
@@ -1192,11 +1366,16 @@
       var nc = el('div', 'imp-card'); nc.id = 'impNewCats';
       nc.appendChild(el('h4', null, '新建分类（' + s.newCats.length + '）'));
       s.newCats.forEach(function (x) {
-        var r = el('div', 'imp-row-opt'); r.dataset.cat = x.name;
+        var r = el('div', 'imp-row-opt'); r.dataset.cat = x.name; r.dataset.item = 'nc:' + x.name;
         var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
         cb.addEventListener('change', function () { setNewCat(x, { on: cb.checked, into: cb.checked ? null : (x.into || null), picked: !cb.checked && !!x.picked }); replan(); });
         var lb = el('label', 'grow imp-newcat-lb'); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '8px'; lb.style.minHeight = '48px'; lb.style.cursor = 'pointer';
-        lb.appendChild(cb); lb.appendChild(el('span', null, '建「' + x.name + '」 ' + x.count + ' 笔')); r.appendChild(lb);
+        lb.appendChild(cb);
+        // 1017-UI9：写清会归进去哪几组（按对方）
+        var into = {}; newCatKeys(p, x.name).forEach(function (k) { var d = rowByKey(k); if (!d) return; var cp0 = cpShow(d.cp) || '—'; into[cp0] = (into[cp0] || 0) + 1; });
+        var lbt = el('span', null, '建「' + x.name + '」 ' + x.count + ' 笔'); var iw = Object.keys(into);
+        var lbw = el('span'); lbw.appendChild(lbt); if (iw.length) lbw.appendChild(el('div', 'imp-soft imp-nc-into', (x.on ? '归进去的：' : '勾上会归进去：') + iw.slice(0, 4).map(function (k) { return k + '（' + into[k] + ' 笔）'; }).join('、') + (iw.length > 4 ? ' 等 ' + iw.length + ' 组' : '')));
+        lb.appendChild(lbw); r.appendChild(lb);
         var opts = [['', '并到已有…']].concat(S.info.cats.map(function (c) { return [c, '并到「' + c + '」']; }));
         r.appendChild(select(opts, x.into || '', function (v) { setNewCat(x, v ? { on: false, into: v, picked: true } : { on: x.defaultOn, into: null, picked: false }); replan(); }, 'imp-into', '推荐的「' + x.name + '」你的存档里没有（' + x.count + ' 笔）'));
         r.appendChild(mk(x.name in S.edits.newCats));
@@ -1208,7 +1387,7 @@
       var gc = el('div', 'imp-card'); gc.id = 'impCpGroups';
       gc.appendChild(el('h4', null, '还没有分类的，按对方一组选一次（' + s.cpGroups.length + ' 组）'));
       s.cpGroups.forEach(function (g) {
-        var r = el('div', 'imp-row-opt imp-tap imp-cp-row'); r.dataset.cp = g.cp;
+        var r = el('div', 'imp-row-opt imp-tap imp-cp-row'); r.dataset.cp = g.cp; r.dataset.item = 'cp:' + g.cp;
         // 1016-Z1：规律说明「工作日中午 12 点左右」放在前面，帮你认出是谁（只是提示，不自动分类）
         var desc = g.cp + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元' + (g.hint ? ' · ' + g.hint : '') + (g.n > 1 ? ' · 每笔 ' + (g.min === g.max ? yuan(g.min) : yuan(g.min) + '–' + yuan(g.max)) + ' 元' : '') + ' → 选个分类';
         r.appendChild(el('span', 'grow', desc));
@@ -1232,7 +1411,7 @@
       var sc = el('div', 'imp-card'); sc.id = 'impSums';
       sc.appendChild(el('h4', null, '几笔加起来正好是一条手记（' + s.sums.length + ' 组）'));
       s.sums.forEach(function (g) {
-        var box = el('div', 'imp-row-opt imp-pc-group'); box.dataset.sum = g.id; box.style.display = 'block';
+        var box = el('div', 'imp-row-opt imp-pc-group'); box.dataset.sum = g.id; box.dataset.item = 'sum:' + g.id; box.style.display = 'block';
         var same = g.options.every(function (o) { return o.record === g.options[0].record; }), m0 = S.manualById[g.options[0].record];
         var hd = el('div', 'imp-pc-head'); hd.appendChild(el('span', 'grow imp-pc-title', same ? '这条手记可能是哪几笔' : '这几笔账单配哪条手记'));
         hd.appendChild(mk(g.chosen !== null)); box.appendChild(hd);
@@ -1276,7 +1455,7 @@
       var pgMore = !!S.view.more.pg;
       pgs.forEach(function (g, gi) {
         if (gi >= MORE_N && !pgMore) return;
-        var box = el('div', 'imp-row-opt'); box.dataset.pg = g.id; box.style.display = 'block';
+        var box = el('div', 'imp-row-opt'); box.dataset.pg = g.id; box.dataset.item = 'pg:' + g.id; box.style.display = 'block';
         var gst = pgState(g);
         box.appendChild(mk(gst.done, false, gst.part)); box.lastChild.style.float = 'right';
         box.appendChild(el('div', 'imp-line', g.text + (g.open ? '' : '（已定）')));
@@ -1312,7 +1491,7 @@
       var md = function (t) { return (+t.slice(5, 7)) + ' 月 ' + (+t.slice(8, 10)) + ' 日'; };
       var sign = function (f) { return (f > 0 ? '+' : f < 0 ? '−' : '') + yuan(Math.abs(f)); };
       s.transfers.forEach(function (t) {
-        var box = el('div', 'imp-row-opt'); box.dataset.tr = t.id; box.style.display = 'block';
+        var box = el('div', 'imp-row-opt'); box.dataset.tr = t.id; box.dataset.item = 'tr:' + t.id; box.style.display = 'block';
         var ts = trState(t); box.appendChild(mk(ts.done, false, ts.part)); box.lastChild.style.float = 'right';
         box.appendChild(el('div', 'imp-line', md(t.from) + (t.to !== t.from ? ' 到 ' + md(t.to) : '') + ' · ' + t.n + ' 笔 · 转出 ' + yuan(t.out) + ' · 转入 ' + yuan(t.in) + ' · 净额 ' + sign(t.net)));
         t.people.forEach(function (x) { box.appendChild(el('div', 'imp-soft', '　' + x.cp + '：转出 ' + yuan(x.out) + '，转入 ' + yuan(x.in) + '，净额 ' + sign(x.net))); });
@@ -1345,7 +1524,7 @@
       var hc = el('div', 'imp-card'); hc.id = 'impRefundHints';
       hc.appendChild(el('h4', null, '待你确认 · 看一眼就行（不用选）'));
       s.refundHints.forEach(function (h) {
-        var l = el('div', 'imp-row-opt imp-tap imp-hint'); l.dataset.key = h.key;
+        var l = el('div', 'imp-row-opt imp-tap imp-hint'); l.dataset.key = h.key; l.dataset.item = 'rh:' + h.key;
         l.appendChild(el('span', 'grow', h.text)); l.appendChild(mk(!!S.view.seen['rh:' + h.key], true));
         l.addEventListener('click', function () { S.view.seen['rh:' + h.key] = true; render(); });
         hc.appendChild(l);
@@ -1533,11 +1712,12 @@
   }
   // 底部浮出一句提示，几秒后消失
   var toastTimer = null;
-  function toast(text, key) {
+  function toast(text, key, onView) {
     if (!dom) return;
     var t = document.getElementById('impToast');
     if (!t) { t = el('div', 'imp-toast'); t.id = 'impToast'; dom.page.appendChild(t); }
-    t.textContent = text; t.dataset.key = key || ''; t.style.display = 'flex';
+    t.innerHTML = ''; t.appendChild(el('span', 'grow imp-toast-t', text)); t.dataset.key = key || ''; t.style.display = 'flex';
+    if (onView) { var v = btn('查看', 'imp-toast-view', function () { t.style.display = 'none'; onView(); }); v.id = 'impToastView'; t.appendChild(v); }
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.style.display = 'none'; }, 4000);
   }
   function rowByKey(key) { var r = null; S.plan.rows.forEach(function (d) { if (d.key === key) r = d; }); return r; }

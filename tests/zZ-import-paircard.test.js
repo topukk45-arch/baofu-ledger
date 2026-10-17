@@ -64,7 +64,7 @@ const TX = () => [
   const pk = pr.dataset.key;
   pr.querySelector('.pc-pick').click();
   const pr2 = q('.imp-pend-row[data-key="' + pk + '"]');
-  ok(S().edits.rows[pk].pick.record === 'p' && pr2.querySelector('.imp-chosen') && /✓ 已选：.*和 10月6日 12:00 的手记合并/.test(pr2.textContent), '2 「选这个」：合并，收成一行「✓ 已选」');
+  ok(S().edits.rows[pk].pick.record === 'p' && pr2.closest('.imp-fold-box') && /→ 和 10月6日 12:00 购物 的手记合并/.test(pr2.textContent) && pr2.querySelector('.imp-mark').dataset.st === 'ok', '2 「选这个」：合并，挪进「已处理」写「→ 和 10月6日 12:00 购物 的手记合并」（1017-UI9）');
   // ===== 3. 行详情的候选也是配对卡：选中变实心加 ✓，其余变淡 =====
   pr2.click();
   const sh = raw('impSheet'), sc = sh.querySelector('.pc');

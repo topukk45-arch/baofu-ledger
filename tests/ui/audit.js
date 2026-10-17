@@ -331,6 +331,20 @@ async function run(cfg, port, browser) {
       await page.evaluate(() => document.getElementById('uiSheetCancel').click());
       await page.waitForTimeout(200);
     }
+    // 1017-UI9：改过以后——按对方选一个分类、勾上新建分类，展开「已处理」；总览「这次所有的改动」
+    await goStep(page, 'cat');
+    if (await page.$('#impCpGroups .imp-cp-row')) {
+      await page.evaluate(() => document.querySelector('#impCpGroups .imp-cp-row').click()); await page.waitForTimeout(300);
+      await page.evaluate(() => { const c = document.querySelectorAll('#uiPickList .cc'); (c[1] || c[0]).click(); }); await page.waitForTimeout(300);
+    }
+    await page.evaluate(() => { const cb = document.querySelector('#impNewCats input[type=checkbox]'); if (cb && !cb.checked) { cb.checked = true; cb.dispatchEvent(new Event('change')); } });
+    await page.waitForTimeout(300);
+    await page.evaluate(() => document.querySelectorAll('#impBody .imp-fold').forEach(f => f.click()));
+    await page.waitForTimeout(300);
+    await measure(page, 'imp-step-cat-done', { scope: IMP, primary: ['#impNext', '#impPrev'], more: true, note: '改过以后，展开「已处理」' });
+    await goStep(page, 'overview'); await page.waitForTimeout(200);
+    await page.evaluate(() => { const c = document.getElementById('impChanges'); if (c) c.scrollIntoView({ block: 'start' }); });
+    await measure(page, 'imp-overview-changes', { scope: IMP, primary: ['#impGo'], scrollTop: false, note: '这次所有的改动' });
     // 退出确认（顶上「‹ 取消」）
     await click(page, '#impBack'); await page.waitForTimeout(400);
     await measure(page, 'imp-exit-sheet', { scope: '#uiSheetMask', primary: ['#impExitStay', '#impExitOk'], scrollTop: false });

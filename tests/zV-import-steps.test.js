@@ -80,9 +80,9 @@ const MANY = () => [
     ok(sheetOpen(t) && raw('uiPickList').classList.contains('filter-chips') && raw('uiPickList').firstElementChild.textContent === '未分类', '2 点整行弹选分类面板（分类块，「未分类」第一个）');
     [...t.d.querySelectorAll('#uiPickList .cc')].find(x => x.textContent === '购物').click();
     ok(!sheetOpen(t) && t.S().edits.cpCats['某虚构平台甲'] === '购物', '2 点一下就选中、面板关掉，照旧记进 edits.cpCats');
-    ok(/已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row .imp-mark').textContent) && /购物/.test(t.d.querySelector('#impCpGroups .imp-cp-row').textContent), '2 那一行标「已选」，写着「购物」');
+    ok(/已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row[data-cp="某虚构平台甲"] .imp-mark').textContent) && /购物/.test(t.d.querySelector('#impCpGroups .imp-cp-row[data-cp="某虚构平台甲"]').textContent), '2 那一行标「已选」，写着「购物」');
     raw('impPrev').click(); raw('impPrev').click(); raw('impNext').click(); raw('impNext').click();
-    ok(t.S().view.step === 'cat' && t.S().edits.cpCats['某虚构平台甲'] === '购物' && /已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row .imp-mark').textContent), '2 回前一步再回来：改动和「已选」都还在');
+    ok(t.S().view.step === 'cat' && t.S().edits.cpCats['某虚构平台甲'] === '购物' && /已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row[data-cp="某虚构平台甲"] .imp-mark').textContent), '2 回前一步再回来：改动和「已选」都还在');
     // 重算后少了一步：把那笔大额勾掉（不导入），「金额要你看一眼」就没事了
     const big = t.S().plan.rows.find(d => d.cp === '某虚构家电店');
     const n0 = t.S().view.steps.length;
