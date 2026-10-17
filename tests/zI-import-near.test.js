@@ -18,7 +18,8 @@ const p2 = n => String(n).padStart(2, '0');
 const man = (id, d, money, o) => Object.assign({ id, time: `2026-10-${p2(d)}T08:30`, money, type: 'expense', cat: '吃饭', remark: '面' }, o || {});
 
 (async () => {
-  const RECS = [man('n1', 5, 30), man('n2', 7, 20), man('n3', 9, 50, { cat: '购物' }), man('n4', 11, 30), man('n5', 11, 31)];
+  // 1017-B：金额相近的、同一天手记比付款早 1 小时以上不再自动合并，n1 改成付款（12:10）后 10 分钟记，照旧测 1016-X 这条路
+  const RECS = [man('n1', 5, 30, { time: '2026-10-05T12:20' }), man('n2', 7, 20), man('n3', 9, 50, { cat: '购物' }), man('n4', 11, 30), man('n5', 11, 31)];
   const BILL = [wx({ time: T(10, 5, 12, 10), fen: 2800 }), wx({ time: T(10, 7), fen: 2200 }), wx({ time: T(10, 9), fen: 4800 }), wx({ time: T(10, 11), fen: 2900 })];
   const F = [['微信.csv', B.bill('wechat', BILL, { range: RANGE }).bytes]];
   const t = await A.boot({ html, www: WWW, seed: A.seedOf(RECS) });

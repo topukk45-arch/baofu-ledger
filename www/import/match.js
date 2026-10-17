@@ -32,6 +32,8 @@
 //     支付宝「转账红包」，或者对方名带 *、清洗后不超过 5 个字、除了 * 只有汉字（像「*小玲」「张*」）。
 //   候选排序：日期只用来筛；候选按时间差（分钟）再按金额差排，第一条是「最像」的（1017-UI5 起先看分类，见 sortCands）。
 // 1017-A：金额相近（1016-X）的自动合并只限手记同一天或晚 1 天；晚 2–3 天的进待你确认（「金额差 x 元、晚 N 天记的」）。金额正好相等的跨天配对不变。
+// 1017-B：金额相近的，同一天、手记比付款早超过 1 小时也不自动合并（「你记的比付款早 N 小时」）；手记正好 00:00 的当作没写具体时间，不拦。
+//   金额正好相等的同一天配对照旧（先记后付、先付后记都算）。
 //   全额退款（④ 里两条都跳过的那对）：不参与配对；原单上记下 3 天内同金额的手记（hintCands），
 //     确认页在所有配对（含你在确认页上选的合并）做完以后，这些手记没被别的账单合并掉的，才挂一句弱提醒，不占手记名额。
 (function (root, factory) {
@@ -41,12 +43,13 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-A';
+  var VERSION = '1017-B';
   var PARTIAL_MAX = 3;
   var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
   var FAR_MAX = 5;
   var NEAR_AUTO_DAYS = 1;   // 1017-A：金额相近的自动合并只认手记同一天或晚 1 天
+  var NEAR_EARLY_MIN = 60;  // 1017-B：同一天、手记比付款早超过 60 分钟的不自动合并
   var BUCKETS = ['add', 'merge', 'skip', 'neutral', 'refund', 'pending', 'error'];
 
   function classifier() {
@@ -305,6 +308,7 @@
     //   为了不抢错：这笔账单只有这一条手记符合、这条手记也只被这一笔账单看中，才合并；不然照旧进待处理。
     //   合并时手记金额不改（确认页可一键改成实付）；差额进结果页「N 笔手记比实付多 x 元，多半是立减」
     //   1017-A：找还是 3 天内找（「只有这一条」也按 3 天算），但只有同一天或手记晚 1 天的才自动合并；晚 2–3 天的进待你确认
+    //   1017-B：同一天的，手记比付款早超过 1 小时（正好 00:00 的不算）也进待你确认
     var nearOk = new Map(), nearBy = new Map();
     bills.forEach(function (b) {
       if (b.done || b.neutral || b.personal) return;
@@ -316,7 +320,10 @@
       if (hits.length !== 1) return;
       // 1017-A：金额相近的自动合并只限同一天或手记晚 1 天；晚 2–3 天的不合并，进待你确认（还是占着「只有这一条」的名额，不让别的账单抢）
       var lateD = dayNo(hits[0].time) - b.day;
+      // 1017-B：同一天、手记比付款早 1 小时以上的也不合并（更可能是另一笔忘了记），进待你确认；手记正好 00:00 的当作没写具体时间，不拦
+      var earlyMin = minOf(b.r.time) - minOf(hits[0].time);
       if (lateD > NEAR_AUTO_DAYS) b.nearLate = { m: hits[0], days: lateD };
+      else if (lateD === 0 && earlyMin > NEAR_EARLY_MIN && hits[0].time.slice(11, 16) !== '00:00') b.nearEarly = { m: hits[0], hours: Math.floor(earlyMin / 60) };
       else nearOk.set(b, hits[0]);
       nearBy.set(hits[0].id, (nearBy.get(hits[0].id) || 0) + 1);
     });
@@ -366,6 +373,8 @@
         var ec = it.cands.filter(function (c) { return c.early; })[0];
         if (it.why === 'near' && b.nearLate && it.cands[0] && it.cands[0].record === b.nearLate.m.id)
           it.msg = '金额差 ' + ((b.nearLate.m.fen - b.fen) / 100).toFixed(2) + ' 元、晚 ' + b.nearLate.days + ' 天记的，请你确认';
+        else if (it.why === 'near' && b.nearEarly && it.cands[0] && it.cands[0].record === b.nearEarly.m.id)
+          it.msg = '你记的比付款早 ' + b.nearEarly.hours + ' 小时、金额差 ' + ((b.nearEarly.m.fen - b.fen) / 100).toFixed(2) + ' 元，请你确认';
         else if (it.why === 'early' && ec) it.msg = '你记的比账单早 ' + ec.early + ' 天' + (ec.delay ? '，可能是延后扣款' : '') + '，请你确认';
         else if (it.why === 'xcat') { var xm = cands[0].m; it.msg = '有一条手记金额一样、晚 ' + Math.abs(dayNo(xm.time) - b.day) + ' 天记的，但分类对不上（账单像「' + billCat(b) + '」，你记的是「' + (xm.cat || '未分类') + '」），请你确认'; }
       } else it.flags.push('missing');     // 漏记

@@ -1,5 +1,6 @@
 // 1017-A 起「金额差一点」的三条收紧（第四轮真机试用）。node zZn-import-near-rules.test.js [index.html]
 //   15（1017-A）：金额相近的自动合并只限同一天或手记晚 1 天；晚 2–3 天的进待你确认，写「金额差 x 元、晚 N 天记的」
+//   17（1017-B）：金额相近的，同一天手记比付款早超过 1 小时也不自动合并，写「你记的比付款早 N 小时」；手记正好 00:00 的不拦
 // 解析 → 定去向 → 配对 → 方案，纯计算。账单、手记、对方、金额全是虚构的。
 const path = require('path');
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
@@ -16,7 +17,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
 const T = (mo, d, h, mi) => ({ y: 2026, mo, d, h: h === undefined ? 12 : h, mi: mi || 0, s: 0 });
 const RANGE = { from: '2026-01-01 00:00:00', to: '2026-12-31 23:59:59' };
 const CATS = ['未分类', '吃饭', '购物', '出行', '游戏', '其他'];
-const RULES = [{ kw: '某虚构超市', cat: '购物' }, { kw: '某虚构面馆', cat: '吃饭' }];
+const RULES = [{ kw: '某虚构超市', cat: '购物' }, { kw: '某虚构面馆', cat: '吃饭' }, { kw: '某虚构游戏', cat: '游戏' }];
 let seq = 0;
 const wno = () => '4200000000' + String(++seq).padStart(19, '0');
 const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户', desc: '虚构商品', io: 'expense', fen: 1000, pm: '零钱', status: '支付成功', mno: '', no: wno() }, o));
@@ -70,6 +71,40 @@ function run(txns, manual) {
   const b1 = wx({ time: T(3, 8, 10, 0), cp: '某虚构超市', fen: 950 });
   const r = run([b0, b1], [man('m', 3, 8, '19:13', 1000, '购物')]);
   ok(r.item(b0).bucket === 'pending' && r.item(b1).bucket === 'pending', '15 两笔都看中同一条手记：都不自动合并');
+}
+// ===== 17. 金额相近、手记比付款早 1 小时以上的，不自动合并 =====
+{
+  // 你给的结构：手记 3-4 16:20 游戏 30.00，账单 3-4 21:43 某游戏公司 29.99
+  const b = wx({ time: T(3, 4, 21, 43), cp: '某虚构游戏公司', desc: '充值', fen: 2999 });
+  const it = run([b], [man('m', 3, 4, '16:20', 3000, '游戏')]).item(b);
+  ok(it.bucket === 'pending' && it.why === 'near' && it.cands[0].record === 'm', '17 同一天、手记早 5 小时 23 分：不自动合并，进待你确认');
+  ok(it.msg === '你记的比付款早 5 小时、金额差 0.01 元，请你确认', '17 写「你记的比付款早 5 小时」：' + it.msg);
+}
+{
+  // 早 59 分、正好 60 分的照旧合并；早 61 分的不合并（各跑一次，免得几笔互相看中）
+  const one = (hm, bt) => { const b = wx({ time: bt, cp: '某虚构面馆', fen: 2800 }); return run([b], [man('a', 3, 4, hm, 3000, '吃饭')]).item(b); };
+  const x59 = one('12:00', T(3, 4, 12, 59)), x60 = one('12:00', T(3, 4, 13, 0)), x61 = one('12:00', T(3, 4, 13, 1));
+  ok(x59.bucket === 'merge' && x59.why === 'near', '17 手记早 59 分钟：照旧自动合并');
+  ok(x60.bucket === 'merge' && x60.why === 'near', '17 手记正好早 60 分钟：照旧自动合并');
+  ok(x61.bucket === 'pending' && x61.msg === '你记的比付款早 1 小时、金额差 2.00 元，请你确认', '17 手记早 61 分钟：进待你确认、写早 1 小时');
+  // 手记正好 00:00 = 没写具体时间，不拦；00:01 起照常算（半夜真的会记账）
+  const z0 = one('00:00', T(3, 4, 21, 43)), z1 = one('00:01', T(3, 4, 21, 43));
+  ok(z0.bucket === 'merge' && z0.into === 'a', '17 手记正好 00:00：当作没写时间，照旧自动合并');
+  ok(z1.bucket === 'pending' && /^你记的比付款早 21 小时/.test(z1.msg), '17 手记 00:01：照常算，早 21 小时进待你确认');
+}
+{
+  // 手记比付款晚（先付后记）照旧合并；金额正好相等的同一天，手记早 5 小时也照旧合并
+  const b0 = wx({ time: T(3, 4, 12, 0), cp: '某虚构面馆', fen: 2800 });
+  const b1 = wx({ time: T(3, 5, 21, 43), cp: '某虚构游戏公司', fen: 3000 });
+  const r = run([b0, b1], [man('a', 3, 4, '20:00', 3000, '吃饭'), man('b', 3, 5, '16:20', 3000, '游戏')]);
+  ok(r.item(b0).bucket === 'merge' && r.item(b0).why === 'near', '17 手记晚 8 小时（先付后记）：照旧自动合并');
+  ok(r.item(b1).bucket === 'merge' && r.item(b1).why === 'merged', '17 金额正好相等、手记早 5 小时：照旧自动合并');
+}
+{
+  // 晚 1 天的不看钟点（手记第二天早上补记）
+  const b = wx({ time: T(3, 4, 21, 0), cp: '某虚构面馆', fen: 2800 });
+  const it = run([b], [man('a', 3, 5, '08:00', 3000, '吃饭')]).item(b);
+  ok(it.bucket === 'merge' && it.why === 'near' && it.days === 1, '17 手记晚 1 天（第二天早上补记）：照旧自动合并');
 }
 })();
 console.log(`${pass} 通过，${fail} 失败`);
