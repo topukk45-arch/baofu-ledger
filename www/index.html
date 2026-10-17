@@ -774,6 +774,13 @@
            键盘上方、内部滚动即可，绝不能改成顶部对齐（否则会被顶到状态栏后面）。
            注意：askMask（金额补全/确认/备注等矮弹窗）也不参与顶部对齐——它内容不高，
            居中时键盘也顶不没它，强行顶部对齐反而会贴死状态栏，难看。 */
+        /* 1017-W：其余弹窗（记一笔、修改、详情、退款、模板、分类、外观、日子、AI 导出、日期 / 年月选择器……）不再居中，
+           照底部面板的样子贴底、上面两个圆角、从下面滑上来；键盘弹起时照旧改成顶部对齐（下面那条规则） */
+        .mask:not(.sheet-mask) { align-items:flex-end; padding:0; }
+        .mask:not(.sheet-mask) > .edit-dialog, .mask:not(.sheet-mask) > .dt-dialog { width:100%; max-width:760px;
+            border-radius:18px 18px 0 0; border-bottom:none; padding-bottom:calc(20px + env(safe-area-inset-bottom));
+            max-height:88vh; max-height:88dvh; animation:askUp .26s ease; box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4); }
+        .mask:not(.sheet-mask) > .edit-dialog h3 { text-align:left; }
         body.kb-open .mask:not(.sheet-mask):not(#askMask) { align-items:flex-start; padding-top:8px; padding-bottom:8px; }
         body.kb-open .edit-dialog { max-height:none; }
         /* 限高交给 mask：弹窗最高占满 mask 可用高度，超出则内部滚动 */
@@ -1415,7 +1422,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-V</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-W</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
