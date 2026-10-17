@@ -8,6 +8,15 @@
 //   临时编号由主页面按导入记录里的顺序编（新增的在前、改过的以前的记录在后；只在结果页那一刻能带上的跳过 / 待处理排在最后），
 //   同一批每次导出编号一样；删掉了的那一笔编号留空（不写进全文）。
 //   开关 { cp: 发对方名, remark: 发备注和商品说明, mask: 打码 }：cp / remark 关掉时那几列整列不出现。
+//
+// 1017-I 读回复：parseReply(回复全文, { batch, aiAt:[导出时间…], cats, rows:[aiExportRows 的行] }) →
+//   { ok:true, items:[{ n, id, field:'cat'|'remark'|'mode'|'flag', value, ref, refId, why, line, gone, cur }], bad:[{ line, why }], outside }
+//   或 { ok:false, why:'noblock'|'nohead'|'batch'|'time', ... }（整份拒收）。
+//   只读 ```记问 开头的代码块（代码块外面的字一概不看，outside 数一下有几行）；代码块第一行要是「记问修改建议 v1 批次 X 导出 Y」，
+//   批次号不是这一次、或导出时间不是这一批记下的导出时间之一 → 整份拒收。下面一行一条「#号 | 改什么 | 改成什么 | 理由」（全角竖线也认）：
+//   改什么只认四种：分类（要是可选分类里的）、备注、口径（计入 / 只算结余 / 不计入）、标记（可能重复 / 可能漏配，后面可以跟「#号」说的是哪一笔）；
+//   号对不上（不在这次导出里、或是没进账本的那几行）、分类不在名单里、改金额 / 时间 / 对方、新建 / 删除、格式乱的、和现在一样的、
+//   同一条同一项提了两次的（只认第一次）→ 一律不认，列进「没看懂的几行」（bad，带原因）。删掉了的那一笔照样列出来，标 gone（界面上灰掉、不能勾）。
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module && module.exports) module.exports = api;
@@ -15,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-H';
+  var VERSION = '1017-I';
   var AI_MAX_ROWS = 300;          // 一段最多几行（太长有的 AI 会截断；以后好调）
   var HEAD = '记问修改建议 v1';    // AI 回复代码块的第一行要原样抄这几个字 + 批次 + 导出时间
   var MODE_NAME = { normal: '计入', flow: '只算结余', skip: '不计入' };
@@ -107,5 +116,79 @@
     return { parts: parts, total: rows.length, head: replyHead(d.batch, d.at) };
   }
 
-  return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, HEAD: HEAD, MODE_NAME: MODE_NAME, mask: mask, personal: personal, exportText: exportText, replyHead: replyHead };
+  // ---------- 1017-I 读回复 ----------
+  var FIELD = { '分类': 'cat', '备注': 'remark', '口径': 'mode', '标记': 'flag' };
+  var MODE_OF = { '计入': 'normal', '只算结余': 'flow', '不计入': 'skip' };
+  var FLAG_OF = { '可能重复': 'dup', '可能漏配': 'miss' };
+  var NOT_ALLOWED = [[/金额|钱数|money/i, '不能改金额'], [/时间|日期|time|date/i, '不能改时间'], [/新建|新增|添加|增加/, '不能新建记录'], [/删除|删掉|删|去掉这笔|作废/, '不能删除记录'],
+                     [/对方|商户|收款方/, '不能改对方'], [/收支|类型/, '不能改收支'], [/合并|配对|拆开/, '这一版不能改配对']];
+  var REMARK_MAX = 200;
+  function blocks(text) {
+    var out = [], re = /```[ \t]*记问[^\n]*\n([\s\S]*?)(```|$)/g, m;
+    while ((m = re.exec(text))) out.push(m[1]);
+    return out;
+  }
+  function parseReply(text, ctx) {
+    text = String(text == null ? '' : text).replace(/\r\n?/g, '\n');
+    ctx = ctx || {};
+    var bs = blocks(text);
+    if (!bs.length) return { ok: false, why: 'noblock' };
+    var outside = Math.max(0, text.split('\n').filter(function (l) { return l.trim(); }).length - bs.reduce(function (n, b) { return n + b.split('\n').filter(function (l) { return l.trim(); }).length + 2; }, 0));
+    var lines = [];
+    bs.forEach(function (b) { b.split('\n').forEach(function (l) { if (l.trim()) lines.push(l.trim()); }); });
+    // 第一行：批次号、导出时间
+    var hm = /^记问修改建议\s*v1\s*批次\s*(\S+)\s*导出\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*$/.exec(lines[0] || '');
+    if (!hm) return { ok: false, why: 'nohead', line: lines[0] || '' };
+    if (hm[1] !== ctx.batch) return { ok: false, why: 'batch', got: hm[1], want: ctx.batch };
+    if ((ctx.aiAt || []).indexOf(hm[2]) < 0) return { ok: false, why: 'time', got: hm[2], want: (ctx.aiAt || []).slice() };
+    var byN = {}; (ctx.rows || []).forEach(function (r) { if (r && Number.isInteger(r.n)) byN[r.n] = r; });
+    var cats = ctx.cats || [], items = [], bad = [], seen = {};
+    var badLine = function (l, why) { bad.push({ line: l, why: why }); };
+    lines.slice(1).forEach(function (l) {
+      if (/^记问修改建议/.test(l)) { if (l === lines[0]) return; badLine(l, '另一次导出的回复'); return; }   // 分几段回复的，每段开头那一行重复出现，跳过
+      var cells = l.replace(/｜/g, '|').split('|').map(function (x) { return x.trim(); });
+      if (cells.length < 3) { badLine(l, '格式不对（要「#号 | 改什么 | 改成什么 | 理由」）'); return; }
+      var nm = /^#?\s*(\d+)$/.exec(cells[0]);
+      var fieldRaw = cells[1], value = cells[2], why = cells.slice(3).join(' | ').trim();
+      if (!nm) {
+        var na0 = NOT_ALLOWED.filter(function (x) { return x[0].test(cells[0] + fieldRaw); })[0];
+        badLine(l, na0 ? na0[1] : '开头不是「#号」'); return;
+      }
+      var n = +nm[1], row = byN[n];
+      if (!row) { badLine(l, '没有 #' + n + ' 这一笔（不在这次导出里，或是没进账本的那几行）'); return; }
+      var field = FIELD[fieldRaw];
+      if (!field) { var na = NOT_ALLOWED.filter(function (x) { return x[0].test(fieldRaw); })[0]; badLine(l, na ? na[1] : '「' + fieldRaw + '」改不了（只能改分类、备注、口径、标记）'); return; }
+      var it = { n: n, id: row.id, field: field, why: why, line: l, gone: !!row.gone };
+      if (field === 'cat') {
+        if (cats.indexOf(value) < 0) { badLine(l, '分类「' + value + '」不在你的分类里'); return; }
+        if (!row.gone && row.cat === value) { badLine(l, '已经是「' + value + '」了'); return; }
+        it.value = value; it.cur = row.cat;
+      } else if (field === 'mode') {
+        var m = MODE_OF[value];
+        if (!m) { badLine(l, '口径只能是计入、只算结余、不计入'); return; }
+        if (!row.gone && row.mode === m) { badLine(l, '已经是「' + value + '」了'); return; }
+        it.value = m; it.cur = row.mode;
+      } else if (field === 'remark') {
+        if (!value) { badLine(l, '备注是空的'); return; }
+        it.value = value.slice(0, REMARK_MAX); it.cur = row.remark || '';
+      } else {
+        var fm = /^(可能重复|可能漏配)\s*(?:#\s*(\d+))?\s*$/.exec(value);
+        if (!fm) { badLine(l, '标记只能是「可能重复」「可能漏配」（后面可以跟 #号）'); return; }
+        it.value = FLAG_OF[fm[1]];
+        if (fm[2]) {
+          var rn = +fm[2], rr = byN[rn];
+          if (!rr || rr.gone || rn === n) { badLine(l, rn === n ? '说的那一笔就是它自己' : '说的 #' + rn + ' 不是账本里的记录'); return; }
+          it.ref = rn; it.refId = rr.id;
+        }
+      }
+      var k = n + '|' + field;
+      if (seen[k]) { badLine(l, '#' + n + ' 的' + fieldRaw + '前面已经提过了，只认第一次'); return; }
+      seen[k] = true;
+      items.push(it);
+    });
+    return { ok: true, items: items, bad: bad, outside: outside, head: lines[0] };
+  }
+
+  return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, HEAD: HEAD, MODE_NAME: MODE_NAME, MODE_OF: MODE_OF, FLAG_OF: FLAG_OF, REMARK_MAX: REMARK_MAX,
+           mask: mask, personal: personal, exportText: exportText, replyHead: replyHead, parseReply: parseReply };
 });
