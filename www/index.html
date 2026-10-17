@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-L</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-M</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1469,6 +1469,8 @@
                     </thead>
                     <tbody id="billList"></tbody>
                 </table>
+                <div class="pager pager-bottom" id="pagerBottom"></div>
+                <div id="pagerPad"></div>
             </div>
 
             <!-- ========== 页面2：统计 ========== -->
@@ -7569,15 +7571,18 @@ ${detail}
             b.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入')); });
             const head=$('billHead'); head.parentNode.insertBefore(b, head);
         }
-        function renderBill(){
+        // 【1017-M】opt.pageOnly：翻页时只换列表那几行，总览、分类汇总、日子卡、筛选小计一概不动
+        //   （以前翻页也整页重画：先清空列表、中间量字号逼浏览器排一次版，页面那一刻只剩上半截，
+        //    滚动位置被夹到 0，再平滑滚回来——看着像整页重播一遍、上下晃）
+        function renderBill(opt){
+            const pageOnly=!!(opt && opt.pageOnly);
             const filterVal=filterCat.value;
             // 结余必须基于「全部记录」累计，否则筛选时结余列会误导（这正是账对不上的根源）
             // 先对全部记录按时间正序，算出每笔的真实账户累计结余。
             // 时间精度仅到分钟，同分钟多笔用「记录在存储数组里的原始顺序」作次级键——
             // 它天然稳定且唯一，不依赖 id 的字符串大小（旧 id 不定长，字符串比较会乱序）。
             const raw=getUserData();
-            renderImpEmptyEntry(raw.length);
-            renderImpRemind();
+            if(!pageOnly){ renderImpEmptyEntry(raw.length); renderImpRemind(); pagerPad(0); }
             // 【为什么先算时间戳再排序】比较器里每调一次 parseRecTime 就是一次
             //   正则 + new Date()。而排序要做 O(n log n) 次比较，每次比较调两遍
             //   —— 12000 条记录约 16 万次比较、32 万次解析，实测占掉 renderBill
@@ -7609,7 +7614,7 @@ ${detail}
             // 再按筛选条件取出要显示的子集（仍保持时间正序）：分类标签 + 搜索条件叠加
             const asc=allAsc.filter(r=>filterMatch(r, filterVal));
 
-            billList.innerHTML='';
+            // 【1017-M】列表不在这里先清空：新的几行在下面拼好了一次换上，中间不留「列表是空的」那一刻
             // 只有存档里**一条记录都没有**时才隐藏汇总区。
             // 此前是「筛选结果为空」也一并隐藏，导致筛选没命中时顶部总览、分类汇总全没了——
             // 全局总览本不该受筛选影响。现在筛选没命中走下面的正常流程，小计条显示「命中 0 条」。
@@ -7620,9 +7625,10 @@ ${detail}
                 $('summaryFilter').style.display='none';
                 $('batchBar').innerHTML=''; $('batchBar').style.display='none';
                 $('catStats').innerHTML=''; $('catStatsCard').style.display='none';
-                $('pager').innerHTML='';
+                renderPager(0);
                 return;
             }
+            if(!pageOnly){
             // 有记录：确保汇总/分类统计容器恢复显示（上次可能被空数据分支隐藏过）
             $('summaryOverall').style.display='';
             $('catStatsCard').style.display='';
@@ -7698,10 +7704,11 @@ ${detail}
                 byCat[r.cat]=(byCat[r.cat]||0)+(c.inc-c.exp);
             });
             renderCatStats(byCat);
+            }
 
             if(asc.length===0){
                 billList.innerHTML=`<tr><td colspan="7" class="empty-tip">没有符合条件的记录</td></tr>`;
-                $('pager').innerHTML='';
+                renderPager(0);
                 return;
             }
 
@@ -7716,6 +7723,7 @@ ${detail}
             const pageItems = desc.slice(start, start + PAGE_SIZE);
 
             const rMap=refundedMap(raw);        // 原账单 id → 已退总额（1010-J）
+            const frag=document.createDocumentFragment();
             pageItems.forEach(item=>{
                 const balance=balOf.get(item);
                 const isExp = item.type==='expense';
@@ -7746,8 +7754,10 @@ ${detail}
                     <td data-label="" class="ops-cell">
                         <button class="operate-btn edit" data-act="edit" data-id="${escapeHtml(item.id)}">修改</button>
                     </td>`;
-                billList.appendChild(tr);
+                frag.appendChild(tr);
             });
+            billList.textContent='';
+            billList.appendChild(frag);
 
             renderPager(totalPages);
         }
@@ -8264,22 +8274,52 @@ ${detail}
         });
         $('bgMonthLabel').addEventListener('click', ()=>$('statMonthLabel').click());   // 复用年月选择器
 
-        // 渲染分页控件（≤1 页时不显示）
+        // 渲染分页控件（≤1 页时不显示）：列表上面、下面各一份（下面那份 1017-M 加）
+        //   按钮只建一次、以后只改文字和能不能点——翻页时点的那个按钮还是原来那个，不闪
         function renderPager(totalPages){
-            const box=$('pager');
-            if(totalPages<=1){ box.innerHTML=''; return; }
-            box.innerHTML='';
-            const prev=document.createElement('button');
-            prev.textContent='‹ 上一页'; prev.disabled = curPage<=1;
-            prev.onclick=()=>{ curPage--; renderBill(); scrollListTop(); if(window.syncFilterFab) window.syncFilterFab(); };
-            const info=document.createElement('span');
-            info.className='page-info'; info.textContent=`第 ${curPage} / ${totalPages} 页`;
-            const next=document.createElement('button');
-            next.textContent='下一页 ›'; next.disabled = curPage>=totalPages;
-            next.onclick=()=>{ curPage++; renderBill(); scrollListTop(); if(window.syncFilterFab) window.syncFilterFab(); };
-            box.appendChild(prev); box.appendChild(info); box.appendChild(next);
+            [['pager','top'],['pagerBottom','bottom']].forEach(([id, from])=>{
+                const box=$(id); if(!box) return;
+                if(totalPages<=1){ box.innerHTML=''; return; }
+                if(!box.querySelector('.page-info')){
+                    box.innerHTML='';
+                    const prev=document.createElement('button');
+                    prev.textContent='‹ 上一页'; prev.dataset.pg='-1';
+                    const info=document.createElement('span'); info.className='page-info';
+                    const next=document.createElement('button');
+                    next.textContent='下一页 ›'; next.dataset.pg='1';
+                    prev.onclick=()=>goPage(-1, from);
+                    next.onclick=()=>goPage(1, from);
+                    box.appendChild(prev); box.appendChild(info); box.appendChild(next);
+                }
+                const [prev, next]=box.querySelectorAll('button');
+                prev.disabled = curPage<=1;
+                next.disabled = curPage>=totalPages;
+                box.querySelector('.page-info').textContent=`第 ${curPage} / ${totalPages} 页`;
+            });
+            if(totalPages<=1) pagerPad(0);
         }
-        // 翻页后让列表顶部对齐，避免停在半截
+        // 列表最下面一块看不见的垫子：翻到最后一页、新的一页比原来短时垫上差的那点高度，
+        //   免得页面变短把滚动位置往上夹、上面那排按钮跟着往下跑（先缩后长）
+        function pagerPad(h){ const p=$('pagerPad'); if(p) p.style.height = h>0 ? h+'px' : ''; }
+        // 【1017-M】翻页：只换列表那几行。
+        //   上面那排：页面一点不动，点的按钮留在原地；
+        //   下面那排：直接（不带动画）跳到新一页的第一行。
+        function goPage(d, from){
+            const y0=window.scrollY;
+            curPage+=d;
+            pagerPad(0);
+            renderBill({ pageOnly:true });
+            if(from==='bottom'){
+                const first=billList.firstElementChild;
+                if(first) window.scrollTo({ top: Math.max(0, first.getBoundingClientRect().top + window.scrollY - 8), behavior:'instant' });
+            } else {
+                const lack = y0 - (document.documentElement.scrollHeight - window.innerHeight);
+                if(lack>0) pagerPad(Math.ceil(lack));
+                if(window.scrollY!==y0) window.scrollTo({ top:y0, behavior:'instant' });
+            }
+            if(window.syncFilterFab) window.syncFilterFab();
+        }
+        // 清筛选（✕）后让列表顶部对齐，避免停在半截
         function scrollListTop(){
             const t=$('billHead') || document.querySelector('table');
             if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
