@@ -122,6 +122,9 @@
     '.imp-cf-list{display:flex;flex-direction:column;gap:10px;margin:2px 0 12px;}',
     '.imp-cf-item{display:flex;gap:10px;align-items:flex-start;}.imp-cf-item i{flex:0 0 8px;height:8px;border-radius:50%;background:var(--c-primary);margin-top:8px;}',
     '.imp-cf-item b{display:block;font-size:15px;color:var(--c-primary-deep);}',
+    '.imp-res-hero{text-align:center;padding:16px 8px 12px;}',
+    '.imp-res-ok{width:56px;height:56px;margin:0 auto 10px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;color:var(--c-on-primary);background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark));}',
+    '.imp-res-title{font-size:20px;font-weight:bold;color:var(--c-primary-deep);margin-bottom:2px;}',
     '.imp-cf-bk{font-size:12.5px;color:var(--c-text-soft);padding:8px 10px;border-radius:8px;background:var(--c-surface);border:1px solid var(--c-border);line-height:1.6;}'
   ].join('\n');
 
@@ -1547,39 +1550,41 @@
   // ---------- 结果页 ----------
   function renderResult() {
     hideSteps();
-    var b = dom.body, res = S.result, c = res.ws.counts; b.innerHTML = '';
+    var b = dom.body, res = S.result, c = res.ws.counts, only = !!res.ws.only; b.innerHTML = '';
     setHead('导入完成', '‹ 返回');
-    var card = el('div', 'imp-card'); card.id = 'impResult';
-    if (res.ws.only) {
-      // 1016-Q：只对账
-      card.appendChild(el('h4', null, '只对账：补进了 ' + res.r.added + ' 条记录'));
+    // 1017-UI3：最上面一个大对勾 + 一句话；下面四格（和总览、确认面板一样）；还有待处理单独一块；接下来可以；撤销的说明放最后
+    var wrap = el('div'); wrap.id = 'impResult';
+    var hero = el('div', 'imp-res-hero');
+    hero.appendChild(el('div', 'imp-res-ok', '✓'));
+    hero.appendChild(el('div', 'imp-res-title', only ? '只对账：补进了 ' + res.r.added + ' 条记录' : '已写进账本'));
+    var log = res.ws.log || {}, rng = log.from ? ' · ' + log.from + ' 至 ' + (log.to || '').slice(5) : '';
+    hero.appendChild(el('div', 'imp-soft', appNames(log.apps) + rng + ' · 用时 ' + (res.ms / 1000).toFixed(1) + ' 秒'));
+    wrap.appendChild(hero);
+    var card = el('div', 'imp-card');
+    if (only) {
       card.appendChild(el('div', 'imp-line imp-res-only', '只写了你勾选的 ' + c.add + ' 笔，其余什么都没改。'));
-    } else
-    card.appendChild(el('h4', null, '已写进账本'));
-    var sum = 0;
-    if (!res.ws.only) BUCKET_LINE.forEach(function (x) {
-      var n = c[x[0]] || 0; sum += n;
-      if (!n && ['error', 'excluded', 'refund'].indexOf(x[0]) >= 0) return;
-      var l = el('div', 'imp-line imp-res-' + x[0], x[1] + ' ' + n + ' 笔'); l.dataset.group = x[0]; card.appendChild(l);
-    });
-    if (!res.ws.only) card.appendChild(el('div', 'imp-line imp-res-total', '合计 ' + sum + ' 笔，文件里共 ' + res.ws.total + ' 笔' + (sum === res.ws.total ? '' : '（对不上，请截图发给开发者）')));
-    if (res.r.added !== undefined && !res.ws.only) card.appendChild(el('div', 'imp-soft', '新建 ' + res.r.added + ' 条记录，改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）'));
-    if (res.ws.learnedN && !res.ws.only) card.appendChild(el('div', 'imp-soft imp-res-learned', '从合并里学到了 ' + res.ws.learnedN + ' 条规则（同一个对方合并上 2 次以上、分类一致），以后直接用。'));
-    if (res.ws.rulesChange && res.ws.rulesChange.length && !res.ws.only) card.appendChild(el('div', 'imp-soft imp-res-rulefix', '改了你的 ' + res.ws.rulesChange.length + ' 条规则：' + res.ws.rulesChange.map(function (x) { return x.kw + ' → ' + x.to; }).join('，')));
-    var nmr = S.plan && S.plan.sections && S.plan.sections.nearMerged;
-    if (nmr && !res.ws.only) card.appendChild(el('div', 'imp-soft imp-res-near', nmr.pay ? nmr.n + ' 笔金额差一点的手记已改成实付金额。' : nmr.n + ' 笔手记比实付多 ' + yuan(nmr.fen) + ' 元，多半是立减。'));
-    if (c.pending) {
-      card.appendChild(el('div', 'imp-soft', '待处理的 ' + c.pending + ' 笔没进账本，存在待处理里，以后处理。'));
-      var pl = btn('还有 ' + c.pending + ' 笔待处理，去处理 ›', 'ui-btn block', function () { openPending(); }); pl.id = 'impResPending'; pl.style.marginTop = '8px'; card.appendChild(pl);
+    } else {
+      card.appendChild(tiles([['新建', (res.r.added !== undefined ? res.r.added : c.add) + ' 条'], ['和手记合并', (c.merge || 0) + ' 笔'], ['留在待处理', (c.pending || 0) + ' 笔'], ['跳过', (c.skip || 0) + ' 笔']], 'impResTiles'));
+      var sum = 0, parts = [];
+      BUCKET_LINE.forEach(function (x) { var n = c[x[0]] || 0; sum += n; if (n) parts.push(x[1] + ' ' + n); });
+      var tl = el('div', 'imp-line imp-res-total' + (sum === res.ws.total ? '' : ' imp-bad'),
+        sum === res.ws.total ? '文件里共 ' + res.ws.total + ' 笔，都对上了（' + parts.join('、') + '）。'
+          : '合计 ' + sum + ' 笔，文件里共 ' + res.ws.total + ' 笔（对不上，请截图发给开发者）');
+      card.appendChild(tl);
+      if (res.r.changed) card.appendChild(el('div', 'imp-soft', '改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）。'));
+      if (res.ws.learnedN) card.appendChild(el('div', 'imp-soft imp-res-learned', '从合并里学到了 ' + res.ws.learnedN + ' 条规则（同一个对方合并上 2 次以上、分类一致），以后直接用。'));
+      if (res.ws.rulesChange && res.ws.rulesChange.length) card.appendChild(el('div', 'imp-soft imp-res-rulefix', '改了你的 ' + res.ws.rulesChange.length + ' 条规则：' + res.ws.rulesChange.map(function (x) { return x.kw + ' → ' + x.to; }).join('，')));
+      var nmr = S.plan && S.plan.sections && S.plan.sections.nearMerged;
+      if (nmr) card.appendChild(el('div', 'imp-soft imp-res-near', nmr.pay ? nmr.n + ' 笔金额差一点的手记已改成实付金额。' : nmr.n + ' 笔手记比实付多 ' + yuan(nmr.fen) + ' 元，多半是立减。'));
     }
-    card.appendChild(el('div', 'imp-soft imp-res-batch', '写入用时 ' + (res.ms / 1000).toFixed(1) + ' 秒（这次导入的编号 ' + res.ws.batch + '，出问题时告诉开发者）'));   // 1016-UI5：「批次号」是开发用语，改成大白话
-    card.appendChild(el('div', 'imp-soft', '写之前自动备份了一份。导错了可以点下面「撤销这次导入」，以后也能在「设置 → 导入记录」里撤销。'));
-    // 1016-UI2：「撤销这次导入」「回到账本」放进底部操作栏
-    var go = btn('回到账本', 'ui-btn primary', function () {
-      close();
-      var tb = document.querySelector('.tab-btn[data-tab="ledger"]'); if (tb) tb.click();
-    });
-    go.id = 'impBackToLedger';
+    wrap.appendChild(card);
+    if (c.pending) {
+      var pc = el('div', 'imp-card'); pc.id = 'impResPend';
+      pc.appendChild(el('div', 'imp-soft', '导入时拿不准的没进账本，存在待处理里，有空再定。'));
+      var pl = btn('还有 ' + c.pending + ' 笔待处理，去处理 ›', 'ui-btn block', function () { openPending(); }); pl.id = 'impResPending'; pl.style.marginTop = '8px'; pc.appendChild(pl);
+      wrap.appendChild(pc);
+    }
+    b.appendChild(wrap);
     // 1016-T：导完指下一步
     var nx = el('div', 'imp-card'); nx.id = 'impNext';
     nx.appendChild(el('h4', null, '接下来可以'));
@@ -1589,12 +1594,21 @@
     var n2 = btn('按过去几个月设预算 ›', 'ui-btn block', goNext('budget')); n2.id = 'impNextBudget';
     var n3 = btn('补一笔期初余额 ›', 'ui-btn block', goNext('opening')); n3.id = 'impNextOpening';
     nr.appendChild(n1); nr.appendChild(n2); nr.appendChild(n3); nx.appendChild(nr);
-    nx.appendChild(el('div', 'imp-soft', '结余是按记录现算的：导进来的只是这段时间的收支差额，不等于钱包里的实际余额。想让结余对上，补一笔「只算结余」的期初余额（不算收入）。'));
-    var un = btn('撤销这次导入', 'ui-btn', function () { undoBatch(res.ws.batch); });
-    un.id = 'impUndoThis';
-    b.appendChild(card);
+    nx.appendChild(el('div', 'imp-soft', '导进来的只是这段时间的收支差额，不等于钱包里的实际余额。想让结余对上，补一笔「只算结余」的期初余额（不算收入）。'));
     b.appendChild(nx);
-    barSet([un, go]);
+    var bk = el('div', 'imp-card');
+    bk.appendChild(el('div', 'imp-soft', '写之前自动备份了一份。导错了可以点下面「撤销这次导入」整批撤销，以后也能在「设置 → 导入记录」里撤销。'));
+    bk.appendChild(el('div', 'imp-soft imp-res-batch', '这次导入的编号 ' + res.ws.batch + '（出问题时告诉开发者）'));   // 1016-UI5：「批次号」是开发用语
+    b.appendChild(bk);
+    // 底部：「回到账本」在上、最显眼；「撤销这次导入」放最下面（返回、撤销这类放最下面），提醒色
+    var go = btn('回到账本', 'ui-btn primary ui-full', function () {
+      close();
+      var tb = document.querySelector('.tab-btn[data-tab="ledger"]'); if (tb) tb.click();
+    });
+    go.id = 'impBackToLedger';
+    var un = btn('撤销这次导入', 'ui-btn danger ui-full', function () { undoBatch(res.ws.batch); });
+    un.id = 'impUndoThis';
+    barSet([go, un]);
     dom.page.scrollTop = 0;
   }
 

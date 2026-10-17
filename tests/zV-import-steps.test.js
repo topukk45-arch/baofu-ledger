@@ -145,6 +145,11 @@ const MANY = () => [
     release(); await t.until(() => raw('impResult'), 30000);
     t.w.JiwenImportStore.commit = real;
     ok(raw('impResult') && !sheetOpen(t) && t.recs().length > MANUAL.length, '4 写完：面板收起，到结果页');
+    // 1017-UI3：成功页：大对勾 + 「已写进账本」、四格、都对上了、还有待处理单独一块；「回到账本」在上，「撤销这次导入」在最下面
+    const rs = t.S().result, kids = [...raw('impBar').children];
+    ok(raw('impResult').querySelector('.imp-res-ok') && /已写进账本/.test(raw('impResult').textContent) && raw('impResTiles') && raw('impResTiles').textContent.includes('新建' + rs.r.added + ' 条'), '4 成功页：大对勾、已写进账本、四格（新建 ' + rs.r.added + ' 条）');
+    ok(/文件里共 \d+ 笔，都对上了/.test(raw('impResult').textContent) && raw('impResPending') && /还有 \d+ 笔待处理/.test(raw('impResPending').textContent), '4 成功页：写明都对上了，还有待处理单独一块');
+    ok(kids[0] === raw('impBackToLedger') && kids[1] === raw('impUndoThis') && raw('impUndoThis').className.includes('danger'), '4 成功页底部：「回到账本」在上，「撤销这次导入」在最下面（提醒色）');
     // 结果页退出不问
     await t.back();
     ok(raw('impPage').style.display === 'none' && !sheetOpen(t), '4 结果页按返回：直接关，不问');
