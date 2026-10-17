@@ -8,6 +8,8 @@
 //     orders: { 键: { app, list: [{ no, id, batch, st }] } }（单号表每一块）, pending: [待处理条目…], logs: [导入记录…]（旧的在前） }
 // 导入记录（log）：{ b, at, apps, from, to, add:[id], h:[指纹]（1016-K 起，和 add 一一对应）, chg:[{ id, was, now（1016-K 起）, nos }],
 //   cpLen, pmLen, cpEnd, pmEnd（1016-K 起）, catsAdded, rulesAdded:{ cat, type, map } }
+//   1017-G 起还有 AI 修改：{ kind:'ai', of:原来那次导入, b, at, add:[], h:[], chg }（只改已有记录的分类 / 备注 / 口径 / aiFlag，名单长度不变）；
+//   撤它和撤导入一样（按 chg 一个字段一个字段还原，你后来改过的不动）；撤原来那次导入要先撤它（依赖 why 'ai'）
 //
 // 撤销一批 = 把这批对账本做的事反过来：
 //   新增的记录删掉（导入后改过的照删，列进 changed）；你挂在这些记录上的退款一起删（userRefunds）；已经被你删掉的跳过（gone）。
@@ -25,8 +27,8 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Y';
-  var OBJ_KEYS = ['src'];          // chg 里这些字段的原值 / 新值存的是 JSON 文本
+  var VERSION = '1017-G';
+  var OBJ_KEYS = ['src', 'aiFlag'];   // chg 里这些字段的原值 / 新值存的是 JSON 文本（1017-G 加 AI 标记）
 
   function hasher() {
     if (typeof JiwenImportWrite !== 'undefined') return JiwenImportWrite.recHash;   // eslint-disable-line no-undef
@@ -81,7 +83,8 @@
     for (var i = ti + 1; i < S.logs.length; i++) {
       var L = S.logs[i], recs = byBatch.get(L.b) || [], reasons = [];
       inChain.forEach(function (X) {
-        if ((L.chg || []).some(function (c) { return X.touched.has(c.id); })) reasons.push({ dep: X.b, why: 'same' });
+        // 1017-G：AI 修改（kind 'ai'）改了 X 碰过的记录：撤 X 之前要先撤这次 AI 修改
+        if ((L.chg || []).some(function (c) { return X.touched.has(c.id); })) reasons.push({ dep: X.b, why: L.kind === 'ai' ? 'ai' : 'same' });
         if (recs.some(function (r) { return r.refundOf && X.touched.has(r.refundOf); })) reasons.push({ dep: X.b, why: 'refund' });
         if (recs.some(function (r) { return (Number.isInteger(r.cp) && r.cp >= X.cp[0] && r.cp < X.cp[1]) || (Number.isInteger(r.pm) && r.pm >= X.pm[0] && r.pm < X.pm[1]); }))
           reasons.push({ dep: X.b, why: 'names' });
@@ -230,7 +233,7 @@
   }
 
   // 给确认框的大白话摘要（⑦b 的界面另做，这里先给开发开关里的临时按钮用）
-  var WHY = { same: '合并或追加了同一条记录', refund: '有退款挂在这批的记录上', names: '用到了这批新加的对方名或支付方式', cat: '用到了这批新建的分类', marker: '用到了这批登记的退款记号', pending: '处理了这批留下的待处理' };
+  var WHY = { ai: 'AI 修改了这批的记录', same: '合并或追加了同一条记录', refund: '有退款挂在这批的记录上', names: '用到了这批新加的对方名或支付方式', cat: '用到了这批新建的分类', marker: '用到了这批登记的退款记号', pending: '处理了这批留下的待处理' };
   function describe(p) {
     if (!p || !p.ok) return '找不到这次导入的记录。';
     var t = p.totals, out = [];

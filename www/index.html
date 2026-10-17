@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-F</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-G</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3328,11 +3328,23 @@
         //   src { app }（alipay / wechat）、batch 导入批次号。名单只往后加，编号就是位置；撤销按导入前的长度截断。
         // 存档里（meta）：cps、pms、importRules { cat:[{kw,cat}], type:[{app, type 或 status, as}], map:[{from,cat}] }。
         //   map（1016-J）：分类对照「推荐分类 → 我的分类」，确认页「新建分类」里手动选了「并到已有」时存；没有就不写这一类。
+        // 1017-G：记录上的「AI 标记」aiFlag { k:'dup'（可能重复）|'miss'（可能漏配）, why:理由（≤200 字）, ref:说的是哪一笔（另一条记录的 id，可没有）}；
+        //   只由「AI 检查导入结果」写，手记不填；跟着记录进备份、云备份，导入备份时 ref 换成新编号（找不到就去掉 ref，标记照留）。
+        //   导入记录里多一种 { kind:'ai', of:原来那次导入的批次号, b, at, add:[], h:[], chg:[{ id, was, now }] }：AI 改了哪几条、改前改后，
+        //   撤销照导入撤销那一套；撤原来那次导入要先撤它（undo.js 算依赖）。AI 修改前也自动备份一份（键 …_bk_<时间>_a，和导入前的共用 3 份）。
         const IMP_APPS=['alipay','wechat'];
         const IMP_LOG_MAX=10;
         const IMP_TYPE_AS=['normal','transfer','refund','skip'];   // 新交易类型怎么处理：照收/支、转账不计入、当退款（1.1）、跳过
         const IMP_STATUS_AS=['import','skip'];                      // 新交易状态：导入 / 跳过
         const IMP_BATCH_RE=/^[0-9a-z]{1,40}$/;
+        const IMP_AI_FLAGS=['dup','miss'];      // 1017-G：AI 标记的类型：可能重复、可能漏配
+        // 1017-G：洗一个 AI 标记；不合格返回 null（记录照留，只是不带标记）。mapId 给了就把 ref 换成新编号（换不了就去掉 ref）
+        function impCleanAiFlag(f, mapId){
+            if(!f || typeof f!=='object' || Array.isArray(f) || !IMP_AI_FLAGS.includes(f.k)) return null;
+            const o={ k:f.k, why:typeof f.why==='string' ? f.why.slice(0, 200) : '' };
+            if(typeof f.ref==='string' && f.ref){ const r=mapId ? mapId(f.ref) : f.ref; if(r) o.ref=r; }
+            return o;
+        }
         function impPrefix(id){ return `imp_${id}_`; }
         function impArchPrefix(id, aid){ return `imp_${id}_${aid}_`; }
         function impOrdKey(id, aid, app, mon){ return `imp_${id}_${aid}_o_${app}_${mon}`; }
@@ -3586,6 +3598,8 @@
                 o.catsAdded=(Array.isArray(x.catsAdded) ? x.catsAdded : []).filter(c=>typeof c==='string' && cats.includes(c));
                 o.rulesAdded=ra;
                 if(x.only===true) o.only=true;      // 1016-Q：只对账（只补了勾选的几笔）
+                // 1017-G：AI 修改（不是导入）：改的是哪一次导入的记录
+                if(x.kind==='ai'){ o.kind='ai'; if(typeof x.of==='string' && IMP_BATCH_RE.test(x.of)) o.of=x.of; }
                 // 1016-Y：这次改了你已有的哪几条规则（关键词、原来的分类、改成的分类），撤销时改回去
                 if(Array.isArray(x.rulesChanged)){
                     const rc=x.rulesChanged.filter(r=>r && typeof r.kw==='string' && r.kw && typeof r.from==='string' && typeof r.to==='string').map(r=>({ kw:r.kw.slice(0, 32), from:r.from, to:r.to }));
@@ -3718,12 +3732,13 @@
         const IMP_BK_MAX=3;
         function impBkPrefix(id, aid){ return `imp_${id}_${aid}_bk_`; }
         function impBkKeys(id, aid){ const p=impBkPrefix(id, aid); return [...__ledgerKeys].filter(k=>k.indexOf(p)===0).sort(); }
-        // kind：'import' 导入前（键 …_bk_<时间>）/ 'undo' 撤销前（1016-K，键 …_bk_<时间>_u），共用最多 3 份的位置
+        // kind：'import' 导入前（键 …_bk_<时间>）/ 'undo' 撤销前（1016-K，键 …_bk_<时间>_u）/ 'ai' AI 修改前（1017-G，键 …_bk_<时间>_a），共用最多 3 份的位置
+        const IMP_BK_KIND={ import:'导入前备份', undo:'撤销前备份', ai:'AI 修改前备份' };
         async function impMakeBackup(t, batch, kind){
             const store=loadStore(t.e.id), a=store.archives[t.name];
             const ex=await impExportFields(t.e.id, t.name, true);
             const arch={}; Object.keys(a).forEach(k=>{ arch[k] = k==='records' ? null : a[k]; });
-            return JSON.stringify({ app:'记问', kind:kind==='undo' ? '撤销前备份' : '导入前备份', user:nameOf(t.e.id), accountId:t.e.id, archive:t.name, aid:t.aid, batch,
+            return JSON.stringify({ app:'记问', kind:IMP_BK_KIND[kind] || IMP_BK_KIND.import, user:nameOf(t.e.id), accountId:t.e.id, archive:t.name, aid:t.aid, batch,
                 cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], ...impArchFields(a), data:a.records, ...ex,
                 _arch:arch, exportedAt:new Date().toLocaleString() });
         }
@@ -3883,7 +3898,7 @@
             const raw=await idbGet(key);
             if(typeof raw!=='string') throw impErr('nobackup');
             const bk=JSON.parse(raw);
-            if(!bk || (bk.kind!=='导入前备份' && bk.kind!=='撤销前备份') || bk.aid!==t.aid || !bk._arch || !Array.isArray(bk.data)) throw impErr('badbackup');
+            if(!bk || !Object.values(IMP_BK_KIND).includes(bk.kind) || bk.aid!==t.aid || !bk._arch || !Array.isArray(bk.data)) throw impErr('badbackup');
             const store=loadStore(t.e.id);
             const a={}; Object.keys(bk._arch).forEach(k=>{ a[k] = k==='records' ? bk.data : bk._arch[k]; });
             if(!('records' in a)) a.records=bk.data;
@@ -4084,7 +4099,7 @@
             // 本机的导入前备份（新的在后）：[{ key, at, batch, records }]（只读键名和开头，不整个解析）
             backups(archive){
                 const t=impTarget(archive);
-                return impBkKeys(t.e.id, t.aid).map(k=>({ key:k, t:parseInt(k.slice(impBkPrefix(t.e.id, t.aid).length), 36), kind:/_u$/.test(k) ? 'undo' : 'import' }));
+                return impBkKeys(t.e.id, t.aid).map(k=>({ key:k, t:parseInt(k.slice(impBkPrefix(t.e.id, t.aid).length), 36), kind:/_u$/.test(k) ? 'undo' : /_a$/.test(k) ? 'ai' : 'import' }));
             },
             // ---- 1016-K：撤销（第一期 ⑦a）----
             // 撤销方案（只读）：import/undo.js 算，带上算的时候账本的版本号。batch：要撤的批次号
@@ -4296,7 +4311,7 @@
                 (lk && lk.orders || []).forEach(key=>{ if(!known[key] && inPend.has(key)) known[key]={ pend:true }; });
                 // 1016-F：没有单号表（换了手机、只恢复了账本）：存档里导入过，单号表却是空的，或者找不到最后一批的批次号 → 按指纹认
                 const log=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
-                const logs=(log && Array.isArray(log.list)) ? log.list : [];
+                const logs=((log && Array.isArray(log.list)) ? log.list : []).filter(l=>l.kind!=='ai');   // 1017-G：AI 修改不算导入
                 let fpMode=false;
                 if(logs.length){
                     const lastB=logs[logs.length-1].b, bs=new Set();
@@ -5985,10 +6000,14 @@ ${detail}
                 if(Number.isInteger(r.cp) && r.cp>=0 && r.cp<cpsLen) rec.cp=r.cp;
                 if(Number.isInteger(r.pm) && r.pm>=0 && r.pm<pmsLen) rec.pm=r.pm;
                 if(typeof r.oc==='string' && r.oc.trim()) rec.oc=r.oc.trim().slice(0, 32);
+                // 1017-G：AI 标记照搬（ref 等全部记录编好号再换，见下面）
+                const af=impCleanAiFlag(r.aiFlag, null); if(af) rec.aiFlag=af;
                 if(r.id!=null) idMap.set(String(r.id), rec);
                 if(type==='income' && r.refundOf!=null && r.refundOf!=='') pend.push([rec, String(r.refundOf)]);
                 out.push(rec);
             }
+            // 1017-G：AI 标记说的那一笔换成新编号；文件里没有那一笔就去掉 ref（标记照留）
+            out.forEach(rec=>{ if(rec.aiFlag && rec.aiFlag.ref){ const o=idMap.get(rec.aiFlag.ref); if(o && o!==rec) rec.aiFlag.ref=o.id; else delete rec.aiFlag.ref; } });
             // 退款挂回原账单：原账单不在文件里 / 不是支出 / 累计超过原金额的，退化成普通收入（不丢、结余也对）
             const used=new Map();
             pend.forEach(([rec, oldId])=>{
@@ -6242,7 +6261,7 @@ ${detail}
             let list=[];
             try{ list=window.JiwenImportStore.backups(); }catch(_){}
             if(!list.length){ customAlert('这个存档还没有导入前的备份（每次导入前会自动备份一份，最多留 3 份）。', '恢复到导入前'); return; }
-            const last=list[list.length-1], when=new Date(last.t).toLocaleString(), what=last.kind==='undo' ? '撤销' : '导入';
+            const last=list[list.length-1], when=new Date(last.t).toLocaleString(), what=last.kind==='undo' ? '撤销' : last.kind==='ai' ? 'AI 修改' : '导入';
             customConfirm(`这份是「${what}前」的备份：恢复到 ${when} 那次${what}之前的样子，账本、单号表、待处理一起还原。\n\n那次${what}之后的所有修改（包括手记）都会没有。确定吗？`, async () => {
                 try{
                     const r=await window.JiwenImportStore.restoreLast();
@@ -7419,7 +7438,7 @@ ${detail}
             const pm=new Date(now.getFullYear(), now.getMonth(), 0), pmEnd=`${pm.getFullYear()}-${pad(pm.getMonth()+1)}-${pad(pm.getDate())}`;
             impGetJson(t.e, impLogKey(t.e.id, t.aid)).then(o=>{
                 if(my!==__remindSeq) return;
-                const logs=((o && o.list) || []).filter(l=>!l.only);
+                const logs=((o && o.list) || []).filter(l=>!l.only && l.kind!=='ai');
                 let last=''; logs.forEach(l=>{ if(l.to && l.to>last) last=l.to; });
                 let b=$('impRemind');
                 if(!logs.length || last>=pmEnd){ if(b) b.remove(); return; }
