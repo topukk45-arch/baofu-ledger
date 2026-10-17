@@ -21,6 +21,9 @@
 // 1016-U：文件卡上写「上次微信导到 YYYY-MM-DD，这之后的才是新的」（按导入记录算，每个来源各算各的）。
 // 1017-H：AI 检查导入结果——导出：结果页「接下来可以」里「交给 AI 再检查一遍」、导入记录每次右侧「AI 检查」→ 导出页（三个开关、分段、先看全文再复制 / 分享），
 //   全文由 import/ai.js 拼（临时编号、批次号、导出时间、打码）；跳过 / 待处理的那几笔只在结果页那一刻能带上。
+// 1017-J：导回来：导出页上「粘贴 AI 的回复」→ 读回复（import/ai.js 的 parseReply）→「AI 的修改建议」页（phase aireview）：
+//   按分类 / 备注 / 口径 / 标记分块，每条一张卡（左上角勾选框，默认不勾），块顶上「这一块全勾」；导入后你改过的写明，已删的灰掉不能勾；
+//   点卡片看详情（备注能改成「换掉原备注」，点「确定」才算）；「没看懂的几行」放最后；底部「改 X 条」先弹确认面板。
 // 1016-T：结果页「接下来可以」：去看统计、按过去几个月设预算（现在先到预算页）、补一笔期初余额（主页面的 JiwenImportNext）。
 // 1016-S：选文件页有「微信怎么导出」「支付宝怎么导出」两页文字教程（截图位置先占位），返回键回到选文件。
 // 1016-Q：确认页写「这段时间漏记了 N 笔，共 x 元」；底部「只对账」进勾选清单，「补进 K 笔」只写勾选的（write.js 的 onlyKeys）。
@@ -164,6 +167,14 @@
     '#impAiText{display:block;box-sizing:border-box;width:100%;min-height:260px;padding:10px;border:1px solid var(--c-border-mid);border-radius:10px;background:var(--c-bg);color:var(--c-text);font-size:13px;line-height:1.5;font-family:inherit;resize:vertical;}',
     '.imp-ai-parts{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0;}.imp-ai-parts .imp-btn.on{border-color:var(--c-primary);color:var(--c-primary-deep);font-weight:bold;}',
     '.imp-log-acts{display:flex;gap:8px;}',
+    // 1017-J：AI 的修改建议
+    '.imp-ai-item{position:relative;}.imp-ai-item .pc{padding-left:52px;}.imp-ai-item.gone .pc{opacity:.5;}',
+    '.imp-ai-chg{font-size:15px;margin:2px 0;}.imp-ai-chg b{color:var(--c-primary-deep);}',
+    '.imp-ai-why{font-size:13px;color:var(--c-text-soft);margin-top:4px;line-height:1.5;}',
+    '.imp-ai-tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;margin:4px 6px 0 0;background:var(--c-bg);border:1px solid var(--st-pend);color:var(--st-pend);}',
+    '.imp-ai-tag.gone{border-color:var(--st-skip);color:var(--st-skip);}',
+    '#impAiPaste{display:block;box-sizing:border-box;width:100%;min-height:200px;padding:10px;border:1px solid var(--c-border-mid);border-radius:10px;background:var(--c-bg);color:var(--c-text);font-size:14px;line-height:1.5;font-family:inherit;}',
+    '.imp-ai-bad{font-size:13px;padding:8px 0;border-bottom:1px dashed var(--c-border);}.imp-ai-bad code{display:block;white-space:pre-wrap;word-break:break-all;color:var(--c-text-soft);}',
     // 1017-E：搜索（确认页标题栏右边的按钮、待处理页顶上、挂退款的候选列表）
     '#impPage .imp-search-btn{flex:0 0 48px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--c-primary-deep);cursor:pointer;padding:0;}',
     '#impPage .imp-search-btn svg,.imp-sr-go svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;}',
@@ -253,6 +264,7 @@
   function headBack() {
     if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;
     if (S && S.phase === 'aiexport') { aiExportBack(); return; }
+    if (S && S.phase === 'aireview') { aiReviewBack(); return; }
     if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }
     if (S && S.phase === 'guide') { S.phase = 'pick'; renderPick(); return; }
     if (hasWork()) { askExit(function () { close(); }); return; }
@@ -323,6 +335,7 @@
     if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }   // 只对账清单 → 回到总览
     if (S && S.phase === 'guide') { S.phase = 'pick'; renderPick(); return; }          // 教程 → 回到选文件
     if (S && S.phase === 'aiexport') { aiExportBack(); return; }                          // 1017-H：导出页 → 回到结果页 / 导入记录
+    if (S && S.phase === 'aireview') { aiReviewBack(); return; }                          // 1017-J：修改建议页 → 回到导出页
     // 1017-UI2：分步确认页：返回键回上一步；第 1 步再按才回选文件（先问一句）；还在算的时候按返回也先问一句
     if (S && S.phase === 'confirm') { var i = stepIndex(); if (i > 0) { goStep(S.view.steps[i - 1]); return; } askExit(backToPick); return; }
     if (S && S.phase === 'progress') { askExit(backToPick); return; }
@@ -2476,8 +2489,15 @@
     }
     var ta = document.createElement('textarea'); ta.id = 'impAiText'; ta.readOnly = true; ta.value = out.parts[a.part].text;
     c2.appendChild(ta);
-    c2.appendChild(el('div', 'imp-soft', '发出去的就是上面这些字。AI 回复以后，把它的回复整段复制下来，回到「设置 → 导入记录」这一次的「AI 检查」里粘贴（下一版做）。'));
+    c2.appendChild(el('div', 'imp-soft', '发出去的就是上面这些字。'));
     b.appendChild(c2);
+    // 1017-J：AI 回复了 → 粘贴回来
+    var c3 = el('div', 'imp-card'); c3.id = 'impAiBackIn';
+    c3.appendChild(el('h4', null, 'AI 回复了？'));
+    c3.appendChild(el('div', 'imp-soft', '把 AI 的回复整段复制下来，点下面粘贴。记问只读它回复里 ```记问 那一段，逐条列出来给你勾，勾上的才改。以后也能从「设置 → 导入记录」这一次的「AI 检查」进来粘贴。'));
+    var pb = btn('粘贴 AI 的回复 ›', 'ui-btn block', function () { aiPaste(); }); pb.id = 'impAiPasteBtn'; pb.style.marginTop = '8px';
+    c3.appendChild(pb);
+    b.appendChild(c3);
     var text = out.parts[a.part].text;
     var mark = function () { return store().aiExportMark(a.batch, a.data.at); };
     var cp = btn(out.parts.length > 1 ? '复制第 ' + (a.part + 1) + ' 段' : '复制全文', 'ui-btn primary ui-full', function () {
@@ -2498,6 +2518,163 @@
   function copyText(text) {
     try { if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(function () { return true; }, function () { fallbackCopy(text); return false; }); } catch (_) {}
     fallbackCopy(text); return Promise.resolve(false);
+  }
+  // ---------- 1017-J：导回来（粘贴 AI 的回复 → 修改建议页）----------
+  var AI_FIELD_NAME = { cat: '分类', remark: '备注', mode: '口径', flag: '标记' };
+  var AI_FLAG_NAME = { dup: '可能重复', miss: '可能漏配' };
+  var AI_WHY = { noblock: '回复里没找到 ```记问 开头的那一段。请让 AI 按导出时说的格式回复（代码块第一行写 ```记问）。',
+                 nohead: '```记问 那一段的第一行不是「记问修改建议 v1 批次 … 导出 …」。请让 AI 原样抄那一行。',
+                 batch: '这份回复是另一次导入的（批次号对不上），整份不认。',
+                 time: '这份回复的导出时间对不上（可能是更早导出的、或者这一批又导出了好几次），整份不认。请重新复制全文发给 AI。' };
+  function aiPaste() {
+    if (!window.JiwenSheet) { alertMsg('主程序版本太旧，先更新一下。', '粘贴 AI 的回复'); return; }
+    var a = S.ai;
+    window.JiwenSheet.open({ title: '粘贴 AI 的回复',
+      body: function (box) {
+        var ta = document.createElement('textarea'); ta.id = 'impAiPaste'; ta.placeholder = '把 AI 的回复整段粘贴在这里'; box.appendChild(ta);
+        var msg = el('div', 'imp-soft imp-bad'); msg.id = 'impAiPasteMsg'; msg.style.marginTop = '8px'; box.appendChild(msg);
+        try { if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function (x) { if (x && !ta.value) ta.value = x; }, function () {}); } catch (_) {}
+      },
+      foot: function (box, done) {
+        var col = el('div', 'ui-stack');
+        var go = btn('读这份回复', 'ui-btn primary block', function () {
+          var text = document.getElementById('impAiPaste').value, msg = document.getElementById('impAiPasteMsg');
+          if (!text.trim()) { msg.textContent = '还没粘贴。'; return; }
+          store().aiExportRows(a.batch).then(function (d) {
+            var r = window.JiwenImportAI.parseReply(text, { batch: a.batch, aiAt: d.aiAt, cats: d.cats, rows: d.rows });
+            if (!r.ok) { msg.textContent = AI_WHY[r.why] || '读不出来。'; return; }
+            done(); openAiReview(r, d);
+          }, function (e) { msg.textContent = '读不出这次导入：' + (e && (e.code || e.message) || e); });
+        }); go.id = 'impAiPasteGo';
+        var no = btn('取消', 'ui-btn block', function () { done(); }); no.id = 'impAiPasteCancel';
+        col.appendChild(go); col.appendChild(no); box.appendChild(col);
+      } });
+  }
+  function openAiReview(r, d) {
+    var byN = {}; d.rows.forEach(function (x) { byN[x.n] = x; });
+    S.ai.review = { r: r, rows: byN, cats: d.cats, sel: {}, remarkMode: {}, badOpen: false };
+    S.phase = 'aireview';
+    renderAiReview();
+  }
+  function aiReviewBack() { S.phase = 'aiexport'; delete S.ai.review; setHead('交给 AI 检查', '‹ 返回'); renderAiExport(); }
+  function aiKey(it) { return it.n + '|' + it.field; }
+  function aiChangeText(it, R) {
+    if (it.field === 'cat') return ['分类', (it.cur || '未分类') + ' → ', it.value];
+    if (it.field === 'mode') return ['口径', (window.JiwenImportAI.MODE_NAME[it.cur] || '计入') + ' → ', window.JiwenImportAI.MODE_NAME[it.value]];
+    if (it.field === 'remark') return R.remarkMode[aiKey(it)] === 'replace' ? ['备注', '换成 ', it.value] : ['备注', '后面加上 ', it.value];
+    var ref = it.ref ? R.rows[it.ref] : null;
+    return ['标记', '', AI_FLAG_NAME[it.value] + (ref ? '（说的是 #' + ref.n + ' ' + fmtTime(ref.time) + ' ' + (cpShow(ref.cp) || '') + ' ' + yuan(ref.fen) + '）' : '')];
+  }
+  function aiSelected() { var R = S.ai.review; return R.r.items.filter(function (it) { return R.sel[aiKey(it)] && !it.gone; }); }
+  function renderAiReview() {
+    var R = S.ai.review, b = dom.body, items = R.r.items; b.innerHTML = '';
+    setHead('AI 的修改建议', '‹ 返回');
+    var usable = items.filter(function (x) { return !x.gone; });
+    var c0 = el('div', 'imp-card'); c0.id = 'impAiReviewHead';
+    c0.appendChild(el('div', 'imp-line', 'AI 提了 ' + (items.length + R.r.bad.length) + ' 条，能用的 ' + usable.length + ' 条' + (R.r.bad.length ? '，没看懂 ' + R.r.bad.length + ' 行（放在最后）' : '') + '。'));
+    c0.appendChild(el('div', 'imp-soft', '默认都不勾，勾上的才改；只改分类、备注、口径和标记，不新建、不删除、不改金额和时间。改之前自动备份，能在「设置 → 导入记录」里整批撤销。'));
+    b.appendChild(c0);
+    ['cat', 'remark', 'mode', 'flag'].forEach(function (f) {
+      var list = items.filter(function (x) { return x.field === f; });
+      if (!list.length) return;
+      var c = el('div', 'imp-card'); c.id = 'impAi-' + f;
+      var h = el('h4', null, (f === 'flag' ? '打标记' : '改' + AI_FIELD_NAME[f]) + '（' + list.length + ' 条）'); c.appendChild(h);
+      var can = list.filter(function (x) { return !x.gone; }), allOn = can.length && can.every(function (x) { return R.sel[aiKey(x)]; });
+      if (can.length > 1 || (can.length === 1 && list.length === 1)) {
+        var all = btn(allOn ? '这一块全不勾' : '这一块全勾', 'imp-btn imp-ai-all', function () { can.forEach(function (x) { if (allOn) delete R.sel[aiKey(x)]; else R.sel[aiKey(x)] = true; }); renderAiReview(); });
+        all.dataset.field = f; all.style.width = '100%'; c.appendChild(all);
+      }
+      if (f === 'flag') c.appendChild(el('div', 'imp-soft', '标记只是给这条记录记一笔「AI 觉得可疑」，记录本身不动；以后在账单详情里能看到、能去掉。'));
+      if (f === 'remark') c.appendChild(el('div', 'imp-soft', '默认加在原备注后面；点卡片能改成换掉原备注。'));
+      list.forEach(function (it) {
+        var row = R.rows[it.n] || {}, k = aiKey(it);
+        var wrap = el('div', 'imp-ai-item' + (it.gone ? ' gone' : '')); wrap.dataset.item = 'ai:' + k; wrap.dataset.key = k;
+        var ckl = el('label', 'imp-near-ck'), ck = document.createElement('input'); ck.type = 'checkbox'; ck.checked = !!R.sel[k]; ck.disabled = !!it.gone; ck.setAttribute('aria-label', '勾上这一条');
+        ck.addEventListener('change', function () { if (ck.checked) R.sel[k] = true; else delete R.sel[k]; renderAiReview(); });
+        ckl.appendChild(ck); ckl.addEventListener('click', function (e) { e.stopPropagation(); });
+        var pc = el('div', 'pc imp-ai-pc');
+        pc.appendChild(el('div', 'pc-lab', '#' + it.n + (row.gone ? ' · 这条已经删了' : ' · ' + fmtTime(row.time) + ' · ' + (cpShow(row.cp) || row.remark || '—') + ' · ' + yuan(row.fen) + ' · ' + (row.cat || '未分类'))));
+        var ct = aiChangeText(it, R), line = el('div', 'imp-ai-chg');
+        line.appendChild(document.createTextNode(ct[0] + '：' + ct[1])); line.appendChild(el('b', null, ct[2])); pc.appendChild(line);
+        pc.appendChild(el('div', 'imp-ai-why', 'AI 的理由：' + (it.why || '（没写）')));
+        if (it.gone) pc.appendChild(el('span', 'imp-ai-tag gone', '已删，改不了'));
+        else if (row.edited) pc.appendChild(el('span', 'imp-ai-tag', '导入后你改过这条'));
+        if (!it.gone && row.aiFlag && it.field === 'flag') pc.appendChild(el('span', 'imp-ai-tag', '已经有标记：' + AI_FLAG_NAME[row.aiFlag.k]));
+        pc.addEventListener('click', function () { aiItemSheet(it); });
+        wrap.appendChild(ckl); wrap.appendChild(pc); c.appendChild(wrap);
+      });
+      b.appendChild(c);
+    });
+    if (R.r.bad.length) {
+      var cb = el('div', 'imp-card'); cb.id = 'impAiBad';
+      var tg = btn('没看懂的 ' + R.r.bad.length + ' 行 ' + (R.badOpen ? '▴' : '▸'), 'imp-btn imp-ai-badtg', function () { R.badOpen = !R.badOpen; renderAiReview(); }); tg.style.width = '100%';
+      cb.appendChild(tg);
+      if (R.badOpen) R.r.bad.forEach(function (x) { var d0 = el('div', 'imp-ai-bad'); d0.appendChild(el('div', null, x.why)); d0.appendChild(el('code', null, x.line)); cb.appendChild(d0); });
+      cb.appendChild(el('div', 'imp-soft', '这几行不改任何东西。'));
+      b.appendChild(cb);
+    }
+    var n = aiSelected().length;
+    var go = btn(n ? '改 ' + n + ' 条' : '还没勾', 'ui-btn primary ui-full', function () { aiConfirm(); }); go.id = 'impAiGo'; go.disabled = !n;
+    var bk = btn('返回', 'ui-btn ui-full', function () { aiReviewBack(); }); bk.id = 'impAiReviewBack';
+    barSet([go, bk]);
+  }
+  // 点卡片：看这一条的详情；备注那条能选「加在后面 / 换掉原备注」，点「确定」才算
+  function aiItemSheet(it) {
+    var R = S.ai.review, row = R.rows[it.n] || {}, k = aiKey(it), draft = R.remarkMode[k] || 'append';
+    window.JiwenSheet.open({ title: '#' + it.n + ' 这一条',
+      body: function (box) {
+        var paint = function () {
+          box.innerHTML = '';
+          [['时间', String(row.time || '').replace('T', ' ')], ['对方', cpShow(row.cp)], ['金额', row.fen !== undefined ? (row.type === 'income' ? '收入 ' : '支出 ') + yuan(row.fen) : ''], ['分类', row.cat], ['口径', window.JiwenImportAI.MODE_NAME[row.mode]],
+           ['备注', row.remark], ['去向', row.dest], ['AI 建议', AI_FIELD_NAME[it.field] + '：' + aiChangeText(it, { rows: R.rows, remarkMode: { } }).slice(1).join('')], ['AI 的理由', it.why || '（没写）'], ['AI 原话', it.line]]
+            .forEach(function (kv) { if (kv[1]) box.appendChild(el('div', 'pc-sub', kv[0] + '：' + kv[1])); });
+          if (it.field === 'remark' && !it.gone) {
+            box.appendChild(el('div', 'imp-sec-t', '备注怎么改'));
+            [['append', '加在原备注后面'], ['replace', '换掉原备注']].forEach(function (o) {
+              var l = el('label', 'imp-ai-opt'), r0 = document.createElement('input'); r0.type = 'radio'; r0.name = 'impAiRm'; r0.value = o[0]; r0.checked = draft === o[0];
+              r0.addEventListener('change', function () { draft = o[0]; });
+              l.appendChild(r0); l.appendChild(el('span', 'grow', o[1])); box.appendChild(l);
+            });
+            box.appendChild(el('div', 'imp-soft', '改动还没生效，点「确定」才改。'));
+          }
+        };
+        paint();
+      },
+      foot: function (box, done) {
+        var col = el('div', 'ui-stack');
+        if (it.field === 'remark' && !it.gone) {
+          var ok0 = btn('确定', 'ui-btn primary block', function () { if (draft === 'replace') R.remarkMode[k] = 'replace'; else delete R.remarkMode[k]; done(); renderAiReview(); }); ok0.id = 'impAiItemOk';
+          col.appendChild(ok0);
+          var no = btn('取消', 'ui-btn block', function () { done(); }); no.id = 'impAiItemCancel'; col.appendChild(no);
+        } else { var cl = btn('关闭', 'ui-btn block', function () { done(); }); cl.id = 'impAiItemClose'; col.appendChild(cl); }
+        box.appendChild(col);
+      } });
+  }
+  // 「改 X 条」：先弹确认面板（数字从勾上的数），「确认修改」在上、「再看看」在下
+  function aiConfirm() {
+    var sel = aiSelected(); if (!sel.length) return;
+    var cnt = { cat: 0, remark: 0, mode: 0, flag: 0 }; sel.forEach(function (x) { cnt[x.field]++; });
+    var recs = {}; sel.forEach(function (x) { recs[x.id] = 1; });
+    window.JiwenSheet.open({ title: '确认修改', onDismiss: function () {},
+      body: function (box) {
+        var l = el('div', 'imp-cf-list');
+        [['cat', '改分类'], ['remark', '改备注'], ['mode', '改口径'], ['flag', '打「AI 觉得可疑」的标记']].forEach(function (x) {
+          if (!cnt[x[0]]) return; var i0 = el('div', 'imp-cf-item'); i0.appendChild(el('i')); var t0 = el('div'); t0.appendChild(el('b', null, x[1] + ' ' + cnt[x[0]] + ' 条')); i0.appendChild(t0); l.appendChild(i0);
+        });
+        box.appendChild(l);
+        box.appendChild(el('div', 'imp-line', '一共动 ' + Object.keys(recs).length + ' 条记录。'));
+        box.appendChild(el('div', 'imp-cf-bk', '改之前会自动备份一份；改完能在「设置 → 导入记录」里整批撤销（撤销时你后来又改过的不动）。'));
+      },
+      foot: function (box, done) {
+        var col = el('div', 'ui-stack');
+        var ok0 = btn('确认修改', 'ui-btn primary block', function () { done(); aiApply(sel); }); ok0.id = 'impAiConfirmOk';
+        var no = btn('再看看', 'ui-btn block', function () { done(); }); no.id = 'impAiConfirmCancel';
+        col.appendChild(ok0); col.appendChild(no); box.appendChild(col);
+      } });
+  }
+  function aiApply(sel) {
+    var st = store();
+    if (!st.aiApply) { alertMsg('这一版还不能写进账本（下一版做）。你勾的这些先记在这一页上。', 'AI 的修改建议'); return; }
   }
   // ---------- 第二期：管理导入规则 ----------
   // 你的分类规则（关键词 → 分类，关键词越长越先用）、分类对照（推荐分类 → 你的分类）、类型规则（没见过的交易类型 / 状态怎么处理）。

@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-I</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-J</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -4155,8 +4155,12 @@
                     // 合并进去的账单金额和这条记录不一样：写明「金额差一点」（导入记录里存着合并进去的账单，1016-Z6 起）
                     const bf=(c && Array.isArray(c.bills) ? c.bills : []).reduce((x, b)=>x+(b.fen||0), 0), rf=Math.round(safeNum(r.money)*100);
                     if(('src' in w) && bf && bf!==rf) dest+='（金额差一点：账单 '+(bf/100).toFixed(2)+'）';
+                    // 1017-J：导入后你改过没有（新建的比指纹，改过的以前的记录比导入写进去的值）
+                    let edited=false;
+                    if(kind[id].add){ const k=(lg.add||[]).indexOf(id), h=Array.isArray(lg.h) ? lg.h[k] : ''; edited=!!h && impRecHash(r)!==h; }
+                    else if(c && c.now) edited=Object.keys(c.now).some(f=>{ const v=(f in r && r[f]!==undefined) ? (r[f]!==null && typeof r[f]==='object' ? JSON.stringify(r[f]) : r[f]) : null; return v!==c.now[f]; });
                     return { n, id, time:r.time||'', fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', mode:recMode(r), dest,
-                             cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', desc:'', remark:r.remark||'', oc:r.oc||'' };
+                             cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', desc:'', remark:r.remark||'', oc:r.oc||'', edited, aiFlag:r.aiFlag||null };
                 });
                 return { batch, at:lg.at||'', cats:(a.cats||[]).slice(), rows, aiAt:(lg.aiAt||[]).slice() };
             },
