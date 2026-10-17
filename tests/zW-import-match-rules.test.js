@@ -92,6 +92,23 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   ok(g && g.suggest === null && g.options[0].kind === 'samecp' && g.options.some(o => o.kind === 'single' && o.bills.length === 1) && [P1, P2, Q].every(x => r.item(x).why === 'multisum'), '1 同一天一笔正好相等、另有几笔加起来也正好：一起列、不带默认，几笔加起来的排前面');
 }
 
+// ===== 2. 1017-UI5 候选排序先看分类，再看相差几天、金额差 =====
+{
+  // 账单推荐「吃饭」；前一天「购物」差 1.40、3 天后「吃饭」差 0.30：吃饭那条排第一（标最像）
+  const X = wx({ time: T(3, 20, 12), cp: '某虚构快餐店', desc: '米饭套餐', fen: 3000 });
+  const r = run([{ app: 'wechat', txns: [X] }], [man('shop', 3, 19, 2860, { cat: '购物' }), man('eat', 3, 23, 2970, { cat: '吃饭' })]);
+  const it = r.item(X);
+  ok(it.rec.cat === '吃饭' && it.bucket === 'pending' && it.cands.map(c => c.record).join() === 'eat,shop', '2 分类对得上的排第一（3 天后、差 0.30 的「吃饭」在前一天、差 1.40 的「购物」前面）：' + (it.cands || []).map(c => c.record).join());
+  // 分类都对得上（或都对不上）：相差天数少的在前，再看金额差
+  const Y = wx({ time: T(4, 10, 12), cp: '某虚构快餐店', desc: '米饭套餐', fen: 3000 });
+  const r2 = run([{ app: 'wechat', txns: [Y] }], [man('far', 4, 13, 2990, { cat: '吃饭' }), man('near', 4, 11, 2800, { cat: '吃饭' }), man('near2', 4, 11, 2900, { cat: '吃饭' })]);
+  ok(r2.item(Y).cands.map(c => c.record).join() === 'near2,near,far', '2 分类一样时：先看相差几天，同一天再看金额差：' + r2.item(Y).cands.map(c => c.record).join());
+  // 推不出分类的账单：不按分类排，照相差天数、金额差
+  const Z = wx({ time: T(4, 20, 12), cp: '某虚构小铺', desc: '/', fen: 3000 });
+  const r3 = run([{ app: 'wechat', txns: [Z] }], [man('z1', 4, 22, 3010, { cat: '吃饭' }), man('z2', 4, 21, 2900, { cat: '购物' })]);
+  ok(r3.item(Z).cands.map(c => c.record).join() === 'z2,z1', '2 账单推不出分类：照相差天数排：' + r3.item(Z).cands.map(c => c.record).join());
+}
+
 console.log(`\n${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);
 })();

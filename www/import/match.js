@@ -30,7 +30,7 @@
 //     命中的进待处理（why 'multisum'），手记留住；整组的说明放在 multiSums 里：只有一种凑法的带默认建议，几种凑法的不带默认。
 //   转账、红包、扫码付给个人：只做精确配对（不做金额相近、部分付款、多笔合一）。个人 = 微信「转账」「扫二维码付款」各种「微信红包」、
 //     支付宝「转账红包」，或者对方名带 *、清洗后不超过 5 个字、除了 * 只有汉字（像「*小玲」「张*」）。
-//   候选排序：日期只用来筛；候选按时间差（分钟）再按金额差排，第一条是「最像」的。
+//   候选排序：日期只用来筛；候选按时间差（分钟）再按金额差排，第一条是「最像」的（1017-UI5 起先看分类，见 sortCands）。
 //   全额退款（④ 里两条都跳过的那对）：不参与配对；原单上记下 3 天内同金额的手记（hintCands），
 //     确认页在所有配对（含你在确认页上选的合并）做完以后，这些手记没被别的账单合并掉的，才挂一句弱提醒，不占手记名额。
 (function (root, factory) {
@@ -40,7 +40,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-UI4';
+  var VERSION = '1017-UI5';
   var PARTIAL_MAX = 3;
   var PLATFORM_RE = /^(美团|淘宝|天猫|京东|拼多多|饿了么|支付宝|微信|抖音|唯品会|财付通)/;            // 部分付款：手记最多是账单的 3 倍
   var EXACT_DAYS = 3, PEND_DAYS = 7, NEAR_FEN = 500, NEAR_RATE = 0.2, REFUND_BACK_DAYS = 180;
@@ -492,11 +492,14 @@
              newCats: cl.newCats, learned: learnedRules, multiSums: multiSums, counts: counts, perFile: perFile, stats: stats };
   }
 
-  // 候选排序：时间差（分钟）小的在前，再看金额差；第一条就是「最像」的
+  // 候选排序（1017-UI5）：先看分类对不对得上（账单推荐的分类和手记一样），再看相差几天、金额差多少，最后看相差几分钟；第一条就是「最像」的。
+  //   分类对不上、推不出分类的照样列，只是排后面
   function sortCands(b, cands) {
-    var t = minOf(b.r.time);
+    var t = minOf(b.r.time), rc = b.it.rec && b.it.rec.layer !== 'none' && b.it.rec.cat && b.it.rec.cat !== '未分类' ? b.it.rec.cat : null;
+    var catOk = function (m) { return rc && m.cat === rc ? 0 : 1; };
     return cands.slice().sort(function (x, y) {
-      return Math.abs(minOf(x.m.time) - t) - Math.abs(minOf(y.m.time) - t) || Math.abs(x.m.fen - b.fen) - Math.abs(y.m.fen - b.fen) || (x.record < y.record ? -1 : x.record > y.record ? 1 : 0);
+      return catOk(x.m) - catOk(y.m) || Math.abs(dayNo(x.m.time) - b.day) - Math.abs(dayNo(y.m.time) - b.day) || Math.abs(x.m.fen - b.fen) - Math.abs(y.m.fen - b.fen)
+        || Math.abs(minOf(x.m.time) - t) - Math.abs(minOf(y.m.time) - t) || (x.record < y.record ? -1 : x.record > y.record ? 1 : 0);
     }).map(function (c) { return { record: c.record }; });
   }
 
