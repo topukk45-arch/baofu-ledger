@@ -54,7 +54,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   $('impUndoThis').click();
   await t.until(() => t.ask());
   const q = t.ask();
-  ok(q && /删掉 2 条导入的记录，还原 2 条合并过的手记/.test(q.msg) && /撤销前会自动备份/.test(q.msg) && $('askOk').textContent === '撤销', '2 确认框是方案摘要：' + (q && q.msg));
+  ok(q && /删掉 2 条导入的记录，还原 2 条合并过的手记/.test(q.msg) && /撤销前会自动备份/.test(q.msg) && $('askOk').textContent === '撤销这次导入' && $('askOk').classList.contains('warn'), '2 确认框是方案摘要：' + (q && q.msg));
   await t.askCancel();
   ok(t.recs().length === nAfter && $('impResult'), '2 点取消：什么都没改，还在结果页');
   $('impUndoThis').click();

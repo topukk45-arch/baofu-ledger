@@ -50,6 +50,11 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   ok(/^删除存档「默认存档」：里面的 1 条记录、分类、预算、模板，还有导入记录、单号表、待处理、导入前的备份都会一起删掉，找不回来。/.test($('askMsg').textContent) && $('askOk').textContent === '删除这个存档' && $('askOk').classList.contains('warn'), '3 删除存档：写清会删掉什么、「删除这个存档」警示色');
   $('askCancel').click(); await t.idle();
   ok(Object.keys(w.loadStore(A.ID).archives).length === 2 && t.recs().length === 1, '3 点取消：什么都没删');
+  // ===== 4. 导入相关（1017-V）：撤销、全部不要了、退出、AI 修改的确认按钮写清楚、警示色（各自的测试里点过：z5、z7、zV、zZw）=====
+  const ui = fs.readFileSync(path.join(WWW, 'import', 'ui.js'), 'utf8');
+  ok(/okText: okText, danger: true/.test(ui) && /'撤销这次导入'/.test(ui) && /'撤销这次 AI 修改'/.test(ui), '4 撤销：「撤销这次导入 / 撤销这次 AI 修改 / 连着撤销这 N 次」警示色');
+  ok(/笔都不要了', danger: true/.test(ui) && /'退出，不导入了', 'ui-btn warn block'/.test(ui) && /按 AI 的建议改这 ' \+ nRec \+ ' 条记录', 'ui-btn warn block'/.test(ui), '4 全部不要了、退出导入、AI 批量改：按钮写清楚、警示色');
+  ok(!/确定吗？|确定撤销吗？/.test(ui), '4 导入页里不再有「确定吗？」');
   console.log(`\n${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.log(e); console.log(`\n${pass} 通过，${fail + 1} 失败`); process.exit(1); });

@@ -363,7 +363,7 @@
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
         var stay = btn('继续导入', 'ui-btn primary block', function () { done(); }); stay.id = 'impExitStay';
-        var quit = btn('退出', 'ui-btn danger block', function () { done(); onExit(); }); quit.id = 'impExitOk';
+        var quit = btn('退出，不导入了', 'ui-btn warn block', function () { done(); onExit(); }); quit.id = 'impExitOk';
         col.appendChild(stay); col.appendChild(quit); box.appendChild(col);
       } });
   }
@@ -2665,11 +2665,12 @@
         box.appendChild(col);
       } });
   }
-  // 「改 X 条」：先弹确认面板（数字从勾上的数），「确认修改」在上、「再看看」在下
+  // 「改 X 条」：先弹确认面板（数字从勾上的数），「按 AI 的建议改这 N 条记录」（批量改，警示色）在上、「再看看」在下
   function aiConfirm() {
     var sel = aiSelected(); if (!sel.length) return;
     var cnt = { cat: 0, remark: 0, mode: 0, flag: 0 }; sel.forEach(function (x) { cnt[x.field]++; });
     var recs = {}; sel.forEach(function (x) { recs[x.id] = 1; });
+    var nRec = Object.keys(recs).length;
     window.JiwenSheet.open({ title: '确认修改', onDismiss: function () {},
       body: function (box) {
         var l = el('div', 'imp-cf-list');
@@ -2682,7 +2683,7 @@
       },
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
-        var ok0 = btn('确认修改', 'ui-btn primary block', function () { done(); aiApply(sel); }); ok0.id = 'impAiConfirmOk';
+        var ok0 = btn('按 AI 的建议改这 ' + nRec + ' 条记录', 'ui-btn warn block', function () { done(); aiApply(sel); }); ok0.id = 'impAiConfirmOk';
         var no = btn('再看看', 'ui-btn block', function () { done(); }); no.id = 'impAiConfirmCancel';
         col.appendChild(ok0); col.appendChild(no); box.appendChild(col);
       } });
@@ -2846,9 +2847,9 @@
     var fen = list.reduce(function (s, x) { return s + (x.item.amt || 0); }, 0);
     head.appendChild(el('div', 'imp-line', '共 ' + list.length + ' 笔，' + yuan(fen) + ' 元。导入时拿不准，没进账本，在这里定。'));
     var all = btn('全部不要了', 'ui-btn danger', function () {
-      window.customConfirm('这 ' + list.length + ' 笔都不要了：不进账本，以后再导同一份账单也不再出现。\n\n以后想要回来，可以撤销它们原来那次导入再重新导。确定吗？', function () {
+      window.customConfirm('这 ' + list.length + ' 笔都不要了：不进账本，以后再导同一份账单也不再出现。\n\n以后想要回来，可以撤销它们原来那次导入再重新导。', function () {
         act(list.map(function (x) { return { key: x.key, do: 'drop' }; }), '已经都不要了');
-      }, '待处理', { okText: '都不要了' });
+      }, '待处理', { okText: '这 ' + list.length + ' 笔都不要了', danger: true });
     }); all.id = 'impPendDropAll';
     // 1016-UI2：「全部不要了」在底部操作栏（和「返回」一起），顶上只写共几笔
     head.appendChild(el('div', 'imp-soft', '每笔下面选：和哪条手记合并、作为新增，或者不要了。'));
@@ -2933,7 +2934,10 @@
     store().undoPlan(b).then(function (p) {
       if (!S) return;
       if (!p || !p.ok) { alertMsg('找不到这次导入的记录（只保留最近 10 次），没法撤销。', '撤销导入'); return; }
-      var msg = window.JiwenImportUndo.describe(p) + '\n\n撤销前会自动备份一份。确定撤销吗？';
+      var msg = window.JiwenImportUndo.describe(p) + '\n\n撤销前会自动备份一份（设置 →「恢复备份」里能找回）。';
+      // 1017-V：按钮写清楚撤的是什么，警示色
+      var tgtAi = (p.steps || []).some(function (x) { return x.b === p.target && x.ai; });
+      var okText = p.chain.length > 1 ? '连着撤销这 ' + p.chain.length + ' 次' : tgtAi ? '撤销这次 AI 修改' : '撤销这次导入';
       window.customConfirm(msg, function () {
         if (!S) return;
         S.phase = 'undoing';
@@ -2947,7 +2951,7 @@
           if (t.aiRestored && r.chain.length === 1 && !del) openLogs('已撤销这次 AI 修改，改回了 ' + t.aiRestored + ' 条' + kept);
           else openLogs('已撤销' + (r.chain.length > 1 ? ' ' + r.chain.length + ' 次' + (t.aiRestored ? '（含 AI 修改）' : '导入') : '') + '，删了 ' + del + ' 条、还原了 ' + rest + ' 条' + kept);
         }, function (e) { fail(e, '撤销失败'); });
-      }, '撤销导入', { okText: '撤销' });
+      }, tgtAi && p.chain.length === 1 ? '撤销 AI 修改' : '撤销导入', { okText: okText, danger: true });
     }, function (e) { fail(e, '算撤销方案时出错'); });
   }
   function copyDev() {

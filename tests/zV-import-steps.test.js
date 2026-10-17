@@ -188,7 +188,7 @@ const MANY = () => [
     raw('impCancel').click();
     ok(sheetOpen(t) && raw('uiSheetTitle').textContent === '退出这次导入？' && raw('impExitMsg').textContent === '选好的 1 份账单不会保存，账本没有任何改动。', '6 有方案时点「取消」：先问；一处没改过只写几份账单');
     const fb = [...raw('uiSheetFoot').querySelectorAll('button')];
-    ok(fb[0] === raw('impExitStay') && fb[1] === raw('impExitOk') && raw('impExitOk').className.includes('danger'), '6 「继续导入」在上、最显眼，「退出」在最下面、提醒色');
+    ok(fb[0] === raw('impExitStay') && fb[1] === raw('impExitOk') && raw('impExitOk').className.includes('warn'), '6 「继续导入」在上、最显眼，「退出」在最下面、提醒色');
     raw('impExitStay').click();
     ok(!sheetOpen(t) && t.S().phase === 'confirm' && t.S().view.step === 'check', '6 点「继续导入」：回到原来那一步');
     // 改两处再从中间步骤顶上「‹ 取消」
