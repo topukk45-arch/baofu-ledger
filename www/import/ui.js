@@ -113,8 +113,20 @@
     '.imp-steps-bar{display:flex;gap:6px;}.imp-steps-bar i{flex:1;height:5px;border-radius:3px;background:var(--c-border);}.imp-steps-bar i.on{background:var(--c-primary);}',
     '.imp-intro{margin:2px 2px 12px;}.imp-intro-t{font-size:15.5px;font-weight:bold;color:var(--c-primary-deep);line-height:1.6;}',
     '.imp-notice{margin:0 0 12px;padding:8px 12px;border-radius:10px;background:var(--c-chip);border:1px solid var(--c-border-mid);font-size:13.5px;color:var(--c-text);}',
-    '.imp-mark{flex:0 0 auto;font-size:12px;line-height:1.6;padding:1px 8px;border-radius:10px;border:1px dashed var(--c-border-mid);color:var(--c-text-soft);white-space:nowrap;}',
-    '.imp-mark.on{border:1px solid transparent;background:var(--c-sel-bg);color:var(--c-sel-text);}',
+    // 1017-UI7：状态颜色。主色 = 确认 / 合并，绿 = 已选 / 对上，红 = 有出入（这两个用主题里的 --c-pos / --c-neg），琥珀 = 待选，灰 = 都不是 / 跳过；
+    //   琥珀和灰打开导入页时按当前主色算（setTokens），离主色太近就挪开。标签：● 待选 / ◐ 部分已定 / ✓ 已选，卡片左边一条同色细竖条
+    ':root{--st-pend:#b4660e;--st-skip:#86867f;--st-ok:var(--c-pos);--st-bad:var(--c-neg);--st-main:var(--c-primary-dark);}',
+    '.imp-mark{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;font-size:12px;line-height:1;padding:5px 9px;border-radius:12px;font-weight:bold;white-space:nowrap;color:var(--st-pend);background:rgba(180,102,14,.12);background:color-mix(in srgb,var(--st-pend) 12%,transparent);}',
+    '.imp-mark svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;}',
+    '.imp-mark.pend svg{fill:currentColor;stroke:none;}',
+    '.imp-mark.on{color:var(--st-ok);background:rgba(58,122,46,.12);background:color-mix(in srgb,var(--st-ok) 12%,transparent);}',
+    '.imp-card.st-pend,.imp-card.st-part,.imp-card.st-ok{position:relative;padding-left:18px;}',
+    '.imp-card.st-pend::before,.imp-card.st-part::before,.imp-card.st-ok::before{content:"";position:absolute;left:0;top:12px;bottom:12px;width:4px;border-radius:0 3px 3px 0;background:var(--st-pend);}',
+    '.imp-card.st-ok::before{background:var(--st-ok);}',
+    '.imp-chosen{display:flex;align-items:center;gap:8px;min-height:48px;color:var(--c-text);}.imp-chosen .grow{flex:1;min-width:0;}',
+    '.imp-chosen .imp-ok-ico{color:var(--st-ok);font-weight:bold;}',
+    '.imp-redo{flex:0 0 auto;min-height:48px;min-width:48px;padding:0 8px;border:none;background:none;color:var(--c-primary-dark);font-size:14px;font-weight:bold;font-family:inherit;text-decoration:underline;cursor:pointer;}',
+    '.imp-keep{margin-top:8px;margin-left:8px;}',
     '.imp-card h4 .imp-mark{margin-left:8px;font-weight:normal;vertical-align:2px;}',
     '.imp-val{flex:0 0 auto;font-weight:bold;color:var(--c-primary-deep);}',
     '.imp-sec-t{font-size:13px;color:var(--c-text-soft);margin:10px 2px 6px;}',
@@ -213,7 +225,7 @@
 
   // ---------- 打开 / 关掉 ----------
   function open() {
-    build();
+    build(); setTokens();
     S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, receipt: true, sums: {}, ruleFix: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {}, seen: {}, more: {}, step: null } };
     try { dom.archive.textContent = '导入到存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
@@ -524,9 +536,41 @@
   var MID = ['match', 'refund', 'cat', 'amount'];
   var MORE_N = 5;          // 待你确认、推荐看一眼这种多的，先列 5 个，其余收起
   var INLINE_MAX = 3;      // 只有 1 步要定、不超过 3 件：放进总览
-  function mk(done, look) {
-    var x = el('span', 'imp-mark' + (done ? ' on' : ''), done ? (look ? '✓ 看过' : '✓ 已定') : (look ? '没看' : '没定'));
+  // 1017-UI7：图标只用 App 已收录的 Lucide（ISC）：circle（待选）、contrast（部分已定）、check（已选）、x（都不是）
+  var ICON = {
+    pend: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>',
+    part: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z" fill="currentColor"/></svg>',
+    ok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+    x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
+  };
+  // 状态标签：done 已选（只看过就行的写「看过」）；part 是「1/8」这种（部分已定）；都没有是待选
+  function mk(done, look, part) {
+    var st = done ? 'ok' : part ? 'part' : 'pend';
+    var x = el('span', 'imp-mark ' + st + (done ? ' on' : ''));
+    x.innerHTML = ICON[st];
+    x.appendChild(document.createTextNode(done ? (look ? '看过' : '已选') : part ? '部分已定 ' + part : (look ? '没看' : '待选')));
+    x.dataset.st = st;
     return x;
+  }
+  // 卡片左边的竖条：卡片里的标签都是已选 → 绿；有已选或部分已定 → 琥珀（部分）；都没选 → 琥珀
+  function cardState(c) {
+    var ms = Array.prototype.slice.call(c.querySelectorAll('.imp-mark'));
+    if (!ms.length) return;
+    var ok = ms.filter(function (m) { return m.dataset.st === 'ok'; }).length;
+    c.classList.remove('st-pend', 'st-part', 'st-ok');
+    c.classList.add(ok === ms.length ? 'st-ok' : ok || ms.some(function (m) { return m.dataset.st === 'part'; }) ? 'st-part' : 'st-pend');
+  }
+  // 琥珀、灰按当前主色算：主色色相离琥珀太近（金色、橙色一类）就把琥珀往橙红挪、压暗一点，免得「待选」和主按钮分不开
+  function setTokens() {
+    try {
+      var hex = getComputedStyle(document.documentElement).getPropertyValue('--c-primary').trim().replace('#', '');
+      if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+      var r = parseInt(hex.slice(0, 2), 16) / 255, g = parseInt(hex.slice(2, 4), 16) / 255, b = parseInt(hex.slice(4, 6), 16) / 255;
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b), h = 0, d = mx - mn;
+      if (d) h = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) * 60 : mx === g ? ((b - r) / d + 2) * 60 : ((r - g) / d + 4) * 60;
+      var near = d && Math.abs(h - 34) < 26 && d / (1 - Math.abs(mx + mn - 1)) > 0.3;
+      document.documentElement.style.setProperty('--st-pend', near ? '#b9520a' : '#b4660e');
+    } catch (_) {}
   }
   function moreBtn(key, n, unit) {
     var open0 = !!S.view.more[key];
@@ -559,12 +603,12 @@
   // 每一步有几件、定了几件（只看方案和改动，不看页面）
   function stepItems(p) {
     var s = p.sections, E = S.edits, V = S.view.seen, it = { match: [], refund: [], cat: [], amount: [] };
-    var picked = function (k) { return !!(E.rows[k] && E.rows[k].pick); };
+    var picked = function (k) { return !!(E.rows[k] && E.rows[k].pick) || !!V['keep:' + k]; };     // 明确点了「还是待确认」也算定了
     s.sums.forEach(function (g) { it.match.push({ id: 'sum:' + g.id, done: g.chosen !== null }); });
     if (s.nearMerged) it.match.push({ id: 'near', done: !!V.near || !!E.nearPay });
-    s.pendGroups.forEach(function (g) { if (g.kind !== 'byBill') it.match.push({ id: 'pg:' + g.id, done: !g.open || g.keys.some(picked) }); });
+    s.pendGroups.forEach(function (g) { if (g.kind !== 'byBill') { var ps = pgState(g); it.match.push({ id: 'pg:' + g.id, done: ps.done, part: ps.part }); } });
     pendSingles(p).forEach(function (d) { (refundishRow(d) ? it.refund : it.match).push({ id: 'ps:' + d.key, done: picked(d.key) }); });
-    s.transfers.forEach(function (t) { it.refund.push({ id: 'tr:' + t.id, done: t.keys.some(function (k) { return E.rows[k] && E.rows[k].mode; }) }); });
+    s.transfers.forEach(function (t) { var ts = trState(t); it.refund.push({ id: 'tr:' + t.id, done: ts.done, part: ts.part }); });
     s.refundHints.forEach(function (h) { it.refund.push({ id: 'rh:' + h.key, done: !!V['rh:' + h.key] }); });
     if (s.receipt) it.refund.push({ id: 'receipt', done: !!V.receipt });
     s.petty.forEach(function (x) { it.refund.push({ id: 'petty:' + x.key, done: x.key in E.petty }); });
@@ -576,6 +620,27 @@
     tk.s.forEach(function (k) { it.cat.push({ id: 'st:' + k, done: !!S.statuses[k] }); });
     s.amountChecks.forEach(function (x) { it.amount.push({ id: 'am:' + x.key, done: !!V['am:' + x.key] || !!E.rows[x.key] }); });
     return it;
+  }
+  // 改回默认就把改动去掉（变回待选）：口径改回这一行原来的；新建分类改回原来的勾法
+  function setModeEdit(k, m) {
+    var d = rowByKey(k), e = S.edits.rows[k] || {};
+    if (d && m === ((d.item && d.item.mode) || 'normal')) delete e.mode; else e.mode = m;
+    if (Object.keys(e).length) S.edits.rows[k] = e; else delete S.edits.rows[k];
+  }
+  function setNewCat(x, v) {
+    if (v.on === !!x.defaultOn && !v.into && !v.picked) delete S.edits.newCats[x.name]; else S.edits.newCats[x.name] = v;
+  }
+  // 1017-UI7：「已定」看这一件现在的状态（撤回、改回默认就变回待选）；几笔一组的写「部分已定 1/8」
+  function pgState(g) {
+    var E = S.edits, V = S.view.seen;
+    var dec = g.keys.filter(function (k) { var d = rowByKey(k); return (E.rows[k] && E.rows[k].pick) || V['keep:' + k] || (d && d.group !== 'pending'); }).length;
+    if (g.kind === 'byManual') return { done: !g.open || g.keys.some(function (k) { return E.rows[k] && E.rows[k].pick; }), part: null };
+    return { done: dec === g.keys.length, part: dec && dec < g.keys.length ? dec + '/' + g.keys.length : null };
+  }
+  function trState(t) {
+    var n = t.keys.filter(function (k) { var d = rowByKey(k); return d && d.mode === 'skip'; }).length;
+    var done = !!S.view.seen['tr:' + t.id] || n === t.keys.length;
+    return { done: done, part: !done && n ? n + '/' + t.keys.length : null, n: n };
   }
   function buildSteps(p) {
     var it = stepItems(p), mids = MID.filter(function (k) { return it[k].length; }), inline = null;
@@ -699,7 +764,7 @@
     var list = info.items[step] || [];
     if (!list.length) { intro('这一步没有要定的了', '点「下一步」接着看。'); return; }
     var t = STEP_INTRO[step](list.length, left(list)); intro(t[0], t[1]);
-    stepCards(step, p, cards).forEach(function (c) { dom.body.appendChild(c); });
+    stepCards(step, p, cards).forEach(function (c) { cardState(c); dom.body.appendChild(c); });
   }
   // 单独一笔拿不准的（待你确认）：点一行打开详情选配哪条 / 作为新增 / 不要了
   function pendCard(p, refund) {
@@ -714,7 +779,7 @@
       var r = el('div', 'imp-row-opt imp-tap imp-pend-row'); r.dataset.key = d.key;
       var g = el('div', 'grow'); g.appendChild(el('div', null, fmtTime(d.time) + ' · ' + (d.title || d.cp || '—') + ' · ' + (d.type === 'income' ? '+' : '−') + yuan(d.fen)));
       g.appendChild(el('div', 'imp-soft', d.group === 'pending' ? (d.reason || '') + ' · 点开选' : '已定：' + S.plan.groupNames[d.group])); r.appendChild(g);
-      r.appendChild(mk(!!(S.edits.rows[d.key] && S.edits.rows[d.key].pick)));
+      r.appendChild(mk(!!(S.edits.rows[d.key] && S.edits.rows[d.key].pick) || !!S.view.seen['keep:' + d.key]));
       r.addEventListener('click', function () { openSheet(d.key); });
       c.appendChild(r);
     });
@@ -764,7 +829,7 @@
     if (info.inline) {
       var list = info.items[info.inline], t = STEP_INTRO[info.inline](list.length, left(list));
       intro(t[0], t[1]);
-      stepCards(info.inline, p, cards).forEach(function (c) { b.appendChild(c); });
+      stepCards(info.inline, p, cards).forEach(function (c) { cardState(c); b.appendChild(c); });
     } else intro('都看过了，确认一下就能导入');
     b.appendChild(renderSummary(p));
     b.appendChild(renderFiles(p, 'diff'));
@@ -995,7 +1060,7 @@
       pc.appendChild(el('h4', null, '疑似零碎扣款'));
       s.petty.forEach(function (x) {
         var r = el('label', 'imp-row-opt imp-tap'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
-        cb.addEventListener('change', function () { S.edits.petty[x.key] = cb.checked; replan(); });
+        cb.addEventListener('change', function () { if (cb.checked) S.edits.petty[x.key] = true; else delete S.edits.petty[x.key]; replan(); });     // 改回默认（不合并）就变回待选
         r.appendChild(cb); r.appendChild(el('span', 'grow', x.cp + ' · ' + x.month + ' · ' + x.n + ' 笔 · 共 ' + yuan(x.fen) + ' 元 · 合成一条'));
         r.appendChild(mk(x.key in S.edits.petty));
         pc.appendChild(r);
@@ -1008,11 +1073,11 @@
       s.newCats.forEach(function (x) {
         var r = el('div', 'imp-row-opt'); r.dataset.cat = x.name;
         var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
-        cb.addEventListener('change', function () { S.edits.newCats[x.name] = { on: cb.checked, into: cb.checked ? null : (x.into || null), picked: !cb.checked && !!x.picked }; replan(); });
+        cb.addEventListener('change', function () { setNewCat(x, { on: cb.checked, into: cb.checked ? null : (x.into || null), picked: !cb.checked && !!x.picked }); replan(); });
         var lb = el('label', 'grow imp-newcat-lb'); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '8px'; lb.style.minHeight = '48px'; lb.style.cursor = 'pointer';
         lb.appendChild(cb); lb.appendChild(el('span', null, '建「' + x.name + '」 ' + x.count + ' 笔')); r.appendChild(lb);
         var opts = [['', '并到已有…']].concat(S.info.cats.map(function (c) { return [c, '并到「' + c + '」']; }));
-        r.appendChild(select(opts, x.into || '', function (v) { S.edits.newCats[x.name] = { on: false, into: v || null, picked: !!v }; replan(); }, 'imp-into', '推荐的「' + x.name + '」你的存档里没有（' + x.count + ' 笔）'));
+        r.appendChild(select(opts, x.into || '', function (v) { setNewCat(x, v ? { on: false, into: v, picked: true } : { on: x.defaultOn, into: null, picked: false }); replan(); }, 'imp-into', '推荐的「' + x.name + '」你的存档里没有（' + x.count + ' 笔）'));
         r.appendChild(mk(x.name in S.edits.newCats));
         nc.appendChild(r);
       });
@@ -1049,8 +1114,11 @@
         var box = el('div', 'imp-row-opt'); box.dataset.sum = g.id; box.style.display = 'block';
         box.appendChild(mk(g.chosen !== null)); box.lastChild.style.float = 'right';
         if (g.chosen !== null) {
-          box.appendChild(el('div', 'imp-line', g.chosen === 'none' ? '已选「都不是」：这几笔作为新增' : '已合并：' + g.options[g.chosen].text));
-          box.appendChild(btn('撤回', 'imp-link imp-sum-undo', function () { delete S.edits.sums[g.id]; replan(); }));
+          // 1017-UI7：已选的组收成一行「✓ 已选：…… · 改」
+          var ch = el('div', 'imp-chosen'); var cg = el('span', 'grow');
+          cg.appendChild(el('span', 'imp-ok-ico', '✓ 已选：')); cg.appendChild(document.createTextNode(g.chosen === 'none' ? '都不是，这几笔分开记（作为新增）' : g.options[g.chosen].text));
+          ch.appendChild(cg); ch.appendChild(btn('改', 'imp-redo imp-sum-undo', function () { delete S.edits.sums[g.id]; replan(); }));
+          box.appendChild(ch);
         } else {
           var nMain = g.options.filter(function (o) { return o.kind !== 'far'; }).length;
           if (g.suggest === null && nMain > 1) box.appendChild(el('div', 'imp-soft', '有 ' + nMain + ' 种凑法，请你选一种：'));
@@ -1085,8 +1153,8 @@
       pgs.forEach(function (g, gi) {
         if (gi >= MORE_N && !pgMore) return;
         var box = el('div', 'imp-row-opt'); box.dataset.pg = g.id; box.style.display = 'block';
-        var gdone = !g.open || g.keys.some(function (k) { return S.edits.rows[k] && S.edits.rows[k].pick; });
-        box.appendChild(mk(gdone)); box.lastChild.style.float = 'right';
+        var gst = pgState(g);
+        box.appendChild(mk(gst.done, false, gst.part)); box.lastChild.style.float = 'right';
         box.appendChild(el('div', 'imp-line', g.text + (g.open ? '' : '（已定）')));
         g.keys.forEach(function (k) {
           var d = rowByKey(k); if (!d) return;
@@ -1116,14 +1184,14 @@
       var sign = function (f) { return (f > 0 ? '+' : f < 0 ? '−' : '') + yuan(Math.abs(f)); };
       s.transfers.forEach(function (t) {
         var box = el('div', 'imp-row-opt'); box.dataset.tr = t.id; box.style.display = 'block';
-        box.appendChild(mk(t.keys.some(function (k) { return S.edits.rows[k] && S.edits.rows[k].mode; }))); box.lastChild.style.float = 'right';
+        var ts = trState(t); box.appendChild(mk(ts.done, false, ts.part)); box.lastChild.style.float = 'right';
         box.appendChild(el('div', 'imp-line', md(t.from) + (t.to !== t.from ? ' 到 ' + md(t.to) : '') + ' · ' + t.n + ' 笔 · 转出 ' + yuan(t.out) + ' · 转入 ' + yuan(t.in) + ' · 净额 ' + sign(t.net)));
         t.people.forEach(function (x) { box.appendChild(el('div', 'imp-soft', '　' + x.cp + '：转出 ' + yuan(x.out) + '，转入 ' + yuan(x.in) + '，净额 ' + sign(x.net))); });
         t.keys.forEach(function (k) {
           var d = rowByKey(k); if (!d) return;
           var r = el('label', 'imp-sub-row'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = d.mode === 'skip'; cb.className = 'imp-tr-cb'; cb.dataset.key = k;
           cb.style.position = 'absolute'; cb.style.opacity = '0'; cb.style.width = '1px'; cb.style.height = '1px';   // 1016-H：用右边的开关代替，点整行都能切换
-          cb.addEventListener('change', function () { var e = S.edits.rows[k] || (S.edits.rows[k] = {}); if (cb.checked) e.mode = 'skip'; else e.mode = 'normal'; replan(); });
+          cb.addEventListener('change', function () { setModeEdit(k, cb.checked ? 'skip' : 'normal'); replan(); });
           r.appendChild(cb); r.appendChild(el('span', 'grow', fmtTime(d.time) + ' · ' + (d.cp || '—') + ' · ' + (d.type === 'expense' ? '转出 ' : '转入 ') + yuan(d.fen)));
           var sw = el('span', 'imp-switch imp-tr-state' + (cb.checked ? ' on' : ''));
           sw.appendChild(el('i')); sw.appendChild(document.createTextNode(cb.checked ? '不计入' : '计入'));
@@ -1131,10 +1199,13 @@
           box.appendChild(r);
         });
         var all = btn(t.allSkip ? '都恢复计入' : '这几笔都标成不计入', t.allSkip ? 'imp-btn' : 'imp-btn gold', function () {
-          t.keys.forEach(function (k) { var e = S.edits.rows[k] || (S.edits.rows[k] = {}); e.mode = t.allSkip ? 'normal' : 'skip'; });
+          t.keys.forEach(function (k) { setModeEdit(k, t.allSkip ? 'normal' : 'skip'); });
           replan();
         });
         all.className += ' imp-tr-all'; all.style.marginTop = '8px'; box.appendChild(all);
+        // 1017-UI7：只标了几笔的，点「其余都保持计入」这一段就算定完
+        if (!ts.done && !t.allSkip) { var keep = btn('其余都保持计入', 'imp-btn imp-keep imp-tr-keep', function () { S.view.seen['tr:' + t.id] = true; render(); }); box.appendChild(keep); }
+        else if (S.view.seen['tr:' + t.id] && ts.n < t.keys.length) box.appendChild(el('div', 'imp-soft', '其余 ' + (t.keys.length - ts.n) + ' 笔保持计入。'));
         tc.appendChild(box);
       });
       tc.appendChild(el('div', 'imp-soft', '只收微信转账、微信红包、支付宝转账红包，相邻两笔隔不到 3 天的串成一段。随礼、还钱这类来回抵掉的，可以标成不计入。'));
@@ -1342,6 +1413,7 @@
   }
   function rowByKey(key) { var r = null; S.plan.rows.forEach(function (d) { if (d.key === key) r = d; }); return r; }
   function setEdit(key, patch) {
+    if (patch.pick) delete S.view.seen['keep:' + key];
     var e = S.edits.rows[key] || {};
     Object.keys(patch).forEach(function (k) { if (patch[k] === null || patch[k] === undefined) delete e[k]; else e[k] = patch[k]; });
     if (Object.keys(e).length) S.edits.rows[key] = e; else delete S.edits.rows[key];
@@ -1442,7 +1514,7 @@
       var a2 = el('div', 'acts');
       var nb = btn('作为新增', 'imp-btn', function () { setEdit(key, { pick: 'new' }); }); nb.id = 'impPickNew';
       var db = btn('不要了', 'imp-btn', function () { setEdit(key, { pick: 'drop' }); }); db.id = 'impPickDrop';
-      var cb = btn('还是待确认', 'imp-btn', function () { setEdit(key, { pick: null }); }); cb.id = 'impPickClear';
+      var cb = btn('还是待确认', 'imp-btn', function () { S.view.seen['keep:' + key] = true; setEdit(key, { pick: null }); }); cb.id = 'impPickClear';     // 明确点了也算定了
       a2.appendChild(nb); a2.appendChild(db); a2.appendChild(cb); sh.appendChild(a2);
     }
     // 1016-G：为什么没配上（开发用：试过哪几条手记、每条卡在哪）

@@ -295,7 +295,7 @@ const before = await t.snapshot();
   ok(sumCard && sumCard.textContent.includes('这 4 笔加起来正好是你记的 4.00 元'), '7 多笔合一的卡片：这 4 笔加起来正好是你记的 4.00 元');
   const merge0 = t.S().plan.mergeM;
   sumCard.querySelector('.imp-sum-pick').click();
-  ok(t.S().plan.mergeM === merge0 + 4 && t.$('impSums').textContent.includes('已合并') && t.go().includes('合并 ' + (merge0 + 4) + ' 笔'), '7 一键合并：底部按钮上合并 +4');
+  ok(t.S().plan.mergeM === merge0 + 4 && t.$('impSums').textContent.includes('✓ 已选：这 4 笔加起来') && t.go().includes('合并 ' + (merge0 + 4) + ' 笔'), '7 一键合并：底部按钮上合并 +4');
   t.$('impSums').querySelector('.imp-sum-undo').click();
   ok(t.S().plan.mergeM === merge0, '7 撤回');
   // 几笔抢一条手记

@@ -54,7 +54,7 @@ const MANY = () => [
     ok(/笔数和账单统计一致/.test(raw('impBody').textContent) && /这次大概/.test(raw('impBody').textContent), '1 第 1 步：笔数核对、这次大概');
     raw('impNext').click();
     ok(t.S().view.step === steps[1] && raw('impPrev') && raw('impNext') && raw('impStepTitle').textContent.startsWith('第 2 步'), '1 下一步：到第 2 步，底部「上一步 / 下一步」');
-    ok(/还剩 \d+ 件没定/.test(raw('impIntro').textContent) && raw('impBody').querySelectorAll('.imp-mark').length > 0, '1 每步顶上一句话写有几件、还剩几件，每件标「没定 / 已定」');
+    ok(/还剩 \d+ 件没定/.test(raw('impIntro').textContent) && raw('impBody').querySelectorAll('.imp-mark').length > 0, '1 每步顶上一句话写有几件、还剩几件，每件标「待选 / 已选」');
     raw('impPrev').click();
     ok(t.S().view.step === 'check', '1 上一步：回第 1 步');
     while (t.S().view.step !== 'overview') raw('impNext').click();
@@ -75,14 +75,14 @@ const MANY = () => [
     await pick(t, bill(MANY()));
     t.w.JiwenImportUI._goStep('cat');
     const row = t.d.querySelector('#impCpGroups .imp-cp-row');
-    ok(row && /某虚构平台甲/.test(row.textContent) && /没定/.test(row.querySelector('.imp-mark').textContent), '2 按对方选分类：整行一块，标「没定」');
+    ok(row && /某虚构平台甲/.test(row.textContent) && /待选/.test(row.querySelector('.imp-mark').textContent), '2 按对方选分类：整行一块，标「待选」');
     row.click();
     ok(sheetOpen(t) && raw('uiPickList').classList.contains('filter-chips') && raw('uiPickList').firstElementChild.textContent === '未分类', '2 点整行弹选分类面板（分类块，「未分类」第一个）');
     [...t.d.querySelectorAll('#uiPickList .cc')].find(x => x.textContent === '购物').click();
     ok(!sheetOpen(t) && t.S().edits.cpCats['某虚构平台甲'] === '购物', '2 点一下就选中、面板关掉，照旧记进 edits.cpCats');
-    ok(/已定/.test(t.d.querySelector('#impCpGroups .imp-cp-row .imp-mark').textContent) && /购物/.test(t.d.querySelector('#impCpGroups .imp-cp-row').textContent), '2 那一行标「已定」，写着「购物」');
+    ok(/已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row .imp-mark').textContent) && /购物/.test(t.d.querySelector('#impCpGroups .imp-cp-row').textContent), '2 那一行标「已选」，写着「购物」');
     raw('impPrev').click(); raw('impPrev').click(); raw('impNext').click(); raw('impNext').click();
-    ok(t.S().view.step === 'cat' && t.S().edits.cpCats['某虚构平台甲'] === '购物' && /已定/.test(t.d.querySelector('#impCpGroups .imp-cp-row .imp-mark').textContent), '2 回前一步再回来：改动和「已定」都还在');
+    ok(t.S().view.step === 'cat' && t.S().edits.cpCats['某虚构平台甲'] === '购物' && /已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row .imp-mark').textContent), '2 回前一步再回来：改动和「已选」都还在');
     // 重算后少了一步：把那笔大额勾掉（不导入），「金额要你看一眼」就没事了
     const big = t.S().plan.rows.find(d => d.cp === '某虚构家电店');
     const n0 = t.S().view.steps.length;
