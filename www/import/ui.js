@@ -587,7 +587,13 @@
     if (sub.length) x.appendChild(el('div', 'pc-sub', sub.join(' · ')));
     return x;
   }
-  function cpShow(cp) { return cp; }
+  // 1017-UI11：对方名、标题显示前去掉多余空格（含全角空格）和空括号（「某某　　(　　　　)」→「某某」）；存的原文不动
+  function cpShow(cp) {
+    if (cp === null || cp === undefined) return cp;
+    var t = String(cp).replace(/[\s\u3000]+/g, ' ');
+    for (var i = 0; i < 3; i++) t = t.replace(/[(（][\s\u3000]*[)）]/g, '').replace(/[［\[][\s\u3000]*[\]］]/g, '');
+    return t.replace(/\s+/g, ' ').trim();
+  }
   // 结论：[{ t, ok: true 对上 / false 有出入 / null 说不上 }]
   function verdict(m, ds) {
     var out = [], tot = ds.reduce(function (s0, d) { return s0 + d.fen; }, 0), diff = m.fen - tot;
@@ -1315,7 +1321,9 @@
       ac.appendChild(el('h4', null, '金额要你看一眼（' + s.amountChecks.length + ' 笔）'));
       s.amountChecks.forEach(function (x) {
         var r = el('div', 'imp-row-opt imp-tap imp-amount-row'); r.dataset.key = x.key; r.dataset.kind = x.kind; r.dataset.item = 'am:' + x.key;
-        r.appendChild(el('span', 'grow', (x.cp || '—') + ' · ' + yuan(x.fen) + ' 元 → ' + (x.cat || '未分类') + (x.kind === 'abnormal' ? '？' : '') + ' 理由：' + x.why));
+        // 1017-UI11：不计入的行不显示分类（1016-G 定的规矩，这里也一样）
+        var ad = rowByKey(x.key), askip = ad && (ad.group === 'neutral' || ad.mode === 'skip');
+        r.appendChild(el('span', 'grow', (cpShow(x.cp) || '—') + ' · ' + yuan(x.fen) + ' 元' + (askip ? '（不计入）' : ' → ' + (x.cat || '未分类') + (x.kind === 'abnormal' ? '？' : '')) + ' 理由：' + x.why));
         r.appendChild(mk(!!S.view.seen['am:' + x.key] || !!S.edits.rows[x.key], true));
         r.addEventListener('click', function () { S.view.seen['am:' + x.key] = true; openSheet(x.key); });
         ac.appendChild(r);
@@ -1391,11 +1399,11 @@
       s.cpGroups.forEach(function (g) {
         var r = el('div', 'imp-row-opt imp-tap imp-cp-row'); r.dataset.cp = g.cp; r.dataset.item = 'cp:' + g.cp;
         // 1016-Z1：规律说明「工作日中午 12 点左右」放在前面，帮你认出是谁（只是提示，不自动分类）
-        var desc = g.cp + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元' + (g.hint ? ' · ' + g.hint : '') + (g.n > 1 ? ' · 每笔 ' + (g.min === g.max ? yuan(g.min) : yuan(g.min) + '–' + yuan(g.max)) + ' 元' : '') + ' → 选个分类';
+        var desc = cpShow(g.cp) + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元' + (g.hint ? ' · ' + g.hint : '') + (g.n > 1 ? ' · 每笔 ' + (g.min === g.max ? yuan(g.min) : yuan(g.min) + '–' + yuan(g.max)) + ' 元' : '') + ' → 选个分类';
         r.appendChild(el('span', 'grow', desc));
         // 1017-UI2：整行都能点，点了弹选分类面板（选了同一个也算定过）；下拉框留在行里（藏着），照旧也能用它改
         var setCp = function (v) { S.view.seen['cp:' + g.cp] = true; if (v === '未分类') delete S.edits.cpCats[g.cp]; else S.edits.cpCats[g.cp] = v; replan(); };
-        var sub0 = g.cp + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元';
+        var sub0 = cpShow(g.cp) + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元';
         var sw = select(catOpts().map(function (c) { return [c, c]; }), g.cat || '未分类', setCp, 'imp-cp-sel', sub0);
         sw.style.display = 'none'; r.appendChild(sw);
         r.appendChild(el('span', 'imp-val', (g.cat || '未分类') + ' ›'));
@@ -1496,7 +1504,7 @@
         var box = el('div', 'imp-row-opt'); box.dataset.tr = t.id; box.dataset.item = 'tr:' + t.id; box.style.display = 'block';
         var ts = trState(t); box.appendChild(mk(ts.done, false, ts.part)); box.lastChild.style.float = 'right';
         box.appendChild(el('div', 'imp-line', md(t.from) + (t.to !== t.from ? ' 到 ' + md(t.to) : '') + ' · ' + t.n + ' 笔 · 转出 ' + yuan(t.out) + ' · 转入 ' + yuan(t.in) + ' · 净额 ' + sign(t.net)));
-        t.people.forEach(function (x) { box.appendChild(el('div', 'imp-soft', '　' + x.cp + '：转出 ' + yuan(x.out) + '，转入 ' + yuan(x.in) + '，净额 ' + sign(x.net))); });
+        t.people.forEach(function (x) { box.appendChild(el('div', 'imp-soft', '　' + cpShow(x.cp) + '：转出 ' + yuan(x.out) + '，转入 ' + yuan(x.in) + '，净额 ' + sign(x.net))); });
         t.keys.forEach(function (k) {
           var d = rowByKey(k); if (!d) return;
           var r = el('label', 'imp-sub-row'); var cb = el('input'); cb.type = 'checkbox'; cb.checked = d.mode === 'skip'; cb.className = 'imp-tr-cb'; cb.dataset.key = k;
@@ -1616,7 +1624,7 @@
       // 1016-G：不计入的不显示分类，金额不带正负号
       var skipRow = d.group === 'neutral' || d.mode === 'skip';
       var c = el('span', 'al-cat'); if (!skipRow) c.appendChild(el('span', 'cat-tag', d.cat || '未分类')); row.appendChild(c);
-      row.appendChild(el('span', 'al-remark', d.title || d.cp || '—'));
+      row.appendChild(el('span', 'al-remark', cpShow(d.title || d.cp) || '—'));
       var isExp = d.type === 'expense';
       row.appendChild(el('span', 'al-amt ' + (skipRow ? 'imp-skip-amt' : (isExp ? 'neg' : 'pos')), (skipRow ? '' : (isExp ? '−' : '+')) + yuan(d.fen)));
       row.appendChild(el('span', 'al-go', '›'));
@@ -1663,7 +1671,7 @@
   //   这条手记你在别处亲手选过：先问一句「已经配给了某某，改配到这里吗？」，确认了才改，那边让出来；只是建议（没人选过）的直接配。
   //   被让出的那笔：回到待你确认，或者候选都被用了就自动作为新增，浮出提示一句
   function sumById(id) { return (S.matched.multiSums || []).filter(function (g) { return g.id === id; })[0] || null; }
-  function rowLabel(d) { return d ? fmtTime(d.time) + ' ' + (d.title || d.cp || '—') + ' ' + yuan(d.fen) : ''; }
+  function rowLabel(d) { return d ? fmtTime(d.time) + ' ' + (cpShow(d.title || d.cp) || '—') + ' ' + yuan(d.fen) : ''; }
   function sumLabel(id) {
     var g = (S.plan.sections.sums || []).filter(function (x) { return x.id === id; })[0];
     return g ? g.keys.map(function (k) { return rowLabel(rowByKey(k)); }).join('、') : '';
@@ -1781,7 +1789,7 @@
     sh.appendChild(el('h4', null, (skipRow ? '' : (d.type === 'expense' ? '−' : '+')) + yuan(d.fen) + ' · ' + (S.plan.groupNames[d.group])));
     if (sheetChanged()) sh.appendChild(el('div', 'imp-soft imp-sheet-pending', '改动还没生效，点「确定」才改'));
     var kv = function (k, v) { if (!v) return; var r = el('div', 'kv'); r.appendChild(el('span', null, k)); r.appendChild(el('span', null, v)); sh.appendChild(r); };
-    kv('时间', d.time.replace('T', ' ')); kv('交易对方', d.cp); kv('商品', d.desc); kv('备注', d.remark);
+    kv('时间', d.time.replace('T', ' ')); kv('交易对方', cpShow(d.cp)); kv('商品', d.desc); kv('备注', d.remark);
     kv('支付方式', (S.parsed.files[d.file].rows[d.row] || {}).pm); kv(d.app === 'alipay' ? '交易分类' : '交易类型', d.kind); kv('状态', d.status);
     kv('来源', APP[d.app]); kv('去向', d.reason);
     if (d.rec && !skipRow) kv('分类推荐', d.rec.cat + '（' + d.rec.reason + (d.rec.conf ? '，把握' + { high: '高', mid: '中', low: '低' }[d.rec.conf] : '') + '）');
@@ -2331,7 +2339,7 @@
       var it = x.item, c = el('div', 'imp-card imp-pend'); c.dataset.key = x.key;
       // 1017-UI10：点上面这两行看详情（和筛选同一套底部面板，只看，底部只有「关闭」）
       var info = el('div', 'imp-tap imp-pend-info'); info.style.cursor = 'pointer';
-      info.appendChild(el('div', 'imp-line', fmtTime(it.t) + ' · ' + (APP[it.app] || it.app) + ' · ' + (it.cp || '—') + ' · ' + (it.io === 'income' ? '+' : '−') + yuan(it.amt)));
+      info.appendChild(el('div', 'imp-line', fmtTime(it.t) + ' · ' + (APP[it.app] || it.app) + ' · ' + (cpShow(it.cp) || '—') + ' · ' + (it.io === 'income' ? '+' : '−') + yuan(it.amt)));
       info.appendChild(el('div', 'imp-soft', x.why + (it.d ? ' · ' + it.d : '') + ' · 详情 ›'));
       info.addEventListener('click', function () { viewSheet('待处理的这一笔', [['时间', String(it.t || '').replace('T', ' ')], ['来源', APP[it.app] || it.app], ['交易对方', it.cp], ['金额', (it.io === 'income' ? '收入 ' : '支出 ') + yuan(it.amt)],
         ['商品', it.d], ['为什么在这里', x.why], ['候选', x.cands.length ? x.cands.length + ' 条' + (x.lostAll ? '（都已经不在了）' : '') : ''], ['单号', it.no]], 'impPendDetailClose'); });
