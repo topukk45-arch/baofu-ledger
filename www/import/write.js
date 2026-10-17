@@ -314,7 +314,11 @@
     counts.add = orders.length;
     var log = {}; Object.keys(ws.log).forEach(function (k) { log[k] = ws.log[k]; });
     log.catsAdded = catsAdded; log.rulesAdded = { cat: [], type: [] }; log.only = true;
-    return { version: ws.version, batch: ws.batch, at: ws.at, records: recs, changes: [], orders: orders, pending: [], pendTaken: [],
+    // 1017-X：补进去的这几笔原来在待处理池里的（以前导入时留下的），从池子里拿掉（不然待处理里还有一份，再作为新增就记了两遍）；
+    //   拿掉的带原来的位置记进导入记录，撤销这次只对账时放回去
+    var booked = {}; orders.forEach(function (o) { booked[o.app + '|' + o.no] = true; });
+    var pendTaken = (ws.pendTaken || []).filter(function (k) { return booked[k]; });
+    return { version: ws.version, batch: ws.batch, at: ws.at, records: recs, changes: [], orders: orders, pending: [], pendTaken: pendTaken,
              cps: cps, pms: pms, cpLen: ws.cpLen, pmLen: ws.pmLen, catsAdded: catsAdded, rulesAdd: [], mapsAdd: [], typesAdd: [],
              log: log, counts: counts, total: ws.total, only: true };
   }

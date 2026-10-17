@@ -85,6 +85,8 @@
       inChain.forEach(function (X) {
         // 1017-G：AI 修改（kind 'ai'）改了 X 碰过的记录：撤 X 之前要先撤这次 AI 修改
         if ((L.chg || []).some(function (c) { return X.touched.has(c.id); })) reasons.push({ dep: X.b, why: L.kind === 'ai' ? 'ai' : 'same' });
+        // 1017-X：AI 修改是对着 X 这次导入做的（of）：就算它改的那条后来被拆开、不算 X 碰过的了，也要先撤它（不然留下一条指向不在的导入的 AI 修改）
+        else if (L.kind === 'ai' && L.of === X.b) reasons.push({ dep: X.b, why: 'ai' });
         if (recs.some(function (r) { return r.refundOf && X.touched.has(r.refundOf); })) reasons.push({ dep: X.b, why: 'refund' });
         if (recs.some(function (r) { return (Number.isInteger(r.cp) && r.cp >= X.cp[0] && r.cp < X.cp[1]) || (Number.isInteger(r.pm) && r.pm >= X.pm[0] && r.pm < X.pm[1]); }))
           reasons.push({ dep: X.b, why: 'names' });
@@ -128,6 +130,8 @@
       Object.keys(c.was || {}).forEach(function (k) {
         if (c.now && (k in c.now) && curVal(r, k) !== c.now[k]) { keptHere.push(k); return; }
         var w = c.was[k];
+        // 1017-X：原来的分类后来被你删了：不改回去（不然记录会挂在一个不存在的分类上），按「保留你改的」算（和 rulesChanged 一样）
+        if (k === 'cat' && typeof w === 'string' && w && w !== '未分类' && S.cats.indexOf(w) < 0) { keptHere.push(k); return; }
         if (w === null) delete r[k];
         else if (OBJ_KEYS.indexOf(k) >= 0 && typeof w === 'string') { try { r[k] = JSON.parse(w); } catch (_) { r[k] = w; } }
         else r[k] = w;

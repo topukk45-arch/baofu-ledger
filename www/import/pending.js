@@ -70,10 +70,19 @@
     var done = {}, usedRec = {}, n = 0;
     function logOf(b) { return out.logs[b] || (out.logs[b] = { add: [], chg: [] }); }
     // 名字：名单里有就用编号；没有时只在这批是现存最后一次导入时往后加（撤销最后一次是按长度截断的，加在别处会被别的批次截掉）
+    //   1017-X：名单里有、但这个名字是之后的导入才加进来的（编号不在这批导完时的名单长度以内）：也不带——
+    //   不然撤销之后那次导入时名单被截短，这条记录的对方编号就越界了。导入记录被挤掉了的批次，只认最旧那次导入之前就有的名字
     function cpIdx(name, b) {
       if (!name) return undefined;
-      if (name in cpAt) return cpAt[name];
-      if (!last || last.b !== b) return undefined;
+      var isLast = !!last && last.b === b;
+      if (name in cpAt) {
+        if (isLast) return cpAt[name];
+        var lg = logs.filter(function (l) { return l && l.b === b && l.kind !== 'ai'; })[0];
+        // 老导入记录没存 cpEnd（1016-K 以前）：照老办法用名单里的编号
+        var lim = lg ? (Number.isInteger(lg.cpEnd) ? lg.cpEnd : Infinity) : (logs[0] && Number.isInteger(logs[0].cpLen) ? logs[0].cpLen : Infinity);
+        return cpAt[name] < lim ? cpAt[name] : undefined;
+      }
+      if (!isLast) return undefined;
       cpAt[name] = cps.length; cps.push(name);
       logOf(b).cpEnd = cps.length;
       return cpAt[name];
