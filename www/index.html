@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-E</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-F</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -5239,6 +5239,7 @@
             setDtInput(billTime, nowDtValue());   // 进入主界面即默认当前时间
             renderBill();
             renderDaysCard();             // 「日子」入口卡（数据独立于存档，跟账号走）
+            ledgerScrollY=0;              // 1017-F：换了账号，账单页从顶上开始
             switchTab(getDefaultTab());   // 按用户设置进入默认页（默认记账）
             // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
             // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
@@ -9326,8 +9327,15 @@ ${detail}
                 }
             }).catch(()=>{ if(my===__storageSeq){ const b=$('storageUse'); if(b) b.remove(); } });
         }
+        // 1017-F：离开账单页时记下滚到哪了，回来放回原处（以前切回来先回到顶上，安卓上还会再自己往下滑一段，看着跳一下）
+        let ledgerScrollY=0;
+        function saveLedgerScroll(){
+            const pl=$('pageLedger');
+            if(currentTab==='ledger' && pl && pl.style.display!=='none') ledgerScrollY=window.scrollY||document.documentElement.scrollTop||0;
+        }
         function switchTab(tab){
             closeAllCs();   // 收起可能展开的下拉：其面板已传送到 body，切页隐藏容器不会带走它
+            saveLedgerScroll();
             currentTab=tab;
             // 「日子」管理页是记账页的子页，不属于任何 tab。切 tab 时必须把它关掉，
             // 否则从子页点底栏会出现「子页与目标页同时显示」。
@@ -9352,8 +9360,10 @@ ${detail}
             if(tab==='stats') renderStats();
             if(tab==='settings') renderStorageUse();
             // 切换标签后回到顶部：延到布局完成后执行，避免在 display 切换同帧里失效
-            window.scrollTo(0,0);
-            requestAnimationFrame(()=>{ window.scrollTo(0,0); document.documentElement.scrollTop=0; document.body.scrollTop=0; });
+            // 1017-F：回到账单页时不回顶上，直接放回离开时的位置（同一帧里放一次、布局完成后再放一次，中间不经过顶上）
+            const y = tab==='ledger' ? ledgerScrollY : 0;
+            window.scrollTo(0,y);
+            requestAnimationFrame(()=>{ window.scrollTo(0,y); document.documentElement.scrollTop=y; if(!y) document.body.scrollTop=0; });
         }
         document.querySelectorAll('.tab-btn').forEach(b=>{
             b.addEventListener('click', ()=>switchTab(b.dataset.tab));
@@ -10347,6 +10357,7 @@ ${detail}
         // ===== 管理页 =====
         // 它是记账页的子页：进入时把 pageLedger 藏起来、pageDays 显示，底部 tab 仍停在「记账」。
         function gotoDaysPage(){
+            saveLedgerScroll();   // 1017-F：从「日子」管理页回来也放回原处
             $('pageLedger').style.display='none';
             $('pageDays').style.display='block';
             $('actionBar').style.display='none';    // 子页里不该有「筛选 / 记一笔」
