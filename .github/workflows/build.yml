@@ -101,28 +101,3 @@ jobs:
           else
             gh release create latest-build "$APK" --title "最新测试版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
           fi
-
-      # 1016-UI1：界面检查分支 ui-review 打包成功后，放进另一个预发行「界面测试版」（标签 ui-review-build，文件 jiwen-ui.apk）。
-      # 只在 ui-review 分支上跑；main 的打包和「最新测试版」不受影响（合并进 main 以后这一步在 main 上也不会触发）。
-      # 标成预发行、不标 Latest，不会顶掉正式版。
-      - name: 发布到「界面测试版」
-        if: github.ref == 'refs/heads/ui-review'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          VER=$(grep -oE 'build [0-9]{4}-[A-Z0-9]+' www/index.html | head -1 | cut -d' ' -f2)
-          APK="$RUNNER_TEMP/jiwen-ui.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
-          WHEN=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')
-          NOTES="界面检查分支 ui-review 的测试包。版本 $VER，打包于 $WHEN（北京时间），对应提交 ${GITHUB_SHA::7}：$(git log -1 --format=%s)
-
-          直接下载下面的 jiwen-ui.apk 安装即可，签名和正式版一样，可以覆盖安装（装回正式版也行）。
-          这个包只用来看界面改动；正式版请看标着「Latest」的那个发行版。"
-          git push -f origin "$GITHUB_SHA:refs/tags/ui-review-build"
-          if gh release view ui-review-build >/dev/null 2>&1; then
-            gh release edit ui-review-build --title "界面测试版 $VER" --notes "$NOTES" --prerelease --latest=false
-            gh release upload ui-review-build "$APK" --clobber
-          else
-            gh release create ui-review-build "$APK" --title "界面测试版 $VER" --notes "$NOTES" --prerelease --latest=false --target "$GITHUB_SHA"
-          fi
