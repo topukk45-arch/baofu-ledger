@@ -671,7 +671,7 @@
         .remark-view { color:var(--c-primary-dark); cursor:pointer; border-bottom:1px dashed var(--c-primary); }
         .remark-view:hover { color:var(--c-text); }
         .remark-empty { color:var(--c-text-soft); }
-        .ask-msg { white-space:pre-wrap; word-break:break-word; }
+        .ask-msg { word-break:break-word; }
 
         .operate-btn { padding:5px 10px; margin:0 3px; border:none; border-radius:4px;
             cursor:pointer; font-size:13px; transition:0.2s; }
@@ -901,14 +901,18 @@
             background:var(--c-accent-soft); color:#5c4500; font-size:13px; white-space:nowrap; transition:0.2s; }
         .dt-now:hover { filter:brightness(1.06); }
 
-        /* 自定义确认/输入弹窗 */
-        .ask-dialog { max-width:360px; }
-        .ask-msg { color:var(--c-primary-deep); text-align:center; margin:6px 0 4px; line-height:1.6; font-size:15px;
-            max-height:55vh; overflow-y:auto; }
+        /* 自定义确认/输入弹窗（1017-S 起是底部面板：.sheet 外观，文字左对齐，按钮竖排、贴底） */
+        #askMask .ask-dialog { transform:translateY(0); max-height:85vh; max-height:85dvh; padding-bottom:0; }
+        #askMask.open .ask-dialog { animation:askUp .26s ease; }
+        @keyframes askUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+        .ask-dialog .sheet-head { margin-bottom:6px; }
+        .ask-msg { color:var(--c-text); text-align:left; margin:2px 0 6px; line-height:1.65; font-size:15px; white-space:pre-line; }
+        .ask-btns { position:sticky; bottom:0; margin:12px -18px 0; padding:10px 18px calc(14px + env(safe-area-inset-bottom));
+            background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); border-top:1px solid var(--c-border); }
         #askInput { width:100%; margin:12px 0 4px; padding:12px; border:1px solid var(--c-primary);
             border-radius:8px; outline:none; background:var(--c-surface); font-size:15px; font-family:inherit; }
         #askInput:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
-        .ask-err { color:#c0392b; font-size:13px; margin:4px 0 0; text-align:center; }
+        .ask-err { color:#c0392b; font-size:13px; margin:4px 0 0; text-align:left; }
 
         /* ===== 外观设置弹窗 ===== */
         .theme-presets { display:flex; flex-wrap:wrap; gap:10px; }
@@ -1411,7 +1415,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-R</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-S</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2033,9 +2037,11 @@
     </div>
 
     <!-- 自定义确认 / 输入 弹窗 -->
-    <div class="mask" id="askMask">
-        <div class="edit-dialog ask-dialog">
-            <h3 id="askTitle">提示</h3>
+    <!-- 1017-S：提示 / 确认 / 输入框改成和「筛选」、选分类同一套底部面板（拖动条 + 标题，往下拉关闭 = 取消），
+         文字左对齐，按钮竖着排：往前走的在上，取消在最下面；危险操作的确认按钮用警示色（opts.danger） -->
+    <div class="mask sheet-mask" id="askMask">
+        <div class="sheet ask-dialog" id="askSheet">
+            <div class="sheet-grip" id="askGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3 id="askTitle">提示</h3></div></div>
             <p id="askMsg" class="ask-msg"></p>
             <!-- 确认弹窗附带的记录清单（批量操作用）：DOM 逐字段 textContent 构建，不走 innerHTML -->
             <div id="askList" class="ask-list" style="display:none"></div>
@@ -2044,9 +2050,9 @@
             <div id="askChoices" class="cat-chips" style="display:none; margin:12px 0 4px;"></div>
             <p id="askErr" class="ask-err" style="display:none"></p>
             <button class="ask-extra-btn" id="askExtra" style="display:none"></button>
-            <div class="dialog-btn">
-                <button class="save" id="askOk">确定</button>
-                <button class="cancel" id="askCancel">取消</button>
+            <div class="ask-btns ui-stack">
+                <button class="ui-btn primary block" id="askOk">确定</button>
+                <button class="ui-btn block" id="askCancel">取消</button>
             </div>
         </div>
     </div>
@@ -2336,8 +2342,12 @@
             askErr.style.display = msg ? 'block' : 'none';
         }
 
+        // 1017-S：显示 / 关掉都走这两个（加 / 去 .open：底部面板的往下拉关闭认它）
+        function askShow(){ askMask.style.display='flex'; askMask.classList.add('open'); $('askSheet').scrollTop=0; }
+        // opts.danger：覆盖、删除、清空、撤销、恢复、批量改这类，确认按钮用警示色；否则主色
+        function askBtnLook(opts){ askOk.className='ui-btn block ' + (opts && opts.danger ? 'warn' : 'primary'); }
         function closeAsk(result){
-            askMask.style.display='none';
+            askMask.style.display='none'; askMask.classList.remove('open');
             askMask.classList.remove('as-page');   // 复位「当内容页用」的降档，下次当提示用时回到最顶
             askErr.style.display='none';
             const choices=$('askChoices');
@@ -2366,6 +2376,8 @@
             } else closeAsk(true);
         });
         askCancel.addEventListener('click', ()=>closeAsk((askMode==='prompt'||askMode==='choose')?null:false));
+        // 1017-S：往下拉关闭 = 返回键 = 取消（提示框就是关掉）；和筛选、选分类同一套手势
+        bindSheetDrag(askMask, $('askSheet'), $('askGrip'), ()=>{ if(askMask.style.display==='flex') closeAsk(null); });
         // 禁止点击遮罩外部关闭，避免误触丢失输入；仅按钮可关闭
         askInput.addEventListener('keydown', e=>{ if(e.key==='Enter') askOk.click(); });
         askInput.addEventListener('input', ()=>{ if(askErr.style.display!=='none') showAskErr(''); });
@@ -2386,6 +2398,7 @@
             askCancel.style.display='';
             askOk.textContent = opts.okText || '确定';
             askCancel.textContent = opts.cancelText || '取消';
+            askBtnLook(opts);
             const extra=$('askExtra');
             if(opts.extra && opts.extra.text){
                 extra.textContent=opts.extra.text;
@@ -2405,7 +2418,7 @@
                 askOk.textContent='确定'; askCancel.textContent='取消';   // 用完恢复默认，避免影响其它弹窗
                 if(r && onOk) onOk();
             };
-            askMask.style.display='flex';
+            askShow();
         }
         // 确认弹窗附带的记录清单：每行「时间 / 分类 / 备注 / 金额」四列。
         // 全部用 createElement + textContent 构建——备注、分类都是用户输入，不能拼进 innerHTML。
@@ -2471,9 +2484,10 @@
             else { askInput.removeAttribute('maxlength'); }
             askCancel.style.display='';
             askErr.style.display='none';
+            askBtnLook(opts);
             askValidate=validate||null;
             askResolve=(r)=>{ if(r!==null && onOk) onOk(r); };
-            askMask.style.display='flex';
+            askShow();
             setTimeout(()=>{ askInput.focus(); askInput.select(); }, 50);
         }
         // 选项弹窗：在弹窗里就地渲染一组可点选标签，选中点确定回调所选值。
@@ -2498,6 +2512,7 @@
             box.classList.toggle('choose-list', asList);
             // 收支两项且带语义色时撑满一行更协调；分类等正常自适应换行
             box.classList.toggle('io-chips', options.length===2 && options.some(o=>o.cls));
+            askBtnLook(null);
             options.forEach(o=>{
                 const b=document.createElement('div');
                 b.className='cc';
@@ -2518,7 +2533,7 @@
                 box.appendChild(b);
             });
             askResolve=(r)=>{ if(r!==null && onOk) onOk(r); };
-            askMask.style.display='flex';
+            askShow();
         }
 
         // 信息弹窗（纯文本）：只有「确定」，可选标题；用于替代 alert 和「查看备注」。
@@ -2539,8 +2554,9 @@
             askMsg.style.textAlign = (align==='left') ? 'left' : '';
             askInput.style.display='none';
             askCancel.style.display='none';
+            askBtnLook(null);
             askResolve=null;
-            askMask.style.display='flex';
+            askShow();
         }
 
         // 信息弹窗（富文本）：走 innerHTML，仅供确实需要结构化排版的少数场景。
@@ -2556,8 +2572,9 @@
             askMsg.style.textAlign = (align==='left') ? 'left' : '';
             askInput.style.display='none';
             askCancel.style.display='none';
+            askBtnLook(null);
             askResolve=null;
-            askMask.style.display='flex';
+            askShow();
         }
 
         // 金额规范化：返回 {ok:true, val} 或 {ok:false, why}，why 用于给出对症提示
