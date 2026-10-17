@@ -1402,7 +1402,7 @@
     <div class="container">
         <div class="login-box" id="loginBox">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-UI7</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1017-UI8</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -4337,7 +4337,7 @@
                     if(typeof r.time!=='string') return;
                     if(m && !r.src && !r.refundOf){
                         const d=r.time.slice(0,10);
-                        if(d>=m.from && d<=m.to) manual.push({ id:r.id, time:r.time, type:r.type, fen:fen(r), cat:r.cat, mode:recMode(r) });
+                        if(d>=m.from && d<=m.to) manual.push({ id:r.id, time:r.time, type:r.type, fen:fen(r), cat:r.cat, mode:recMode(r), remark:r.remark||'' });   // 1017-UI8：备注只给确认页显示（配对卡、为什么没配上），配对不看它
                     }
                     if(r.src && r.type==='expense' && Number.isInteger(r.cp)){
                         (q && q.refunds || []).forEach(x=>{

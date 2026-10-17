@@ -127,6 +127,23 @@
     '.imp-chosen .imp-ok-ico{color:var(--st-ok);font-weight:bold;}',
     '.imp-redo{flex:0 0 auto;min-height:48px;min-width:48px;padding:0 8px;border:none;background:none;color:var(--c-primary-dark);font-size:14px;font-weight:bold;font-family:inherit;text-decoration:underline;cursor:pointer;}',
     '.imp-keep{margin-top:8px;margin-left:8px;}',
+    // 1017-UI8：配对卡
+    '.imp-pc-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;}.imp-pc-title{font-weight:bold;color:var(--c-primary-deep);}',
+    '.pc-me{background:var(--c-chip);border-radius:10px;padding:8px 10px;margin:6px 0 8px;}',
+    '.pc-lab{font-size:12px;color:var(--c-text-soft);margin-bottom:2px;}.pc-sum{font-size:13px;color:var(--c-text);margin:0 0 4px;}',
+    '.pc-main{display:flex;gap:8px;align-items:baseline;font-size:15px;color:var(--c-primary-deep);}.pc-main .grow{flex:1;min-width:0;}',
+    '.pc-main .amt{flex:0 0 auto;font-weight:bold;font-variant-numeric:tabular-nums;}',
+    '.pc-sub{font-size:12px;color:var(--c-text-soft);margin-top:1px;word-break:break-all;}',
+    '.pc{border:1px solid var(--c-border);border-radius:12px;background:var(--c-surface);padding:8px 10px 10px;margin:8px 0;cursor:pointer;}',
+    '.pc.on{border-color:var(--st-ok);box-shadow:0 0 0 1px var(--st-ok) inset;}.pc.dim{opacity:.5;}',
+    '.pc-bill{padding:6px 0;border-bottom:1px dashed var(--c-border);}.pc-bill:last-child{border-bottom:none;}',
+    '.pc-full{background:var(--c-surface);border:1px solid var(--c-border);border-radius:10px;padding:8px 10px;margin:6px 0;}',
+    '.pc-ver{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;margin:6px 0 8px;color:var(--c-text-soft);}',
+    '.pc-ver .ok{color:var(--st-ok);}.pc-ver .no{color:var(--st-bad);font-weight:bold;}',
+    '.pc-pick{display:block;width:100%;min-height:48px;border-radius:10px;border:1.5px solid var(--st-main);background:transparent;color:var(--st-main);font-size:15px;font-weight:bold;font-family:inherit;cursor:pointer;}',
+    '.pc.on .pc-pick{background:var(--st-ok);border-color:var(--st-ok);color:#fff;}.pc-pick:disabled{opacity:.45;}',
+    '.pc-none{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:48px;margin-top:8px;border-radius:10px;border:1.5px solid var(--st-skip);background:transparent;color:var(--st-skip);font-size:15px;font-family:inherit;cursor:pointer;}',
+    '.pc-none svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;}',
     '.imp-card h4 .imp-mark{margin-left:8px;font-weight:normal;vertical-align:2px;}',
     '.imp-val{flex:0 0 auto;font-weight:bold;color:var(--c-primary-deep);}',
     '.imp-sec-t{font-size:13px;color:var(--c-text-soft);margin:10px 2px 6px;}',
@@ -536,6 +553,89 @@
   var MID = ['match', 'refund', 'cat', 'amount'];
   var MORE_N = 5;          // 待你确认、推荐看一眼这种多的，先列 5 个，其余收起
   var INLINE_MAX = 3;      // 只有 1 步要定、不超过 3 件：放进总览
+  // ---------- 1017-UI8：配对卡 ----------
+  //   上面「你记的」（时间、分类、金额、备注），下面「账单里的」一笔一行（时间、对方、金额，第二行小字写商品说明、支付方式、来源），
+  //   最下面一行结论（合计、差多少钱、差几天、分类对不对得上，对不上的用红色）；底部整宽「选这个」，选中变实心加 ✓。点卡片看两边完整详情。
+  //   几笔加起来、待你确认、金额差一点的、单笔候选、行详情里的候选都用这一份
+  function dayNum(t) { return Math.round(Date.UTC(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) / 86400000); }
+  function mdhm(t) { return (+t.slice(5, 7)) + '月' + (+t.slice(8, 10)) + '日 ' + t.slice(11, 16); }
+  function billRec(d) { var r = d && d.item && d.item.rec; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; }
+  function cut(t, n) { t = String(t || ''); return t.length > n ? t.slice(0, n) + '…' : t; }
+  function meBlock(m, lab) {
+    var x = el('div', 'pc-me'); x.appendChild(el('div', 'pc-lab', lab || '你记的'));
+    var mm = el('div', 'pc-main'); mm.appendChild(el('span', 'grow', mdhm(m.time) + ' · ' + (m.cat || '未分类'))); mm.appendChild(el('span', 'amt', yuan(m.fen))); x.appendChild(mm);
+    if (m.remark) x.appendChild(el('div', 'pc-sub', '备注：' + cut(m.remark, 30)));
+    return x;
+  }
+  function billBlock(d) {
+    var x = el('div', 'pc-bill'), row = S.parsed.files[d.file].rows[d.row] || {};
+    var mm = el('div', 'pc-main'); mm.appendChild(el('span', 'grow', mdhm(d.time) + ' · ' + (cpShow(d.cp) || '—'))); mm.appendChild(el('span', 'amt', yuan(d.fen))); x.appendChild(mm);
+    var sub = [Plan.cleanDesc ? Plan.cleanDesc(d.desc || '') : d.desc, row.pm, APP[d.app]].filter(function (v) { return v && v !== '/'; });
+    if (sub.length) x.appendChild(el('div', 'pc-sub', sub.join(' · ')));
+    return x;
+  }
+  function cpShow(cp) { return cp; }
+  // 结论：[{ t, ok: true 对上 / false 有出入 / null 说不上 }]
+  function verdict(m, ds) {
+    var out = [], tot = ds.reduce(function (s0, d) { return s0 + d.fen; }, 0), diff = m.fen - tot;
+    if (ds.length > 1) out.push({ t: '合计 ' + yuan(tot), ok: diff === 0 });
+    out.push({ t: diff === 0 ? '差 0.00' : (diff > 0 ? '手记多 ' : '账单多 ') + yuan(Math.abs(diff)), ok: diff === 0 });
+    var dd = ds.map(function (d) { return dayNum(m.time) - dayNum(d.time); }), early = Math.min.apply(null, dd), late = Math.max.apply(null, dd);
+    if (early < 0) out.push({ t: '你记的比账单早 ' + (-early) + ' 天', ok: false });
+    else out.push({ t: late === 0 ? '同一天' : '晚 ' + late + ' 天记的', ok: true });
+    var rcs = ds.map(billRec), rc = rcs.every(function (c) { return c && c === rcs[0]; }) ? rcs[0] : null;
+    if (!rc) out.push({ t: '账单推不出分类', ok: null });
+    else if (rc === (m.cat || '未分类')) out.push({ t: '分类对得上', ok: true });
+    else out.push({ t: '分类对不上（账单像「' + rc + '」）', ok: false });
+    return out;
+  }
+  function verdictEl(list) {
+    var v = el('div', 'pc-ver');
+    list.forEach(function (x) { var sp = el('span', x.ok === true ? 'ok' : x.ok === false ? 'no' : ''); sp.textContent = (x.ok === true ? '✓ ' : x.ok === false ? '✗ ' : '') + x.t; v.appendChild(sp); });
+    return v;
+  }
+  // o：{ lab, sum（一句话）, manual, showManual, bills:[行], picked, dim, also, early, cls, pickText, pickCls, i, onPick, noPick, verdict }
+  function pairCard(o) {
+    var c = el('div', 'pc' + (o.picked ? ' on' : '') + (o.dim ? ' dim' : '') + (o.cls ? ' ' + o.cls : ''));
+    if (o.lab) c.appendChild(el('div', 'pc-lab', o.lab));
+    if (o.sum) c.appendChild(el('div', 'pc-sum', o.sum));
+    if (o.manual && o.showManual !== false) c.appendChild(meBlock(o.manual));
+    if (o.bills && o.bills.length) { var bl = el('div', 'pc-bills'); if (o.showManual !== false && o.manual) bl.appendChild(el('div', 'pc-lab', '账单里的')); o.bills.forEach(function (d) { bl.appendChild(billBlock(d)); }); c.appendChild(bl); }
+    if (o.manual && o.bills && o.bills.length) c.appendChild(verdictEl(o.verdict || verdict(o.manual, o.bills)));
+    else if (o.verdict) c.appendChild(verdictEl(o.verdict));
+    if (o.also) c.appendChild(el('div', 'imp-also', o.also));
+    if (!o.noPick) {
+      var b = btn(o.picked ? '✓ 已选这个' : (o.pickText || '选这个'), 'pc-pick ' + (o.pickCls || ''), function (e) { e.stopPropagation(); if (o.onPick) o.onPick(); });
+      if (o.i !== undefined) b.dataset.i = o.i;
+      if (o.disabled) b.disabled = true;
+      c.appendChild(b);
+    }
+    c.addEventListener('click', function (e) { e.stopPropagation(); if (e.target.closest('button')) return; pairDetail(o); });
+    return c;
+  }
+  function noneBtn(text, cls, fn) {
+    var b = btn('', 'pc-none ' + (cls || ''), fn); b.innerHTML = ICON.x; b.appendChild(document.createTextNode(text)); return b;
+  }
+  // 点配对卡：看两边完整详情（只看，底部「关闭」）
+  function pairDetail(o) {
+    if (!window.JiwenSheet) return;
+    window.JiwenSheet.open({ title: '两边的详情',
+      body: function (box) {
+        if (o.manual) {
+          var m = o.manual, a = el('div', 'pc-me'); a.appendChild(el('div', 'pc-lab', '你记的'));
+          [['时间', m.time.replace('T', ' ')], ['分类', m.cat || '未分类'], ['金额', yuan(m.fen)], ['备注', m.remark || '']].forEach(function (kv) { if (kv[1]) a.appendChild(el('div', 'pc-sub', kv[0] + '：' + kv[1])); });
+          box.appendChild(a);
+        }
+        (o.bills || []).forEach(function (d) {
+          var row = S.parsed.files[d.file].rows[d.row] || {}, x = el('div', 'pc-bill pc-full'); x.appendChild(el('div', 'pc-lab', '账单里的 · ' + (APP[d.app] || '')));
+          [['时间', d.time.replace('T', ' ')], ['交易对方', d.cp], ['商品', d.desc], ['金额', yuan(d.fen)], ['支付方式', row.pm], [d.app === 'alipay' ? '交易分类' : '交易类型', d.kind], ['状态', d.status], ['备注', d.remark], ['推荐分类', billRec(d)]]
+            .forEach(function (kv) { if (kv[1] && kv[1] !== '/') x.appendChild(el('div', 'pc-sub', kv[0] + '：' + kv[1])); });
+          box.appendChild(x);
+        });
+        if (o.manual && o.bills && o.bills.length) box.appendChild(verdictEl(verdict(o.manual, o.bills)));
+      },
+      foot: function (box, done) { var cl = btn('关闭', 'ui-btn block', function () { done(); }); cl.id = 'impPairClose'; box.appendChild(cl); } });
+  }
   // 1017-UI7：图标只用 App 已收录的 Lucide（ISC）：circle（待选）、contrast（部分已定）、check（已选）、x（都不是）
   var ICON = {
     pend: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>',
@@ -776,11 +876,25 @@
     var more = !!S.view.more[key];
     rows.forEach(function (d, i) {
       if (i >= MORE_N && !more) return;
-      var r = el('div', 'imp-row-opt imp-tap imp-pend-row'); r.dataset.key = d.key;
-      var g = el('div', 'grow'); g.appendChild(el('div', null, fmtTime(d.time) + ' · ' + (d.title || d.cp || '—') + ' · ' + (d.type === 'income' ? '+' : '−') + yuan(d.fen)));
-      g.appendChild(el('div', 'imp-soft', d.group === 'pending' ? (d.reason || '') + ' · 点开选' : '已定：' + S.plan.groupNames[d.group])); r.appendChild(g);
-      r.appendChild(mk(!!(S.edits.rows[d.key] && S.edits.rows[d.key].pick) || !!S.view.seen['keep:' + d.key]));
-      r.addEventListener('click', function () { openSheet(d.key); });
+      // 1017-UI8：一笔一块。还没定的：账单 + 最像的那条手记一张配对卡（「选这个」就合并），其他候选、作为新增、不要了点开详情；定了的收成一行
+      var r = el('div', 'imp-row-opt imp-tap imp-pend-row'); r.dataset.key = d.key; r.style.display = 'block';
+      var e0 = S.edits.rows[d.key] || {}, done0 = !!e0.pick || !!S.view.seen['keep:' + d.key] || d.group !== 'pending';
+      var hd = el('div', 'imp-pc-head'); hd.appendChild(el('span', 'grow imp-soft', d.reason || '')); hd.appendChild(mk(done0)); r.appendChild(hd);
+      var c0 = (d.cands || [])[0], m0 = c0 && c0.record && !refund ? S.manualById[c0.record] : null;
+      if (d.group !== 'pending' || done0) {
+        var ch = el('div', 'imp-chosen'); var cg = el('span', 'grow');
+        cg.appendChild(el('span', 'imp-ok-ico', '✓ 已选：')); cg.appendChild(document.createTextNode(fmtTime(d.time) + ' ' + (d.title || d.cp || '—') + ' ' + yuan(d.fen) + ' → ' + (e0.pick && e0.pick.record && S.manualById[e0.pick.record] ? '和 ' + mdhm(S.manualById[e0.pick.record].time) + ' 的手记合并' : S.plan.groupNames[d.group] + (d.autoNew ? '（候选被别处选走了）' : ''))));
+        ch.appendChild(cg); ch.appendChild(btn('改', 'imp-redo imp-pend-redo', function (ev) { ev.stopPropagation(); openSheet(d.key); })); r.appendChild(ch);
+      } else if (m0) {
+        r.appendChild(pairCard({ lab: c0.early ? '可能是' : '最像', manual: m0, bills: [d], also: alsoOf(c0.record, { key: d.key }), pickCls: 'imp-pend-pick',
+          onPick: function () { withClaim(c0.record, { key: d.key }, function () { setEdit(d.key, { pick: { record: c0.record } }); }); } }));
+      } else r.appendChild(pairCard({ lab: '账单里的', bills: [d], noPick: true }));
+      if (d.group === 'pending' && !done0) {
+        var more0 = (d.cands || []).length - (m0 ? 1 : 0);
+        var ob = btn((more0 > 0 ? '其他 ' + more0 + ' 条候选、' : '') + '作为新增 / 不要了 · 点开 ›', 'imp-link imp-pend-open', function (ev) { ev.stopPropagation(); openSheet(d.key); });
+        r.appendChild(ob);
+      }
+      r.addEventListener('click', function (ev) { if (ev.target === r) openSheet(d.key); });
       c.appendChild(r);
     });
     if (rows.length > MORE_N) c.appendChild(moreBtn(key, rows.length - MORE_N, '笔'));
@@ -1043,6 +1157,13 @@
       nc0.addEventListener('click', function () { if (!S.view.seen.near) { S.view.seen.near = true; render(); } });
       var nb0 = btn(s.nearMerged.pay ? '还是按手记金额' : '一键改成实付金额', 'imp-btn', function (e) { e.stopPropagation(); S.view.seen.near = true; S.edits.nearPay = !S.edits.nearPay; replan(); });
       nb0.id = 'impNearPay'; nb0.style.marginTop = '8px';
+      // 1017-UI8：每一笔一张配对卡（只看）；多了先列 3 笔
+      var nOpen = !!S.view.more.near;
+      s.nearMerged.keys.forEach(function (k, i) {
+        var d = rowByKey(k), m = d && S.manualById[d.into]; if (!m || (i >= 3 && !nOpen)) return;
+        nc0.appendChild(pairCard({ manual: m, bills: [d], noPick: true, cls: 'imp-near-pc' }));
+      });
+      if (s.nearMerged.keys.length > 3) nc0.appendChild(moreBtn('near', s.nearMerged.keys.length - 3, '笔'));
       nc0.appendChild(nb0);
       out.near = nc0;
     }
@@ -1106,13 +1227,15 @@
       gc.appendChild(el('div', 'imp-soft', '选了的导入时记成你的规则，以后同一个对方直接归过去（规则只管以后的导入，不改已经入账的）。'));
       out.cpGroups = gc;
     }
-    // 多笔合一
+    // 多笔合一（1017-UI8：配对卡）。组里各种选法的手记一样时，「你记的」只在组顶上写一次；几笔加起来的、一笔账单的分开叫
     if (s.sums.length) {
       var sc = el('div', 'imp-card'); sc.id = 'impSums';
       sc.appendChild(el('h4', null, '几笔加起来正好是一条手记（' + s.sums.length + ' 组）'));
       s.sums.forEach(function (g) {
-        var box = el('div', 'imp-row-opt'); box.dataset.sum = g.id; box.style.display = 'block';
-        box.appendChild(mk(g.chosen !== null)); box.lastChild.style.float = 'right';
+        var box = el('div', 'imp-row-opt imp-pc-group'); box.dataset.sum = g.id; box.style.display = 'block';
+        var same = g.options.every(function (o) { return o.record === g.options[0].record; }), m0 = S.manualById[g.options[0].record];
+        var hd = el('div', 'imp-pc-head'); hd.appendChild(el('span', 'grow imp-pc-title', same ? '这条手记可能是哪几笔' : '这几笔账单配哪条手记'));
+        hd.appendChild(mk(g.chosen !== null)); box.appendChild(hd);
         if (g.chosen !== null) {
           // 1017-UI7：已选的组收成一行「✓ 已选：…… · 改」
           var ch = el('div', 'imp-chosen'); var cg = el('span', 'grow');
@@ -1120,24 +1243,25 @@
           ch.appendChild(cg); ch.appendChild(btn('改', 'imp-redo imp-sum-undo', function () { delete S.edits.sums[g.id]; replan(); }));
           box.appendChild(ch);
         } else {
+          if (same && m0) box.appendChild(meBlock(m0));
           var nMain = g.options.filter(function (o) { return o.kind !== 'far'; }).length;
-          if (g.suggest === null && nMain > 1) box.appendChild(el('div', 'imp-soft', '有 ' + nMain + ' 种凑法，请你选一种：'));
+          if (g.suggest === null && nMain > 1) box.appendChild(el('div', 'imp-soft', '有 ' + nMain + ' 种选法，请你选一种：'));
           // 1017-UI4：跨天的选法排最后、默认收起（同一天的配法你不要时，跨天的也看得到）
-          var farN = g.options.filter(function (o) { return o.kind === 'far'; }).length, farOpen = !!S.view.more['far:' + g.id], farBox = null;
+          var farN = g.options.filter(function (o) { return o.kind === 'far'; }).length, farOpen = !!S.view.more['far:' + g.id], farBox = null, no = 0;
           g.options.forEach(function (o, i) {
             if (o.kind === 'far' && !farBox) {
               var ft = btn(farOpen ? '收起跨天的选法' : '还有 ' + farN + ' 种跨天的选法 ▸', 'imp-link imp-far-toggle', function () { S.view.more['far:' + g.id] = !farOpen; render(); });
               box.appendChild(ft);
               farBox = el('div', 'imp-far-box'); farBox.style.display = farOpen ? '' : 'none'; box.appendChild(farBox);
             }
-            var r = el('div', 'imp-sub-row' + (o.kind === 'far' ? ' imp-far-opt' : ''));
-            var lb = el('span', 'grow', o.text + '：' + o.keys.map(function (k) { var d = rowByKey(k); return d ? fmtTime(d.time) + ' ' + (d.title || '—') + ' ' + yuan(d.fen) : ''; }).join('；'));
-            var also = alsoOf(o.record, { sum: g.id }); if (also) lb.appendChild(el('div', 'imp-also', also));
-            r.appendChild(lb);
-            var b = btn(g.suggest === i ? '合并' : '就是这个', g.suggest === i ? 'imp-btn gold' : 'imp-btn', function () { withClaim(o.record, { sum: g.id }, function () { S.edits.sums[g.id] = i; replan(); }); });
-            b.className += ' imp-sum-pick'; b.dataset.i = i; r.appendChild(b); (o.kind === 'far' ? farBox : box).appendChild(r);
+            var ds = o.keys.map(rowByKey).filter(Boolean), m = S.manualById[o.record];
+            var kindName = o.kind === 'far' ? '跨天 · 一笔账单' : o.keys.length > 1 ? '几笔加起来' : '一笔账单';
+            var card = pairCard({ lab: (o.kind === 'far' ? '' : '选法 ' + (++no) + ' · ') + kindName + (g.suggest === i ? ' · 建议' : ''), sum: o.text,
+              manual: m, showManual: !same, bills: ds, also: alsoOf(o.record, { sum: g.id }), cls: o.kind === 'far' ? 'imp-far-opt' : '',
+              pickCls: 'imp-sum-pick', i: i, onPick: function () { withClaim(o.record, { sum: g.id }, function () { S.edits.sums[g.id] = i; replan(); }); } });
+            (o.kind === 'far' ? farBox : box).appendChild(card);
           });
-          var nb = btn('都不是', 'imp-btn imp-sum-none', function () { S.edits.sums[g.id] = 'none'; replan(); }); box.appendChild(nb);
+          box.appendChild(noneBtn('都不是，分开记', 'imp-sum-none', function () { S.edits.sums[g.id] = 'none'; replan(); }));
         }
         sc.appendChild(box);
       });
@@ -1156,20 +1280,25 @@
         var gst = pgState(g);
         box.appendChild(mk(gst.done, false, gst.part)); box.lastChild.style.float = 'right';
         box.appendChild(el('div', 'imp-line', g.text + (g.open ? '' : '（已定）')));
+        // 1017-UI8：配对卡。按手记归组的「你记的」只在组顶上写一次，下面每笔账单一张卡；几笔几条互相都可能的，每笔点开在详情里选
+        var gm = g.kind === 'byManual' ? S.manualById[g.records[0]] : null;
+        if (gm) box.appendChild(meBlock(gm));
         g.keys.forEach(function (k) {
           var d = rowByKey(k); if (!d) return;
-          var r = el('div', 'imp-sub-row'); r.dataset.key = k;
-          r.appendChild(el('span', 'grow', fmtTime(d.time) + ' · ' + (d.title || '—') + ' · ' + yuan(d.fen) + ' · ' + S.plan.groupNames[d.group]));
-          if (g.kind === 'byManual' && d.group === 'pending') {
-            var b = btn('选这一笔', 'imp-btn imp-pg-pick', function () { setEdit(k, { pick: { record: g.records[0] } }); }); r.appendChild(b);
-          } else if (d.group === 'pending') {
-            r.appendChild(btn('选…', 'imp-btn imp-pg-open', function () { openSheet(k); }));
+          var r = el('div', 'imp-sub-row imp-pc-row'); r.dataset.key = k; r.style.display = 'block';
+          if (gm) {
+            var mine = S.edits.rows[k] && S.edits.rows[k].pick && S.edits.rows[k].pick.record === g.records[0];
+            r.appendChild(pairCard({ lab: d.group === 'pending' ? '一笔账单' : '一笔账单 · ' + S.plan.groupNames[d.group], manual: gm, showManual: false, bills: [d], picked: mine,
+              dim: !mine && d.group !== 'pending', noPick: d.group !== 'pending' && !mine, pickCls: 'imp-pg-pick',
+              onPick: function () { if (mine) return; withClaim(g.records[0], { key: k }, function () { setEdit(k, { pick: { record: g.records[0] } }); }); } }));
+          } else {
+            r.appendChild(pairCard({ lab: '一笔账单 · ' + S.plan.groupNames[d.group], bills: [d], noPick: d.group !== 'pending', pickText: '点开选是哪一条 ›', pickCls: 'imp-pg-open', onPick: function () { openSheet(k); } }));
           }
           box.appendChild(r);
         });
         var edited = g.keys.some(function (k) { return S.edits.rows[k] && S.edits.rows[k].pick; });
-        if (g.open && !edited) box.appendChild(btn('都不是（都作为新增）', 'imp-btn imp-pg-none', function () { g.keys.forEach(function (k) { var e = S.edits.rows[k] || (S.edits.rows[k] = {}); e.pick = 'new'; }); replan(); }));
-        if (edited) box.appendChild(btn('重新选', 'imp-link imp-pg-undo', function () { g.keys.forEach(function (k) { if (S.edits.rows[k]) { delete S.edits.rows[k].pick; if (!Object.keys(S.edits.rows[k]).length) delete S.edits.rows[k]; } }); replan(); }));
+        if (g.open && !edited) box.appendChild(noneBtn('都不是，都作为新增', 'imp-pg-none', function () { g.keys.forEach(function (k) { var e = S.edits.rows[k] || (S.edits.rows[k] = {}); e.pick = 'new'; }); replan(); }));
+        if (edited) box.appendChild(btn('重新选', 'imp-redo imp-pg-undo', function () { g.keys.forEach(function (k) { if (S.edits.rows[k]) { delete S.edits.rows[k].pick; if (!Object.keys(S.edits.rows[k]).length) delete S.edits.rows[k]; } }); replan(); }));
         gc2.appendChild(box);
       });
       if (pgs.length > MORE_N) gc2.appendChild(moreBtn('pg', pgs.length - MORE_N, '组'));
@@ -1484,30 +1613,27 @@
           sh.appendChild(mt);
         }
         if (i > 0 && !moreOpen) return;
-        var r = el('div', 'imp-row-opt'); r.dataset.i = i;
-        var label, pick;
-        if (c.record) {
-          var m = S.manualById[c.record];
-          label = m ? fmtTime(m.time) + ' · ' + (m.cat || '') + ' · ' + yuan(m.fen) + (m.cp ? ' · ' + m.cp : '') : '账本里的一条记录';
-          pick = { record: c.record };
+        var pick, chosen, isRefund = d.why === 'refundcands' || !!c.row, card;
+        if (c.record) pick = { record: c.record }; else pick = { row: c.row };
+        chosen = d.item && S.edits.rows[key] && S.edits.rows[key].pick && JSON.stringify(S.edits.rows[key].pick) === JSON.stringify(pick);
+        var onPick = function () { if (isRefund) setEdit(key, { pick: pick }); else withClaim(c.record, { key: key }, function () { setEdit(key, { pick: pick }); }); };
+        var dis = !isRefund && used[c.record] && !chosen && !claimOf(c.record, { key: key });      // 这条手记已经和别的账单合并了（你亲手选的除外：点了先问）
+        var bestLab = i === 0 && allC.length > 1 && !c.early;      // 1017-UI6：手记比账单早的不当「最像」
+        if (c.record && S.manualById[c.record] && !isRefund) {
+          // 1017-UI8：候选是手记 → 配对卡（这笔账单在详情顶上，卡里只写「你记的」和结论）
+          card = pairCard({ manual: S.manualById[c.record], bills: [d], showManual: true, verdict: verdict(S.manualById[c.record], [d]), picked: chosen, dim: !!S.edits.rows[key] && !!S.edits.rows[key].pick && !chosen,
+            also: alsoOf(c.record, { key: key }), pickCls: 'imp-pick', disabled: dis, onPick: onPick, lab: bestLab ? ' ' : '' });
+          card.querySelector('.pc-bills') && card.querySelector('.pc-bills').remove();
         } else {
-          var o = S.parsed.files[c.row.file].rows[c.row.row];
-          label = '这一批里的 ' + fmtTime(o.time) + ' · ' + (o.cp || '') + ' · ' + yuan(o.fen);
-          pick = { row: c.row };
+          var label;
+          if (c.record) { var m = S.manualById[c.record]; label = m ? fmtTime(m.time) + ' · ' + (m.cat || '') + ' · ' + yuan(m.fen) + (m.cp ? ' · ' + m.cp : '') : '账本里的一条记录'; }
+          else { var o = S.parsed.files[c.row.file].rows[c.row.row]; label = '这一批里的 ' + fmtTime(o.time) + ' · ' + (o.cp || '') + ' · ' + yuan(o.fen); }
+          card = pairCard({ sum: label, noPick: false, picked: chosen, pickText: isRefund ? '挂到这笔' : '选这个', pickCls: 'imp-pick', disabled: dis, onPick: onPick, lab: bestLab ? ' ' : '' });
         }
-        var lb = el('span', 'grow');
-        if (i === 0 && allC.length > 1 && !c.early) lb.appendChild(el('span', 'imp-best', '最像'));      // 1017-UI6：手记比账单早的不当「最像」
-        lb.appendChild(document.createTextNode(label));
-        if (c.early) lb.appendChild(el('div', 'imp-also imp-early', '你记的比账单早 ' + c.early + ' 天' + (c.delay ? '，可能是延后扣款' : '')));
-        r.appendChild(lb);
-        var chosen = d.item && S.edits.rows[key] && S.edits.rows[key].pick && JSON.stringify(S.edits.rows[key].pick) === JSON.stringify(pick);
-        // 退款类的候选是「挂到这笔原单」，其余是「和这条手记合并」
-        var isRefund = d.why === 'refundcands' || !!c.row;
-        var b = btn(chosen ? '已选' : (isRefund ? '挂到这笔' : '和这条合并'), chosen ? 'imp-btn gold' : 'imp-btn', function () { if (isRefund) setEdit(key, { pick: pick }); else withClaim(c.record, { key: key }, function () { setEdit(key, { pick: pick }); }); });
-        b.className += ' imp-pick';
-        if (!isRefund && used[c.record] && !chosen && !claimOf(c.record, { key: key })) b.disabled = true;      // 这条手记已经和别的账单合并了（你亲手选的除外：点了先问）
-        var also = !isRefund && alsoOf(c.record, { key: key }); if (also) lb.appendChild(el('div', 'imp-soft imp-also', also));
-        r.appendChild(b); sh.appendChild(r);
+        card.dataset.i = i;
+        if (bestLab) { var lb0 = card.querySelector('.pc-lab'); lb0.textContent = ''; lb0.appendChild(el('span', 'imp-best', '最像')); }
+        if (c.early && c.delay) card.insertBefore(el('div', 'imp-also imp-early', '可能是延后扣款（地铁、公交这类常常过几天才扣）'), card.querySelector('.pc-pick'));      // 早几天已经写在结论里
+        sh.appendChild(card);
       });
     }
     if (d.canPick) {
@@ -1526,7 +1652,8 @@
       var rows = el('div', 'imp-trace-rows'); tb.appendChild(rows);
       if (!d.item.trace.length) rows.appendChild(el('div', 'imp-soft', '当天没有金额相符的手记（前后 7 天、金额在三分之一到三倍之间的都没有）'));
       d.item.trace.forEach(function (x) {
-        rows.appendChild(el('div', 'imp-soft imp-trace-row', fmtTime(x.time) + ' · ' + (x.cat || '未分类') + ' · ' + yuan(x.fen) + '：' + x.why));
+        var rm = (S.manualById[x.record] || {}).remark;      // 1017-UI8：带上手记备注（太长截断）
+        rows.appendChild(el('div', 'imp-soft imp-trace-row', fmtTime(x.time) + ' · ' + (x.cat || '未分类') + ' · ' + yuan(x.fen) + (rm ? ' · 备注：' + cut(rm, 16) : '') + '：' + x.why));
       });
       sh.appendChild(tb);
     }
