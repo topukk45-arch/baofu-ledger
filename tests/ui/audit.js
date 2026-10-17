@@ -312,12 +312,14 @@ async function run(cfg, port, browser) {
     await page.setInputFiles('#impFile', richBills());
     await waitImpConfirm(page);
     await measure(page, 'imp-confirm', { scope: IMP, primary: ['#impGo', '#impRecon', '#impCancel'], more: true });
-    // 下拉框的选择面板（1016-UI7 起不弹系统自带的）
-    if (await page.$('#impTypes .imp-sel, #impCpGroups .imp-sel')) {
-      await page.evaluate(() => { const w = document.querySelector('#impTypes .imp-sel') || document.querySelector('#impCpGroups .imp-sel'); w.scrollIntoView({ block: 'center' }); w.click(); });
+    // 下拉框的选择面板（1016-UI7 起不弹系统自带的；1017-UI1 起是主程序的共用底部面板）：一个非分类的、一个选分类的
+    for (const [sel, nm] of [['#impTypes .imp-sel', 'imp-picker'], ['#impCpGroups .imp-sel, #impNewCats .imp-sel', 'imp-picker-cat']]) {
+      if (!(await page.$(sel))) continue;
+      await page.evaluate(sel => { const w = document.querySelector(sel); w.scrollIntoView({ block: 'center' }); w.click(); }, sel);
+      await page.waitForTimeout(400);
+      await measure(page, nm, { scope: '#uiSheetMask', primary: ['#uiSheetCancel'], scrollTop: false });
+      await page.evaluate(() => document.getElementById('uiSheetCancel').click());
       await page.waitForTimeout(200);
-      await measure(page, 'imp-picker', { scope: '#impPickMask', primary: ['#impPickCancel'], scrollTop: false });
-      await page.evaluate(() => document.getElementById('impPickCancel').click());
     }
     // 每一块单独截一张
     const blocks = await page.evaluate(() => [...document.querySelectorAll('#impBody > .imp-card, #impBody > div > .imp-card, #impDetails')].map(c => c.id || (c.dataset.file !== undefined ? 'file' + c.dataset.file : '')).filter(Boolean));

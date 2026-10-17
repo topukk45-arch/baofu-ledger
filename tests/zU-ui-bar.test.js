@@ -69,18 +69,27 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   ok($('impLogsPending') && $('impLogs').compareDocumentPosition($('impLogsPending')) & 4, '9 导入记录：待处理入口在记录下面');
   t.w.JiwenImportUI.openRules();
   ok(inBar('impBarClose') && $('impRuleAddCard') && $('impRuleAddCard').contains($('impRuleAddBtn')) && $('impRuleAddCard').classList.contains('imp-push'), '10 规则页：底部有「返回」，「加一条分类规则」单独一块放在下面');
-  // 1016-UI7：下拉框不弹系统自带的选择框，点了从底部弹出记问自己的选择面板
+  // 1016-UI7 / 1017-UI1：下拉框不弹系统自带的选择框，点了弹主程序的共用底部面板（和「筛选」同一套 class）；选分类用分类块，单选
   const ns = $('impRuleNewCat'), wrap = ns.parentNode;
+  const sheetOpen = () => $('uiSheetMask') && $('uiSheetMask').classList.contains('open') && $('uiSheetMask').style.display === 'flex';
   ok(wrap.classList.contains('imp-sel'), '11 下拉框套了一层（点它弹记问自己的面板）');
   wrap.click();
-  const opts = [...t.d.querySelectorAll('#impPickList .imp-pick-opt')];
-  ok($('impPickMask').style.display === 'flex' && opts.length === ns.options.length && opts.filter(b => b.classList.contains('on')).length === 1, '11 选择面板打开：选项一个不少，当前那项标出来');
+  const opts = [...t.d.querySelectorAll('#uiPickList .cc')];
+  ok(sheetOpen() && $('uiSheetMask').className.includes('sheet-mask') && $('uiSheet').className.includes('sheet') && $('uiSheet').querySelector('.sheet-grip .sheet-handle') && $('uiSheetTitle').textContent === '归到哪个分类',
+    '11 选分类面板：和筛选同一套样子（sheet-mask / sheet / 拖动条），标题写选什么');
+  ok($('uiPickList').classList.contains('filter-chips') && opts.length === ns.options.length && opts.filter(b => b.classList.contains('sel')).length === 1 && opts.every(b => !b.closest('.ui-sheet-foot')),
+    '11 分类是筛选里那种分类块，一个不少，当前那项高亮');
+  ok([...$('uiSheetFoot').querySelectorAll('button')].map(b => b.textContent).join() === '取消', '11 底部只有「取消」');
   let changed = 0; ns.addEventListener('change', () => changed++);
-  const other = opts.find(b => !b.classList.contains('on'));
+  const other = opts.find(b => !b.classList.contains('sel'));
   other.click();
-  ok($('impPickMask').style.display === 'none' && ns.value === other.dataset.value && changed === 1, '11 选一项：面板收起，下拉框的值跟着变、发一次 change');
+  ok(!sheetOpen() && ns.value === other.dataset.value && changed === 1, '11 点一下就选中并关掉，下拉框的值跟着变、发一次 change');
+  wrap.click(); const before = ns.value;
+  [...t.d.querySelectorAll('#uiPickList .cc')].find(b => !b.classList.contains('sel'));
+  $('uiSheetCancel').click();
+  ok(!sheetOpen() && ns.value === before && changed === 1, '11 点「取消」：面板关掉，什么都不改');
   wrap.click(); await t.back();
-  ok($('impPickMask').style.display === 'none' && $('impPage').style.display === 'block', '11 面板开着时按返回键只关面板');
+  ok(!sheetOpen() && $('impPage').style.display === 'block' && ns.value === before, '11 面板开着时按返回键只关面板、不改');
   $('impBarClose').click();
   ok($('impPage').style.display === 'none' && $('impBar').style.display === 'none', '10 点「返回」关掉导入页、操作栏一起收起');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));

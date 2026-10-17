@@ -76,14 +76,6 @@
     '.imp-row-opt .imp-sel{flex:0 1 auto;max-width:11em;}',
     // 1016-UI7：下拉框不弹系统自带的选择框（安卓上跟着系统主题配色，深色时白字配浅底看不清），点了从底部弹出记问自己的选择面板
     '.imp-sel{position:relative;display:inline-flex;min-width:0;cursor:pointer;}.imp-sel select{width:100%;max-width:none;pointer-events:none;}',
-    '#impPickMask{position:fixed;inset:0;z-index:997;background:rgba(0,0,0,.35);display:none;align-items:flex-end;justify-content:center;}',
-    '#impPick{background:var(--c-surface-2);color:var(--c-text);width:100%;max-width:520px;max-height:75vh;max-height:75dvh;display:flex;flex-direction:column;border-radius:16px 16px 0 0;}',
-    '#impPick h4{font-size:15px;color:var(--c-primary-deep);padding:14px 16px 6px;}',
-    '#impPickList{overflow-y:auto;padding:0 12px;display:flex;flex-direction:column;gap:8px;}',
-    '.imp-pick-opt{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:48px;padding:10px 14px;border:1px solid var(--c-border);border-radius:10px;background:var(--c-surface);color:var(--c-text);font-size:15px;font-family:inherit;text-align:left;cursor:pointer;}',
-    '.imp-pick-opt.on{background:var(--c-sel-bg);border-color:var(--c-sel-border);color:var(--c-sel-text);font-weight:bold;}',
-    '.imp-pick-opt i{font-style:normal;flex:0 0 auto;}',
-    '#impPick .imp-sheet-foot{margin:12px 0 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--c-surface-2);border-top:1px solid var(--c-border);}',
     '#impPage input[type=text]{min-height:48px;padding:8px 12px;border:1px solid var(--c-primary);border-radius:10px;font-size:15px;background:var(--c-surface);color:var(--c-text);}',
     '#impPage input[type=checkbox]{width:22px;height:22px;flex:0 0 22px;accent-color:var(--c-primary);-webkit-appearance:checkbox;appearance:auto;}',
     '.imp-link{display:inline-flex;align-items:center;min-height:48px;background:none;border:none;color:var(--c-primary-deep);text-decoration:underline;text-underline-offset:3px;font-size:13.5px;padding:0 2px;cursor:pointer;font-family:inherit;text-align:left;}',
@@ -142,10 +134,8 @@
     var pc = btn('取消', 'ui-btn block', function () { close(); }); pc.id = 'impProgCancel';
     box.appendChild(pt); box.appendChild(pb); box.appendChild(pc);
     pg.appendChild(box);
-    var pm = el('div'); pm.id = 'impPickMask'; var pk = el('div'); pk.id = 'impPick'; pm.appendChild(pk);
-    pm.addEventListener('click', function (e) { if (e.target === pm) closePicker(); });
-    [page, bar, file, sm, pg, pm].forEach(function (x) { document.body.appendChild(x); });
-    dom = { page: page, body: body, bar: bar, go: go, recon: rc, cancel: cancel, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub, back: back, pickMask: pm, pick: pk };
+    [page, bar, file, sm, pg].forEach(function (x) { document.body.appendChild(x); });
+    dom = { page: page, body: body, bar: bar, go: go, recon: rc, cancel: cancel, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub, back: back };
     if (window.ResizeObserver) try { new ResizeObserver(syncBar).observe(bar); } catch (_) {}
     return dom;
   }
@@ -169,35 +159,26 @@
     close();
   }
   function setHead(title, backText) { dom.title.textContent = title; dom.back.textContent = backText || '‹ 返回'; }
-  // 1016-UI7：下拉框套一层，点了弹出记问自己的选择面板（底部，选项 48px 高、当前的那项标出来），选了照样给 select 赋值、发 change
-  function wrapSel(se) {
+  // 1016-UI7 / 1017-UI1：下拉框套一层，点了不弹系统自带的选择框，弹主程序的共用底部面板（JiwenSheet，和「筛选」同一套外观）；
+  //   选分类的用筛选里那种分类块（「未分类」放第一个），别的选项一行一个；点一下就选中并关掉，选了照样给 select 赋值、发 change
+  var CAT_SEL = { 'imp-into': 1, 'imp-cp-sel': 1, 'imp-row-cat': 1, 'imp-pend-cat': 1, 'imp-rule-cat': 1, 'imp-rule-newcat': 1, 'imp-map-cat': 1 };
+  var SEL_TITLE = { 'imp-type-sel': '这类交易怎么处理', 'imp-status-sel': '这个状态怎么处理', 'imp-into': '并到哪个已有分类', 'imp-cp-sel': '这个对方归到哪个分类',
+                    'imp-row-cat': '这一笔归到哪个分类', 'imp-pend-cat': '作为新增，归到哪个分类', 'imp-rule-cat': '归到哪个分类', 'imp-rule-newcat': '归到哪个分类', 'imp-map-cat': '归到哪个分类' };
+  function wrapSel(se, sub) {
     var w = el('span', 'imp-sel');
     w.appendChild(se);
+    if (sub) se.dataset.sub = sub;
     w.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); openPicker(se); });
     return w;
   }
   function openPicker(se) {
-    var pk = dom.pick; pk.innerHTML = '';
-    var T = { 'imp-type-sel': '这类交易怎么处理', 'imp-status-sel': '这个状态怎么处理', 'imp-into': '并到哪个已有分类', 'imp-cp-sel': '这个对方归到哪个分类',
-              'imp-row-cat': '选分类', 'imp-pend-cat': '选分类', 'imp-rule-cat': '归到哪个分类', 'imp-rule-newcat': '归到哪个分类', 'imp-map-cat': '归到哪个分类' };
-    pk.appendChild(el('h4', null, T[se.className.split(' ')[0]] || '选一个'));
-    var list = el('div'); list.id = 'impPickList'; pk.appendChild(list);
-    var cur = null;
-    [].slice.call(se.options).forEach(function (o) {
-      var on = o.value === se.value;
-      var b = btn('', 'imp-pick-opt' + (on ? ' on' : ''), function () {
-        closePicker();
-        if (se.value !== o.value) { se.value = o.value; se.dispatchEvent(new Event('change', { bubbles: true })); }
-      });
-      b.dataset.value = o.value;
-      b.appendChild(el('span', null, o.textContent)); if (on) { b.appendChild(el('i', null, '✓')); cur = b; }
-      list.appendChild(b);
-    });
-    var ft = el('div', 'imp-sheet-foot'); var cl = btn('取消', 'ui-btn block', closePicker); cl.id = 'impPickCancel'; ft.appendChild(cl); pk.appendChild(ft);
-    dom.pickMask.style.display = 'flex';
-    if (cur) list.scrollTop = Math.max(0, cur.offsetTop - list.clientHeight / 2);
+    var cls = se.className.split(' ')[0], isCat = !!CAT_SEL[cls];
+    var opts = [].slice.call(se.options).map(function (o) { return { value: o.value, label: cls === 'imp-into' ? (o.value || '不并，照原样') : o.textContent }; });
+    if (isCat) opts.sort(function (a, b) { return (b.value === '未分类') - (a.value === '未分类'); });
+    window.JiwenSheet.pick({ title: SEL_TITLE[cls] || '选一个', sub: se.dataset.sub || '', options: opts, value: se.value, chips: isCat,
+      onPick: function (v) { if (se.value !== v) { se.value = v; se.dispatchEvent(new Event('change', { bubbles: true })); } } });
   }
-  function closePicker() { if (dom) dom.pickMask.style.display = 'none'; }
+  function closePicker() { if (window.JiwenSheet && window.JiwenSheet.isOpen()) window.JiwenSheet.close(); }
   function closeBtn(text) { var b = btn(text || '返回', 'ui-btn', function () { close(); }); b.id = 'impBarClose'; return b; }
 
   // ---------- 打开 / 关掉 ----------
@@ -222,7 +203,7 @@
     if (J()) try { J().cancel(); } catch (_) {}
     if (!dom) return;
     dom.page.style.display = 'none'; dom.bar.style.display = 'none';
-    dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none'; dom.pickMask.style.display = 'none';
+    dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none'; closePicker();
     dom.body.innerHTML = '';
     S = null;
   }
@@ -230,7 +211,6 @@
   // 返回键：先关最上面那一层（行详情 → 进度（停掉线程，整页也关掉）→ 整页）
   function canBack() { return isOpen(); }
   function back() {
-    if (dom.pickMask.style.display === 'flex') { closePicker(); return; }
     if (dom.sheetMask.style.display === 'flex') { closeSheet(); return; }
     if (S && (S.phase === 'writing' || S.phase === 'undoing')) return;   // 写入 / 撤销中不让退出（写完或失败会自己回来）
     if (S && S.phase === 'confirm' && S.view && S.view.recon) { toggleRecon(); return; }
@@ -612,11 +592,11 @@
       s.newCats.forEach(function (n) { if (n.on && list.indexOf(n.name) < 0) list.push(n.name); });
       return list;
     };
-    function select(opts, val, fn, cls) {
+    function select(opts, val, fn, cls, sub) {
       var se = el('select', cls || '');
       opts.forEach(function (o) { var op = el('option', null, o[1]); op.value = o[0]; se.appendChild(op); });
       se.value = val; se.addEventListener('change', function () { fn(se.value); });
-      return wrapSel(se);
+      return wrapSel(se, sub);
     }
     // 1016-M：选过的那几行重算以后就不算「没见过」了，照样留在这里（能改回去）；记在 S.seenTypes / S.seenStatuses
     S.seenTypes = S.seenTypes || {}; S.seenStatuses = S.seenStatuses || {};
@@ -631,14 +611,14 @@
         var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.type;
         r.appendChild(el('span', 'grow', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔，共 ' + yuan(t.fen) + ' 元'));
         r.appendChild(select([['', '照收支导入（放进其他）'], ['normal', '照收支导入'], ['transfer', '当转账（不计入）'], ['refund', '当退款挂到原单'], ['skip', '跳过']], S.types[k] || '',
-          function (v) { if (v) S.types[k] = v; else delete S.types[k]; rerun(); }, 'imp-type-sel'));
+          function (v) { if (v) S.types[k] = v; else delete S.types[k]; rerun(); }, 'imp-type-sel', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
         c.appendChild(r);
       });
       statusRows.forEach(function (t) {
         var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.status;
         r.appendChild(el('span', 'grow', '状态「' + t.status + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
         r.appendChild(select([['', '导入（放进其他）'], ['import', '导入'], ['skip', '跳过']], S.statuses[k] || '',
-          function (v) { if (v) S.statuses[k] = v; else delete S.statuses[k]; rerun(); }, 'imp-status-sel'));
+          function (v) { if (v) S.statuses[k] = v; else delete S.statuses[k]; rerun(); }, 'imp-status-sel', '状态「' + t.status + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
         c.appendChild(r);
       });
       c.appendChild(el('div', 'imp-soft', '选了处理方式的，导入时记成规则，下次直接照办；不选的照收支导入、放进「其他」，下次还会问。'));
@@ -698,7 +678,7 @@
         var lb = el('label', 'grow imp-newcat-lb'); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '8px'; lb.style.minHeight = '48px'; lb.style.cursor = 'pointer';
         lb.appendChild(cb); lb.appendChild(el('span', null, '建「' + x.name + '」 ' + x.count + ' 笔')); r.appendChild(lb);
         var opts = [['', '并到已有…']].concat(S.info.cats.map(function (c) { return [c, '并到「' + c + '」']; }));
-        r.appendChild(select(opts, x.into || '', function (v) { S.edits.newCats[x.name] = { on: false, into: v || null, picked: !!v }; replan(); }, 'imp-into'));
+        r.appendChild(select(opts, x.into || '', function (v) { S.edits.newCats[x.name] = { on: false, into: v || null, picked: !!v }; replan(); }, 'imp-into', '推荐的「' + x.name + '」你的存档里没有（' + x.count + ' 笔）'));
         nc.appendChild(r);
       });
       out.push(nc);
@@ -713,7 +693,7 @@
         r.appendChild(el('span', 'grow', desc));
         r.appendChild(select(catOpts().map(function (c) { return [c, c]; }), g.cat || '未分类', function (v) {
           if (v === '未分类') delete S.edits.cpCats[g.cp]; else S.edits.cpCats[g.cp] = v; replan();
-        }, 'imp-cp-sel'));
+        }, 'imp-cp-sel', g.cp + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元'));
         gc.appendChild(r);
       });
       gc.appendChild(el('div', 'imp-soft', '选了的导入时记成你的规则，以后同一个对方直接归过去（规则只管以后的导入，不改已经入账的）。'));
@@ -974,7 +954,7 @@
         }
         setEdit(key, { cat: v });
       });
-      var l = el('div', 'imp-line imp-cat-line', '分类 '); var sw = wrapSel(se); sw.style.flex = '1'; l.appendChild(sw); acts.appendChild(l);
+      var l = el('div', 'imp-line imp-cat-line', '分类 '); var sw = wrapSel(se, (d.title || d.cp || '') + ' · ' + yuan(d.fen) + ' 元'); sw.style.flex = '1'; l.appendChild(sw); acts.appendChild(l);
     }
     if (d.canMode) {
       ['normal', 'flow', 'skip'].forEach(function (m) {
@@ -1276,7 +1256,7 @@
     rules.cat.forEach(function (r, i) {
       var row = el('div', 'imp-row-opt imp-rule-row'); row.dataset.kw = r.kw;
       row.appendChild(el('span', 'grow', '「' + r.kw + '」→'));
-      row.appendChild(wrapSel(catSel(r.cat, function (v) { var n = rules.cat.slice(); n[i] = { kw: r.kw, cat: v }; save(Object.assign({}, rules, { cat: n }), '已改：「' + r.kw + '」→ ' + v); }, 'imp-rule-cat')));
+      row.appendChild(wrapSel(catSel(r.cat, function (v) { var n = rules.cat.slice(); n[i] = { kw: r.kw, cat: v }; save(Object.assign({}, rules, { cat: n }), '已改：「' + r.kw + '」→ ' + v); }, 'imp-rule-cat'), '交易对方里有「' + r.kw + '」的'));
       row.appendChild(btn('删除', 'imp-btn imp-rule-del', function () { save(Object.assign({}, rules, { cat: rules.cat.filter(function (_, k) { return k !== i; }) }), '已删：「' + r.kw + '」'); }));
       c1.appendChild(row);
     });
@@ -1300,7 +1280,7 @@
     rules.map.forEach(function (m, i) {
       var row = el('div', 'imp-row-opt imp-map-row'); row.dataset.from = m.from;
       row.appendChild(el('span', 'grow', '推荐「' + m.from + '」→'));
-      row.appendChild(wrapSel(catSel(m.cat, function (v) { var n = rules.map.slice(); n[i] = { from: m.from, cat: v }; save(Object.assign({}, rules, { map: n }), '已改：推荐「' + m.from + '」→ ' + v); }, 'imp-map-cat')));
+      row.appendChild(wrapSel(catSel(m.cat, function (v) { var n = rules.map.slice(); n[i] = { from: m.from, cat: v }; save(Object.assign({}, rules, { map: n }), '已改：推荐「' + m.from + '」→ ' + v); }, 'imp-map-cat'), '推荐「' + m.from + '」落不到你的分类时'));
       row.appendChild(btn('删除', 'imp-btn imp-map-del', function () { save(Object.assign({}, rules, { map: rules.map.filter(function (_, k) { return k !== i; }) }), '已删：推荐「' + m.from + '」的对照'); }));
       c2.appendChild(row);
     });
@@ -1385,7 +1365,7 @@
       if (!x.refund) {
         se = el('select', 'imp-pend-cat');
         cats.forEach(function (n) { var o = el('option', null, n); o.value = n; se.appendChild(o); });
-        var lb = el('div', 'imp-soft', '分类 '); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '6px'; lb.style.flex = '1 1 100%'; var sw = wrapSel(se); sw.style.flex = '1'; lb.appendChild(sw); acts.appendChild(lb);
+        var lb = el('div', 'imp-soft', '分类 '); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '6px'; lb.style.flex = '1 1 100%'; var sw = wrapSel(se, (it.cp || '—') + ' · ' + yuan(it.amt) + ' 元'); sw.style.flex = '1'; lb.appendChild(sw); acts.appendChild(lb);
       }
       var nb = btn(x.refund ? '作为新增（只算结余）' : '作为新增', 'imp-btn imp-pend-new', function () {
         act([{ key: x.key, do: 'new', cat: se ? se.value : '未分类' }], '已作为新增记进账本');
