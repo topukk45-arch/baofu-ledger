@@ -1435,6 +1435,7 @@
         .storage-use { text-align:center; font-size:12px; color:var(--c-text-soft); margin:14px 0 -6px; }
         .storage-warn { flex-direction:column; align-items:stretch; gap:4px; color:var(--c-neg); }
         .storage-warn span { font-size:13px; color:var(--c-text); }
+        .bg-suggest-same { font-size:13px; color:var(--c-text-soft); padding:6px 0 2px; line-height:1.6; }
         .bg-sel-all { min-height:var(--ui-tap); margin:8px 0 2px; padding:0 18px; }   /* 1019-G：预算建议的全选 / 全不选 */
     </style>
 </head>
@@ -1442,7 +1443,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-I</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-J</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -8350,13 +8351,15 @@ ${detail}
         // 只看今天之前已经过完的月份，往前最多 6 个、这个存档有记录的月份；不到 3 个月不建议。
         // 每个分类：这几个月各花了多少（支出、口径「计入」、退款抵扣，和预算页的「已花」同一个口径；某个月没花算 0），取中位数，
         //   往上取整到 10 元；中位数是 0 的不建议。只算不写，写不写、写哪几个由你勾
-        const BUDGET_SUGGEST={ MIN_MONTHS:3, MAX_MONTHS:6, ROUND:10 };
+        // 1019-J：MIN_MEDIAN：每月中位数不到 50 元的不建议（零星几笔，比如「存款」大多是收入、支出偶尔一两块钱）；这个分类收入比支出多的也不建议
+        const BUDGET_SUGGEST={ MIN_MONTHS:3, MAX_MONTHS:6, ROUND:10, MIN_MEDIAN:50 };
         function budgetSuggest(dec, now){
             now=now||new Date();
-            const cur=now.getFullYear()*12+now.getMonth(), has=new Set(), sums=new Map();
+            const cur=now.getFullYear()*12+now.getMonth(), has=new Set(), sums=new Map(), incs=new Map();
             dec.forEach(x=>{
                 const m=x.y*12+x.mo; if(m>=cur) return;
                 has.add(m);
+                if(x.r.type==='income' && !x.r.refundOf && recMode(x.r)==='normal'){ const c=x.r.cat||'未分类'; let o=incs.get(c); if(!o) incs.set(c, o=new Map()); o.set(m, (o.get(m)||0)+safeNum(x.r.money)); }
                 const e=expSigned(x.r); if(!e || recMode(x.r)!=='normal') return;
                 const c=x.r.cat||'未分类';
                 let o=sums.get(c); if(!o) sums.set(c, o=new Map());
@@ -8368,7 +8371,10 @@ ${detail}
             sums.forEach((o, c)=>{
                 const vs=months.map(m=>Math.max(0, round2(o.get(m)||0))).sort((a, b)=>a-b), n=vs.length;
                 const med=n%2 ? vs[(n-1)/2] : (vs[n/2-1]+vs[n/2])/2;
-                if(!(med>0)) return;
+                if(!(med>0) || med<BUDGET_SUGGEST.MIN_MEDIAN) return;
+                // 这个分类大部分是收入（这几个月收入比支出多）：不建议
+                const exp=months.reduce((t, m)=>t+Math.max(0, o.get(m)||0), 0), io=incs.get(c), inc=io ? months.reduce((t, m)=>t+(io.get(m)||0), 0) : 0;
+                if(inc>exp) return;
                 list.push({ cat:c, median:round2(med), suggest:Math.ceil(med/BUDGET_SUGGEST.ROUND)*BUDGET_SUGGEST.ROUND });
             });
             list.sort((a, b)=>b.suggest-a.suggest);
@@ -8394,12 +8400,14 @@ ${detail}
             if(!S.list.length){
                 note.textContent = S.months<BUDGET_SUGGEST.MIN_MONTHS ? `过去有记录的完整月份只有 ${S.months} 个，至少要 ${BUDGET_SUGGEST.MIN_MONTHS} 个月才给建议。` : '过去几个月没有能参考的支出。';
             } else {
-                note.textContent=`按过去 ${S.months} 个月每月花的中位数，往上取整到 10 元。没设预算的默认勾上；已经设了的不勾，勾上就换成建议的。`;
+                note.textContent=`按过去 ${S.months} 个月每月花的中位数，往上取整到 10 元；每月不到 ${BUDGET_SUGGEST.MIN_MEDIAN} 元、或者收入比支出多的分类不给建议。没设预算的默认勾上；已经设了的不勾，勾上就换成建议的。`;
                 const box=document.createElement('div'); box.id='bgSuggestList';
                 // 1019-G：勾选框超过 3 个，顶上放「全选」，全勾上了变「全不选」
                 let allBtn=null;
                 const syncAll=()=>{ if(!allBtn) return; const cbs=[...box.querySelectorAll('input[type=checkbox]')]; allBtn.textContent=(cbs.length && cbs.every(c=>c.checked)) ? '全不选' : '全选'; };
-                S.list.filter(x=>cats.includes(x.cat)).forEach(x=>{
+                // 1019-J：建议值和现在的预算一样的，不一行一行列，收成一行「其余 N 个分类和建议一致」
+                const sameAs=S.list.filter(x=>cats.includes(x.cat) && budgets[x.cat]>0 && Math.abs(safeNum(budgets[x.cat])-x.suggest)<0.005);
+                S.list.filter(x=>cats.includes(x.cat) && sameAs.indexOf(x)<0).forEach(x=>{
                     const row=document.createElement('label'); row.className='bg-suggest-row'; row.dataset.cat=x.cat;
                     row.style.display='flex'; row.style.gap='8px'; row.style.alignItems='center'; row.style.padding='6px 0'; row.style.fontSize='13px';
                     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!(budgets[x.cat]>0);
@@ -8414,6 +8422,11 @@ ${detail}
                     card.appendChild(allBtn); syncAll();
                 }
                 card.appendChild(box);
+                if(sameAs.length){
+                    const same=document.createElement('div'); same.id='bgSuggestSame'; same.className='bg-suggest-same';
+                    same.textContent=`${box.children.length ? '其余' : ''} ${sameAs.length} 个分类和建议一致：${sameAs.map(x=>x.cat).join('、')}`.trim();
+                    card.appendChild(same);
+                }
                 const go=document.createElement('button'); go.type='button'; go.className='mini-btn gold'; go.id='bgSuggestApply'; go.textContent='写入勾上的';
                 go.addEventListener('click', ()=>{
                     const pick=[...box.querySelectorAll('.bg-suggest-row')].filter(r=>r.querySelector('input').checked).map(r=>S.list.find(x=>x.cat===r.dataset.cat));
