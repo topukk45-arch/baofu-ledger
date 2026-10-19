@@ -737,7 +737,7 @@
             box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4);
             padding:8px 18px calc(20px + env(safe-area-inset-bottom));
             max-height:85dvh; overflow-y:auto;
-            transform:translateY(100%); transition:transform .32s ease; }
+            transform:translateY(100%); transition:transform .22s ease; }   /* 1019-N：打开往上滑入，和关掉滑走差不多快 */
         .sheet-mask.open .sheet { transform:translateY(0); }   /* 打开时滑入 */
         .sheet-handle { width:40px; height:4px; border-radius:2px; background:var(--c-border-mid);
             margin:6px auto 12px; }
@@ -772,7 +772,7 @@
            .form-mask 的面板显示出来（display:flex）就在位，从下面滑上来用动画，不靠 .open 类。
            键盘弹起时和筛选一样：mask 高度由 syncMaskHeight 收成可视区，面板贴着键盘上沿、最高占满可视区、里面滑，
            不再顶部对齐（原来顶部对齐时面板下沿和键盘之间会露缝）。 */
-        .form-mask > .sheet { transform:none; animation:askUp .26s ease; max-height:88vh; max-height:88dvh;
+        .form-mask > .sheet { transform:none; animation:askUp .22s ease; max-height:88vh; max-height:88dvh;
             width:100%; max-width:760px; padding:8px 18px calc(20px + env(safe-area-inset-bottom));
             border-radius:18px 18px 0 0; border-bottom:none; box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4); }
         /* 拖动条和标题钉在面板顶上：键盘弹起、面板里滑到备注时，标题照样看得见、照样能往下拉 */
@@ -918,8 +918,18 @@
 
         /* 自定义确认/输入弹窗（1017-S 起是底部面板：.sheet 外观，文字左对齐，按钮竖排、贴底） */
         #askMask .ask-dialog { transform:translateY(0); max-height:85vh; max-height:85dvh; padding-bottom:0; }
-        #askMask.open .ask-dialog { animation:askUp .26s ease; }
+        #askMask.open .ask-dialog { animation:askUp .22s ease; }
         @keyframes askUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+        /* 1019-N：面板关掉时的影子：往下滑走 + 遮罩淡出（约 200 毫秒），点不动；减少动画时只很快地淡出 */
+        .sheet-ghost { position:fixed; top:0; left:0; width:100%; height:100vh; height:100dvh; display:flex; align-items:flex-end; justify-content:center;
+            background:rgba(0,0,0,0.3); pointer-events:none; overflow:hidden; }
+        .sheet-ghost.ghost-down { animation:ghostBgOut .2s ease forwards; }
+        .sheet-ghost.ghost-down > * { animation:ghostDown .2s ease forwards !important; }
+        .sheet-ghost.ghost-fade { animation:ghostFade .08s linear forwards; }
+        .sheet-ghost.ghost-fade > * { animation:none !important; }
+        @keyframes ghostDown { from { transform:translateY(var(--gy, 0px)); } to { transform:translateY(100%); } }
+        @keyframes ghostBgOut { from { background-color:rgba(0,0,0,0.3); } to { background-color:rgba(0,0,0,0); } }
+        @keyframes ghostFade { from { opacity:1; } to { opacity:0; } }
         .ask-dialog .sheet-head { margin-bottom:6px; }
         .ask-msg { color:var(--c-text); text-align:left; margin:2px 0 6px; line-height:1.65; font-size:15px; white-space:pre-line; }
         .ask-btns { position:sticky; bottom:0; margin:12px -18px 0; padding:10px 18px calc(14px + env(safe-area-inset-bottom));
@@ -1445,7 +1455,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-M</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-N</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -7598,6 +7608,7 @@ ${detail}
             sheet.addEventListener('touchend', ()=>{
                 if(!tDrag){ touchReset(); return; }
                 const close = tDY>dismissDistance() || (tDY>FLING_MIN_PX && tVel>FLING_V);
+                if(close) sheet.__dragY=tDY;   // 1019-N：关掉时的影子从手指拉到的地方接着往下滑
                 sheet.style.transition=''; sheet.style.transform='';
                 touchReset();
                 if(close) onDismiss();
@@ -7648,6 +7659,7 @@ ${detail}
                     try{ grip.releasePointerCapture(dragId); }catch(_){}
                 }
                 const shouldClose = dragDY>DRAG_DISMISS_PX || fling;
+                if(shouldClose) sheet.__dragY=dragDY;
                 dragging=false; dragDY=0; dragId=null;
                 if(shouldClose) onDismiss();
             }
@@ -7684,6 +7696,7 @@ ${detail}
                 footEl=document.createElement('div'); footEl.className='ui-sheet-foot'; footEl.id='uiSheetFoot';
                 sheet.appendChild(grip); sheet.appendChild(subEl); sheet.appendChild(bodyEl); sheet.appendChild(footEl);
                 mask.appendChild(sheet); document.body.appendChild(mask);
+                sheetGhostWatch(mask);   // 1019-N：关掉时的收起动画（马上接上，不等观察者）
                 drag=bindSheetDrag(mask, sheet, grip, ()=>dismiss());
             }
             function isOpen(){ return !!mask && mask.classList.contains('open'); }
@@ -7800,7 +7813,7 @@ ${detail}
             function closeSheetDiscard(){
                 sheetMask.classList.remove('open');
                 resetSheetDrag();
-                setTimeout(()=>{ sheetMask.style.display='none'; loadCommittedIntoControls(); }, 320);
+                sheetMask.style.display='none'; loadCommittedIntoControls();   // 1019-N：当场关掉，滑走的动画由共用的「影子」做（和别的面板一样）
             }
             // 暴露给系统返回键处理器：它在这个 IIFE 之外，但必须走这个正规出口
             // ——只 remove('open') 会漏掉 display 复位和拖拽 transform 复位，
@@ -7811,7 +7824,7 @@ ${detail}
                 commitDraft();
                 sheetMask.classList.remove('open');
                 resetSheetDrag();
-                setTimeout(()=>{ sheetMask.style.display='none'; }, 320);
+                sheetMask.style.display='none';   // 1019-N：同上
             }
             fab.addEventListener('click', openSheet);
             applyBtn.addEventListener('click', closeSheetApply);
@@ -11277,6 +11290,58 @@ ${detail}
             }
         });
 
+        // ===== 1019-N：所有底部面板关闭都有收起动画 =====
+        //   不管怎么关（返回键、侧滑返回、取消 / 确定、往下拉、代码里关），面板一 display:none，就在原地放一个「影子」：
+        //   照着关之前的样子复制一份（没有 id、点不动），往下滑走 + 遮罩淡出（SHEET_OUT_MS，和往下拉松手后差不多），收完就移除。
+        //   真正的面板当场就关了，所以关掉以后的状态、逻辑和以前完全一样，不用每个面板各写一份。
+        //   影子在的时候再按返回：先把影子立刻收完，再收下一层（handleBack 里调 sheetGhostsFinish）。系统设了「减少动画」时改成很短的淡出。
+        const SHEET_OUT_MS=200, SHEET_FADE_MS=80;
+        const SHEET_GHOST_SKIP={};
+        const __ghosts=new Set();
+        function reduceMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){ return false; } }
+        function sheetGhostsFinish(){ [...__ghosts].forEach(g=>g.__fin && g.__fin()); }
+        window.__sheetGhosts=()=>__ghosts.size;   // 给测试用
+        function sheetGhost(m){
+            const sh=m.querySelector('.sheet') || m.firstElementChild;
+            if(!sh || !document.body) return;
+            const t0=window.JiwenPerf ? window.JiwenPerf.now() : Date.now();
+            const g=m.cloneNode(true);
+            g.removeAttribute('id'); g.querySelectorAll('[id]').forEach(x=>x.removeAttribute('id'));
+            g.querySelectorAll('[name]').forEach(x=>x.removeAttribute('name'));
+            // 输入框里填的字（cloneNode 不带）照抄过去，免得滑走时一下子空了
+            const src=m.querySelectorAll('input,textarea,select'), dst=g.querySelectorAll('input,textarea,select');
+            src.forEach((x, i)=>{ if(dst[i]){ if(x.type==='checkbox' || x.type==='radio') dst[i].checked=x.checked; else dst[i].value=x.value; } });
+            g.classList.remove('mask', 'open', 'closing');
+            g.classList.add('sheet-ghost', reduceMotion() ? 'ghost-fade' : 'ghost-down');
+            g.setAttribute('aria-hidden', 'true');
+            g.style.display='flex'; g.style.zIndex=getComputedStyle(m).zIndex || '1000';
+            g.style.height=m.__ghostH || '';
+            document.body.appendChild(g);
+            const gs=g.querySelector('.sheet') || g.firstElementChild;
+            if(gs){ gs.scrollTop=sh.__lastScroll || 0; gs.style.transform=''; g.style.setProperty('--gy', (sh.__dragY||0)+'px'); }
+            sh.__dragY=0;
+            __ghosts.add(g);
+            let done=false;
+            g.__fin=()=>{ if(done) return; done=true; __ghosts.delete(g); g.remove();
+                if(window.JiwenPerf) window.JiwenPerf.add({ kind:'关闭面板', ms:Math.round((window.JiwenPerf.now())-t0), what:m.id }); };
+            if(gs) gs.addEventListener('animationend', ()=>g.__fin(), { once:true });
+            setTimeout(()=>g.__fin(), (reduceMotion() ? SHEET_FADE_MS : SHEET_OUT_MS)+60);   // 动画事件没来（被打断、没有布局）的兜底
+        }
+        function sheetGhostWatch(m){
+            if(m.__ghostWatch || SHEET_GHOST_SKIP[m.id]) return; m.__ghostWatch=1;
+            const sh=()=>m.querySelector('.sheet') || m.firstElementChild;
+            // 面板里滚到哪了（关掉以后读不到了，影子要照着摆）
+            m.addEventListener('scroll', e=>{ const x=sh(); if(x && e.target===x) x.__lastScroll=x.scrollTop; }, true);
+            // 按每次改动之前的样子判断（同一拍里开了又关也认得出）
+            new MutationObserver(recs=>{
+                const now=m.style.display;
+                if(now==='flex'){ m.__ghostH=m.style.height || ''; return; }   // 键盘弹起时 mask 被收成可视区高度，影子照着
+                if(!m.__noGhost && recs.some(r=>/display:\s*flex/.test(r.oldValue||''))) sheetGhost(m);
+            }).observe(m, { attributes:true, attributeFilter:['style'], attributeOldValue:true });
+        }
+        document.querySelectorAll('.mask').forEach(sheetGhostWatch);
+        new MutationObserver(ms=>ms.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.classList && n.classList.contains('mask')) sheetGhostWatch(n); }))).observe(document.body, { childList:true });
+
         // ===== 1019-M：性能记录：点输入框到能输入、键盘弹起时面板动了几次、面板打开用了多久 =====
         (function(){
             const P=window.JiwenPerf;
@@ -11466,6 +11531,7 @@ ${detail}
             //   handleBack 是唯一的处理入口，两条路复用同一套层级逻辑，不会有两套行为。
             let backLock=false;   // 防抖：两条路都触发时别关掉两层
             function handleBack(){
+                sheetGhostsFinish();                 // 1019-N：还在滑走的面板立刻收完，再收下一层
                 if(backLock) return true;
                 const l=topLayer();
                 if(!l) return false;                 // 没东西可关 → 让调用方决定（退出 App）
