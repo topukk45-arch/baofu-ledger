@@ -142,7 +142,7 @@ const pickBackup = async (t, text) => {
     const e0 = T6.get('wechat', BILL[0].no);
     ok(r && r.kept === 4 && r.dropped === 0 && e0 && a6.records.some(x => x.id === e0.id && x.money === 30), '6 单号表恢复了：4 个单号，记录换成了新编号 ' + JSON.stringify(r));
     // 切到这个存档再导同一份账单
-    t6.w.eval('currentArchive = ' + JSON.stringify(name));
+    t6.w.eval('JiwenBase.currentArchive = ' + JSON.stringify(name));
     const rr = await t6.importFiles(F, null, { noGo: true });
     ok(rr.plan.counts.add === 0 && rr.plan.counts.pending === 0 && rr.plan.counts.merge === 0, '6 再导同一份账单：一条不新增、没有待处理（不用按指纹猜）');
     let e2 = null;

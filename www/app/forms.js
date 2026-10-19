@@ -523,7 +523,7 @@
             // 保存失败（如存储配额满）时 saveUserData 已弹出失败提示，这里必须提前返回：
             // 否则会继续弹「记账成功」，造成「提示成功但实际没存上」的丢账假象。
             if(!saveUserData(data)) return;
-            curPage = 1;            // 新记录在最前，回到第 1 页才看得到
+            JiwenBase.curPage = 1;            // 新记录在最前，回到第 1 页才看得到
             refreshAllViews();
             // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
             addMask.style.display='none';

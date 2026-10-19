@@ -76,7 +76,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   ok(timerBad.length === 0, '3 顶层登记的计时器 / Promise.then / 观察器没有要用后面文件的名字：' + timerBad.join('；'));
   // 切后台那两个监听要用后面文件的函数：开头就看没进账号直接返回，空档里不会走到（锁住这一点，以后改了要重新看）
   const fnSrc = name => { const m = code.match(new RegExp('function ' + name + '\\(\\)\\{([\\s\\S]{0,200})')); return m ? m[1] : ''; };
-  ok(/^\s*if\(!currentUser \|\| \$\('mainBox'\)\.style\.display!=='block'\) return;/.test(fnSrc('resumeSave')), '3 切后台的 resumeSave 开头就看没进账号直接返回');
+  ok(/^\s*if\(!(JiwenBase\.)?currentUser \|\| \$\('mainBox'\)\.style\.display!=='block'\) return;/.test(fnSrc('resumeSave')), '3 切后台的 resumeSave 开头就看没进账号直接返回');   // 1019-Z4-M20 起写成 JiwenBase.currentUser
   ok(/__ledger\.forEach/.test(fnSrc('ledgerFlushOnHide')) && fileAt(code.indexOf('const __ledger')) <= fileAt(code.indexOf('function ledgerFlushOnHide')), '3 切后台的 ledgerFlushOnHide 只在已经读进来的账本上做（空档里账本还没读，什么都不做）');
 
   // 4. 真按外部文件加载

@@ -13,7 +13,7 @@
             Object.keys(store.archives).forEach(name => {
                 const opt=document.createElement('option');
                 opt.value=name; opt.textContent=name;
-                if(name===currentArchive) opt.selected=true;
+                if(name===JiwenBase.currentArchive) opt.selected=true;
                 archiveSelect.appendChild(opt);
             });
             odRefreshStatusUI();
@@ -23,13 +23,13 @@
                 const plugin = odPlugin();
                 if(!plugin){ customAlert('这个功能目前只支持安装到手机上的 App，网页版暂不支持。'); return; }
                 try{
-                    const suggested = `记问存档_${currentArchive}.json`;
+                    const suggested = `记问存档_${JiwenBase.currentArchive}.json`;
                     const res = await plugin.pickFile({ mode:'create', suggestedName: suggested });
                     if(!res || !res.uri) return;
                     // 重新选择 = 明确的用户意图，解除守卫（含损坏名单），否则一旦拦下就再也恢复不了
-                    __corruptedStores.delete(storeKey(currentUser));
-                    ledgerAcceptDamage(currentUser, currentArchive);   // 这个存档读不出来的月份按现在的样子重写，以后不再暂停
-                    odSetLink(currentUser, currentArchive, { uri: res.uri, name: res.name || suggested,
+                    __corruptedStores.delete(storeKey(JiwenBase.currentUser));
+                    ledgerAcceptDamage(JiwenBase.currentUser, JiwenBase.currentArchive);   // 这个存档读不出来的月份按现在的样子重写，以后不再暂停
+                    odSetLink(JiwenBase.currentUser, JiwenBase.currentArchive, { uri: res.uri, name: res.name || suggested,
                         lastSyncAt:null, lastError:null, blocked:false, lastCount:0 });
                     odRefreshStatusUI();
                     customAlert('已连接，之后每次记账/修改会自动同步到这个文件。现在先手动同步一次试试。', '连接成功');
@@ -43,10 +43,10 @@
         $('odOrdersBtn').addEventListener('click', async () => {
             const plugin=odPlugin(); if(!plugin) return;
             try{
-                const suggested=`记问单号表_${currentArchive}.json`;
+                const suggested=`记问单号表_${JiwenBase.currentArchive}.json`;
                 const res=await plugin.pickFile({ mode:'create', suggestedName:suggested });
                 if(!res || !res.uri) return;
-                odSetOrdLink(currentUser, currentArchive, { uri:res.uri, name:res.name || suggested, lastSyncAt:null, lastError:null });
+                odSetOrdLink(JiwenBase.currentUser, JiwenBase.currentArchive, { uri:res.uri, name:res.name || suggested, lastSyncAt:null, lastError:null });
                 await odOrdersSync();
                 odRefreshStatusUI();
                 const ol=odGetOrdLink();
@@ -77,7 +77,7 @@
                     const plugin = odPlugin();
                     const link = odGetLink();
                     if(plugin && link && link.uri){ plugin.forget({ uri: link.uri }).catch(()=>{}); }
-                    odClearLink(currentUser, currentArchive);
+                    odClearLink(JiwenBase.currentUser, JiwenBase.currentArchive);
                     odRefreshStatusUI();
                 }, '取消自动同步', { okText:'停止自动同步', cancelText:'继续同步' });
             });
@@ -90,7 +90,7 @@
             const on=!devImportOn();
             try{ if(on) localStorage.setItem(DEV_IMPORT_KEY,'1'); else localStorage.removeItem(DEV_IMPORT_KEY); }catch(_){}
             renderDevImport();
-            try{ if(currentUser) renderBill(); }catch(_){}     // 1016-R：空账本的小入口跟着开关出现 / 消失
+            try{ if(JiwenBase.currentUser) renderBill(); }catch(_){}     // 1016-R：空账本的小入口跟着开关出现 / 消失
             renderStorageUse();
             try{ odRefreshStatusUI(); }catch(_){}
             customAlert(on ? '已打开「导入（开发中）」，入口在上面「存档管理」里。只在这台手机上有效。' : '已关闭「导入（开发中）」。', '开发开关');
@@ -104,14 +104,14 @@
             const reader=new FileReader();
             reader.onload=ev=>trackBusy((async()=>{
                 try{
-                    const { finalName, stats, daysAdded, daysPending }=await importArchiveFromText(ev.target.result, currentUser);
+                    const { finalName, stats, daysAdded, daysPending }=await importArchiveFromText(ev.target.result, JiwenBase.currentUser);
                     // importArchiveFromText 内部已把新存档写盘并设好 store.last，无需再重读重写一遍
-                    currentArchive=finalName;
+                    JiwenBase.currentArchive=finalName;
                     // refreshAllViews 里已含 renderDaysCard，导进来的倒数日会一并刷新到入口卡
                     refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
-                    const user=currentUser;
+                    const user=JiwenBase.currentUser;
                     askImportOtherDays(daysPending, user, (asked)=>{
-                        if(asked && user===currentUser) refreshAllViews();
+                        if(asked && user===JiwenBase.currentUser) refreshAllViews();
                         customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}${importDaysSuffix(daysAdded+asked)}`, '导入成功', 'left');
                     });
                 }catch(err){

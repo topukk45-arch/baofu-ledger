@@ -927,9 +927,9 @@
         }
         function syncStatTodayFab(){
             const f=$('statTodayFab'); if(!f) return;
-            fabWake(f, currentTab==='stats' && statAway());
+            fabWake(f, JiwenBase.currentTab==='stats' && statAway());
         }
-        window.addEventListener('scroll', ()=>{ if(currentTab==='stats' && statAway()) syncStatTodayFab(); }, { passive:true });
+        window.addEventListener('scroll', ()=>{ if(JiwenBase.currentTab==='stats' && statAway()) syncStatTodayFab(); }, { passive:true });
         $('statTodayFab').addEventListener('click', ()=>{
             const now=new Date();
             statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null; bgExpanded.clear();
@@ -1070,7 +1070,7 @@
             try{
                 localStorage.setItem(daysKey(user), JSON.stringify(list));
                 // 倒数日也在 odBuildPayload 的打包范围内，改完同样要同步（见 saveStoreSafe 处注释）
-                if(user===undefined || user===currentUser) odScheduleSync();
+                if(user===undefined || user===JiwenBase.currentUser) odScheduleSync();
                 return true;
             }catch(err){
                 customAlert('存储空间已满，这个日子没能保存。请删除部分记录后重试。', '保存失败');

@@ -16,8 +16,4 @@
         const { refreshArchiveSelect, renderStorageUse } = window.JiwenSettings;   // 旧代码引用表：settings 已搬进 app/settings.js，旧文件都搬完时删掉
 
 
-        let currentUser = '';
-        let currentArchive = '';
-        let currentTab = 'ledger';
-        let curPage = 1;
 

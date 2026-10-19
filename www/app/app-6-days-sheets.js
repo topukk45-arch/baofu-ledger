@@ -69,7 +69,7 @@
                 new MutationObserver(()=>{
                     const now=m.style.display;
                     if(now==='flex' && was!=='flex') formSnaps[id]=formState(id);
-                    if(now!=='flex'){ delete formSnaps[id]; if(was==='flex' && currentUser) try{ localStorage.removeItem('app_formdraft_'+currentUser); }catch(_){} }   // 1019-F：关掉了，填到一半的草稿不要了
+                    if(now!=='flex'){ delete formSnaps[id]; if(was==='flex' && JiwenBase.currentUser) try{ localStorage.removeItem('app_formdraft_'+JiwenBase.currentUser); }catch(_){} }   // 1019-F：关掉了，填到一半的草稿不要了
                     was=now;
                 }).observe(m, { attributes:true, attributeFilter:['style'] });
             }

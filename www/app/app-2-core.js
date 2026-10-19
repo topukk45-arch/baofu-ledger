@@ -146,7 +146,7 @@
                         // 1016-R：新账号进去以后问一次「怎么开始？」（开发开关开着才问；只在新建账号这一次，可以跳过）
                         // 是「用记问打开」账单文件进来的，已经在导入了，就不问
                         const viaFile=window.__impOpenedNow; window.__impOpenedNow=false;
-                        if(currentUser===id && devImportOn() && !viaFile) customConfirm('怎么开始？\n\n可以从零开始一笔笔记，也可以先把微信、支付宝的账单导进来，第一次打开就有几个月的统计可看。', ()=>{
+                        if(JiwenBase.currentUser===id && devImportOn() && !viaFile) customConfirm('怎么开始？\n\n可以从零开始一笔笔记，也可以先把微信、支付宝的账单导进来，第一次打开就有几个月的统计可看。', ()=>{
                             loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
                         }, '怎么开始', { okText:'导入微信、支付宝账单', cancelText:'从零开始记' });
                     }
@@ -179,17 +179,17 @@
             }));
         }
         function enterAccount(id){
-            currentUser = id;
+            JiwenBase.currentUser = id;
             touchAccount(id);
             localStorage.setItem('app_logged_in_user', id);   // 记住当前登录账号（编号），下次自动进入
             const store = loadStore();
             saveStoreSafe(store);
-            currentArchive = store.last || Object.keys(store.archives)[0];
+            JiwenBase.currentArchive = store.last || Object.keys(store.archives)[0];
             // 兜底：若 last 指向一个已不存在的存档（导入/迁移等异常路径下可能发生），
             // 回退到第一个存档，避免 curArchive() 返回 undefined 导致主界面白屏
-            if(!store.archives[currentArchive]){
-                currentArchive = Object.keys(store.archives)[0];
-                store.last = currentArchive; saveStoreSafe(store);
+            if(!store.archives[JiwenBase.currentArchive]){
+                JiwenBase.currentArchive = Object.keys(store.archives)[0];
+                store.last = JiwenBase.currentArchive; saveStoreSafe(store);
             }
             loginBox.style.display='none';
             mainBox.style.display='block';
@@ -207,8 +207,8 @@
             const auto=!!window.__autoLogin;
             const rs=auto && getDefaultTabPref()==='last' ? resumeTake(id) : null;   // 1019-L：设置里选了「上次停留」才回去
             window.__autoLogin=false;
-            if(rs && rs.tab==='ledger' && rs.page>1){ curPage=rs.page; renderBill(); }
-            if(rs && rs.tab==='ledger'){ ledgerScrollY=rs.y||0; currentTab=''; }   // currentTab 先清掉：switchTab 开头记滚动位置那一步别把它冲成 0
+            if(rs && rs.tab==='ledger' && rs.page>1){ JiwenBase.curPage=rs.page; renderBill(); }
+            if(rs && rs.tab==='ledger'){ ledgerScrollY=rs.y||0; JiwenBase.currentTab=''; }   // currentTab 先清掉：switchTab 开头记滚动位置那一步别把它冲成 0
             switchTab(rs ? rs.tab : getDefaultTab());   // 按用户设置进入默认页（默认记账）
             if(auto) setTimeout(()=>formDraftRestore(id), 0);   // 填到一半的记一笔 / 修改，不管默认页选哪个都接着来
             // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
@@ -219,7 +219,7 @@
         }
 
         logoutBtn.addEventListener('click', () => {
-            currentUser=''; currentArchive='';
+            JiwenBase.currentUser=''; JiwenBase.currentArchive='';
             localStorage.removeItem('app_logged_in_user');   // 退出后不再自动登录
             mainBox.style.display='none';
             $('tabBar').style.display='none';
@@ -232,7 +232,7 @@
 
         // 修改用户名：数据按编号存，改名只改账号列表里的名字（再抄一份进 store），不搬任何数据
         $('editNameBtn').addEventListener('click', () => {
-            const id=currentUser, oldName=nameOf(id);
+            const id=JiwenBase.currentUser, oldName=nameOf(id);
             customPrompt('', oldName, (newName)=>{
                 newName=newName.trim();
                 if(newName===oldName) return;
@@ -249,9 +249,9 @@
             }, { placeholder:'输入新用户名（最多 8 字）', maxchars:8 });
         });
         archiveSelect.addEventListener('change', () => {
-            currentArchive = archiveSelect.value;
-            const store=loadStore(); store.last=currentArchive; saveStoreSafe(store);
-            curPage=1; JiwenStats.statSelDay=null; resetSearch(); refreshCatSelectors(); refreshAllViews();
+            JiwenBase.currentArchive = archiveSelect.value;
+            const store=loadStore(); store.last=JiwenBase.currentArchive; saveStoreSafe(store);
+            JiwenBase.curPage=1; JiwenStats.statSelDay=null; resetSearch(); refreshCatSelectors(); refreshAllViews();
             odRefreshStatusUI();
         });
         $('newArchive').addEventListener('click', () => {
@@ -259,7 +259,7 @@
                 name=name.trim();
                 const store=loadStore();
                 store.archives[name]={ records:[], cats:DEFAULT_CATS.slice() };
-                store.last=name; saveStoreSafe(store); currentArchive=name;
+                store.last=name; saveStoreSafe(store); JiwenBase.currentArchive=name;
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '新建存档', (name)=>{
                 name=name.trim();
@@ -270,21 +270,21 @@
             }, { placeholder:'输入存档名称（最多 16 字）', maxchars:16 });
         });
         $('renameArchive').addEventListener('click', () => {
-            customPrompt('', currentArchive, (name)=>{
+            customPrompt('', JiwenBase.currentArchive, (name)=>{
                 name=name.trim();
-                if(name===currentArchive) return;
-                const oldArchive=currentArchive;
+                if(name===JiwenBase.currentArchive) return;
+                const oldArchive=JiwenBase.currentArchive;
                 const store=loadStore();
                 store.archives[name]=store.archives[oldArchive];
                 delete store.archives[oldArchive];
                 // 云备份连接按「用户名__存档名」存，存档改名必须跟着搬，否则改名后显示「未连接」、
                 // 备份静默停掉。先搬连接、再存档：saveStoreSafe 会触发同步，那时要能找到新名下的连接。
-                odMoveLink(currentUser, oldArchive, currentUser, name);
-                currentArchive=name; store.last=name; saveStoreSafe(store);
+                odMoveLink(JiwenBase.currentUser, oldArchive, JiwenBase.currentUser, name);
+                JiwenBase.currentArchive=name; store.last=name; saveStoreSafe(store);
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '重命名存档', (name)=>{
                 name=name.trim();
-                if(name===currentArchive) return '';
+                if(name===JiwenBase.currentArchive) return '';
                 if(!name) return '存档名不能为空';
                 if(charLen(name) > 16) return '存档名最多 16 个字～';
                 if(loadStore().archives[name]) return '该存档名已存在';
@@ -295,18 +295,18 @@
             const store=loadStore();
             if(Object.keys(store.archives).length<=1){ customAlert('至少保留一个存档！'); return; }
             // 1017-U：写清楚会删掉什么（记录几条、导入记录和导入前备份），按钮「删除这个存档」警示色
-            const n0=(store.archives[currentArchive] && store.archives[currentArchive].records || []).length;
-            customConfirm(`删除存档「${currentArchive}」：里面的 ${n0} 条记录、分类、预算、模板，还有导入记录、单号表、待处理、导入前的备份都会一起删掉，找不回来。\n\n别的存档不受影响；要留底可以先在设置里「导出存档」。云盘上已有的备份文件不删。`, ()=>{
+            const n0=(store.archives[JiwenBase.currentArchive] && store.archives[JiwenBase.currentArchive].records || []).length;
+            customConfirm(`删除存档「${JiwenBase.currentArchive}」：里面的 ${n0} 条记录、分类、预算、模板，还有导入记录、单号表、待处理、导入前的备份都会一起删掉，找不回来。\n\n别的存档不受影响；要留底可以先在设置里「导出存档」。云盘上已有的备份文件不删。`, ()=>{
                 const s=loadStore();
-                const delName=currentArchive;
+                const delName=JiwenBase.currentArchive;
                 delete s.archives[delName];
                 // 顺带清掉这个存档的云备份连接，并释放系统授权（云盘上的文件不删）
-                const delLink=odGetLink(currentUser, delName);
+                const delLink=odGetLink(JiwenBase.currentUser, delName);
                 const odp=odPlugin();
                 if(odp && delLink && delLink.uri){ odp.forget({ uri: delLink.uri }).catch(()=>{}); }
-                odClearLink(currentUser, delName);
-                currentArchive=Object.keys(s.archives)[0];
-                s.last=currentArchive; saveStoreSafe(s);
+                odClearLink(JiwenBase.currentUser, delName);
+                JiwenBase.currentArchive=Object.keys(s.archives)[0];
+                s.last=JiwenBase.currentArchive; saveStoreSafe(s);
                 refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
             }, '删除存档', { danger:true, okText:'删除这个存档' });
         });
@@ -319,18 +319,18 @@
             // （切到「旅行」存档，「入职纪念日」难道就不存在了）。
             // 【1015-B】导入的名单、规则、导入记录、待处理池、单号表一起带上（空的不写，没导入过的存档备份内容不变）
             let impExtra;
-            try{ impExtra=await impExportFields(currentUser, currentArchive, true); }
+            try{ impExtra=await impExportFields(JiwenBase.currentUser, JiwenBase.currentArchive, true); }
             catch(err){
                 customAlert(err && err.code==='impdamaged'
                     ? '导入的单号表有一部分读不出来，这次没有导出。原文已另存在手机里，请联系开发者。'
                     : '读取导入数据失败，请重试。', '导出失败');
                 return;
             }
-            const payload={ app:'记问', user:nameOf(currentUser), accountId:currentUser, archive:currentArchive,
+            const payload={ app:'记问', user:nameOf(JiwenBase.currentUser), accountId:JiwenBase.currentUser, archive:JiwenBase.currentArchive,
                 cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], ...impArchFields(a), data:a.records, days:loadDays(),
                 ...impExtra, exportedAt:new Date().toLocaleString() };
             const json=JSON.stringify(payload,null,2);
-            const fileName=`记账存档_${currentArchive}_${Date.now()}.json`;
+            const fileName=`记账存档_${JiwenBase.currentArchive}_${Date.now()}.json`;
 
             // 在 App（安卓 WebView）里，<a download> 无效，改用 Capacitor 文件插件直接存到手机
             const cap = window.Capacitor;
@@ -376,7 +376,7 @@
         // 而不是塞进单行 <input>——几千条记录的 JSON 在单行框里既读不了、也没法可靠全选复制，
         // 那等于「最后的救命通道」实际拿不到数据。
         function showExportCopy(json){
-            openAiExport(json, `${currentArchive} · ${(json.length/1024).toFixed(1)} KB`, {
+            openAiExport(json, `${JiwenBase.currentArchive} · ${(json.length/1024).toFixed(1)} KB`, {
                 mode: 'backup',
                 title: '导出存档（手动保存）',
                 tip: '无法直接写入文件，请点「复制」或「分享」，把内容保存到记事本 / 云笔记 / 聊天收藏。这段文本就是完整备份，之后可用「导入存档」还原。'
@@ -400,7 +400,7 @@
         // 避免「新增/删除记录后切到统计页数字没更新」的问题
         function refreshAllViews(){
             renderBill();
-            if(currentTab==='stats') renderStats();
+            if(JiwenBase.currentTab==='stats') renderStats();
             // 「日子」入口卡也一并刷新：它虽与账单无关，但改名等路径会换 currentUser，
             // 收在这里就不必在每个调用点各加一行（漏一个就是显示旧账号的日子）。
             if(typeof renderDaysCard==='function') renderDaysCard();

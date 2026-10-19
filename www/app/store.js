@@ -105,7 +105,7 @@
 
         // 数据层统一支持「显式指定用户」：传入 user 则操作该用户的数据，省略则默认当前登录用户。
         // 这样导入到其它账号时无需临时改写全局 currentUser（旧做法在异步/重入下会写错账号）。
-        function storeKey(user){ return `store_${user!==undefined ? user : currentUser}`; }
+        function storeKey(user){ return `store_${user!==undefined ? user : JiwenBase.currentUser}`; }
 
         // ===== 账本存储（1013-G 起按月分块存在 IndexedDB）=====
         // 1013-D 把账本搬进了 IndexedDB，但还是一个账号一整段 JSON：记一笔就整本序列化、整本写库，
@@ -1161,10 +1161,10 @@
         // ---- 对外：给以后的导入代码用的一组读写函数（这一版不接界面）----
         // 都是当前账号；archive 是存档名，不传就是当前存档。
         function impTarget(archive){
-            if(!currentUser) throw impErr('nologin');
-            const key=storeKey(currentUser), e=__ledger.get(key);
+            if(!JiwenBase.currentUser) throw impErr('nologin');
+            const key=storeKey(JiwenBase.currentUser), e=__ledger.get(key);
             if(!e || !e.has) throw impErr('notloaded');
-            const name=archive!==undefined ? archive : currentArchive;
+            const name=archive!==undefined ? archive : JiwenBase.currentArchive;
             const aid=e.names.get(name);
             if(!aid) throw impErr('noarchive');
             return { e, key, aid, name };
@@ -1611,7 +1611,7 @@
                 await impBkDone(t, saved);
                 ms.total=Math.round(clock()-t0);
                 prog && prog('done', 1, 1);
-                if(t.e.id===currentUser && t.name===currentArchive){
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){
                     try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
                 }
@@ -1645,7 +1645,7 @@
                 try{ await impApplyUndo(t, p.after); }
                 catch(err){ await impBkFail(t, saved); throw err; }
                 await impBkDone(t, saved);
-                if(t.e.id===currentUser && t.name===currentArchive){
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){
                     try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
                 }
@@ -1744,7 +1744,7 @@
                     await saveStoreDurable(store, t.e.id, ()=>[[impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:cleanLog })]]);
                 }catch(err){ await impBkFail(t, saved); throw err; }
                 await impBkDone(t, saved);
-                if(t.e.id===currentUser && t.name===currentArchive){
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){
                     try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
                 }
@@ -1821,7 +1821,7 @@
                 pairs.push([impLogKey(t.e.id, t.aid), cleanLog.length ? JSON.stringify({ v:1, list:cleanLog }) : null]);
                 if(window.__impFailAt==='splitSave') throw impErr('test');
                 await saveStoreDurable(store, user, ()=>pairs);
-                if(t.e.id===currentUser && t.name===currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return { added:made.length, ids:made.map(r=>r.id) };
             },
@@ -1833,7 +1833,7 @@
                 const clean=impCleanRules(rules, a.cats||[]);
                 if(clean) a.importRules=clean; else delete a.importRules;
                 await saveStoreDurable(store, user, ()=>[]);
-                if(t.e.id===currentUser && t.name===currentArchive){ try{ odScheduleSync(); }catch(_){} }
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ odScheduleSync(); }catch(_){} }
                 return clean || { cat:[], type:[] };
             },
             // ---- 1016-N：待处理（第一期 ⑧）----
@@ -1849,7 +1849,7 @@
                 const t=impTarget(archive);
                 if(!window.JiwenImportPending) throw impErr('nomodule');
                 const r=await impApplyPending(t, acts);
-                if(t.e.id===currentUser && t.name===currentArchive){
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){
                     try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
                 }
@@ -1889,7 +1889,7 @@
                 const t=impTarget(opts.archive);
                 if(impBkKeys(t.e.id, t.aid).indexOf(key)<0) throw impErr('nobackup');
                 const r=await impRestoreFrom(t, key, { ver:opts.ver });
-                if(t.e.id===currentUser && t.name===currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return r;
             },
@@ -2052,7 +2052,7 @@
         let __forceFlushing=null;
         function ledgerFlushOnHide(){
             if(__forceFlushing) return __forceFlushing;
-            const cur=currentUser ? storeKey(currentUser) : null;
+            const cur=JiwenBase.currentUser ? storeKey(JiwenBase.currentUser) : null;
             const jobs=[];
             __ledger.forEach((e, k)=>{
                 if(k===cur && e.has){
@@ -2438,7 +2438,7 @@
             return arr;
         }
         function loadStore(user){
-            const u = (user!==undefined) ? user : currentUser;
+            const u = (user!==undefined) ? user : JiwenBase.currentUser;
             const e = __ledger.get(storeKey(u));
             if (!e) throw new Error('notloaded:'+storeKey(u));
             if (!e.has) {
@@ -2476,7 +2476,7 @@
         function saveStoreSafe(store, user){
             try{
                 const ok = saveStore(store, user);
-                if(ok && (user===undefined || user===currentUser)) odScheduleSync();
+                if(ok && (user===undefined || user===JiwenBase.currentUser)) odScheduleSync();
                 return ok;
             }
             catch(err){
@@ -2486,7 +2486,7 @@
                 return false;
             }
         }
-        function curArchive(store){ return store.archives[currentArchive]; }
+        function curArchive(store){ return store.archives[JiwenBase.currentArchive]; }
 
         // ===== 账号（1010-K7）=====
         // 账号 = 一个永远不变的内部编号 + 一个给人看的名字。所有数据按编号存（store_<编号>、days_<编号>…），
@@ -2743,7 +2743,7 @@
         function odBuildPayload(){
             const store=loadStore(); const a=curArchive(store);
             // 【1015-B】导入用的名单、规则在 meta 里（空的不写）；导入记录、待处理池在 odSyncNow 里另读
-            return { app:'记问', user:nameOf(currentUser), accountId:currentUser, archive:currentArchive,
+            return { app:'记问', user:nameOf(JiwenBase.currentUser), accountId:JiwenBase.currentUser, archive:JiwenBase.currentArchive,
                 cats:a.cats, budgets:a.budgets||{}, tpls:a.tpls||[], ...impArchFields(a), data:a.records, days:loadDays(),
                 exportedAt:new Date().toLocaleString() };
         }
@@ -2755,8 +2755,8 @@
         function odGetLink(user, archive){
             try{
                 const raw = localStorage.getItem(odKey(
-                    user!==undefined ? user : currentUser,
-                    archive!==undefined ? archive : currentArchive
+                    user!==undefined ? user : JiwenBase.currentUser,
+                    archive!==undefined ? archive : JiwenBase.currentArchive
                 ));
                 return raw ? JSON.parse(raw) : null;
             }catch(_){ return null; }
@@ -2795,7 +2795,7 @@
         //   （按规则本来就等于没导过），忽略的照留。主云备份恢复后记录会重新编号，所以不按 id 认。
         function odOrdKey(user, archive){ return `onedrive_orders_${user}__${archive}`; }
         function odGetOrdLink(user, archive){
-            try{ const raw=localStorage.getItem(odOrdKey(user!==undefined ? user : currentUser, archive!==undefined ? archive : currentArchive)); return raw ? JSON.parse(raw) : null; }catch(_){ return null; }
+            try{ const raw=localStorage.getItem(odOrdKey(user!==undefined ? user : JiwenBase.currentUser, archive!==undefined ? archive : JiwenBase.currentArchive)); return raw ? JSON.parse(raw) : null; }catch(_){ return null; }
         }
         function odSetOrdLink(user, archive, link){ try{ localStorage.setItem(odOrdKey(user, archive), JSON.stringify(link)); }catch(_){} }
         // 指纹：和 import/write.js 的 recHash 一样的算法（主页面平时不载入 write.js，这里抄一份；测试里比对两边一致）
@@ -2822,7 +2822,7 @@
         }
         // 导入相关的写完以后调：连了单号表云端文件才写；主连接被暂停（本地数据有问题）时也不写
         async function odOrdersSync(user, archive){
-            user=user!==undefined ? user : currentUser; archive=archive!==undefined ? archive : currentArchive;
+            user=user!==undefined ? user : JiwenBase.currentUser; archive=archive!==undefined ? archive : JiwenBase.currentArchive;
             const plugin=odPlugin(), link=odGetOrdLink(user, archive);
             if(!plugin || !link || !link.uri) return;
             const main=odGetLink(user, archive);
@@ -2870,7 +2870,7 @@
         }
         async function odSyncNow(){
             const plugin = odPlugin();
-            const user = currentUser, archive = currentArchive;
+            const user = JiwenBase.currentUser, archive = JiwenBase.currentArchive;
             const link = odGetLink(user, archive);
             if(!plugin || !link || !link.uri) return;
 
@@ -2950,7 +2950,7 @@
                     }
                 }
             }
-            if(nameEl) nameEl.textContent = currentArchive || '';
+            if(nameEl) nameEl.textContent = JiwenBase.currentArchive || '';
             const plugin = odPlugin();
             if(!plugin){
                 statusEl.textContent = '当前平台不支持（仅安卓 App 内可用）';
@@ -2968,7 +2968,7 @@
                 if(disBtn) disBtn.style.display='';
                 connBtn.textContent = '重新选择备份文件';
                 // 存档改名后连接仍指向原文件（系统授权只认那一个文件），文件名对不上时说一句，免得误以为断了
-                const nameNote = (link.name && link.name!==`记问存档_${currentArchive}.json`)
+                const nameNote = (link.name && link.name!==`记问存档_${JiwenBase.currentArchive}.json`)
                     ? '（云盘文件名不随存档改名）' : '';
                 if(link.blocked){
                     // 守卫拦下：这不是「会自动重试」的失败，是刻意停住。文案必须说清，
@@ -3192,7 +3192,7 @@
         // 【1013-G】只拷当前存档的记录数组（浅拷贝），不用把整个 store 都拼出来
         function getUserData(){
             const e=__ledger.get(storeKey());
-            const aid=e && e.has ? e.names.get(currentArchive) : undefined;
+            const aid=e && e.has ? e.names.get(JiwenBase.currentArchive) : undefined;
             const st=aid ? e.archs.get(aid) : undefined;
             if(!st) return curArchive(loadStore()).records;
             return ledgerTagRecords(st.recs.slice(), aid);
@@ -3202,7 +3202,7 @@
         //   写库失败由 ledgerWriteSoon 统一提示一次，修改留在内存里，下次保存 / 切后台时再写。
         function saveUserData(data, silent){
             const store=loadStore(); curArchive(store).records=data;
-            store.last=currentArchive;
+            store.last=JiwenBase.currentArchive;
             let ok;
             if(silent){
                 try{ ok = saveStore(store); }
@@ -3254,7 +3254,7 @@
         //   【导出/导入】存储归存储，传输归传输：导出存档时会把 days 一起写进文件（换手机
         //   能带走），但导入只在「文件里的 user === 目标账号」时才收，否则跳过——见
         //   importArchiveFromText。多存档时每份导出各带一份相同副本，这是可接受的冗余。
-        function daysKey(user){ return `days_${user!==undefined ? user : currentUser}`; }
+        function daysKey(user){ return `days_${user!==undefined ? user : JiwenBase.currentUser}`; }
         // 【P3】损坏处理向 loadStore 看齐：原先直接 return []，下一次 saveDays 就把坏数据
         //   永久覆盖了，连人工抢救的机会都没有。倒数日虽小，但同一份代码里两套存储对
         //   「数据坏了」给出两种处理，本身就是将来会看走眼的坑。只留最近 1 份，不堆积。

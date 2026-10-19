@@ -69,15 +69,15 @@
             if(document.getElementById('impPage') && document.getElementById('impPage').offsetParent!==null) return false;
             if(tab==='ledger'){
                 if(window.__filterActive && window.__filterActive()) return false;   // 打开时会清掉筛选
-                if(pref!=='last' && curPage!==1) return false;                      // 打开时回第 1 页
+                if(pref!=='last' && JiwenBase.curPage!==1) return false;                      // 打开时回第 1 页
                 return true;
             }
             if(tab==='stats'){
-                if(tab!==currentTab) return false;   // 统计页不在屏幕上，内容不一定是最新的
+                if(tab!==JiwenBase.currentTab) return false;   // 统计页不在屏幕上，内容不一定是最新的
                 const n=new Date();
                 return JiwenStats.statYear===n.getFullYear() && JiwenStats.statMonth===n.getMonth() && JiwenStats.statSelDay==null && JiwenStats.statTab==='flow' && JiwenStats.statMonthCatMode==='expense';
             }
-            if(tab==='settings') return tab===currentTab;
+            if(tab==='settings') return tab===JiwenBase.currentTab;
             return false;
         }
         function snapPrune(orig, copy, page){
@@ -103,8 +103,8 @@
         }
         function snapSave(){
             try{
-                if(!currentUser || $('mainBox').style.display!=='block'){ snapDrop(); return; }
-                const pref=getDefaultTabPref(), tab=pref==='last' ? currentTab : pref;
+                if(!JiwenBase.currentUser || $('mainBox').style.display!=='block'){ snapDrop(); return; }
+                const pref=getDefaultTabPref(), tab=pref==='last' ? JiwenBase.currentTab : pref;
                 if(!snapBootState(tab, pref)){ snapDrop(); return; }
                 const pageId={ ledger:'pageLedger', stats:'pageStats', settings:'pageSettings' }[tab];
                 // 只要主界面（只留要进的那一页）、底栏、记账页的底部操作栏；登录框、各个弹窗（都在 .container 里、都藏着）不要
@@ -112,7 +112,7 @@
                 const mb=$('mainBox').cloneNode(true);
                 // 只留一屏看得见的：这一页正显示着时，屏幕下沿以下的、框里滚出去看不见的都不要（东西越少，打开时画得越快；
                 //   下面那些反正看不见，真的那页画好就换掉了）
-                if(tab===currentTab) snapPrune($('mainBox'), mb, $(pageId));
+                if(tab===JiwenBase.currentTab) snapPrune($('mainBox'), mb, $(pageId));
                 mb.querySelectorAll('.tab-page').forEach(pg=>{ if(pg.id!==pageId) pg.remove(); else pg.style.display='block'; });
                 const pd=mb.querySelector('#pageDays'); if(pd) pd.remove();
                 mb.querySelectorAll('input, textarea').forEach(x=>{ if(x.type!=='checkbox' && x.type!=='radio') x.setAttribute('value', x.value||''); });
@@ -127,9 +127,9 @@
                 const bodyCls=String(document.body.className||'').split(/\s+/).filter(k=>k && SNAP_BODY_SKIP.indexOf(k)<0)
                     .filter(k=>k!=='tab-ledger' && k!=='tab-stats').concat(tab==='ledger' ? ['tab-ledger'] : tab==='stats' ? ['tab-stats'] : []).join(' ');
                 snapDrop();
-                localStorage.setItem('app_snap_'+currentUser, JSON.stringify({ v:1, build:$('loginBuild').textContent, day:`${n.getFullYear()}-${n.getMonth()+1}-${n.getDate()}`,
-                    pref, tab, page:curPage, y:(tab==='ledger' && pref==='last') ? (window.scrollY||document.documentElement.scrollTop||0) : 0,
-                    w:window.innerWidth, at:Date.now(), archive:currentArchive, root:document.documentElement.getAttribute('style')||'', body:bodyCls, html }));
+                localStorage.setItem('app_snap_'+JiwenBase.currentUser, JSON.stringify({ v:1, build:$('loginBuild').textContent, day:`${n.getFullYear()}-${n.getMonth()+1}-${n.getDate()}`,
+                    pref, tab, page:JiwenBase.curPage, y:(tab==='ledger' && pref==='last') ? (window.scrollY||document.documentElement.scrollTop||0) : 0,
+                    w:window.innerWidth, at:Date.now(), archive:JiwenBase.currentArchive, root:document.documentElement.getAttribute('style')||'', body:bodyCls, html }));
             }catch(_){ snapDrop(); }
         }
         // 真的首屏画好了：下一帧拿掉快照（这一帧真的那页已经排好，拿掉看不出变化）；没有快照时告诉原生层可以收启动画面了
@@ -142,20 +142,20 @@
         }
         window.snapSave=snapSave; window.snapDrop=snapDrop;   // 给测试用
         function resumeSave(){
-            if(!currentUser || $('mainBox').style.display!=='block') return;
+            if(!JiwenBase.currentUser || $('mainBox').style.display!=='block') return;
             saveLedgerScroll();
-            try{ localStorage.setItem(resumeKey(currentUser), JSON.stringify({ tab:currentTab, page:curPage, y:ledgerScrollY, archive:currentArchive, at:Date.now() })); }catch(_){}
+            try{ localStorage.setItem(resumeKey(JiwenBase.currentUser), JSON.stringify({ tab:JiwenBase.currentTab, page:JiwenBase.curPage, y:ledgerScrollY, archive:JiwenBase.currentArchive, at:Date.now() })); }catch(_){}
             try{
                 const f=formDraftNow();
-                if(f) localStorage.setItem(formDraftKey(currentUser), JSON.stringify(Object.assign(f, { archive:currentArchive, at:Date.now() })));
-                else localStorage.removeItem(formDraftKey(currentUser));
+                if(f) localStorage.setItem(formDraftKey(JiwenBase.currentUser), JSON.stringify(Object.assign(f, { archive:JiwenBase.currentArchive, at:Date.now() })));
+                else localStorage.removeItem(formDraftKey(JiwenBase.currentUser));
             }catch(_){}
             snapSave();
         }
         function resumeTake(id){
             let r=null;
             try{ r=JSON.parse(localStorage.getItem(resumeKey(id))||'null'); }catch(_){ r=null; }
-            if(!r || r.archive!==currentArchive) return null;
+            if(!r || r.archive!==JiwenBase.currentArchive) return null;
             if(['ledger','stats','settings'].indexOf(r.tab)<0) return null;
             // 1019-L：选了「上次停留」就回到上次的页签（不限多久）；页码、滚动位置只在离开不到 2 小时时放回
             if(!(Date.now()-r.at < RESUME_MAX_MS)) return { tab:r.tab, page:1, y:0 };
@@ -173,7 +173,7 @@
         function formDraftRestore(id){
             let f=null;
             try{ f=JSON.parse(localStorage.getItem(formDraftKey(id))||'null'); }catch(_){ f=null; }
-            if(!f || !(Date.now()-f.at < RESUME_MAX_MS) || f.archive!==currentArchive || !f.v) return;
+            if(!f || !(Date.now()-f.at < RESUME_MAX_MS) || f.archive!==JiwenBase.currentArchive || !f.v) return;
             const v=f.v, cats=getCats();
             if(f.kind==='add'){
                 openAddModal();
@@ -211,13 +211,13 @@
         function saveLedgerScroll(){
             if(!tabShownOnce) return;
             const pl=$('pageLedger');
-            if(currentTab==='ledger' && pl && pl.style.display!=='none') ledgerScrollY=window.scrollY||document.documentElement.scrollTop||0;
+            if(JiwenBase.currentTab==='ledger' && pl && pl.style.display!=='none') ledgerScrollY=window.scrollY||document.documentElement.scrollTop||0;
         }
         function switchTab(tab){
             closeAllCs();   // 收起可能展开的下拉：其面板已传送到 body，切页隐藏容器不会带走它
             saveLedgerScroll();
             tabShownOnce=true;
-            currentTab=tab;
+            JiwenBase.currentTab=tab;
             // 「日子」管理页是记账页的子页，不属于任何 tab。切 tab 时必须把它关掉，
             // 否则从子页点底栏会出现「子页与目标页同时显示」。
             const pd=$('pageDays'); if(pd) pd.style.display='none';
@@ -256,7 +256,7 @@
             function onScroll(){
                 const y = window.scrollY||document.documentElement.scrollTop;
                 let show;
-                if(currentTab==='ledger'){
+                if(JiwenBase.currentTab==='ledger'){
                     // 回顶落点是「账单标题」而非页顶。用标题相对视口的位置判断：标题被滚到视口上方
                     // 一段距离后才显示按钮；回顶到标题处时它 rect.top≈0，不再满足条件 → 按钮消失。
                     const head=$('billHead');
@@ -265,21 +265,21 @@
                     } else {
                         show = y > 400;
                     }
-                } else if(currentTab==='stats'){
+                } else if(JiwenBase.currentTab==='stats'){
                     show = y > 400;
                 } else {
                     show = false;
                 }
                 fabWake(btn, show);   // 1017-N：滑动时出现，停下 1.5 秒淡出
                 // 账单页滑动时 ✕ 也跟着出现、停下一起淡出
-                if(currentTab==='ledger' && window.syncFilterFab) window.syncFilterFab();
+                if(JiwenBase.currentTab==='ledger' && window.syncFilterFab) window.syncFilterFab();
             }
             fabHold(btn); fabHold($('clearFilterFab')); fabHold($('statTodayFab'));
             window.addEventListener('scroll', onScroll, {passive:true});
             btn.addEventListener('click', ()=>{
                 // 记账页：落到账单标题处（其下方就是翻页条），方便随手翻页——而非滚到整页最顶的「日子」卡片。
                 // 其他页（统计）：仍回到整页顶部。
-                const head = currentTab==='ledger' ? $('billHead') : null;
+                const head = JiwenBase.currentTab==='ledger' ? $('billHead') : null;
                 if(head){ head.scrollIntoView({ behavior:'smooth', block:'start' }); }
                 else { window.scrollTo({top:0, behavior:'smooth'}); }
             });

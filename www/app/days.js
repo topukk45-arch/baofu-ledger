@@ -10,7 +10,7 @@
         //   这没有削弱需求：入口卡是记账页顶部的一张小卡，真要展示 99 条也早就滚出屏幕了；
         //   而且超出的条目在日子页里一条不少，纯粹是「露多少」的问题，不涉及丢数据。
         const DAYS_CARD_MIN=3, DAYS_CARD_MAX=99, DAYS_CARD_DEFAULT=3;
-        function daysCardKey(user){ return `days_card_n_${user!==undefined ? user : currentUser}`; }
+        function daysCardKey(user){ return `days_card_n_${user!==undefined ? user : JiwenBase.currentUser}`; }
         // 读取时也钳一道：localStorage 是用户可改的，别信它写回来的值
         function getDaysCardN(){
             const raw=parseInt(localStorage.getItem(daysCardKey()), 10);

@@ -45,7 +45,7 @@
                 return;   // 配额满等，本次放弃，保持原样，下次再修
             }
             try{ localStorage.setItem(flagKey,'1'); }catch(_){}
-            if(user!==currentUser) return;   // 写库的工夫里切了账号：标记照打，界面不用刷、也不弹提示
+            if(user!==JiwenBase.currentUser) return;   // 写库的工夫里切了账号：标记照打，界面不用刷、也不弹提示
 
             // 修完必须刷新视图，否则界面还停在修复前的旧数据上
             refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();

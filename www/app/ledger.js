@@ -98,7 +98,7 @@
                 searchState.to   = to.dataset.day || null;
                 searchState.mode = draftMode || null;
                 filterCat.value = draftCat;
-                curPage=1;
+                JiwenBase.curPage=1;
                 renderBill();
                 window.syncFilterFab();
             }
@@ -114,7 +114,7 @@
                 // 主页面「清除/重置」浮钮：记账页且「有筛选生效 或 不在第 1 页」时浮现（1017-N 起停下 1.5 秒淡出、滑动时再出来）。
                 // 翻页也是「偏离默认视图」的一种，点 ✕ 一并回到第 1 页 + 清筛选（clearAllFilters 已含 curPage=1）。
                 const cf=$('clearFilterFab');
-                if(cf) fabWake(cf, (active || curPage>1) && currentTab==='ledger');   // 1017-N：停下 1.5 秒淡出
+                if(cf) fabWake(cf, (active || JiwenBase.curPage>1) && JiwenBase.currentTab==='ledger');   // 1017-N：停下 1.5 秒淡出
             };
 
             // 打开：先把已提交状态灌进控件作为草稿起点，再渲染分类标签（高亮草稿分类），滑入
@@ -213,7 +213,7 @@
         function clearAllFilters(){
             resetSearch();                 // 清搜索条件 + 控件 + 草稿分类
             filterCat.value='__all';       // 分类筛选也归零（resetSearch 不动分类，这里补上）
-            curPage=1;
+            JiwenBase.curPage=1;
             if(window.syncFilterFab) window.syncFilterFab();            // 先同步浮钮/图标状态
             if($('filterChips')) renderFilterChips();                  // sheet 若开着，分类高亮回「全部」
             renderBill();                                              // 再刷新列表
@@ -265,7 +265,7 @@
             const old=$('impRemind');
             let t=null; if(on){ try{ t=impTarget(); }catch(_){ t=null; } }
             const now=new Date(), ym=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
-            const rk=`app_imp_remind_${currentUser}__${currentArchive}`;
+            const rk=`app_imp_remind_${JiwenBase.currentUser}__${JiwenBase.currentArchive}`;
             let dismissed=false; try{ dismissed=localStorage.getItem(rk)===ym; }catch(_){}
             if(!t || now.getDate()>IMP_REMIND_DAYS || dismissed){ if(old) old.remove(); return; }
             const pm=new Date(now.getFullYear(), now.getMonth(), 0), pmEnd=`${pm.getFullYear()}-${pad(pm.getMonth()+1)}-${pad(pm.getDate())}`;
@@ -444,9 +444,9 @@
 
             // 分页：只渲染当前页，结余/汇总仍按全部记录计算
             const totalPages = Math.max(1, Math.ceil(desc.length / PAGE_SIZE));
-            if(curPage > totalPages) curPage = totalPages;
-            if(curPage < 1) curPage = 1;
-            const start = (curPage - 1) * PAGE_SIZE;
+            if(JiwenBase.curPage > totalPages) JiwenBase.curPage = totalPages;
+            if(JiwenBase.curPage < 1) JiwenBase.curPage = 1;
+            const start = (JiwenBase.curPage - 1) * PAGE_SIZE;
             const pageItems = desc.slice(start, start + PAGE_SIZE);
 
             const rMap=refundedMap(raw);        // 原账单 id → 已退总额（1010-J）
@@ -562,16 +562,16 @@
             if(change.cat!==undefined && prevFilter!=='__all' && prevFilter!==change.cat){
                 filterCat.value=change.cat;
             }
-            curPage=1;
+            JiwenBase.curPage=1;
             refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
-            batchUndo={ prev, prevFilter, archive:currentArchive };
+            batchUndo={ prev, prevFilter, archive:JiwenBase.currentArchive };
             customConfirm(`已处理 ${mainN} 条记录。`, null, '批量操作完成',
                 { okText:'好的', extra:{ text:'撤销这次操作', onClick:undoBatch } });
             askCancel.style.display='none';      // 「好的」「取消」意思一样，只留一个
         }
         function undoBatch(){
             const u=batchUndo; batchUndo=null;
-            if(!u || u.archive!==currentArchive) return;
+            if(!u || u.archive!==JiwenBase.currentArchive) return;
             const map=new Map(u.prev.map(p=>[p.id, p]));
             const data=getUserData();
             data.forEach((r,i)=>{
@@ -583,7 +583,7 @@
             });
             if(!saveUserData(data)) return;
             filterCat.value=u.prevFilter;         // 分类表没变，原筛选值一定还在
-            curPage=1;
+            JiwenBase.curPage=1;
             refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
             customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
         }
@@ -684,9 +684,9 @@
                     box.appendChild(prev); box.appendChild(info); box.appendChild(next);
                 }
                 const [prev, next]=box.querySelectorAll('button');
-                prev.disabled = curPage<=1;
-                next.disabled = curPage>=totalPages;
-                box.querySelector('.page-info').textContent=`第 ${curPage} / ${totalPages} 页`;
+                prev.disabled = JiwenBase.curPage<=1;
+                next.disabled = JiwenBase.curPage>=totalPages;
+                box.querySelector('.page-info').textContent=`第 ${JiwenBase.curPage} / ${totalPages} 页`;
             });
             if(totalPages<=1) pagerPad(0);
         }
@@ -698,7 +698,7 @@
         //   下面那排：直接（不带动画）跳到新一页的第一行。
         function goPage(d, from){
             const y0=window.scrollY;
-            curPage+=d;
+            JiwenBase.curPage+=d;
             pagerPad(0);
             renderBill({ pageOnly:true });
             if(from==='bottom'){

@@ -61,7 +61,7 @@
                 if(mainBox.style.display!=='block'){ loginBox.style.display='block'; document.body.classList.add('login-mode'); try{ renderRecentUsers(); }catch(_){} }
                 loginBox.style.visibility='';
                 snapUnveil();   // 1019-U：真的首屏（或登录页）出来了，拿掉快照、收启动画面
-                if(currentUser){ const id=currentUser; setTimeout(()=>{ impDraftExpire(id).catch(()=>{}); }, 3000); }   // 1019-V：超过 24 小时的导入草稿删掉（等首屏出来一会儿再读库，不挡打开）
+                if(JiwenBase.currentUser){ const id=JiwenBase.currentUser; setTimeout(()=>{ impDraftExpire(id).catch(()=>{}); }, 3000); }   // 1019-V：超过 24 小时的导入草稿删掉（等首屏出来一会儿再读库，不挡打开）
             }));
         })();
 

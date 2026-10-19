@@ -140,7 +140,7 @@
 - 往上调用（回调口）：按这张表算下来只剩三种，暂时留着、测试锁住只减不增：数据改了删首屏快照（存储 → `snapDrop`）、存储写不进去弹提示（存储 → `customAlert`）、数据改了刷新所有页面（分类 / 账单页批量 / 记一笔 / 详情 → `refreshAllViews`、`refreshCatSelectors`）。写法：调用的时候才去 `window.JiwenXxx.fn()` 拿（加载时不取）。以后改成「下层留一个口子、上层登记进来」要你定（见还要确认）。
 - 一个模块的文件长这样：开头 `(function(){`、结尾把入口挂上 `window.JiwenXxx = { … };` 再 `})();`；代码原样剪进去，**不改缩进、不改一个字**（测试里有按原文找的检查，比如 `const SHEET_MS=300;`）。用下层的东西：模块开头一行 `const { a, b, c } = window.JiwenBase;`，取出来的名字和原来一样，调用的地方不用改；只取函数和常量。
 - 会变的状态不能那样取（取出来就是那一刻的值）：
-  - 全 App 共用的四个 `currentUser`、`currentArchive`、`currentTab`、`curPage`（共约 160 处）放进 `JiwenBase.state`，用的地方改成 `St.currentUser`（模块开头 `const St = JiwenBase.state;`）——这是唯一要成片改写法的一步，单独一个提交，逐字节对比、全部测试；
+  - 全 App 共用的四个 `currentUser`、`currentArchive`、`currentTab`、`curPage`（1019-Z4-M20 做了）：那四行 `let` 原样挪进 `app/base.js`，`JiwenBase` 入口上给读写口（`get currentUser(){…}, set currentUser(v){…}`），别处 150 处用到的地方按语法树换成 `JiwenBase.currentUser`（原来设计写的 `JiwenBase.state` / `St.` 没用：读写口直接挂在入口上，少一层）。这是唯一成片改写法的一步，单独一个提交，逐字节对比、全部测试；
   - 别的模块的状态（统计页的 `statYear` / `statMonth` / `statSelDay` / `statTab` / `statMonthCatMode`、记一笔的 `billCatSel` / `billTypeSel` / `editId` / `editCatSel` / `editTypeSel`、日子的 `daysSelecting`、筛选的 `draftMode`、预算建议的 `bgSuggestOpen`、数字键盘的 `kpTarget`）由它的入口带读写口（`get statYear(){…}`），别处写成 `JiwenStats.statYear`。
 - 还没搬的旧代码（`app-N-….js`）用到已经搬走的名字：在那个旧文件开头加一段「旧代码引用表」`const { … } = window.JiwenBase;`，那块搬走时删掉；只减不增。
 - 顶层的事件绑定语句（给某个按钮 `addEventListener` 那种）跟着它服务的页面走，不跟着原来所在的节（比如账号那节里给「新建账号」绑点击的，归登录页）；这种在设计表的 `BIND` 里按语句开头的文字登记归哪块（搬走一节以后留下的绑定语句会落在上一节的标题下面，不登记会算错）。
@@ -168,6 +168,7 @@
   - 1019-Z4-M17 统计页 `app/stats.js`（`JiwenStats`，70 条、对外 bgSuggestOpen / calcDay / closeDetail / dayNumHtml / fmtDayDate / openAiFlagList / openDetail / renderStats / saveDays / setStatTab / sortedDays / statMonth / statMonthCatMode / statSelDay / statTab / statYear）。
   - 1019-Z4-M18 日子 `app/days.js`（`JiwenDays`，41 条、对外 closeDayDialog / closeDayMgr / daysSelecting / exitSelectMode / openDayDialog / renderDaysCard / renderDaysList）。
   - 1019-Z4-M19 设置页 `app/settings.js`（`JiwenSettings`，12 条、对外 refreshArchiveSelect / renderStorageUse）。
+  - 1019-Z4-M20 四个共用状态收进基础：`currentUser` / `currentArchive` / `currentTab` / `curPage` 的四行 `let` 原样挪进 `app/base.js`，`JiwenBase` 上给读写口，别处 150 处改成 `JiwenBase.currentUser` 这种（工具 `tests/tools/move-state.js`，按语法树找）。外壳要在加载时读 `currentTab`，必须先做这一步（第一次试搬外壳时报「currentTab 还没初始化」，退回）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

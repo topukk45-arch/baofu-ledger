@@ -18,7 +18,7 @@ async function newAccount(t, name) {
   await t.until(() => t.ask());
   t.$('askInput').value = name; t.$('askInput').dispatchEvent(new t.w.Event('input'));
   await t.askOk();
-  await t.until(() => t.w.eval('currentUser') && t.$('mainBox').style.display === 'block');
+  await t.until(() => t.w.eval('JiwenBase.currentUser') && t.$('mainBox').style.display === 'block');
   await t.idle(); await new Promise(r => setTimeout(r, 30));
 }
 
@@ -43,7 +43,7 @@ async function newAccount(t, name) {
     const t2 = await A.boot({ html, www: WWW, phone: t.phone, seed: {} , before: (w) => {} });
     ok(!t2.ask(), '1 重开 App 不再问');
     // 记到 5 条：入口消失
-    const id = t.w.eval('currentUser');
+    const id = t.w.eval('JiwenBase.currentUser');
     await (async () => { const s = t.w.JiwenStore.loadStore(id); const a = Object.values(s.archives)[0]; a.records = [1, 2, 3, 4].map(i => man('r' + i, i)); t.w.JiwenStore.saveStore(s, id); t.w.eval('JiwenLedger.renderBill')(); await t.idle(); })();
     ok(!!t.$('impEmptyEntry'), '2 4 条：入口还在');
     await (async () => { const s = t.w.JiwenStore.loadStore(id); const a = Object.values(s.archives)[0]; a.records = [1, 2, 3, 4, 5].map(i => man('r' + i, i)); t.w.JiwenStore.saveStore(s, id); t.w.eval('JiwenLedger.renderBill')(); await t.idle(); })();

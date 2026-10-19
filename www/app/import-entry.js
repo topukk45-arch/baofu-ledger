@@ -184,7 +184,7 @@
             if(!pl || typeof pl.getPending!=='function') return;
             let r=null; try{ r=await pl.getPending(); }catch(_){ return; }
             const f=r && r.file; if(!f) return;
-            if(!currentUser){ window.__impOpened=f; return; }
+            if(!JiwenBase.currentUser){ window.__impOpened=f; return; }
             impOpenFile(f);
         }
         function impOpenFile(f){

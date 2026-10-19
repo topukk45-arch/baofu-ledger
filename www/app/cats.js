@@ -225,7 +225,7 @@
                 if(n>0) a.budgets[cat]=n; else delete a.budgets[cat];
                 if(!saveStoreSafe(store)) return;
                 if(!(opts && opts.fromStats)) openCatManager();
-                if(currentTab==='stats') renderStats();
+                if(JiwenBase.currentTab==='stats') renderStats();
                 if(opts && opts.back) opts.back(cat);
             }, '分类预算', (v)=>{
                 const n=Number(v);
