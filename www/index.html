@@ -1430,7 +1430,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-D</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-E</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3407,6 +3407,9 @@
         function impOrdKey(id, aid, app, mon){ return `imp_${id}_${aid}_o_${app}_${mon}`; }
         function impPendKey(id, aid){ return `imp_${id}_${aid}_p`; }
         function impLogKey(id, aid){ return `imp_${id}_${aid}_i`; }
+        //   · imp_<账号>_<存档号>_d   1019-E：导入草稿（确认页上选好的文件和选择）。只在这台手机上，不进备份、云备份，
+        //     不走账本写入队列（不改账本版本，免得「账本变了」拒绝导入）；删存档、删账号、恢复备份时跟着删
+        function impDraftKey(id, aid){ return `imp_${id}_${aid}_d`; }
         function impParseOrdKey(id, aid, k){
             const p=impArchPrefix(id, aid)+'o_';
             if(typeof k!=='string' || k.indexOf(p)!==0) return null;
@@ -4510,6 +4513,33 @@
                 return r;
             },
 
+            // ---- 1019-E：导入草稿：确认页每改一处存一份（{ v:1, at, files:[{ name, data:ArrayBuffer }], edits, types, statuses, view, labels, sig }）----
+            //   直接写库（不排进账本队列、不改账本版本）；导入成功、主动退出、选了「重新开始」就删
+            async draftSave(d, archive){
+                const t=impTarget(archive);
+                if(!d || d.v!==1) return false;
+                await idbBatch([['put', impDraftKey(t.e.id, t.aid), d]]);
+                return true;
+            },
+            async draftLoad(archive){
+                const t=impTarget(archive);
+                let v=null;
+                try{ v=await idbGet(impDraftKey(t.e.id, t.aid)); }catch(_){ return null; }
+                return v && v.v===1 && Array.isArray(v.files) && v.files.length ? v : null;
+            },
+            async draftDrop(archive){
+                const t=impTarget(archive), k=impDraftKey(t.e.id, t.aid);
+                if(__ledgerKeys.has(k)) await idbBatch([['del', k]]);
+            },
+            // 账本现在的样子（记录、分类、导入记录）一个指纹：草稿存下以后账本改没改过（只在存草稿第一次、接着来时各算一次）
+            draftSig(archive){
+                const t=impTarget(archive), st=t.e.archs.get(t.aid), a=ledgerAssembleArchive(t.e, t.aid);
+                let h=5381;
+                const add=x=>{ const str=String(x); for(let i=0;i<str.length;i++) h=((h*33) ^ str.charCodeAt(i))>>>0; };
+                (st ? st.recs : []).forEach(r=>add(JSON.stringify(r)));
+                add((a.cats||[]).join('|'));
+                return (st ? st.recs.length : 0)+':'+h.toString(36);
+            },
             // ---- 1016-B：导入确认页要的只读数据（不写任何东西）----
             // 存档的分类、规则、对方名单，是不是新用户（记录少于 30 条、分类还是默认那 7 个）
             archiveInfo(archive){

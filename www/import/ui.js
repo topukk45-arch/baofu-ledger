@@ -308,6 +308,69 @@
     try { dom.archive.textContent = '导入到存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
     dom.page.style.display = 'block'; barSet([]);
     renderPick();
+    askResume();
+  }
+  // ---------- 1019-E：导入草稿（闪退、被系统杀掉以后，选的文件和确认页上的选择还在）----------
+  //   确认页每改一处（每次 render），等 0.4 秒存一份：选好的文件（解压以后的）、S.edits、类型 / 状态选择、停在哪一步、看过的；
+  //   按账号 + 存档存在这台手机上（JiwenImportStore.draftSave，不进备份）。下次打开导入页问「上次导入没做完，接着来吗？」，
+  //   接着来就拿草稿里的文件照常重算一遍（账本变过也按现在的账本算），选择照样套上去，套不上的写明哪几处；
+  //   导入成功、主动退出、选了「重新开始」就删掉草稿。
+  var draftTimer = null, draftQ = Promise.resolve();
+  function draftOk() { var st = store(); return !!(st && st.draftSave && st.draftLoad && st.draftDrop); }
+  function editLabels() {
+    var out = {}, rows = (S.plan && S.plan.rows) || [];
+    Object.keys(S.edits.rows || {}).forEach(function (k) { var d = rows.filter(function (r) { return r.key === k; })[0]; out[k] = d ? fmtTime(d.time) + ' ' + (cpShow(d.cp || d.title) || '—') + ' ' + yuan(d.fen) : k; });   // 写对方名，比商品说明好认
+    Object.keys(S.edits.sums || {}).forEach(function (k) { out['sum:' + k] = '一组「几笔加起来」'; });
+    return out;
+  }
+  function saveDraft() {
+    if (!S || S.phase !== 'confirm' || !S.srcFiles || !draftOk()) return;
+    if (draftTimer) clearTimeout(draftTimer);
+    draftTimer = setTimeout(function () {
+      draftTimer = null;
+      if (!S || S.phase !== 'confirm' || !S.srcFiles) return;
+      var d = { v: 1, at: Date.now(), files: S.srcFiles, edits: S.edits, types: S.types, statuses: S.statuses,
+                view: { step: S.view.step, seen: S.view.seen || {}, reconPick: S.view.reconPick || null }, labels: editLabels(), sig: S.draftSig || '', n: editCount() };
+      var json; try { json = JSON.parse(JSON.stringify({ edits: d.edits, types: d.types, statuses: d.statuses, view: d.view, labels: d.labels })); } catch (_) { return; }
+      d.edits = json.edits; d.types = json.types; d.statuses = json.statuses; d.view = json.view; d.labels = json.labels;
+      draftQ = draftQ.then(function () { return store().draftSave(d); }).catch(function () {});
+    }, 400);
+  }
+  function dropDraft() {
+    if (draftTimer) { clearTimeout(draftTimer); draftTimer = null; }
+    if (!draftOk()) return;
+    draftQ = draftQ.then(function () { return store().draftDrop(); }).catch(function () {});
+  }
+  function askResume() {
+    if (!draftOk() || !window.JiwenSheet) return;
+    var my = S;
+    draftQ.then(function () { return store().draftLoad(); }).then(function (d) {
+      if (!d || S !== my || !S || S.phase !== 'pick') return;
+      var when = new Date(d.at), at = isNaN(when) ? '' : (when.getMonth() + 1) + '月' + when.getDate() + '日 ' + String(when.getHours()).padStart(2, '0') + ':' + String(when.getMinutes()).padStart(2, '0');
+      window.JiwenSheet.open({ title: '上次导入没做完，接着来吗？', onDismiss: function () {},
+        body: function (box) {
+          var t = el('div', 'ui-msg');
+          t.appendChild(el('p', '', '上次' + (at ? '（' + at + '）' : '') + '选了 ' + d.files.length + ' 份账单' + (d.n ? '，做了 ' + d.n + ' 处选择' : '') + '，还没导入，账本没有改动。'));
+          t.appendChild(el('p', 'ui-msg-soft', d.files.map(function (f) { return f.name; }).join('、')));
+          t.id = 'impResumeMsg'; box.appendChild(t);
+        },
+        foot: function (box, done) {
+          var col = el('div', 'ui-stack');
+          var go = btn('接着来', 'ui-btn primary block', function () { done(); resume(d); }); go.id = 'impResumeGo';
+          var fresh = btn('重新开始', 'ui-btn block', function () { done(); dropDraft(); }); fresh.id = 'impResumeFresh';
+          col.appendChild(go); col.appendChild(fresh); box.appendChild(col);
+        } });
+    }).catch(function () {});
+  }
+  function resume(d) {
+    if (!S || S.phase !== 'pick') return;
+    var e = d.edits || {};
+    S.edits = Object.assign({ rows: {}, cpCats: {}, newCats: {}, petty: {}, receipt: true, sums: {}, ruleFix: {} }, e);
+    S.types = d.types || {}; S.statuses = d.statuses || {};
+    var v = d.view || {};
+    S.view.step = v.step || null; S.view.seen = v.seen || {}; if (v.reconPick) S.view.reconPick = v.reconPick;
+    S.resume = { labels: d.labels || {}, sig: d.sig || '', n: d.n || 0 };
+    start(d.files.map(function (f) { return { name: f.name, data: f.data }; }));
   }
   // 1016-Z3：「用记问打开」：带着文件直接进导入页（正在写入 / 撤销时不打断）
   function openWith(files) {
@@ -363,7 +426,7 @@
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
         var stay = btn('继续导入', 'ui-btn primary block', function () { done(); }); stay.id = 'impExitStay';
-        var quit = btn('退出，不导入了', 'ui-btn warn block', function () { done(); onExit(); }); quit.id = 'impExitOk';
+        var quit = btn('退出，不导入了', 'ui-btn warn block', function () { done(); dropDraft(); onExit(); }); quit.id = 'impExitOk';
         col.appendChild(stay); col.appendChild(quit); box.appendChild(col);
       } });
   }
@@ -460,6 +523,7 @@
   }
   function readAll(files) {
     return Promise.all(files.map(function (f) {
+      if (f && Object.prototype.toString.call(f.data) === '[object ArrayBuffer]') return Promise.resolve({ name: f.name, data: f.data.slice(0) });   // 1019-E：草稿里的文件
       if (typeof f.arrayBuffer === 'function') return f.arrayBuffer().then(function (ab) { return { name: f.name, data: ab }; });
       return new Promise(function (res, rej) { var r = new FileReader(); r.onload = function () { res({ name: f.name, data: r.result }); }; r.onerror = function () { rej(r.error); }; r.readAsArrayBuffer(f); });
     }));
@@ -484,6 +548,7 @@
       return unzipAll(fs, alive);
     }).then(function (fs) {
       if (!alive() || !fs) return;
+      S.srcFiles = fs.map(function (f) { return { name: f.name, data: f.data.slice(0) }; });   // 1019-E：存草稿用（交给线程的那份会被转走）
       return J().run('parse', { files: fs }, { onProgress: function (d, t) { if (alive()) progress('读文件…', d, t); } }).then(function (r) {
         if (!alive()) return;
         S.parsed = r.result;
@@ -581,19 +646,29 @@
         });
       });
       // 重算以后，套不上的改动丢掉（那一行已经不在原来的组里了）
-      var lost = 0, keys = {};
+      var lost = 0, keys = {}, lostKeys = [];
       S.matched.items.forEach(function (it) { if (it.key) keys[it.key] = it.bucket; });
       Object.keys(S.edits.rows).forEach(function (k) {
         var e = S.edits.rows[k], b = keys[k];
         var ok = b && !((e.split && b !== 'merge') || (e.pick && b !== 'pending'));
-        if (!ok) { delete S.edits.rows[k]; lost++; }
+        if (!ok) { delete S.edits.rows[k]; lost++; lostKeys.push(k); }
       });
       var sids = {}; (S.matched.multiSums || []).forEach(function (g) { sids[g.id] = g.options.length; });
-      Object.keys(S.edits.sums).forEach(function (k) { var v = S.edits.sums[k]; if (!(k in sids) || (typeof v === 'number' && v >= sids[k])) { delete S.edits.sums[k]; lost++; } });
+      Object.keys(S.edits.sums).forEach(function (k) { var v = S.edits.sums[k]; if (!(k in sids) || (typeof v === 'number' && v >= sids[k])) { delete S.edits.sums[k]; lost++; lostKeys.push('sum:' + k); } });
       S.lost = lost;
+      // 1019-E：账本现在的指纹（存草稿时带上；接着上次的时候和草稿里的比，看账本改没改过）
+      var sigNow = ''; try { sigNow = store().draftSig ? store().draftSig() : ''; } catch (_) {}
+      var res = S.resume; S.resume = null; S.draftSig = sigNow;
       dom.prog.style.display = 'none';
       S.phase = 'confirm';
       replan();
+      if (res) {
+        var names = lostKeys.map(function (k) { return res.labels[k] || k; });
+        var msg = (res.sig && sigNow && res.sig !== sigNow ? '账本在上次之后改过，已经按现在的账本重新算了一遍。\n\n' : '')
+          + (res.n ? (names.length ? '上次的 ' + res.n + ' 处选择，有 ' + names.length + ' 处没套上（那几笔现在的去处变了），要重新选：\n' + names.join('\n') : '上次的 ' + res.n + ' 处选择都套上了。') : '接着上次的来，选好的账单都在。');
+        S.resumeMsg = msg;
+        alertMsg(msg, '接着上次的导入');
+      }
     });
   }
   function rerun() {
@@ -983,6 +1058,7 @@
   }
   function render() {
     S.view.seen = S.view.seen || {}; S.view.more = S.view.more || {};
+    saveDraft();
     if (S.view.recon) { renderRecon(); return; }
     var p = S.plan, info = buildSteps(p);
     S.view.items = info.items; S.view.inline = info.inline;
@@ -2272,6 +2348,7 @@
       if (slowTimer) clearTimeout(slowTimer);
       if (my !== runId || !S) return;
       S.phase = 'done'; S.result = { ws: ws, r: r, ms: Date.now() - t0 };
+      dropDraft();   // 1019-E：导入成功，草稿没用了
       sheetClose();
       dom.prog.style.display = 'none';
       renderResult();
