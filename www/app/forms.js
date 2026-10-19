@@ -307,7 +307,7 @@
             data.push(rec);
             if(!saveUserData(data)) return;
             closeRefund();
-            refreshAllViews();
+            window.JiwenTabs.refreshAllViews();
             const left=round2(rem-amt);
             customAlert(left>0 ? `已退款 ${amt.toFixed(2)}，这笔还能再退 ${left.toFixed(2)}。` : `已退款 ${amt.toFixed(2)}，这笔已全额退款。`, '退款完成');
         });
@@ -524,7 +524,7 @@
             // 否则会继续弹「记账成功」，造成「提示成功但实际没存上」的丢账假象。
             if(!saveUserData(data)) return;
             JiwenBase.curPage = 1;            // 新记录在最前，回到第 1 页才看得到
-            refreshAllViews();
+            window.JiwenTabs.refreshAllViews();
             // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
             addMask.style.display='none';
             // 这一笔没填备注 → 成功弹窗额外给个「添加备注」按钮，方便当场补；填了则不显示。
@@ -557,7 +557,7 @@
                 if(i<0) return;                   // 记录意外不存在则放弃
                 data[i]=Object.assign({}, data[i], { remark:text.slice(0, 5000) });   // 与记账表单一致的长度上限；换成新对象（1013-G）
                 saveUserData(data);               // 写失败时 saveUserData 内部已提示
-                refreshAllViews();
+                window.JiwenTabs.refreshAllViews();
             }, '备注', null, { maxlen:5000 });
         }
 
@@ -674,7 +674,7 @@
             editMask.style.display='none';
             editMask.classList.remove('over-detail');   // 复位层级，不影响下次普通调用
             editId=null;
-            if(opts.refresh) refreshAllViews();
+            if(opts.refresh) window.JiwenTabs.refreshAllViews();
         }
 
         cancelEdit.addEventListener('click', ()=>closeEditModal());

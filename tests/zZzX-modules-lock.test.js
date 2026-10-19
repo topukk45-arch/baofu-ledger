@@ -88,6 +88,24 @@ const namesOf = p => !p ? [] : p.type === 'Identifier' ? [p.name] : p.type === '
       ok(useBad.length === 0, `4 ${m.file}：旧文件用它的名字都经过旧代码引用表：${useBad.join('、')}`);
       const redef = [...S.topDecls(S.parse(lt)).keys()].filter(n => own.has(n));
       ok(redef.length === 0, `4 ${m.file}：旧文件不再定义同名的东西：${redef.join('、')}`);
+    } else {
+      // 1019-Z4-M25 起旧文件都搬完了：同样四条，换成对整个 app/ 查
+      const allText = files.map(f => fs.readFileSync(path.join(WWW, f), 'utf8'));
+      const legacyAlias = new RegExp(`^ *const \\{[^}\\n]*\\} = window\\.${m.entry};.*旧代码引用表`, 'm');
+      ok(!allText.some(t => legacyAlias.test(t)), `4 ${m.file}：旧代码引用表都删了（哪个文件里都没有取 ${m.entry} 的旧代码引用表那一行）`);
+      ok(raw.split(`<script src="${m.file}?v=`).length === 2, `4 ${m.file}：index.html 只引用一次`);
+      // 别的模块用它里面的名字：只能经过入口（取名字那一行 / window.${m.entry}.xxx），不许直接按名字用
+      const bad = [];
+      mods.filter(o => o !== m).forEach(o => {
+        const ot = fs.readFileSync(path.join(WWW, o.file), 'utf8'), oa = S.parse(ot);
+        const ob = oa.body[0] && oa.body[0].expression && oa.body[0].expression.callee && oa.body[0].expression.callee.body ? oa.body[0].expression.callee.body.body : [];
+        const oown = new Set(), oimp = new Set();
+        ob.forEach(x => { if (x.type === 'FunctionDeclaration') oown.add(x.id.name); else if (x.type === 'VariableDeclaration') { const d = x.declarations[0]; if (d.init && d.init.type === 'MemberExpression' && d.init.object.name === 'window' && d.id.type === 'ObjectPattern') namesOf(d.id).forEach(n => oimp.add(n)); else x.declarations.forEach(y => namesOf(y.id).forEach(n => oown.add(n))); } });
+        const orr = D.freeRefs(oa.body[0]);
+        [...orr.reads, ...orr.writes].forEach(n => { if (own.has(n) && !oown.has(n) && !oimp.has(n) && !PL.LEGACY.includes(n)) bad.push(o.key + ':' + n); });
+      });
+      ok(bad.length === 0, `4 ${m.file}：别的模块只经过入口用它的名字：${bad.join('、')}`);
+      ok(S.topDecls(S.parse(allText.join(''))).size === 0 || [...S.topDecls(S.parse(allText.join(''))).keys()].every(n => !own.has(n)), `4 ${m.file}：哪个文件顶层都没有它的名字`);
     }
   }
   // 5

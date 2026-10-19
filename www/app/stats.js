@@ -877,7 +877,7 @@
                 const next=Object.assign({}, data[i]); delete next.aiFlag;
                 data[i]=next;
                 if(!saveUserData(data)) return;
-                try{ refreshAllViews(); }catch(_){}
+                try{ window.JiwenTabs.refreshAllViews(); }catch(_){}
                 openDetail(rec.id);
             });
             f.appendChild(b);

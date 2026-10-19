@@ -563,7 +563,7 @@
                 filterCat.value=change.cat;
             }
             JiwenBase.curPage=1;
-            refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
+            window.JiwenTabs.refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
             batchUndo={ prev, prevFilter, archive:JiwenBase.currentArchive };
             customConfirm(`已处理 ${mainN} 条记录。`, null, '批量操作完成',
                 { okText:'好的', extra:{ text:'撤销这次操作', onClick:undoBatch } });
@@ -584,7 +584,7 @@
             if(!saveUserData(data)) return;
             filterCat.value=u.prevFilter;         // 分类表没变，原筛选值一定还在
             JiwenBase.curPage=1;
-            refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
+            window.JiwenTabs.refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
             customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
         }
         window.addEventListener('resize', ()=>fitNums($('summaryOverall')), { passive:true });

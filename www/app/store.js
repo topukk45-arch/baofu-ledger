@@ -1612,7 +1612,7 @@
                 ms.total=Math.round(clock()-t0);
                 prog && prog('done', 1, 1);
                 if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){
-                    try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
+                    try{ window.JiwenTabs.refreshCatSelectors(); window.JiwenTabs.refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
                 }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
@@ -1646,7 +1646,7 @@
                 catch(err){ await impBkFail(t, saved); throw err; }
                 await impBkDone(t, saved);
                 if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){
-                    try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
+                    try{ window.JiwenTabs.refreshCatSelectors(); window.JiwenTabs.refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
                 }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
@@ -1745,7 +1745,7 @@
                 }catch(err){ await impBkFail(t, saved); throw err; }
                 await impBkDone(t, saved);
                 if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){
-                    try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
+                    try{ window.JiwenTabs.refreshCatSelectors(); window.JiwenTabs.refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
                 }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
@@ -1821,7 +1821,7 @@
                 pairs.push([impLogKey(t.e.id, t.aid), cleanLog.length ? JSON.stringify({ v:1, list:cleanLog }) : null]);
                 if(window.__impFailAt==='splitSave') throw impErr('test');
                 await saveStoreDurable(store, user, ()=>pairs);
-                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ window.JiwenTabs.refreshCatSelectors(); window.JiwenTabs.refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return { added:made.length, ids:made.map(r=>r.id) };
             },
@@ -1850,7 +1850,7 @@
                 if(!window.JiwenImportPending) throw impErr('nomodule');
                 const r=await impApplyPending(t, acts);
                 if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){
-                    try{ refreshCatSelectors(); refreshAllViews(); }catch(_){}
+                    try{ window.JiwenTabs.refreshCatSelectors(); window.JiwenTabs.refreshAllViews(); }catch(_){}
                     try{ odScheduleSync(); }catch(_){}
                 }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
@@ -1889,7 +1889,7 @@
                 const t=impTarget(opts.archive);
                 if(impBkKeys(t.e.id, t.aid).indexOf(key)<0) throw impErr('nobackup');
                 const r=await impRestoreFrom(t, key, { ver:opts.ver });
-                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ refreshCatSelectors(); refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ window.JiwenTabs.refreshCatSelectors(); window.JiwenTabs.refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return r;
             },

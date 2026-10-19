@@ -18,7 +18,7 @@
             if(a.cats.includes(name)){ showCatErr('该分类已存在'); return; }
             a.cats.push(name); saveStoreSafe(store);
             $('newCatName').value=''; showCatErr('');
-            refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
+            window.JiwenTabs.refreshCatSelectors(); openCatManager(); window.JiwenTabs.refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             // 新分类排在末尾，若标签条已需横滑则它在最右看不到——主动滚到可见，给用户「确实加上了」的反馈
             const fbox=$('filterChips');
             if(fbox){
@@ -186,7 +186,7 @@
             const set=new Set(order);
             a.cats=order.concat(a.cats.filter(c=>!set.has(c)));
             saveStoreSafe(store);
-            refreshCatSelectors(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
+            window.JiwenTabs.refreshCatSelectors(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
         }
         // 设置 / 修改 / 取消某分类的每月预算。填 0 = 取消（customPrompt 不接受空串，用 0 表示「不要了」）。
         // opts.fromStats：从统计页「未设预算」里点的，存完只刷新统计页，不弹出分类管理
@@ -225,7 +225,7 @@
                 if(n>0) a.budgets[cat]=n; else delete a.budgets[cat];
                 if(!saveStoreSafe(store)) return;
                 if(!(opts && opts.fromStats)) openCatManager();
-                if(JiwenBase.currentTab==='stats') renderStats();
+                if(JiwenBase.currentTab==='stats') window.JiwenStats.renderStats();
                 if(opts && opts.back) opts.back(cat);
             }, '分类预算', (v)=>{
                 const n=Number(v);
@@ -253,7 +253,7 @@
                 // 【1015-B】导入的分类规则也跟着改名
                 impRulesRenameCat(a, oldName, name);
                 saveStoreSafe(store);
-                refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
+                window.JiwenTabs.refreshCatSelectors(); openCatManager(); window.JiwenTabs.refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
                 if(back) back(name);
             }, '重命名分类', (name)=>{
                 name=name.trim();
@@ -285,7 +285,7 @@
                 // 【1015-B】导入的分类规则：指向这个分类的直接删（「关键词 → 未分类」没有意义）
                 impRulesDropCat(ar, name);
                 saveStoreSafe(s);
-                refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
+                window.JiwenTabs.refreshCatSelectors(); openCatManager(); window.JiwenTabs.refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
             }, '删除分类', { danger:true, okText:`删除分类「${name}」`, onCancel:(opts && opts.back) ? ()=>opts.back(name) : null });
         }
         window.JiwenCats = { deleteCat, editBudget, openCatManager, renameCat };   // cats 模块对外只有这一个入口

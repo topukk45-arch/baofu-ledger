@@ -7,7 +7,7 @@
 
 ## 项目结构
 - App 的代码都在 `www/` 下，Capacitor 把整个 `www/` 打包成安卓 APK（以 `www/` 为准；仓库根目录那个 `index.html` 是老拷贝，不参与打包，别改它）。
-  - `www/index.html`：主程序（记账、统计、设置、存储），启动时只加载这一个文件。modules 分支（1019-Z4-M2 起）：大脚本和大样式剪到了 `www/app/` 下（见「模块重构分支 modules」那一节），`index.html` 里只剩 HTML、首屏快照那一小段内联脚本和几行引用。
+  - `www/index.html`：主程序（记账、统计、设置、存储），启动时只加载这一个文件。modules 分支（1019-Z4-M2 起）：大脚本和大样式剪到了 `www/app/` 下（见「模块重构分支 modules」那一节），`index.html` 里只剩 HTML、首屏快照那一小段内联脚本和几行引用；1019-Z4-M25 起 `www/app/` 下是 20 个模块文件（`base.js` → … → `boot.js`，见「模块规矩」）+ `app.css`，原来的 `app-1…7.js` 都搬空删掉了。
   - `www/import/`：账单导入（1015-A 起），**启动时一个都不加载**，打开导入时 `index.html` 的 `loadImportModule()` 才插入 `import/import.js`：
     - `core.js`：纯计算（解析、配对、分类都放这里或同样写法的兄弟文件）；
     - `merchants.js`：内置商户词表（分类推荐的第 4 层；只放全国性的公开品牌和具体的商品词，不放宽词和两种意思的词）；1016-Z4 起另有 `games`（游戏词：强的 8 个 → 游戏把握中，「礼包」→ 游戏把握低、排最后，说明里有流量 / 零食这类词时不算；存档里没有「游戏」分类就不推荐、不新建，`classify.js` 里处理）；
@@ -137,12 +137,12 @@
   | 4 页面 | forms（`JiwenForms`）→ ledger（`JiwenLedger`）→ stats（`JiwenStats`）→ days（`JiwenDays`）→ cats（`JiwenCats`） | 记一笔 / 修改 / 退款 / 口径 / 模板；账单页（列表、翻页、搜索筛选、分类汇总、批量）；统计页（预算、预算建议、年月选择、账单详情）；日子；分类管理 |
   | 5 外壳 | settings（`JiwenSettings`）→ tabs（`JiwenTabs`）→ login（`JiwenLogin`）→ back（`JiwenBack`）→ boot（`JiwenBoot`，空的） | 设置页、外观、存储用量；页签切换、进账号、日子管理页进出、刷新所有页面、被杀回来、首屏快照、历史脏数据自检；登录页；返回键层级表和弹窗关闭表（要认得每一种弹窗，所以放最上面）；启动 |
   按节归、个别名字单独挪（比如 `pad`、`escapeHtml` 原来在日期选择、存储那几节，归基础；`getUserData` 原来在分类拖动那节，归存储），全表见 `modules-plan.js`；`node tests/tools/modules-plan.js` 打印每个模块多大、还有哪些往上调用。
-- 往上调用（回调口）：按这张表算下来只剩三种，暂时留着、测试锁住只减不增：数据改了删首屏快照（存储 → `snapDrop`）、存储写不进去弹提示（存储 → `customAlert`）、数据改了刷新所有页面（分类 / 账单页批量 / 记一笔 / 详情 → `refreshAllViews`、`refreshCatSelectors`）。写法：调用的时候才去 `window.JiwenXxx.fn()` 拿（加载时不取）。以后改成「下层留一个口子、上层登记进来」要你定（见还要确认）。
+- 往上调用（回调口）：按这张表算下来只剩三种，暂时留着、测试锁住只减不增：数据改了删首屏快照（存储 → `snapDrop`）、存储写不进去弹提示（存储 → `customAlert`）、数据改了刷新所有页面（分类 / 账单页批量 / 记一笔 / 详情 → `refreshAllViews`、`refreshCatSelectors`）。写法：调用的时候才去 `window.JiwenXxx.fn()` 拿（加载时不取）；1019-Z4-M25 起都这样写了（`window.JiwenTabs.refreshAllViews()`、`window.JiwenStats.renderStats()`），本来就挂在 window 上的老入口 `snapDrop`、`customAlert` 照旧按名字调。以后改成「下层留一个口子、上层登记进来」要你定（见还要确认）。
 - 一个模块的文件长这样：开头 `(function(){`、结尾把入口挂上 `window.JiwenXxx = { … };` 再 `})();`；代码原样剪进去，**不改缩进、不改一个字**（测试里有按原文找的检查，比如 `const SHEET_MS=300;`）。用下层的东西：模块开头一行 `const { a, b, c } = window.JiwenBase;`，取出来的名字和原来一样，调用的地方不用改；只取函数和常量。
 - 会变的状态不能那样取（取出来就是那一刻的值）：
   - 全 App 共用的四个 `currentUser`、`currentArchive`、`currentTab`、`curPage`（1019-Z4-M20 做了）：那四行 `let` 原样挪进 `app/base.js`，`JiwenBase` 入口上给读写口（`get currentUser(){…}, set currentUser(v){…}`），别处 150 处用到的地方按语法树换成 `JiwenBase.currentUser`（原来设计写的 `JiwenBase.state` / `St.` 没用：读写口直接挂在入口上，少一层）。这是唯一成片改写法的一步，单独一个提交，逐字节对比、全部测试；
   - 别的模块的状态（统计页的 `statYear` / `statMonth` / `statSelDay` / `statTab` / `statMonthCatMode`、记一笔的 `billCatSel` / `billTypeSel` / `editId` / `editCatSel` / `editTypeSel`、日子的 `daysSelecting`、筛选的 `draftMode`、预算建议的 `bgSuggestOpen`、数字键盘的 `kpTarget`）由它的入口带读写口（`get statYear(){…}`），别处写成 `JiwenStats.statYear`。
-- 还没搬的旧代码（`app-N-….js`）用到已经搬走的名字：在那个旧文件开头加一段「旧代码引用表」`const { … } = window.JiwenBase;`，那块搬走时删掉；只减不增。
+- 还没搬的旧代码（`app-N-….js`）用到已经搬走的名字：在第一个旧文件开头加一行「旧代码引用表」`const { … } = window.JiwenBase;`（搬的过程中用，1019-Z4-M25 旧文件全部搬空，引用表跟着删了）。
 - 顶层的事件绑定语句（给某个按钮 `addEventListener` 那种）跟着它服务的页面走，不跟着原来所在的节（比如账号那节里给「新建账号」绑点击的，归登录页）；这种在设计表的 `BIND` 里按语句开头的文字登记归哪块（搬走一节以后留下的绑定语句会落在上一节的标题下面，不登记会算错）。
 - 老入口留在 `window` 上（`www/import/`、原生层以外按名字找的）：`JiwenPerf`、`JiwenSheet`、`JiwenImportStore`、`JiwenImportNext`、`customAlert`、`customConfirm`、`customPrompt`、`openDevImportCheck`、`kpOpen`、`kpClose`、`openTextPanel`、`snapSave`、`snapDrop`、`openEdit`、`viewRemark`、`syncFilterFab`、`closeFilterSheet`、`setDraftCat`、`getDraftCat`、`dtWheelsSync`、`openPerfPage`、`SHEET_MS`（名单在 `modules-plan.js` 的 `LEGACY`）。另外原来就挂在 window 上、几块之间打招呼用的 `__kbHoldInfo` 这类 `__` 开头的小钩子也照旧（`__impOpened` 这种用到时才挂的列在 `LEGACY_LAZY`）。原生层不直接调网页里的函数（查过）。HTML 里没有 `onclick="…"` 这类属性（查过 0 处），JS 里的 `.onclick=` 本来就是代码绑定，照旧。
 - 每搬一块：一块一个提交，从最底层开始；依赖检查 `zZzX-modules-lock` 自动把每个已经搬好的模块锁死（这个文件就是一个 IIFE、顶层不定义名字，挂到 window 上的只有它的入口和名单里的老入口，只从排在前面的模块取名字、排在后面的只能是回调口，旧文件只通过旧代码引用表用它，真起 App 时入口上的名字和文件里写的一样、里面的名字没漏到 window 上）；全部测试、逐字节对比、导入标准答案一致，量一次启动时间；牵连太广、要动逻辑才搬得动的退回，记进还要确认，做下一块。
@@ -173,6 +173,7 @@
   - 1019-Z4-M22 登录页 `app/login.js`（`JiwenLogin`，17 条、对外 login / renderRecentUsers）。
   - 1019-Z4-M23 返回键 `app/back.js`（`JiwenBack`，7 条、对外 ）。
   - 1019-Z4-M24 启动 `app/boot.js`（`JiwenBoot`，1 条、对外 ）。
+  - 1019-Z4-M25 收尾：旧文件 `app-1…7.js` 只剩旧代码引用表和空行，删掉、`index.html` 去掉引用；模块里按名字直接调回调口的 20 处改成 `window.JiwenTabs.xxx()` / `window.JiwenStats.renderStats()`（工具 `tests/tools/finish-legacy.js`）。现在 `www/app/` 下 20 个模块文件，每个就是一个 IIFE、对外一个入口，`zZzX-modules-lock` 每个都锁着。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

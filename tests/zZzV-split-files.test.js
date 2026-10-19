@@ -31,7 +31,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   const modFiles = files.filter(f => !/^app\/app-\d+-/.test(f)), oldFiles = files.filter(f => /^app\/app-\d+-/.test(f));
   const nums = oldFiles.map(f => +f.match(/^app\/app-(\d+)-/)[1]);
   ok(files.slice(0, modFiles.length).every((f, i) => f === modFiles[i]) && modFiles.every(f => PLAN.includes(f)) && modFiles.every((f, i) => !i || PLAN.indexOf(f) > PLAN.indexOf(modFiles[i - 1])), '1 模块文件在前、照设计表的先后：' + modFiles.join(' '));
-  ok(nums.length > 0 && nums.every((n, i) => !i || n > nums[i - 1]), '1 还没搬的 app-N 在后、按编号顺序：' + oldFiles.join(' '));
+  ok(nums.every((n, i) => !i || n > nums[i - 1]) && (!oldFiles.length || files.indexOf(oldFiles[0]) === modFiles.length), '1 还没搬的 app-N 在后、按编号顺序（1019-Z4-M25 起都搬完了，一个都没有）：' + (oldFiles.join(' ') || '没有'));
   const lines = raw.split('\n'), first = lines.findIndex(l => l.includes(tags[0][0]));
   ok(tags.every((m, i) => lines[first + i].trim() === m[0]), '1 几个脚本一行一个、挨着放');
   const links = [...raw.matchAll(/<link rel="stylesheet" href="(app\/[^"]+)">/g)];

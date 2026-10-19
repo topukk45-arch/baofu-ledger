@@ -108,10 +108,10 @@
                     // importArchiveFromText 内部已把新存档写盘并设好 store.last，无需再重读重写一遍
                     JiwenBase.currentArchive=finalName;
                     // refreshAllViews 里已含 renderDaysCard，导进来的倒数日会一并刷新到入口卡
-                    refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
+                    refreshArchiveSelect(); window.JiwenTabs.refreshCatSelectors(); window.JiwenTabs.refreshAllViews();
                     const user=JiwenBase.currentUser;
                     askImportOtherDays(daysPending, user, (asked)=>{
-                        if(asked && user===JiwenBase.currentUser) refreshAllViews();
+                        if(asked && user===JiwenBase.currentUser) window.JiwenTabs.refreshAllViews();
                         customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}${importDaysSuffix(daysAdded+asked)}`, '导入成功', 'left');
                     });
                 }catch(err){
