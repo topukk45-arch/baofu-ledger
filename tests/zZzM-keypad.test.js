@@ -27,6 +27,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   ok(shown('kpMask') && m.classList.contains('kp-on') && $('kpOk').textContent === '确定', '1 打开记一笔：弹数字键盘，对着金额框，大按钮写「确定」');
   ok($('kpVal').textContent === '0.00' && $('kpVal').classList.contains('kp-empty'), '1 没输入时灰色 0.00');
   ok($('kpGrid').querySelectorAll('.kp-key').length === 13 && $('kpOk') && $('kpDel'), '1 键盘：1–9、0、小数点、退格、大按钮');
+  await new Promise(r => w.requestAnimationFrame(r));
+  ok(!$('addSheet').classList.contains('kp-lift') && !/sheet\.kp-lift \.rec-foot/.test([...d.querySelectorAll('style')].map(x => x.textContent).join('')), '1 1019-Y：记一笔不垫空白、保存那排照旧贴底（被数字键盘整个盖住，不露半截）');
 
   // 2. 实时同步 + 输入规则
   let n = 0; m.addEventListener('input', () => n++);
@@ -73,7 +75,9 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   w.kpClose(); w.closeFilterSheet();
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   $('manageTplSetting').click(); $('tplNew').click(); await t.idle();
-  $('tplEditMoney').click(); ok(shown('kpMask'), '4 模板固定金额：数字键盘'); keys('25'); w.kpClose();
+  $('tplEditMoney').click(); ok(shown('kpMask'), '4 模板固定金额：数字键盘');
+  await new Promise(r => w.requestAnimationFrame(r));
+  ok($('tplEditSheet').classList.contains('kp-lift'), '4 模板面板（没有贴底的保存那排）照旧垫一块键盘高的空白再滚'); keys('25'); w.kpClose();
   ok($('tplEditMoney').value === '25', '4 模板金额 25'); $('tplEditCancel').click(); if (t.ask()) await t.askOk(); $('closeTpl').click();
 
   // 5. 预算（要金额的提示框）：滑上来以后自动弹数字键盘，大按钮写「保存」、直接提交
