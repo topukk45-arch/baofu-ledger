@@ -27,7 +27,9 @@ function bootSync(records, budgets){
   const chip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===txt);
   const stats=()=>d.querySelector('.tab-btn[data-tab="stats"]').click();
   const catRow=c=>[...$('catList').querySelectorAll('.cat-item')].find(r=>r.dataset.cat===c);
-  const btn=(row,txt)=>[...row.querySelectorAll('button')].find(b=>b.textContent===txt);
+  // 1019-C 起行里不放按钮：点整行打开操作面板，再在面板里找按钮（预算 → 设预算 / 改预算，删除 → 删除这个分类）
+  const btn=(row,txt)=>{ if(dom.window.JiwenSheet.isOpen()) dom.window.JiwenSheet.close(); row.click();
+    const id={'预算':'catActBudget','改名':'catActRename','删除':'catActDelete'}[txt]; return id ? $(id) : null; };
   return {w:dom.window,d,$,errs,arc,chip,stats,catRow,btn};
 }
 const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
@@ -38,14 +40,14 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
   const t=await boot();
   t.$('manageCatSetting').click();
   const row=t.catRow('游戏');
-  ok(t.btn(row,'预算') && t.btn(row,'改名') && t.btn(row,'删除'), '每行有「预算 / 改名 / 删除」');
+  ok(t.btn(row,'预算') && t.btn(row,'改名') && t.btn(row,'删除'), '每行点开有「设预算 / 改名 / 删除这个分类」');
   t.btn(row,'预算').click();
   ok(t.$('askTitle').textContent==='分类预算' && t.$('askInput').getAttribute('inputmode')==='decimal', '弹出预算输入，数字键盘');
   t.$('askInput').value='-5'; t.$('askOk').click();
   ok(t.$('askErr').style.display==='block' && !t.arc().budgets, '负数被拦下');
   t.$('askInput').value='200'; t.$('askOk').click();
   ok(t.arc().budgets && t.arc().budgets['游戏']===200, '保存 200');
-  ok(t.catRow('游戏').querySelector('.cat-budget').textContent==='每月 200', '分类行显示「每月 200」');
+  ok(t.catRow('游戏').querySelector('.cat-budget').textContent==='每月预算 200', '分类行显示「每月预算 200」（1019-C 起的写法）');
   ok(t.$('catMask').style.display==='flex', '保存后仍停在分类管理');
   t.btn(t.catRow('游戏'),'预算').click();
   ok(t.$('askInput').value==='200', '再次打开回显当前预算');

@@ -43,7 +43,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   $('cancelEdit').click();
   // ===== 3. 设置和存档（1017-U）=====
   w.deleteCat('购物');
-  ok(/^删除分类「购物」。\n\n有 1 条记录使用该分类，删除后将归为「未分类」。$/.test($('askMsg').textContent) && $('askOk').textContent === '删除分类「购物」' && $('askOk').classList.contains('warn'), '3 删除分类：写几条会变未分类、按钮写分类名、警示色');
+  ok(/^删除分类「购物」。\n\n有 1 条记录用着这个分类，删了以后这些记录会变成「未分类」，金额和备注都不动。$/.test($('askMsg').textContent) && $('askOk').textContent === '删除分类「购物」' && $('askOk').classList.contains('warn'), '3 删除分类：写几条会变未分类、按钮写分类名、警示色');
   $('askCancel').click(); await t.idle();
   { const st = w.loadStore(A.ID); st.archives['另一个'] = { cats: ['未分类'], records: [] }; w.saveStore(st, A.ID); await t.idle(); }
   $('delArchive').click();

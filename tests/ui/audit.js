@@ -53,7 +53,7 @@ const seedOf = (o) => {
   if (o.dev) ls.app_dev_import = '1';
   if (o.recs) {
     ls.accounts = JSON.stringify([{ id: ID, name: '小明' }]); ls.app_logged_in_user = ID; ls['app_time_repaired_' + ID] = '1';
-    ls['store_' + ID] = JSON.stringify({ archives: { '默认存档': { cats: o.cats || BASE_CATS.slice(0, 8), records: o.recs } }, last: '默认存档', accountName: '小明' });
+    ls['store_' + ID] = JSON.stringify({ archives: { '默认存档': Object.assign({ cats: o.cats || BASE_CATS.slice(0, 8), records: o.recs }, o.budgets ? { budgets: o.budgets } : {}) }, last: '默认存档', accountName: '小明' });
   } else ls.accounts = '[]';
   return ls;
 };
@@ -484,6 +484,23 @@ async function run(cfg, port, browser) {
     if (dayOpen) await kbCheck('day', 'dayMask', '#dayName');
     await page.close();
   }
+  // ===== 7. 分类管理按 1.3 倍字号（1019-C）：分类名完整、不贴边，预算那段先省略 =====
+  if (cfg.name === 'main' || cfg.name === 'narrow') {
+    const keep = cfg.scale; cfg.scale = 1.3;
+    const cats = ['未分类', '购物', '红包', '水电燃气费', '人情往来', '咖啡奶茶', '地铁公交', '房租物业'];
+    const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(20), cats, budgets: { '购物': 1350, '红包': 2840, '水电燃气费': 12000, '人情往来': 800 } }) });
+    cfg.scale = keep;
+    await tab(page, 'settings');
+    await click(page, '#manageCatSetting'); await page.waitForTimeout(400);
+    const r = await page.evaluate(() => [...document.querySelectorAll('#catList .cat-item')].map(row => {
+      const n = row.querySelector('.cat-name'), m = row.querySelector('.cat-more'), b = row.querySelector('.cat-budget');
+      const last = (b || n).getBoundingClientRect();
+      return { cat: row.dataset.cat, cut: n.scrollWidth > n.clientWidth + 1, gap: Math.round(m.getBoundingClientRect().left - Math.min(last.right, row.querySelector('.cat-left').getBoundingClientRect().right)), h: Math.round(row.getBoundingClientRect().height) };
+    }));
+    results.push({ name: 'cat-manager-x1.3', cfg: cfg.name, cat: true, rows: r });
+    if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-cat-manager-x1.3.png`) });
+    await page.close();
+  }
   return results;
 }
 
@@ -506,6 +523,7 @@ async function run(cfg, port, browser) {
     md.push(`## ${c}`, '', '| 页面 | 可点的 | 小于 48 | 间距小于 8 | 主按钮（离底 px） | 主按钮在上半屏 | 内容到 / 屏高 | 下面空着 |', '|---|---|---|---|---|---|---|---|');
     all[c].forEach(m => {
       if (m.name === 'devoff-leaks') return;
+      if (m.cat) { const bad = m.rows.filter(x => x.cut || x.gap < 8 || x.h < 48); md.push(`| ${m.name} | ${m.rows.length} 行 | 分类名被截 ${m.rows.filter(x => x.cut).length} 行 | 离 › 不到 8px ${m.rows.filter(x => x.gap < 8).length} 行 | 行高 ${Math.min(...m.rows.map(x => x.h))}px 起 | ${bad.length ? '有问题' : ''} | | |`); return; }
       if (m.kb) { md.push(`| ${m.name} | 键盘弹起：${m.kbOpen ? '认出来了' : '没认出来'} | 下沿离键盘 ${m.gap}px | 标题离顶 ${m.gripTop}px | — | ${m.gap > 1 || m.gripTop < 0 ? '有问题' : ''} | ${m.H} | |`); return; }
       const pr = m.prim.slice(0, 3).map(p => `${p.name.split(' ')[0]} ${p.offscreen ? '要往下滑' : p.fromBottom}`).join('；') || '—';
       md.push(`| ${m.name} | ${m.n} | ${m.small.length} | ${m.tight.length} | ${pr} | ${m.prim.some(p => p.upper) ? '是' : ''} | ${m.contentBottom} / ${m.H} | ${m.blank} |`);

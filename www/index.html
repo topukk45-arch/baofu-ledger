@@ -806,6 +806,18 @@
             border-color:var(--c-primary); position:relative; z-index:5; }
         .cat-item.drag-placeholder { opacity:0.35; }
         .cat-reorder-tip { font-size:11.5px; color:var(--c-text-soft); margin:2px 2px 8px; }
+        /* 1019-C：分类管理一行 = 拖动手柄 + 分类名（16px）+ 每月预算（14px）+ ›，整行点开操作面板。
+           地方不够时先省略预算那一段，分类名最后才省略；文字区和右边的 › 之间至少 8px。 */
+        #catMask .cat-reorder-tip { font-size:13px; }
+        #catList { padding-bottom:4px; }
+        #catList .cat-item { min-height:52px; padding:6px 12px 6px 6px; gap:8px; cursor:pointer; }
+        #catList .cat-item .cat-left { flex:1 1 auto; min-width:0; gap:10px; }
+        #catList .cat-item .drag-handle { display:inline-flex; align-items:center; justify-content:center; min-width:40px; min-height:var(--ui-tap); padding:0; }
+        #catList .cat-item .cat-name { flex:0 0 auto; max-width:100%; font-size:16px; }
+        #catList .cat-item .cat-budget { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
+        #catList .cat-item .cat-more { flex:0 0 auto; color:var(--c-text-soft); font-size:20px; line-height:1; }
+        #catMask .cat-add-row { margin-top:12px; padding-top:14px; border-top:1px solid var(--c-border); }
+        #catMask .cat-add-row .mini-btn { min-height:var(--ui-tap); padding:0 18px; }
 
         .empty-tip { text-align:center; padding:30px; color:var(--c-text); }
 
@@ -1418,7 +1430,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-B</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-C</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -6791,21 +6803,17 @@ ${detail}
                 const bv=(a.budgets && a.budgets[c]>0) ? a.budgets[c] : null;
                 if(bv!=null){
                     const bs=document.createElement('span'); bs.className='cat-budget';
-                    bs.textContent=`每月 ${safeNum(bv).toFixed(0)}`;
+                    bs.textContent=`每月预算 ${safeNum(bv).toFixed(0)}`;
                     left.appendChild(bs);
                 }
-
-                const wrap=document.createElement('div');
-                wrap.style.flexShrink='0';
-                const bg=document.createElement('button'); bg.textContent='预算'; bg.style.marginRight='6px';
-                bg.onclick=()=>editBudget(c);
-                const rn=document.createElement('button'); rn.textContent='改名'; rn.style.marginRight='6px';
-                rn.onclick=()=>renameCat(c);
-                const del=document.createElement('button'); del.textContent='删除';
-                del.onclick=()=>deleteCat(c);
-                wrap.appendChild(bg); wrap.appendChild(rn); wrap.appendChild(del);
-
-                div.appendChild(left); div.appendChild(wrap);
+                // 1019-C：行里不再塞「预算 / 改名 / 删除」三个小按钮，整行点开一个面板（拖动手柄除外）
+                const more=document.createElement('span'); more.className='cat-more'; more.textContent='›'; more.setAttribute('aria-hidden','true');
+                div.appendChild(left); div.appendChild(more);
+                div.setAttribute('role','button');
+                div.addEventListener('click', e=>{
+                    if(e.target.closest('.drag-handle') || div.classList.contains('dragging') || (div.__dragEnd && Date.now()-div.__dragEnd<400)) return;
+                    openCatActions(c);
+                });
                 attachCatDrag(div, handle);
                 list.appendChild(div);
             });
@@ -6915,6 +6923,7 @@ ${detail}
                 document.removeEventListener('pointercancel', onUp);
                 document.removeEventListener('touchcancel', onUp);
 
+                item.__dragEnd=Date.now();   // 1019-C：刚拖完松手带出来的那一下点击不算「点开」
                 persistCatOrder();
             }
 
@@ -6942,6 +6951,29 @@ ${detail}
         }
         // 设置 / 修改 / 取消某分类的每月预算。填 0 = 取消（customPrompt 不接受空串，用 0 表示「不要了」）。
         // opts.fromStats：从统计页「未设预算」里点的，存完只刷新统计页，不弹出分类管理
+        // 1019-C：分类的操作面板：标题是分类名，「设预算」「改名」「删除这个分类」（警示色）竖排，「取消」在最下面
+        function openCatActions(c){
+            const a=curArchive(loadStore());
+            if(!a.cats.includes(c)) return;
+            const used=a.records.filter(r=>r.cat===c).length;
+            const bv=(a.budgets && a.budgets[c]>0) ? a.budgets[c] : null;
+            const sub=(bv!=null ? `每月预算 ${safeNum(bv).toFixed(0)} · ` : '') + (used ? `${used} 条记录` : '还没有记录');
+            const btn=(id, text, cls, fn)=>{ const b=document.createElement('button'); b.type='button'; b.id=id; b.className='ui-btn block '+(cls||''); b.textContent=text; b.addEventListener('click', fn); return b; };
+            window.JiwenSheet.open({ title:c, sub,
+                body(box, done){
+                    const st=document.createElement('div'); st.className='ui-stack'; st.id='catActList';
+                    st.appendChild(btn('catActBudget', bv!=null ? '改预算' : '设预算', '', ()=>{ done(); editBudget(c); }));
+                    st.appendChild(btn('catActRename', '改名', '', ()=>{ done(); renameCat(c); }));
+                    if(c!=='未分类') st.appendChild(btn('catActDelete', '删除这个分类', 'warn', ()=>{ done(); deleteCat(c); }));
+                    else { const p=document.createElement('div'); p.className='ui-msg ui-msg-soft'; p.textContent='「未分类」是保留分类，不能删除。'; st.appendChild(p); }
+                    box.appendChild(st);
+                },
+                foot(box, done){
+                    const st=document.createElement('div'); st.className='ui-stack';
+                    st.appendChild(btn('catActCancel', '取消', '', ()=>done()));
+                    box.appendChild(st);
+                } });
+        }
         function editBudget(cat, opts){
             const cur=getBudgets()[cat];
             customPrompt(`给「${cat}」设一个每月预算（元）。填 0 表示取消预算。`, cur>0 ? String(cur) : '', (v)=>{
@@ -6992,8 +7024,12 @@ ${detail}
             const store=loadStore(); const a=curArchive(store);
             if(a.cats.length<=1){ customAlert('至少保留一个分类！'); return; }
             const used=a.records.filter(r=>r.cat===name).length;
-            const tip=used>0?`有 ${used} 条记录使用该分类，删除后将归为「未分类」。`:'';
-            customConfirm(`删除分类「${name}」。${tip ? '\n\n'+tip : ''}`, ()=>{
+            const nTpl=(Array.isArray(a.tpls) ? a.tpls : []).filter(t=>t.cat===name).length;
+            const hasBudget=!!(a.budgets && a.budgets[name]>0);
+            const lines=[used>0 ? `有 ${used} 条记录用着这个分类，删了以后这些记录会变成「未分类」，金额和备注都不动。` : '没有记录用着这个分类。'];
+            if(nTpl) lines.push(`${nTpl} 个常用模板也会变成「未分类」。`);
+            if(hasBudget) lines.push('这个分类的每月预算会一起删掉。');
+            customConfirm(`删除分类「${name}」。\n\n${lines.join('\n')}`, ()=>{
                 const s=loadStore(); const ar=curArchive(s);
                 ar.cats=ar.cats.filter(c=>c!==name);
                 if(!ar.cats.includes('未分类')) ar.cats.unshift('未分类');
