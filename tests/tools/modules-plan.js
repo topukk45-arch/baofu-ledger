@@ -67,7 +67,7 @@ const CALLBACKS = {
   'store → ask': ['customAlert'],
   'cats → tabs': ['refreshCatSelectors', 'refreshAllViews'],
   'cats → stats': ['renderStats'],   // 设好预算后刷新统计页（1019-Z4-M8 调先后时数出来的）
-  'settings → tabs': ['snapDrop'],   // 换主题、改默认进入页面后删首屏快照（同上）
+  'settings → tabs': ['snapDrop', 'refreshCatSelectors', 'refreshAllViews'],   // 换主题、改默认进入页面后删首屏快照（同上）
   'ledger → tabs': ['refreshAllViews'],
   'forms → tabs': ['refreshAllViews'],
   'stats → tabs': ['refreshAllViews'],

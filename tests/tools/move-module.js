@@ -117,6 +117,10 @@ function run(key, opt) {
   let out = '(function(){\n';
   Object.keys(imports).sort((x, y) => order[x] - order[y]).forEach(o => { out += `${IND}const { ${[...imports[o]].sort().join(', ')} } = window.${PL.MODULES[order[o]].entry};   // 用到前面模块的\n`; });
   chunks.forEach(c => { out += RAW.slice(c.a, c.z); });
+  // 老入口名单里的名字，原来是顶层 function / var（自己就挂在 window 上），搬进 IIFE 以后要明着挂上，不然 www/import/ 这些找不到
+  const movedWin = new Set(); pick.forEach(st => D.freeRefs(st).winSet.forEach(n => movedWin.add(n)));
+  const implicit = pick.filter(st => st.type === 'FunctionDeclaration' || (st.type === 'VariableDeclaration' && st.kind === 'var')).flatMap(ownNames).filter(n => PL.LEGACY.includes(n) && !movedWin.has(n));
+  implicit.forEach(n => { out += `${IND}window.${n} = ${n};   // 老入口：原来是顶层的，自己就在 window 上，搬进来以后照旧挂上\n`; });
   out += `${IND}window.${mod.entry} = { ${exportsList.map(n => setters.includes(n) ? `get ${n}(){ return ${n}; }, set ${n}(v){ ${n}=v; }` : getters.includes(n) ? `get ${n}(){ return ${n}; }` : n).join(', ')} };   // ${mod.key} 模块对外只有这一个入口${getters.length ? '（get / set 的是会变的变量，读写的时候才去取）' : ''}\n})();\n`;
   // 旧文件剪掉这几块
   const newLegacy = legacy.map(b => {
@@ -151,7 +155,7 @@ function run(key, opt) {
   const m = firstTag.exec(html);
   if (!m) throw new Error('index.html 里找不到 ' + first.file);
   html = html.replace(firstTag, `${m[1]}<script src="${mod.file}?v=${ver}"></script>\n${m[0]}`);
-  const report = { getters, setters, getterSites, key, entry: mod.entry, file: mod.file, stmts: pick.length, lines: out.split('\n').length, exports: exportsList, legacyRefs: [...legacyUses].sort(), imports: Object.fromEntries(Object.entries(imports).map(([k, v]) => [k, [...v]])), testUse: [...testUse].sort() };
+  const report = { implicit, getters, setters, getterSites, key, entry: mod.entry, file: mod.file, stmts: pick.length, lines: out.split('\n').length, exports: exportsList, legacyRefs: [...legacyUses].sort(), imports: Object.fromEntries(Object.entries(imports).map(([k, v]) => [k, [...v]])), testUse: [...testUse].sort() };
   if (opt.dry) return report;
   fs.writeFileSync(path.join(WWW, mod.file), out);
   newLegacy.forEach(b => fs.writeFileSync(path.join(WWW, b.file), b.text));

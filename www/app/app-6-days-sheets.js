@@ -190,9 +190,6 @@
                 }).observe(m, { attributes:true, attributeFilter:['style'] });
             }
         });
-        // 输入提示框要金额的（预算、补金额）：也用数字键盘，大按钮直接提交提示框
-        askInput.addEventListener('click', ()=>{ if(askInput.dataset.kp==='1') kpOpen(askInput, { ok:askInput.dataset.kpOk||'确定', onOk:()=>askOk.click() }); });
-        askInput.addEventListener('focus', ()=>{ if(askInput.dataset.kp==='1'){ askInput.blur(); kpOpen(askInput, { ok:askInput.dataset.kpOk||'确定', onOk:()=>askOk.click() }); } });
 
         // ===== 系统返回键 / 侧滑返回 =====
         // 【问题】日子管理页是「记账页的子页」——只是把 pageLedger 藏起来、pageDays 显示，

@@ -4,6 +4,7 @@
         const { kpClose, kpOn, kpOpen } = window.JiwenKeypad;   // 旧代码引用表：keypad 已搬进 app/keypad.js，旧文件都搬完时删掉
         const { closeText } = window.JiwenText;   // 旧代码引用表：text 已搬进 app/text.js，旧文件都搬完时删掉
         const { bindSheetDrag, sheetGhostsFinish } = window.JiwenPanel;   // 旧代码引用表：sheet 已搬进 app/sheet.js，旧文件都搬完时删掉
+        const { askCancel, askMask, closeAsk, customAlert, customAlertHtml, customChoose, customConfirm, customPrompt } = window.JiwenAsk;   // 旧代码引用表：ask 已搬进 app/ask.js，旧文件都搬完时删掉
 
         // ===== 1010-K5：点「备注」后，把保存按钮也露出来 =====
         // 键盘弹起时弹窗被压到半屏，WebView 只把备注框本身滚进视野，紧挨着的「添加记录 / 保存」
