@@ -1132,6 +1132,13 @@
         .cs-name { color:var(--c-text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .cs-amt { flex-shrink:0; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
         .cs-empty { color:var(--c-text-soft); font-size:13px; padding:8px 2px; }
+        /* 1019-H：分类汇总框里还能往下滑的提示：比右下角圆钮小一号，叠在框的右下角；点击区域照样撑到 48（.ui-hit） */
+        .cat-card { position:relative; }
+        .cs-hint { position:absolute; right:12px; bottom:10px; z-index:2; width:36px; height:36px; border-radius:50%; padding:0;
+            border:1px solid var(--c-border-mid); background:var(--c-surface); color:var(--c-primary-dark); font-size:18px; line-height:1;
+            box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),0.3); cursor:pointer; opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
+        .cs-hint.show { opacity:1; pointer-events:auto; }
+        .cs-hint:active { transform:scale(0.92); }
 
         /* 列表式选项：一行一个、左对齐，多了框内滑动（批量菜单、选分类） */
         #askChoices.choose-list { flex-direction:column; flex-wrap:nowrap; gap:0; max-height:52vh;
@@ -1431,7 +1438,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-G</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-H</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1464,6 +1471,8 @@
                         </div>
                     </div>
                     <div class="cat-stats" id="catStats"></div>
+                    <!-- 1019-H：框里还有没露出来的分类：右下角冒一个小圆钮 ↓（滑到底变 ↑），停下 0.8 秒淡出 -->
+                    <button class="cs-hint ui-hit" id="catStatsHint" type="button" aria-label="往下翻">↓</button>
                 </div>
 
                 <!-- 「日子」入口卡：显示最近的几个倒数日，点「管理 ›」进管理页。
@@ -1649,6 +1658,13 @@
                         <div class="seg" id="addSideSeg">
                             <button data-v="left">左</button>
                             <button data-v="right">右</button>
+                        </div>
+                    </div>
+                    <div class="set-item set-static">
+                        <span>滑动提示</span>
+                        <div class="seg" id="scrollHintSeg">
+                            <button data-v="on">开</button>
+                            <button data-v="off">关</button>
                         </div>
                     </div>
                     <div class="set-item set-static">
@@ -2269,7 +2285,7 @@
             if(!el) return;
             clearTimeout(el._fabT);
             el.classList.toggle('show', !!on);
-            if(on) el._fabT=setTimeout(()=>el.classList.remove('show'), FAB_IDLE);
+            if(on) el._fabT=setTimeout(()=>el.classList.remove('show'), el._fabIdle || FAB_IDLE);   // 1019-H：分类汇总的滑动提示停 0.8 秒（HINT_IDLE），别的照旧 1.5 秒
         }
         function fabHold(el){
             if(!el) return;
@@ -8205,6 +8221,48 @@ ${detail}
                     + `<span class="cs-amt ${pos?'pos':'neg'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</span></div>`;
             }).join('');
         }
+        // ===== 1019-H：分类汇总能滑但看不出来：右下角的小圆钮 =====
+        //   分类超过 6 个、框里装不下时才有：卡片每次从屏幕外回到屏幕上冒一次（IntersectionObserver；卡片一直在屏幕上、滑的是整页时不冒）；
+        //   在框里滑时出现；停下 HINT_IDLE（0.8 秒）淡出（不改共用的 FAB_IDLE）。滑到框底换成 ↑，点了回框顶；在中间点 ↓ 往下翻一屏。
+        //   这次打开 App 以后在框里滑到过底，就不再做进屏幕的提示。设置里「滑动提示」关掉就都不出现（存这台手机，不进备份）。
+        const HINT_IDLE=800, HINT_MIN_ROWS=6;
+        let catHintSeen=false;   // 这次打开 App 以后在框里滑到过底
+        function scrollHintOn(){ try{ return localStorage.getItem('app_scroll_hint')!=='off'; }catch(_){ return true; } }
+        const catHint=$('catStatsHint'), catBox=$('catStats');
+        catHint._fabIdle=HINT_IDLE;
+        fabHold(catHint);
+        function catHintFits(){ return scrollHintOn() && catBox.querySelectorAll('.cs-row').length>HINT_MIN_ROWS && catBox.scrollHeight>catBox.clientHeight+2; }
+        function catHintAtEnd(){ return catBox.scrollTop+catBox.clientHeight>=catBox.scrollHeight-2; }
+        function catHintPaint(){ const end=catHintAtEnd(); catHint.textContent=end ? '↑' : '↓'; catHint.setAttribute('aria-label', end ? '回到最上面' : '往下翻'); }
+        function catHintWake(){ if(!catHintFits()){ fabWake(catHint, false); return; } catHintPaint(); fabWake(catHint, true); }
+        catBox.addEventListener('scroll', ()=>{ if(catHintAtEnd()) catHintSeen=true; catHintWake(); }, { passive:true });
+        catHint.addEventListener('click', ()=>{
+            const top=catHintAtEnd() ? 0 : Math.min(catBox.scrollTop+catBox.clientHeight, catBox.scrollHeight-catBox.clientHeight);
+            try{ catBox.scrollTo({ top, behavior:'smooth' }); }catch(_){ catBox.scrollTop=top; }
+            catHintWake();
+        });
+        if(window.IntersectionObserver){
+            let wasIn=false;
+            new IntersectionObserver(es=>{
+                es.forEach(e=>{
+                    const nowIn=e.isIntersecting && e.intersectionRatio>0;
+                    if(nowIn && !wasIn && !catHintSeen) catHintWake();
+                    if(!nowIn) fabWake(catHint, false);
+                    wasIn=nowIn;
+                });
+            }, { threshold:[0, 0.6] }).observe($('catStatsCard'));
+        }
+        window.__catHintWake=catHintWake;   // 给测试用
+        (function(){
+            const seg=$('scrollHintSeg');
+            function paint(){ const on=scrollHintOn(); seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', (b.dataset.v==='on')===on)); }
+            seg.querySelectorAll('button').forEach(b=>b.addEventListener('click', ()=>{
+                try{ if(b.dataset.v==='off') localStorage.setItem('app_scroll_hint', 'off'); else localStorage.removeItem('app_scroll_hint'); }catch(_){}
+                if(b.dataset.v==='off') fabWake(catHint, false);
+                paint();
+            }));
+            paint();
+        })();
         $('catSortSeg').addEventListener('click', e=>{
             const b=e.target.closest('button[data-v]'); if(!b) return;
             try{ localStorage.setItem('app_catstats_sort', b.dataset.v); }catch(_){}
