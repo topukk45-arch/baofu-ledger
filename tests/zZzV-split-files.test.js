@@ -84,7 +84,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   const t = await A.boot({ html: raw, www: WWW, seed: A.seedOf(recs) });
   const got = t.log.filter(p => /^app\//.test(p));
   ok(files.every(f => got.includes(f)) && got.includes('app/app.css'), '4 一个个读了 app/*.js 和 app.css：' + got.join(' '));
-  ok(typeof t.w.switchTab === 'function' && typeof t.w.JiwenStore.loadStore === 'function' && t.w.JiwenSheet && t.w.JiwenPerf, '4 各个文件里的全局都在');
+  ok(typeof t.w.JiwenTabs.switchTab === 'function' && typeof t.w.JiwenStore.loadStore === 'function' && t.w.JiwenSheet && t.w.JiwenPerf, '4 各个文件里的全局都在');
   ok(t.$('mainBox').style.display === 'block' && t.$('loginBox').style.display === 'none', '4 自动进了账号（主界面出来、登录框收起）');
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
   ok(/虚构午饭/.test(t.$('billList').textContent), '4 账单页列出记录');

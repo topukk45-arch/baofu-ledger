@@ -1,34 +1,4 @@
 
-        // 入口卡事件委托：点某一条 → 直接编辑它（常用操作不必先进管理页）；点空态 → 去添加
-        $('daysEntryRows').addEventListener('click', e=>{
-            const el=e.target.closest('[data-day-act]');
-            if(!el) return;
-            if(el.dataset.dayAct==='add'){ gotoDaysPage(); openDayDialog(null); }
-            else if(el.dataset.dayAct==='edit'){ openDayDialog(el.dataset.dayId); }
-        });
-        $('daysManageBtn').addEventListener('click', gotoDaysPage);
-
-        // ===== 管理页 =====
-        // 它是记账页的子页：进入时把 pageLedger 藏起来、pageDays 显示，底部 tab 仍停在「记账」。
-        function gotoDaysPage(){
-            saveLedgerScroll();   // 1017-F：从「日子」管理页回来也放回原处
-            $('pageLedger').style.display='none';
-            $('pageDays').style.display='block';
-            $('actionBar').style.display='none';    // 子页里不该有「筛选 / 记一笔」
-            const tt=$('toTopBtn');        if(tt) tt.classList.remove('show');
-            const cf=$('clearFilterFab');  if(cf) cf.classList.remove('show');
-            document.body.classList.remove('tab-ledger');   // 去掉为记账页底部常驻条留的内边距
-            renderDaysList();
-            window.scrollTo(0,0);
-        }
-        function backFromDaysPage(){
-            if(JiwenDays.daysSelecting) exitSelectMode();   // 别把选择模式带出这一页
-            $('pageDays').style.display='none';
-            switchTab('ledger');            // 交回 switchTab 统一处理显隐/底栏/浮钮，别自己拼
-            renderDaysCard();               // 可能改过，刷新入口卡
-        }
-        $('daysBack').addEventListener('click', backFromDaysPage);
-
         // ===== 1019-B：底部面板式的弹窗，往下拉 / 返回键关闭走同一个出口 =====
         //   记一笔、修改账单、日子这三个填表的：填过东西（和打开时比变了）先问「放弃这次填写？」，没填过直接关；
         //   别的弹窗直接关（和点它的「关闭 / 取消」一样）。点弹窗里的「关闭 / 取消」按钮照旧直接关，不问。

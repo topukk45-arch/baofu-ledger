@@ -14,6 +14,7 @@
         const { calcDay, closeDetail, dayNumHtml, fmtDayDate, renderStats, saveDays, setStatTab, sortedDays } = window.JiwenStats;   // 旧代码引用表：stats 已搬进 app/stats.js，旧文件都搬完时删掉
         const { closeDayDialog, closeDayMgr, exitSelectMode, openDayDialog, renderDaysCard, renderDaysList } = window.JiwenDays;   // 旧代码引用表：days 已搬进 app/days.js，旧文件都搬完时删掉
         const { refreshArchiveSelect, renderStorageUse } = window.JiwenSettings;   // 旧代码引用表：settings 已搬进 app/settings.js，旧文件都搬完时删掉
+        const { backFromDaysPage, enterAccount, refreshAllViews, refreshCatSelectors, snapUnveil } = window.JiwenTabs;   // 旧代码引用表：tabs 已搬进 app/tabs.js，旧文件都搬完时删掉
 
 
 

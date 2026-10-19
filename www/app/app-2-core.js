@@ -178,45 +178,6 @@
                 customAlert('读取账本失败，请关掉 App 重新打开后再试。', '读取失败');
             }));
         }
-        function enterAccount(id){
-            JiwenBase.currentUser = id;
-            touchAccount(id);
-            localStorage.setItem('app_logged_in_user', id);   // 记住当前登录账号（编号），下次自动进入
-            const store = loadStore();
-            saveStoreSafe(store);
-            JiwenBase.currentArchive = store.last || Object.keys(store.archives)[0];
-            // 兜底：若 last 指向一个已不存在的存档（导入/迁移等异常路径下可能发生），
-            // 回退到第一个存档，避免 curArchive() 返回 undefined 导致主界面白屏
-            if(!store.archives[JiwenBase.currentArchive]){
-                JiwenBase.currentArchive = Object.keys(store.archives)[0];
-                store.last = JiwenBase.currentArchive; saveStoreSafe(store);
-            }
-            loginBox.style.display='none';
-            mainBox.style.display='block';
-            $('tabBar').style.display='flex';
-            document.body.classList.remove('login-mode');
-            nowUser.innerText = `当前用户：${nameOf(id)}`;
-            resetSearch();
-            refreshArchiveSelect();
-            refreshCatSelectors();
-            setDtInput(billTime, nowDtValue());   // 进入主界面即默认当前时间
-            renderBill();
-            renderDaysCard();             // 「日子」入口卡（数据独立于存档，跟账号走）
-            ledgerScrollY=0;              // 1017-F：换了账号，账单页从顶上开始
-            // 1019-F：打开 App 自动登录、上次是被系统关掉的（离开不到 RESUME_MAX_MS）：回到上次的页签、账单页第几页、滚到哪
-            const auto=!!window.__autoLogin;
-            const rs=auto && getDefaultTabPref()==='last' ? resumeTake(id) : null;   // 1019-L：设置里选了「上次停留」才回去
-            window.__autoLogin=false;
-            if(rs && rs.tab==='ledger' && rs.page>1){ JiwenBase.curPage=rs.page; renderBill(); }
-            if(rs && rs.tab==='ledger'){ ledgerScrollY=rs.y||0; JiwenBase.currentTab=''; }   // currentTab 先清掉：switchTab 开头记滚动位置那一步别把它冲成 0
-            switchTab(rs ? rs.tab : getDefaultTab());   // 按用户设置进入默认页（默认记账）
-            if(auto) setTimeout(()=>formDraftRestore(id), 0);   // 填到一半的记一笔 / 修改，不管默认页选哪个都接着来
-            // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
-            // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
-            trackBusy(runTimeRepairOnce(id));
-            // 1016-Z3：没进账号时「用记问打开」过来的账单文件，进了账号再接着处理
-            if(window.__impOpened){ const f=window.__impOpened; window.__impOpened=null; window.__impOpenedNow=true; setTimeout(()=>impOpenFile(f), 0); }
-        }
 
         logoutBtn.addEventListener('click', () => {
             JiwenBase.currentUser=''; JiwenBase.currentArchive='';
@@ -381,27 +342,4 @@
                 title: '导出存档（手动保存）',
                 tip: '无法直接写入文件，请点「复制」或「分享」，把内容保存到记事本 / 云笔记 / 聊天收藏。这段文本就是完整备份，之后可用「导入存档」还原。'
             });
-        }
-        function refreshCatSelectors(){
-            const cats=getCats();
-            fillSelect(billCat, cats, cats[0]);
-            const cur=filterCat.value;
-            filterCat.innerHTML='<option value="__all">全部</option>';
-            cats.forEach(c=>{
-                const o=document.createElement('option'); o.value=c; o.textContent=c;
-                filterCat.appendChild(o);
-            });
-            // 当前筛选值若在新分类表里仍存在则保留，否则回落到「全部」
-            filterCat.value = [...filterCat.options].some(o=>o.value===cur) ? cur : '__all';
-            renderFilterChips();
-            if(window.syncFilterFab) window.syncFilterFab();
-        }
-        // 数据变更后统一刷新：账单页总是刷新；统计页若正在显示也立即重算，
-        // 避免「新增/删除记录后切到统计页数字没更新」的问题
-        function refreshAllViews(){
-            renderBill();
-            if(JiwenBase.currentTab==='stats') renderStats();
-            // 「日子」入口卡也一并刷新：它虽与账单无关，但改名等路径会换 currentUser，
-            // 收在这里就不必在每个调用点各加一行（漏一个就是显示旧账号的日子）。
-            if(typeof renderDaysCard==='function') renderDaysCard();
         }
