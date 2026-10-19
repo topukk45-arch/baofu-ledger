@@ -2,8 +2,11 @@ package com.baofu.ledger;
 
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.View;
 import android.webkit.WebView;
+
+import androidx.core.splashscreen.SplashScreen;
 
 import com.getcapacitor.BridgeActivity;
 
@@ -14,8 +17,20 @@ public class MainActivity extends BridgeActivity {
     // 背景都钉成米黄，可确保露出的间隙不是刺眼的白色（“白图”）。
     private static final int BG = Color.parseColor("#FDF8E8");
 
+    // 1019-U：启动画面最多留这么久（毫秒）。网页层首屏画出来就调 Launch.ready()，通常用不到这么久
+    private static final long SPLASH_MAX_MS = 1000;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        // 1019-U：启动画面等网页首屏画好再收（原来系统画出第一帧就收，那时网页还是一片底色），最多 1 秒。
+        //   installSplashScreen 必须在 super.onCreate() 之前调；主题里 AppTheme.NoActionBarLaunch 本来就是 Theme.SplashScreen。
+        LaunchPlugin.reset();
+        final long t0 = SystemClock.uptimeMillis();
+        try {
+            SplashScreen splash = SplashScreen.installSplashScreen(this);
+            splash.setKeepOnScreenCondition(() -> !LaunchPlugin.isReady() && SystemClock.uptimeMillis() - t0 < SPLASH_MAX_MS);
+        } catch (Exception ignored) {}
+        registerPlugin(LaunchPlugin.class);
         // 必须在 super.onCreate() 之前注册：让「云备份」设置里的 OneDrive 直连功能可用
         registerPlugin(OneDriveLinkPlugin.class);
         // 1016-Z3：「用记问打开」账单文件（csv / xlsx）

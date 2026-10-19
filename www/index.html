@@ -421,9 +421,9 @@
             color:var(--c-text-soft); transition:0.15s; }
         /* 1010-K3：底栏文字用霞鹜文楷（LXGW WenKai，SIL OFL 1.1，可商用），
            只裁出「统计记账设置」6 个字内嵌，不随系统字体变；其他字照常用系统字体。 */
-        @font-face { font-family:'JiwenTab'; font-weight:400; font-display:block;
+        @font-face { font-family:'JiwenTab'; font-weight:400; font-display:swap;
             src:url(data:font/woff2;base64,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) format('woff2'); }
-        @font-face { font-family:'JiwenTab'; font-weight:700; font-display:block;
+        @font-face { font-family:'JiwenTab'; font-weight:700; font-display:swap;
             src:url(data:font/woff2;base64,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) format('woff2'); }
         /* 图标：统计 = Lucide chart-spline（ISC 授权）；记账 = Tabler list-check、设置 = Tabler adjustments-horizontal（MIT 授权）。
            选中时每个图标只有一笔（.acc）变 --c-tab-accent：统计=曲线，记账=中间的勾，设置=中间的圆钮。 */
@@ -776,6 +776,9 @@
             width:100%; max-width:760px; padding:8px 18px calc(20px + env(safe-area-inset-bottom));
             border-radius:18px 18px 0 0; border-bottom:none; box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4); }
         /* 拖动条和标题钉在面板顶上：键盘弹起、面板里滑到备注时，标题照样看得见、照样能往下拉 */
+        /* 1019-U：首屏快照（上次离开时的首屏，打开 App 时大脚本还没跑完就先画出来；真的画好了就拿掉）。点不动、盖在最上面 */
+        .boot-snap { position:fixed; inset:0; z-index:990; overflow:hidden; background:var(--c-bg); }
+        .boot-snap > .container { position:relative; }
         .form-mask .sheet-grip { position:sticky; top:-8px; z-index:2; margin:-8px -18px 0; padding:8px 18px 0;
             background:var(--c-sheet); border-radius:18px 18px 0 0; }
         .form-mask .sheet-head h3 { text-align:left; margin:0; }
@@ -1527,7 +1530,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-T</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-U</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2357,6 +2360,34 @@
     </div>
     </div>
 
+    <!-- 1019-U：首屏快照。上次切到后台时把首屏存在这台手机（localStorage 的 app_snap_<账号>，不进备份），
+         打开 App 时这一小段先跑：记住的账号有快照、是同一版、同一天、默认进入页面和屏幕宽度都没变，就把它原样画出来
+         （大脚本要先读完、编译完才开始跑，CPU 调慢 4 倍时要 400 毫秒以上，这一段在那之前就能出图），
+         再告诉原生层首屏已经出来、启动画面可以收了。真的首屏画好以后（initApp 里 snapUnveil()）拿掉。
+         账本一改、换账号 / 存档、恢复、导入、撤销都会删掉快照（snapDrop()），所以画出来的永远和账本对得上。 -->
+    <script>
+        (function(){
+            try{
+                var u=localStorage.getItem('app_logged_in_user'); if(!u) return;
+                var raw=localStorage.getItem('app_snap_'+u); if(!raw) return;
+                var o=JSON.parse(raw), b=document.getElementById('loginBuild'), d=new Date();
+                var pref=localStorage.getItem('app_default_tab'); if(['stats','ledger','settings','last'].indexOf(pref)<0) pref='ledger';
+                if(!o || o.v!==1 || !b || o.build!==b.textContent || o.day!==d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate() || o.pref!==pref || o.w!==window.innerWidth) return;
+                var y=0;
+                if(o.pref==='last' && Date.now()-o.at<7200000) y=o.y||0;      // 「上次停留」、离开不到 2 小时：照原来滚到的位置
+                else if(o.page>1) return;                                    // 别的情况打开都是第 1 页、顶上
+                if(typeof o.root==='string') document.documentElement.setAttribute('style', o.root);   // 主题色
+                if(typeof o.body==='string') document.body.className=o.body;
+                var el=document.createElement('div'); el.id='bootSnap'; el.className='boot-snap'; el.setAttribute('aria-hidden','true');
+                el.innerHTML=o.html;
+                if(y && el.firstElementChild) el.firstElementChild.style.top=(-y)+'px';
+                document.body.appendChild(el);
+                window.__bootSnap={ at:Math.round(performance.now()), user:u };
+                // 首屏已经出来了：原生启动画面可以收了（这一帧画完就是快照）
+                requestAnimationFrame(function(){ try{ var c=window.Capacitor, p=c&&c.Plugins&&c.Plugins.Launch; if(p&&p.ready) p.ready(); }catch(e){} });
+            }catch(e){ try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
+        })();
+    </script>
     <script>
         // ===== 1019-M：性能记录（开发开关里的「性能记录」页看、复制）=====
         //   App 自己记：启动各段耗时（网页脚本开始跑、打开数据库、读账本、画出首屏）、点输入框到能输入用了多久、
@@ -2380,7 +2411,8 @@
             function bootDone(){
                 if(boot.done) return; boot.done=1;
                 const f=()=>{ boot.paint=Math.round(now()); const e={ kind:'启动', ms:boot.paint };
-                    ['script','db','read','render','paint'].forEach(k=>{ if(boot[k]!=null) e[k]=boot[k]; });
+                    if(window.__bootSnap) boot.snap=window.__bootSnap.at;   // 1019-U：快照先画出来的时间
+                    ['snap','script','db','read','render','paint'].forEach(k=>{ if(boot[k]!=null) e[k]=boot[k]; });
                     e.n=window.__perfRecs; add(e); };
                 if(window.requestAnimationFrame) requestAnimationFrame(()=>setTimeout(f, 0)); else setTimeout(f, 0);
             }
@@ -3387,6 +3419,7 @@
             return { recs, seqs, idx };
         }
         function ledgerApply(e, store){
+            snapDrop();   // 1019-U：账本（内存里）要改了，首屏快照作废
             e.ver++;
             const archives=store.archives || {};
             const names=Object.keys(archives);
@@ -3546,6 +3579,7 @@
             if(!e) return Promise.resolve();
             if(e.busy) return e.busy;
             if(!ledgerDirty(e)) return Promise.resolve();
+            snapDrop();   // 1019-U：要往库里写账本 / 单号表 / 待处理 / 导入记录了（导入、撤销、恢复、AI 修改……），首屏快照作废
             const p=(async()=>{
                 try{
                     while(ledgerDirty(e)){
@@ -5320,6 +5354,7 @@
         // 写存档：先改内存（只标出改动涉及的月份），马上排队写 IndexedDB。写库是异步的，失败时由 ledgerWriteSoon 提示，
         //   内存里的修改留着，下次保存 / 切后台时再写。必须确认写进去才能往下走的地方用 saveStoreDurable。
         function saveStore(store, user){
+            snapDrop();   // 1019-U：账本改了，快照作废
             const key=storeKey(user);
             ledgerApply(ledgerEntryForWrite(key), store);
             ledgerWriteSoon(key);
@@ -7999,6 +8034,7 @@ ${detail}
             window.getDraftCat = function(){ return draftCat; };
 
             // 筛选图标高亮 + 清除浮钮显隐：搜索条件或分类筛选任一生效都算「正在筛选」（基于已提交状态）
+            window.__filterActive = ()=>!!(hasActiveSearch() || (filterCat.value && filterCat.value!=='__all'));   // 1019-U：首屏快照看要不要存
             window.syncFilterFab = function(){
                 const active = hasActiveSearch() || (filterCat.value && filterCat.value!=='__all');
                 fab.classList.toggle('active-filter', active);
@@ -10132,7 +10168,7 @@ ${detail}
             function loadPrefs(){
                 try{ return JSON.parse(localStorage.getItem('app_appearance')||'{}'); }catch(_){ return {}; }
             }
-            function savePrefs(p){ localStorage.setItem('app_appearance', JSON.stringify(p)); }
+            function savePrefs(p){ localStorage.setItem('app_appearance', JSON.stringify(p)); try{ snapDrop(); }catch(_){} }   // 1019-U：换了主题，快照作废
 
             // —— 弹窗交互 ——
             const themeMask=$('themeMask');
@@ -10220,7 +10256,7 @@ ${detail}
             return (v==='stats'||v==='ledger'||v==='settings'||v==='last') ? v : 'ledger';
         }
         function getDefaultTab(){ const v=getDefaultTabPref(); return v==='last' ? 'ledger' : v; }
-        function setDefaultTab(v){ localStorage.setItem('app_default_tab', v); }
+        function setDefaultTab(v){ localStorage.setItem('app_default_tab', v); snapDrop(); }   // 1019-U：打开时进哪页变了，快照作废
 
         // 记一笔按钮位置偏好（全局，左撇子可设为「左」）。默认 right=记一笔在右、筛选在左。
         function getAddSide(){
@@ -10291,6 +10327,93 @@ ${detail}
         //   正常回到前台（没被杀）什么都不用做。表单关掉（保存、取消、放弃）就把它的草稿删掉。
         const RESUME_MAX_MS=2*3600*1000;
         const resumeKey=id=>'app_resume_'+id, formDraftKey=id=>'app_formdraft_'+id;
+        // ===== 1019-U：首屏快照 =====
+        //   切到后台时（resumeSave）把打开 App 时会看到的那一页原样存一份：只在「现在屏幕上的样子就是下次打开会看到的样子」时存，
+        //   对不上（翻到了第 2 页、开着筛选、统计页不在这个月……）就删掉，宁可慢一点也不画错。
+        //   账本一改（saveStore）、换账号 / 存档、恢复、导入、撤销、换主题、改默认页都删（snapDrop），下次切后台再存。
+        const SNAP_MAX=400000;
+        const SNAP_BODY_SKIP=['kb-open','login-mode','days-selecting'];
+        function snapDrop(){
+            try{ Object.keys(localStorage).forEach(k=>{ if(k.indexOf('app_snap_')===0) localStorage.removeItem(k); }); }catch(_){}
+        }
+        function snapBootState(tab, pref){
+            if($('pageDays') && $('pageDays').style.display!=='none' && $('pageDays').style.display!=='') return false;   // 日子管理页开着
+            if(document.getElementById('impPage') && document.getElementById('impPage').offsetParent!==null) return false;
+            if(tab==='ledger'){
+                if(window.__filterActive && window.__filterActive()) return false;   // 打开时会清掉筛选
+                if(pref!=='last' && curPage!==1) return false;                      // 打开时回第 1 页
+                return true;
+            }
+            if(tab==='stats'){
+                if(tab!==currentTab) return false;   // 统计页不在屏幕上，内容不一定是最新的
+                const n=new Date();
+                return statYear===n.getFullYear() && statMonth===n.getMonth() && statSelDay==null && statTab==='flow' && statMonthCatMode==='expense';
+            }
+            if(tab==='settings') return tab===currentTab;
+            return false;
+        }
+        function snapPrune(orig, copy, page){
+            const a=orig.querySelectorAll('*'), b=copy.querySelectorAll('*');
+            if(a.length!==b.length) return;
+            const vh=window.innerHeight||0; if(!vh) return;
+            const clipCache=new Map();
+            const clipOf=el=>{   // 往上找最近的会把内容裁掉的框（overflow 不是 visible），返回它的下沿；没有就是屏幕下沿
+                const p=el.parentElement;
+                if(!p || p===page || !page.contains(p)) return vh;
+                if(clipCache.has(p)) return clipCache.get(p);
+                const cs=getComputedStyle(p);
+                const v=(cs.overflowY!=='visible') ? Math.min(p.getBoundingClientRect().bottom, clipOf(p)) : clipOf(p);
+                clipCache.set(p, v); return v;
+            };
+            const drop=[];
+            for(let i=0;i<a.length;i++){
+                if(!page.contains(a[i]) || a[i]===page) continue;
+                const r=a[i].getBoundingClientRect();
+                if(r.top > clipOf(a[i]) + 8) drop.push(b[i]);
+            }
+            drop.forEach(x=>{ if(x.isConnected || x.parentNode) x.remove(); });
+        }
+        function snapSave(){
+            try{
+                if(!currentUser || $('mainBox').style.display!=='block'){ snapDrop(); return; }
+                const pref=getDefaultTabPref(), tab=pref==='last' ? currentTab : pref;
+                if(!snapBootState(tab, pref)){ snapDrop(); return; }
+                const pageId={ ledger:'pageLedger', stats:'pageStats', settings:'pageSettings' }[tab];
+                // 只要主界面（只留要进的那一页）、底栏、记账页的底部操作栏；登录框、各个弹窗（都在 .container 里、都藏着）不要
+                const c=document.querySelector('body > .container').cloneNode(false);
+                const mb=$('mainBox').cloneNode(true);
+                // 只留一屏看得见的：这一页正显示着时，屏幕下沿以下的、框里滚出去看不见的都不要（东西越少，打开时画得越快；
+                //   下面那些反正看不见，真的那页画好就换掉了）
+                if(tab===currentTab) snapPrune($('mainBox'), mb, $(pageId));
+                mb.querySelectorAll('.tab-page').forEach(pg=>{ if(pg.id!==pageId) pg.remove(); else pg.style.display='block'; });
+                const pd=mb.querySelector('#pageDays'); if(pd) pd.remove();
+                mb.querySelectorAll('input, textarea').forEach(x=>{ if(x.type!=='checkbox' && x.type!=='radio') x.setAttribute('value', x.value||''); });
+                c.appendChild(mb);
+                const tb=$('tabBar').cloneNode(true); tb.style.display='flex';
+                tb.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+                c.appendChild(tb);
+                if(tab==='ledger'){ const ab=$('actionBar').cloneNode(true); ab.style.display='flex'; c.appendChild(ab); }
+                const html=c.outerHTML;
+                if(html.length>SNAP_MAX){ snapDrop(); return; }
+                const n=new Date();
+                const bodyCls=String(document.body.className||'').split(/\s+/).filter(k=>k && SNAP_BODY_SKIP.indexOf(k)<0)
+                    .filter(k=>k!=='tab-ledger' && k!=='tab-stats').concat(tab==='ledger' ? ['tab-ledger'] : tab==='stats' ? ['tab-stats'] : []).join(' ');
+                snapDrop();
+                localStorage.setItem('app_snap_'+currentUser, JSON.stringify({ v:1, build:$('loginBuild').textContent, day:`${n.getFullYear()}-${n.getMonth()+1}-${n.getDate()}`,
+                    pref, tab, page:curPage, y:(tab==='ledger' && pref==='last') ? (window.scrollY||document.documentElement.scrollTop||0) : 0,
+                    w:window.innerWidth, at:Date.now(), archive:currentArchive, root:document.documentElement.getAttribute('style')||'', body:bodyCls, html }));
+            }catch(_){ snapDrop(); }
+        }
+        // 真的首屏画好了：下一帧拿掉快照（这一帧真的那页已经排好，拿掉看不出变化）；没有快照时告诉原生层可以收启动画面了
+        function snapUnveil(){
+            const el=document.getElementById('bootSnap');
+            const go=()=>{
+                const x=document.getElementById('bootSnap'); if(x) x.remove();
+                try{ const c=window.Capacitor, p=c&&c.Plugins&&c.Plugins.Launch; if(p&&p.ready) p.ready(); }catch(_){}
+            };
+            if(el && window.requestAnimationFrame) requestAnimationFrame(go); else go();
+        }
+        window.snapSave=snapSave; window.snapDrop=snapDrop;   // 给测试用
         function resumeSave(){
             if(!currentUser || $('mainBox').style.display!=='block') return;
             saveLedgerScroll();
@@ -10300,6 +10423,7 @@ ${detail}
                 if(f) localStorage.setItem(formDraftKey(currentUser), JSON.stringify(Object.assign(f, { archive:currentArchive, at:Date.now() })));
                 else localStorage.removeItem(formDraftKey(currentUser));
             }catch(_){}
+            snapSave();
         }
         function resumeTake(id){
             let r=null;
@@ -10356,13 +10480,16 @@ ${detail}
         try{ const cap=window.Capacitor; if(cap && cap.Plugins && cap.Plugins.App && cap.Plugins.App.addListener) cap.Plugins.App.addListener('pause', ()=>resumeSave()); }catch(_){}
         // 1017-F：离开账单页时记下滚到哪了，回来放回原处（以前切回来先回到顶上，安卓上还会再自己往下滑一段，看着跳一下）
         let ledgerScrollY=0;
+        let tabShownOnce=false;   // 1019-U：打开 App 第一次切页签时不读滚动位置（读了会逼浏览器多排一次版）
         function saveLedgerScroll(){
+            if(!tabShownOnce) return;
             const pl=$('pageLedger');
             if(currentTab==='ledger' && pl && pl.style.display!=='none') ledgerScrollY=window.scrollY||document.documentElement.scrollTop||0;
         }
         function switchTab(tab){
             closeAllCs();   // 收起可能展开的下拉：其面板已传送到 body，切页隐藏容器不会带走它
             saveLedgerScroll();
+            tabShownOnce=true;
             currentTab=tab;
             // 「日子」管理页是记账页的子页，不属于任何 tab。切 tab 时必须把它关掉，
             // 否则从子页点底栏会出现「子页与目标页同时显示」。
@@ -11781,7 +11908,7 @@ ${detail}
             new MutationObserver(ms=>ms.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.classList.contains('mask')) watchMask(n); }))).observe(document.body, { childList:true });
             // 「性能记录（开发中）」页：一行一条，能一键复制全部、清空
             function fmt(e){
-                if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}）`;
+                if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}）`;
                 if(e.kind==='点输入框') return `${e.at} 点输入框到能输入 ${e.ms}ms（${e.what}）`;
                 if(e.kind==='键盘') return `${e.at} 键盘 面板位置变了 ${e.moves} 次，最慢一帧 ${e.maxFrame}ms、平均 ${e.avgFrame}ms，可视区 ${e.vv}（${e.what}）`;
                 if(e.kind==='打开面板' || e.kind==='关闭面板') return `${e.at} ${e.kind} ${e.ms}ms（${e.what}）`;
@@ -12257,6 +12384,7 @@ ${detail}
                 // 自动登录成功时登录框已经 display:none，放不放都看不见；没进去（出错）就把登录页放出来
                 if(mainBox.style.display!=='block'){ loginBox.style.display='block'; document.body.classList.add('login-mode'); try{ renderRecentUsers(); }catch(_){} }
                 loginBox.style.visibility='';
+                snapUnveil();   // 1019-U：真的首屏（或登录页）出来了，拿掉快照、收启动画面
             }));
         })();
 
