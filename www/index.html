@@ -1443,7 +1443,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-J</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-K</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1974,6 +1974,45 @@
             <div class="dialog-btn ui-stack form-btns">
                 <button class="ui-btn primary block" id="tplNew">新建模板</button>
                 <button class="ui-btn block" id="closeTpl">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1019-K：模板面板（新建 / 编辑）：只填模板要的，没有记账时间；保存只存模板、不写账本 -->
+    <div class="mask sheet-mask form-mask" id="tplEditMask">
+        <div class="sheet edit-dialog" id="tplEditSheet">
+            <div class="sheet-grip" id="tplEditGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3 id="tplEditTitle">新建模板</h3></div></div>
+            <div class="form-box">
+                <div class="field">
+                    <label class="field-label">名字（可不填，最多 10 字）</label>
+                    <input type="text" id="tplEditName" maxlength="20" placeholder="不填就用备注或分类">
+                </div>
+                <div class="field">
+                    <label class="field-label">分类</label>
+                    <div class="cat-chips" id="tplEditCats"></div>
+                </div>
+                <div class="field">
+                    <label class="field-label">收支</label>
+                    <div class="cat-chips io-chips" id="tplEditTypes"></div>
+                </div>
+                <div class="field">
+                    <label class="field-label">统计口径</label>
+                    <div class="cat-chips mode-chips" id="tplEditMode"></div>
+                </div>
+                <div class="field">
+                    <label class="field-label">备注（可不填）</label>
+                    <textarea id="tplEditRemark" class="remark-area" maxlength="5000" rows="2"></textarea>
+                </div>
+                <div class="field">
+                    <label class="field-label">固定金额（可不填，每次不一样的就空着）</label>
+                    <input type="text" inputmode="decimal" id="tplEditMoney" class="money-input" placeholder="不带金额">
+                </div>
+                <p id="tplEditErr" class="ask-err" style="display:none"></p>
+            </div>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="tplEditSave">保存</button>
+                <button class="ui-btn warn block" id="tplEditDelete" style="display:none">删除这个模板</button>
+                <button class="ui-btn block" id="tplEditCancel">取消</button>
             </div>
         </div>
     </div>
@@ -8815,7 +8854,7 @@ ${detail}
                 box.dataset.mode='normal'; delete box.dataset.auto; paintModeChips(box);
             }
         }
-        ['billMode','editMode'].forEach(id=>{
+        ['billMode','editMode','tplEditMode'].forEach(id=>{
             const box=$(id); if(!box) return;
             MODE_OPTS.forEach(o=>{
                 const b=document.createElement('div');
@@ -8838,15 +8877,15 @@ ${detail}
         }
 
         // ===== 常用模板（1010-I）=====
-        // 存在存档里：archive.tpls = [{ id, type, cat, remark, money|null, mode }]，跟着存档走（导出/云备份/导入）。
+        // 存在存档里：archive.tpls = [{ id, type, cat, remark, money|null, mode, name? }]，跟着存档走（导出/云备份/导入）。1019-K 起可以有 name（没有就不带）。
         // 顺序完全由用户决定（不按使用次数自动排），点一下只「填表」，不直接入账。
         // money 为 null 表示「不带金额」：适合每次金额不同的，比如吃饭；固定价的（订阅、房贷）就带上。
-        const TPL_MAX=12;
+        const TPL_MAX=12, TPL_NAME_MAX=10;
         function getTpls(){
             const a=curArchive(loadStore());
             return (a && Array.isArray(a.tpls)) ? a.tpls : [];
         }
-        function tplName(t){ return (t.remark||'').trim().split('\n')[0] || t.cat; }
+        function tplName(t){ return (t.name||'').trim() || (t.remark||'').trim().split('\n')[0] || t.cat; }   // 1019-K：模板可以有自己的名字（name，可有可无）
         function tplSame(a, b){
             return a.type===b.type && a.cat===b.cat && (a.remark||'')===(b.remark||'')
                 && (a.mode||'normal')===(b.mode||'normal') && (a.money==null ? null : round2(a.money))===(b.money==null ? null : round2(b.money));
@@ -8864,6 +8903,8 @@ ${detail}
                 if(t.money!=null && t.money!==''){ const m=normMoney(t.money); if(!m.ok) return; money=m.val; }
                 const n={ id:genId(), type, cat, remark:String(t.remark==null?'':t.remark).trim().slice(0,5000), money,
                           mode:(t.mode==='flow'||t.mode==='skip') ? t.mode : 'normal' };
+                const nm=charSlice(String(t.name==null?'':t.name).trim(), TPL_NAME_MAX);
+                if(nm) n.name=nm;   // 1019-K：有名字才带（没名字的模板和以前一模一样）
                 if(!out.some(o=>tplSame(o,n))) out.push(n);
             });
             return out;
@@ -8931,7 +8972,7 @@ ${detail}
             }catch(_){}
         }
         // 把表单当前内容存成模板。src: { type, cat, remark, money(字符串), mode }；after: 存完后的回调
-        function saveTplFrom(src, after, prefix){
+        function saveTplFrom(src, after){
             if(!src.type || !src.cat){ customAlert('先选好分类和收支，再存为常用。'); return; }
             if(getTpls().length>=TPL_MAX){ customAlert(`常用模板最多 ${TPL_MAX} 个，先去「设置 → 管理常用模板」删掉几个吧。`); return; }
             const base={ type:src.type, cat:src.cat, remark:(src.remark||'').trim().slice(0,5000),
@@ -8939,18 +8980,18 @@ ${detail}
             const m=normMoney(src.money);
             const doSave=(withMoney)=>{
                 const t=Object.assign({ id:genId(), money: withMoney ? m.val : null }, base);
-                if(getTpls().some(o=>tplSame(o,t))){ customAlert((prefix ? prefix+'\n\n' : '')+'这个已经在常用里了。'); return; }
+                if(getTpls().some(o=>tplSame(o,t))){ customAlert('这个已经在常用里了。'); return; }
                 const store=loadStore(); const a=curArchive(store);
                 a.tpls=(Array.isArray(a.tpls) ? a.tpls.slice() : []).concat([t]);
-                if(!saveStoreSafe(store)) return;
+                if(!saveTplStore(store)) return;
                 if(after) after();
-                customAlert(`${prefix ? prefix+'\n\n' : ''}已存为常用：${tplName(t)}${withMoney?' '+m.val.toFixed(2):''}`);
+                customAlert(`已存为常用：${tplName(t)}${withMoney?' '+m.val.toFixed(2):''}`);
             };
             if(String(src.money||'').trim()==='' || !m.ok){ doSave(false); return; }
             customChoose('金额要一起存吗？', [
                 { value:'with',    label:`带上金额 ${m.val.toFixed(2)}`, desc:'固定价的：订阅、房贷、话费' },
                 { value:'without', label:'不带金额', desc:'每次金额不一样的：吃饭、打车' },
-            ], (v)=>doSave(v==='with'), '存为常用', prefix ? ()=>customAlert(prefix+'没有存成常用。') : null, { layout:'list' });
+            ], (v)=>doSave(v==='with'), '存为常用', null, { layout:'list' });
         }
         $('billSaveTpl').addEventListener('click', ()=>{
             saveTplFrom({ type:billTypeSel, cat:billCatSel, remark:billRemark.value, money:billMoney.value,
@@ -9065,6 +9106,9 @@ ${detail}
                 del.onclick=()=>removeTpl(t.id);
                 wrap.appendChild(up); wrap.appendChild(del);
                 div.appendChild(left); div.appendChild(wrap);
+                // 1019-K：点行（不是 ↑ / 删除）打开模板面板改它
+                div.dataset.id=t.id; div.setAttribute('role','button'); div.style.cursor='pointer';
+                div.addEventListener('click', e=>{ if(e.target.closest('button')) return; openTplEditor(t.id); });
                 list.appendChild(div);
             });
             $('tplMask').style.display='flex';
@@ -9076,27 +9120,90 @@ ${detail}
             if(i<0 || j<0 || j>=arr.length) return;
             [arr[i], arr[j]]=[arr[j], arr[i]];
             a.tpls=arr;
-            if(saveStoreSafe(store)) openTplManager();
+            if(saveTplStore(store)) openTplManager();
         }
         function removeTpl(id){
             const store=loadStore(); const a=curArchive(store);
             a.tpls=(Array.isArray(a.tpls) ? a.tpls : []).filter(t=>t.id!==id);
-            if(saveStoreSafe(store)) openTplManager();
+            if(saveTplStore(store)) openTplManager();
         }
         $('manageTplSetting').addEventListener('click', openTplManager);
-        // 1019-D：管理页里「新建模板」：打开记一笔（标题写「记一笔，顺便存成常用」），点「添加记录」时这一笔照常记下，再存成常用模板
-        let addAlsoTpl=false;
+        // 1019-K：「新建模板」不再借用记一笔（原来点「添加记录」会往账本里真记一笔），单独一个模板面板（openTplEditor）
         $('tplNew').addEventListener('click', ()=>{
             if(getTpls().length>=TPL_MAX){ customAlert(`常用模板最多 ${TPL_MAX} 个，先删掉几个吧。`); return; }
-            $('tplMask').style.display='none';
-            openAddModal();
-            addAlsoTpl=true;
-            $('addSheet').querySelector('.sheet-head h3').textContent='记一笔，顺便存成常用';
+            openTplEditor(null);
         });
         $('closeTpl').addEventListener('click', ()=>{ $('tplMask').style.display='none'; });
+        // ===== 1019-K：模板面板（新建 / 编辑都用它）=====
+        //   只填模板要的：名字（可不填）、分类、收支、口径、备注、固定金额（可不填）；没有记账时间。
+        //   保存只改存档里的 tpls：不写记录、不改账本版本（saveTplStore），回到模板列表。
+        let tplEditId=null, tplEditCat='', tplEditType='';
+        function tplEditChips(){
+            const cb=$('tplEditCats'); cb.innerHTML='';
+            getCats().forEach(c=>{ const b=document.createElement('div'); b.className='cc'+(c===tplEditCat?' sel':''); b.textContent=c;
+                b.onclick=()=>{ const prev=tplEditCat; tplEditCat=c; cb.querySelectorAll('.cc').forEach(x=>x.classList.toggle('sel', x===b)); autoModeOnCat($('tplEditMode'), prev, c); }; cb.appendChild(b); });
+            const tb=$('tplEditTypes'); tb.innerHTML='';
+            [{v:'expense', t:'支出', cls:'sel-out'}, {v:'income', t:'收入', cls:'sel-in'}].forEach(o=>{ const b=document.createElement('div'); b.className='cc'+(o.v===tplEditType?' '+o.cls:''); b.textContent=o.t;
+                b.onclick=()=>{ tplEditType=o.v; tb.querySelectorAll('.cc').forEach(x=>x.classList.remove('sel-out','sel-in')); b.classList.add(o.cls); }; tb.appendChild(b); });
+        }
+        function openTplEditor(id){
+            const t=id ? getTpls().find(x=>x.id===id) : null;
+            if(id && !t){ customAlert('这个模板已经不在了。'); openTplManager(); return; }
+            tplEditId=t ? t.id : null;
+            tplEditCat=t && getCats().includes(t.cat) ? t.cat : '';
+            tplEditType=t ? t.type : '';
+            $('tplEditTitle').textContent=t ? '编辑模板' : '新建模板';
+            $('tplEditName').value=t ? (t.name||'') : '';
+            $('tplEditRemark').value=t ? (t.remark||'') : '';
+            $('tplEditMoney').value=t && t.money!=null ? safeNum(t.money).toFixed(2) : '';
+            setModeChips($('tplEditMode'), t ? t.mode : 'normal');
+            tplEditChips();
+            $('tplEditDelete').style.display=t ? '' : 'none';
+            $('tplEditErr').style.display='none';
+            $('tplEditMask').style.display='flex';
+        }
+        function closeTplEditor(){ $('tplEditMask').style.display='none'; tplEditId=null; }
+        // 只改模板：照常写存档（云备份里也有模板），但不把账本版本往上加（导入确认页不会因此说「账本变了」）
+        function saveTplStore(store){
+            const e=__ledger.get(storeKey()), v=e ? e.ver : null;
+            const ok=saveStoreSafe(store);
+            if(ok && e && v!==null) e.ver=v;
+            return ok;
+        }
+        function tplEditErr(msg){ const el=$('tplEditErr'); el.textContent=msg; el.style.display='block'; }
+        $('tplEditSave').addEventListener('click', ()=>{
+            if(!tplEditCat) return tplEditErr('选一个分类');
+            if(!tplEditType) return tplEditErr('选支出还是收入');
+            const name=$('tplEditName').value.trim();
+            if(charLen(name)>TPL_NAME_MAX) return tplEditErr(`名字最多 ${TPL_NAME_MAX} 个字`);
+            const mv=$('tplEditMoney').value.trim(); let money=null;
+            if(mv!==''){ const m=normMoney(mv); if(!m.ok) return tplEditErr('固定金额：'+m.why); money=m.val; }
+            const t={ id:tplEditId || genId(), type:tplEditType, cat:tplEditCat, remark:$('tplEditRemark').value.trim().slice(0,5000), money, mode:getModeChips($('tplEditMode')) };
+            if(name) t.name=name;
+            const store=loadStore(); const a=curArchive(store);
+            const arr=Array.isArray(a.tpls) ? a.tpls.slice() : [];
+            if(arr.some(o=>o.id!==t.id && tplSame(o, t))) return tplEditErr('已经有一个一样的模板了');
+            const i=arr.findIndex(o=>o.id===t.id);
+            if(i>=0) arr[i]=t; else { if(arr.length>=TPL_MAX) return tplEditErr(`常用模板最多 ${TPL_MAX} 个`); arr.push(t); }
+            a.tpls=arr;
+            if(!saveTplStore(store)) return;
+            closeTplEditor();
+            renderTplChips();
+            openTplManager();
+        });
+        $('tplEditCancel').addEventListener('click', closeTplEditor);
+        $('tplEditDelete').addEventListener('click', ()=>{
+            const id=tplEditId; if(!id) return;
+            const t=getTpls().find(x=>x.id===id);
+            customConfirm(`删除模板「${t ? tplName(t) : ''}」。记过的账不受影响。`, ()=>{
+                const store=loadStore(); const a=curArchive(store);
+                a.tpls=(Array.isArray(a.tpls) ? a.tpls : []).filter(x=>x.id!==id);
+                if(!saveTplStore(store)) return;
+                closeTplEditor(); renderTplChips(); openTplManager();
+            }, '删除模板', { danger:true, okText:'删除这个模板' });
+        });
+        $('tplEditMoney').addEventListener('input', ()=>{ const el=$('tplEditMoney'), v=sanitizeMoney(el.value); if(v!==el.value) el.value=v; });
         function openAddModal(){
-            addAlsoTpl=false;
-            const h=$('addSheet').querySelector('.sheet-head h3'); if(h) h.textContent='记一笔';
             resetBillForm();
             if(window.__openModalAfterKeyboard){
                 // 键盘先出来，弹窗再淡入（消除被键盘顶起的闪动）
@@ -9189,12 +9296,6 @@ ${detail}
             refreshAllViews();
             // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
             addMask.style.display='none';
-            // 1019-D：从「新建模板」进来的：这一笔记下了，接着存成常用（金额带不带照旧问一句），不再问「再记一笔」
-            if(addAlsoTpl){
-                addAlsoTpl=false;
-                saveTplFrom({ type, cat, remark, money, mode:getModeChips($('billMode')) }, ()=>renderTplChips(), '这一笔已经记下了。');
-                return;
-            }
             // 这一笔没填备注 → 成功弹窗额外给个「添加备注」按钮，方便当场补；填了则不显示。
             const confirmOpts={ okText:'再记一笔', cancelText:'关闭' };
             if(!remark){
@@ -11091,6 +11192,7 @@ ${detail}
             detailMask:()=>closeDetail(),
             refundMask:()=>closeRefund(),
             tplMask:()=>{ $('tplMask').style.display='none'; },
+            tplEditMask:()=>closeTplEditor(),
             catMask:()=>{ $('catMask').style.display='none'; },
             themeMask:()=>{ $('themeMask').style.display='none'; },
             dtMask:()=>closeDtPicker(),   // 和原来返回键一样：直接关，不算「取消」回调
@@ -11100,7 +11202,7 @@ ${detail}
             dayMgrMask:()=>closeDayMgr(),
             ymMask:()=>{ $('ymMask').style.display='none'; },
         };
-        const FORM_ASK=['addMask','editMask','dayMask'];
+        const FORM_ASK=['addMask','editMask','dayMask','tplEditMask'];
         const formSnaps={};
         // 表单现在的样子：输入框、日期、选中的标签、开关（打开时记一份，关的时候比一比）
         function formState(id){
@@ -11198,6 +11300,7 @@ ${detail}
                 { can:()=>isOpen('dayMask'),    close:()=>formBackClose('dayMask') },
                 { can:()=>isOpen('dayMgrMask'), close:()=>formBackClose('dayMgrMask') },
                 { can:()=>isOpen('catMask'),    close:()=>formBackClose('catMask') },
+                { can:()=>isOpen('tplEditMask'), close:()=>formBackClose('tplEditMask') },
                 { can:()=>isOpen('tplMask'),    close:()=>formBackClose('tplMask') },
                 { can:()=>isOpen('themeMask'),  close:()=>formBackClose('themeMask') },
                 // 统计页的年月选择器。它和 dtMask 是两套独立实现，别忘了这一个
