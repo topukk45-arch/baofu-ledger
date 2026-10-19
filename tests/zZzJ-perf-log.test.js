@@ -41,6 +41,7 @@ const log = w => JSON.parse(w.localStorage.getItem('app_perf_log') || '[]');
   w.visualViewport.height = 650; w.visualViewport.dispatchEvent(new w.Event('resize'));
   await wait(1000);
   const k = log(w).find(e => e.kind === '键盘');
+  ok(k && typeof k.blank === 'number', '4 1019-W：键盘那条还记了露出空白几帧 ' + JSON.stringify(k));
   ok(k && typeof k.moves === 'number' && k.vv === '970→650' && /txtMask/.test(k.what), '4 键盘弹起：记了面板位置变了几次（1019-O 起点备注弹的是文字输入小面板）' + JSON.stringify(k));
 
   // 5. 页面：设置里有入口（开发开关开着），一行一条，能复制、清空
@@ -50,6 +51,7 @@ const log = w => JSON.parse(w.localStorage.getItem('app_perf_log') || '[]');
   $('devPerfBtn').click();
   ok(w.JiwenSheet.isOpen() && $('uiSheetTitle').textContent === '性能记录（开发中）', '5 打开性能记录页');
   ok(/启动 \d+ms/.test($('perfList').textContent) && /键盘 面板位置变了/.test($('perfList').textContent), '5 一行一条写成大白话');
+  ok(/露出空白 \d+ 帧/.test($('perfList').textContent), '5 键盘那行写露出空白几帧');
   $('perfCopy').click(); await wait(10);
   ok(/记问性能记录/.test(w.__copied || '') && /点输入框到能输入/.test(w.__copied || ''), '5 「复制全部」：复制的是全部记录');
   $('perfClear').click();

@@ -32,12 +32,14 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
   // 2. 键盘弹起：先全冻住，停下来只放开最上面的小面板，记一笔一直冻着
   vvTo(650);
-  ok(held() === 'addMask,txtMask', '2 键盘一动：开着的两层都冻住（不跟着缩）');
+  // 1019-W：这一段键盘变化的第一帧，小面板直接贴到键盘上（不冻），下面的记一笔冻住
+  ok(held() === 'addMask', '2 键盘一动：记一笔冻住不跟着缩，小面板这一帧就贴到键盘上');
   vvTo(640); vvTo(630);
-  await wait(60);
-  ok(held() === 'addMask,txtMask', '2 键盘还在动：还冻着');
-  await wait(120);
-  ok(held() === 'addMask', '2 停下来：只放开最上面的小面板（它只动这一次），记一笔一直冻着不动');
+  await wait(30);
+  ok(held() === 'addMask,txtMask' && $('txtMask').style.getPropertyValue('--hold-h') === '650px', '2 键盘还在动：小面板先停在第一帧的位置（不一步一步跟），记一笔还冻着');
+  await wait(80);
+  ok(held() === 'addMask', '2 停下来（60 毫秒没再动）：放开小面板贴到最后的位置，记一笔一直冻着不动');
+  ok(/max\(var\(--hold-h\), 100%\)/.test([...d.querySelectorAll('style')].map(x => x.textContent).join('')), '2 冻住的层不比屏幕矮（键盘先变矮又变高时不露出页面底色）');
   ok($('addMask').style.getPropertyValue('--hold-h') === '970px', '2 记一笔冻在键盘动之前的高度');
 
   // 3. 确定：字写回备注，小面板关，回到记一笔

@@ -820,7 +820,7 @@
         body.kb-open .sheet { max-height:100%; }
         /* 1019-O：键盘弹起 / 收起时先把所有开着的层按原来的高度冻住（不跟着缩），等键盘停下再只放开最上面那层，
            它只动一次；下面几层一直不动。--hold-h 是键盘动之前的高度 */
-        .mask.kb-hold { bottom:auto; height:var(--hold-h); }
+        .mask.kb-hold { bottom:auto; height:max(var(--hold-h), 100%); }   /* 1019-W：冻住的层永远不比屏幕矮（键盘一段里先变矮又变高时，原来会露出一截页面底色） */
         .mask.kb-hold > .sheet, .mask.kb-hold > .edit-dialog, .mask.kb-hold > .dt-dialog { max-height:var(--hold-max) !important; }
         /* 1019-O：文字输入的小面板（只有一个输入框），和日期选择同一套外观，贴在键盘上面 */
         #txtMask { z-index:1036; }
@@ -1530,7 +1530,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-V</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-W</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2444,14 +2444,20 @@
             //   现在：可视区一开始变，先把所有开着的层按变之前的高度冻住（.kb-hold），不跟着动；
             //   等可视区停下来（KB_SETTLE_MS 没再变），只放开最上面那一层——它只动一次，贴到键盘上面；下面几层一直不动。
             //   键盘收起、可视区回到原来的高度，全部放开（冻住的高度本来就是原来的，不会再动）。
-            const KB_SETTLE_MS=120;
+            // 1019-W：最上面那层（正在输入的小面板）不再跟着冻住等 120 毫秒：这一段键盘变化的第一帧就贴到键盘上面，
+            //   这一段里后面的几步先停在那儿（不一步一步跟），停下来再放开一次；下面几层照旧一直冻着。停下来的判定 120 → 60 毫秒。
+            const KB_SETTLE_MS=60;
             function openMasks(){
                 const ms=[...document.querySelectorAll('.mask')].filter(m=>m.style.display==='flex');
                 ms.sort((a, b)=>(parseInt(getComputedStyle(a).zIndex)||0)-(parseInt(getComputedStyle(b).zIndex)||0) || (a.compareDocumentPosition(b) & 4 ? -1 : 1));
                 return ms;
             }
-            let holdH=0, settleT=null;
-            function holdAll(h){ openMasks().forEach(m=>{ if(m.classList.contains('kb-hold')) return;
+            let holdH=0, settleT=null, firstH=0;
+            function holdTopAt(h){ const ms=openMasks(), m=ms[ms.length-1]; if(!m || m.classList.contains('kb-hold')) return;
+                const sh=m.querySelector('.sheet') || m.firstElementChild;
+                if(sh){ const mx=getComputedStyle(sh).maxHeight; if(/px$/.test(mx)) m.style.setProperty('--hold-max', Math.round(parseFloat(mx))+'px'); }
+                m.style.setProperty('--hold-h', h+'px'); m.classList.add('kb-hold'); }
+            function holdAll(h, skipTop){ const all=openMasks(), topM=all[all.length-1]; all.forEach(m=>{ if(m.classList.contains('kb-hold') || (skipTop && m===topM)) return;
                 const sh=m.querySelector('.sheet') || m.firstElementChild;
                 // 面板的最高高度原来按屏幕百分比算，屏幕一缩它也缩：冻住时一起按现在的像素定住
                 // 这时屏幕已经缩了（按屏幕百分比算的最高高度也跟着缩了），按比例换回键盘动之前的高度
@@ -2469,7 +2475,8 @@
                 let baseH = vv.height, lastH = vv.height;
                 vv.addEventListener('resize', ()=>{
                     const shrunk = (baseH - vv.height) > 120;   // 可视区明显变矮 = 键盘弹起
-                    if(!settleT){ holdH=Math.round(lastH); holdAll(holdH); }   // 这一轮刚开始变：按变之前的高度冻住（先冻再改 kb-open，免得量到变了以后的高度）
+                    if(!settleT){ holdH=Math.round(lastH); holdAll(holdH, true); firstH=Math.round(vv.height); }   // 这一轮刚开始变：下面几层按变之前的高度冻住（先冻再改 kb-open，免得量到变了以后的高度）；最上面那层这一帧直接贴到键盘上
+                    else holdTopAt(firstH);   // 这一轮后面几步：最上面那层先停在第一帧的位置，等停下来再放开
                     document.body.classList.toggle('kb-open', shrunk);
                     lastH=vv.height;
                     clearTimeout(settleT);
@@ -11891,14 +11898,17 @@ ${detail}
                 if(watching || !P.on()) return;
                 const sh=topSheet(); if(!sh) return;
                 watching=true;
-                const t0=P.now(), tops=[], frames=[]; let last=null, prev=t0;
+                const t0=P.now(), tops=[], frames=[]; let last=null, prev=t0, blank=0;
                 const tick=()=>{
-                    const top=Math.round(sh.getBoundingClientRect().top), n=P.now();
+                    const r=sh.getBoundingClientRect(), top=Math.round(r.top), n=P.now();
                     if(top!==last){ tops.push(top); last=top; }
+                    // 1019-W：这一帧露没露出空白底：面板（或它的遮罩）下沿够不到看得见的屏幕底
+                    const vis=(vv.offsetTop||0)+vv.height, mk=sh.closest('.mask'), mb=mk ? mk.getBoundingClientRect().bottom : r.bottom;
+                    if(Math.min(r.bottom, mb) < vis-1) blank++;
                     frames.push(n-prev); prev=n;
                     if(n-t0<900) requestAnimationFrame(tick);
                     else { watching=false; const fs=frames.slice(1);
-                        P.add({ kind:'键盘', moves:Math.max(0, tops.length-1), maxFrame:Math.round(Math.max(0, ...fs)), avgFrame:fs.length ? Math.round(fs.reduce((a, b)=>a+b, 0)/fs.length) : 0, vv:Math.round(h0)+'→'+Math.round(vv.height), what:nameOf(sh) }); }
+                        P.add({ kind:'键盘', moves:Math.max(0, tops.length-1), blank, maxFrame:Math.round(Math.max(0, ...fs)), avgFrame:fs.length ? Math.round(fs.reduce((a, b)=>a+b, 0)/fs.length) : 0, vv:Math.round(h0)+'→'+Math.round(vv.height), what:nameOf(sh) }); }
                 };
                 requestAnimationFrame(tick);
             });
@@ -11923,7 +11933,7 @@ ${detail}
             function fmt(e){
                 if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}）`;
                 if(e.kind==='点输入框') return `${e.at} 点输入框到能输入 ${e.ms}ms（${e.what}）`;
-                if(e.kind==='键盘') return `${e.at} 键盘 面板位置变了 ${e.moves} 次，最慢一帧 ${e.maxFrame}ms、平均 ${e.avgFrame}ms，可视区 ${e.vv}（${e.what}）`;
+                if(e.kind==='键盘') return `${e.at} 键盘 面板位置变了 ${e.moves} 次${e.blank!=null ? `，露出空白 ${e.blank} 帧` : ''}，最慢一帧 ${e.maxFrame}ms、平均 ${e.avgFrame}ms，可视区 ${e.vv}（${e.what}）`;
                 if(e.kind==='打开面板' || e.kind==='关闭面板') return `${e.at} ${e.kind} ${e.ms}ms（${e.what}）`;
                 return e.at+' '+JSON.stringify(e);
             }
