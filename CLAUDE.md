@@ -125,6 +125,33 @@
   - 测试怎么读：测试进程预先载入 `tests/tools/inline-hook.js`（`run-all.js` 每个都带上；单独跑一个时 `node -r ./tools/inline-hook.js xxx.test.js`），读 `index.html` 时按引用把 `app/*.js`、`app.css` 拼回单文件，老测试一条不改；`regress.js` 自己装这个钩子。要读拆开原样的（`zZzV`）用 `fs.readFileSync(文件)` 读字节再转字（钩子只管读成字的）。
   - 工具：`tests/tools/split-index.js`（一次性的切分脚本，切完自查拼回去逐字节一样）、`tests/tools/inline.js`（拼回去）、`tests/tools/scan.js`（acorn 扫顶层：每条顶层语句当场用到哪些名字、登记了哪些以后才跑的回调；`zZzV` 和以后的依赖检查共用）。`tests/package.json` 多了 acorn、acorn-walk 两个开发依赖。`tests/ui/audit.js` 的小服务器给 `.css` 回 `text/css`（不然 Chromium 不认这个样式表）。
 
+## 模块规矩（modules 分支，1019-Z4-M3 起；设计在 `tests/tools/modules-plan.js`，合并时一起带进 main）
+- 目标：`www/app/` 下一个模块一个文件，每个模块对外只有一个全局入口（`window.JiwenXxx`，照 `www/import/` 的写法），其余名字都关在模块里面。
+- 分层（从下到上）：0 基础 → 1 存储 → 2 面板底座 → 3 业务 → 4 页面 → 5 启动 / 外壳。同一层里也排了先后，**只许调排在自己前面的模块**，排在后面的一律不许直接调。模块和先后（`index.html` 里的引用顺序也照这个）：
+  | 层 | 模块（入口） | 装什么 |
+  | --- | --- | --- |
+  | 0 基础 | base（`JiwenBase`） | 性能记录（入口 `JiwenPerf` 不变）、`$`、常量、页面元素句柄、软键盘、金额输入过滤、dt-input 垫片、数字字号、时间解析、口径计算、补零 / 四舍五入 / 转义这些小工具 |
+  | 1 存储 | store（`JiwenStore`） | 账本存储（IndexedDB 分块、写入队列）、loadStore / saveStore、账号、老数据迁移、搬家、退款和预算的计算、分类 / 模板 / 日子的数据、导入数据和写入（入口 `JiwenImportStore` 不变）、云备份、单号表上云、备份文件导出 / 导入 |
+  | 2 面板底座 | select（`JiwenSelect`）→ keypad（`JiwenKeypad`）→ text（`JiwenText`）→ date（`JiwenDate`）→ ask（`JiwenAsk`）→ sheet（`JiwenSheet`） | 金色下拉、数字键盘、文字小面板、日期时间选择、提示 / 确认 / 输入框、共用底部面板（往下拉关闭、收起动画、滚动锁、按下反馈） |
+  | 3 业务 | ai（`JiwenAiExport`）→ impentry（`JiwenImportEntry`） | 导出账单给 AI、导入入口（开发开关、`loadImportUI`、用记问打开、空账本入口、月初提醒、待处理横幅） |
+  | 4 页面 | forms（`JiwenForms`）→ ledger（`JiwenLedger`）→ stats（`JiwenStats`）→ days（`JiwenDays`）→ cats（`JiwenCats`） | 记一笔 / 修改 / 退款 / 口径 / 模板；账单页（列表、翻页、搜索筛选、分类汇总、批量）；统计页（预算、预算建议、年月选择、账单详情）；日子；分类管理 |
+  | 5 外壳 | settings（`JiwenSettings`）→ tabs（`JiwenTabs`）→ login（`JiwenLogin`）→ back（`JiwenBack`）→ boot（不对外） | 设置页、外观、存储用量；页签切换、进账号、日子管理页进出、刷新所有页面、被杀回来、首屏快照、历史脏数据自检；登录页；返回键层级表和弹窗关闭表（要认得每一种弹窗，所以放最上面）；启动 |
+  按节归、个别名字单独挪（比如 `pad`、`escapeHtml` 原来在日期选择、存储那几节，归基础；`getUserData` 原来在分类拖动那节，归存储），全表见 `modules-plan.js`；`node tests/tools/modules-plan.js` 打印每个模块多大、还有哪些往上调用。
+- 往上调用（回调口）：按这张表算下来只剩三种，暂时留着、测试锁住只减不增：数据改了删首屏快照（存储 → `snapDrop`）、存储写不进去弹提示（存储 → `customAlert`）、数据改了刷新所有页面（分类 / 账单页批量 / 记一笔 / 详情 → `refreshAllViews`、`refreshCatSelectors`）。写法：调用的时候才去 `window.JiwenXxx.fn()` 拿（加载时不取）。以后改成「下层留一个口子、上层登记进来」要你定（见还要确认）。
+- 一个模块的文件长这样：开头 `(function(){`、结尾把入口挂上 `window.JiwenXxx = { … };` 再 `})();`；代码原样剪进去，**不改缩进、不改一个字**（测试里有按原文找的检查，比如 `const SHEET_MS=300;`）。用下层的东西：模块开头一行 `const { a, b, c } = window.JiwenBase;`，取出来的名字和原来一样，调用的地方不用改；只取函数和常量。
+- 会变的状态不能那样取（取出来就是那一刻的值）：
+  - 全 App 共用的四个 `currentUser`、`currentArchive`、`currentTab`、`curPage`（共约 160 处）放进 `JiwenBase.state`，用的地方改成 `St.currentUser`（模块开头 `const St = JiwenBase.state;`）——这是唯一要成片改写法的一步，单独一个提交，逐字节对比、全部测试；
+  - 别的模块的状态（统计页的 `statYear` / `statMonth` / `statSelDay` / `statTab` / `statMonthCatMode`、记一笔的 `billCatSel` / `billTypeSel` / `editId` / `editCatSel` / `editTypeSel`、日子的 `daysSelecting`、筛选的 `draftMode`、预算建议的 `bgSuggestOpen`、数字键盘的 `kpTarget`）由它的入口带读写口（`get statYear(){…}`），别处写成 `JiwenStats.statYear`。
+- 还没搬的旧代码（`app-N-….js`）用到已经搬走的名字：在那个旧文件开头加一段「旧代码引用表」`const { … } = window.JiwenBase;`，那块搬走时删掉；只减不增。
+- 顶层的事件绑定语句（给某个按钮 `addEventListener` 那种）跟着它服务的页面走，不跟着原来所在的节（比如账号那节里给「新建账号」绑点击的，归登录页）。
+- 老入口留在 `window` 上（`www/import/`、原生层以外按名字找的）：`JiwenPerf`、`JiwenSheet`、`JiwenImportStore`、`JiwenImportNext`、`customAlert`、`customConfirm`、`customPrompt`、`openDevImportCheck`、`kpOpen`、`kpClose`、`openTextPanel`、`snapSave`、`snapDrop`、`openEdit`、`viewRemark`、`syncFilterFab`、`closeFilterSheet`、`setDraftCat`、`getDraftCat`、`dtWheelsSync`、`openPerfPage`、`SHEET_MS`（名单在 `modules-plan.js` 的 `LEGACY`）。原生层不直接调网页里的函数（查过）。HTML 里没有 `onclick="…"` 这类属性（查过 0 处），JS 里的 `.onclick=` 本来就是代码绑定，照旧。
+- 每搬一块：一块一个提交，从最底层开始；加依赖检查把这块锁死（这个文件顶层不定义名字、挂到 window 上的只有它的入口和名单里的老入口、别的文件不直接用它里面的名字、它只调排在前面的模块）；全部测试、逐字节对比、导入标准答案一致，量一次启动时间；牵连太广、要动逻辑才搬得动的退回，记进还要确认，做下一块。
+- 测试里直接调全局函数的（61 个名字、64 个文件，`w.loadStore(…)`、`w.eval('renderBill()')` 这类）：那块搬走时只改调用写法，参数和检查一字不动，提交说明里列出改了哪些。以后改成：
+  - `JiwenStore`：loadStore（29 个文件）、saveStore（17）、ledgerGet、storeKey（各 9）、importArchiveFromText（8）、odBuildPayload、getUserData（各 7）、odSyncNow（6）、saveUserData、impTarget（各 4）、__LEDGER_STRICT（3）、genId、impBlkDecode（各 2）、budgetSpentIn、getBudgets、getCats、__ledger、saveStoreDurable、ledgerDropAccount、curArchive、impRecHash、impOrdersRestoreFromCloud、odRefreshStatusUI、impCleanAiFlag、impMakeBackup、impBkPrefix、idbBatch、__ledgerKeys、sanitizeTpls、tplName、ledgerIdle（各 1）；
+  - `JiwenImportEntry`：loadImportUI（19）、renderDevImport（3）；`JiwenStats`：openDetail（6）、statYear、statMonth、renderStats、openAiFlagList；`JiwenCats`：deleteCat（6）、renameCat（5）；`JiwenAiExport`：buildAiText（5）；`JiwenLedger`：renderBill、goPage（各 2）、applyBatch、undoBatch、openBatchMenu；`JiwenForms`：billTypeSel、resetBillForm、setModeChips；`JiwenDate`：setDtInput（2）、closeDtPicker、openDtPicker；`JiwenSettings`：refreshArchiveSelect；`JiwenTabs`：switchTab；`JiwenBase.state`：currentUser、currentArchive；
+  - 老入口照旧不用改：customAlert / customConfirm / customPrompt、kpClose、SHEET_MS。
+- 工具：`tests/tools/deps.js`（按节算谁用了谁的名字、读写哪些变量、挂了哪些 window 名字），`tests/tools/modules-plan.js`（上面这张表 + 按表算往上调用）。
+
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。
 
