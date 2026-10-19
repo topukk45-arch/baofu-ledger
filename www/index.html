@@ -1530,7 +1530,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-U</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-V</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -3685,6 +3685,18 @@
         //   · imp_<账号>_<存档号>_d   1019-E：导入草稿（确认页上选好的文件和选择）。只在这台手机上，不进备份、云备份，
         //     不走账本写入队列（不改账本版本，免得「账本变了」拒绝导入）；删存档、删账号、恢复备份时跟着删
         function impDraftKey(id, aid){ return `imp_${id}_${aid}_d`; }
+        // 1019-V：导入草稿最多留 24 小时（账单文件只在导入没做完时临时存在这台手机上）；过了就删，下次打开导入页也不问
+        const IMP_DRAFT_MAX_MS=24*3600*1000;
+        function impDraftStale(v){ return !v || !(typeof v.at==='number') || Date.now()-v.at > IMP_DRAFT_MAX_MS; }
+        // 打开 App 进了账号、首屏出来以后过一会儿：这个账号各个存档里超过 24 小时的草稿都删掉（没再打开导入页也删）
+        async function impDraftExpire(id){
+            const ks=[...__ledgerKeys].filter(k=>k.indexOf(`imp_${id}_`)===0 && /_d$/.test(k));
+            for(const k of ks){
+                let v=null;
+                try{ v=await idbGet(k); }catch(_){ v=null; }
+                if(impDraftStale(v)){ try{ await idbBatch([['del', k]]); }catch(_){} }
+            }
+        }
         function impParseOrdKey(id, aid, k){
             const p=impArchPrefix(id, aid)+'o_';
             if(typeof k!=='string' || k.indexOf(p)!==0) return null;
@@ -4800,6 +4812,7 @@
                 const t=impTarget(archive);
                 let v=null;
                 try{ v=await idbGet(impDraftKey(t.e.id, t.aid)); }catch(_){ return null; }
+                if(v && impDraftStale(v)){ try{ await idbBatch([['del', impDraftKey(t.e.id, t.aid)]]); }catch(_){} return null; }   // 1019-V：超过 24 小时，删掉、不问
                 return v && v.v===1 && Array.isArray(v.files) && v.files.length ? v : null;
             },
             async draftDrop(archive){
@@ -12385,6 +12398,7 @@ ${detail}
                 if(mainBox.style.display!=='block'){ loginBox.style.display='block'; document.body.classList.add('login-mode'); try{ renderRecentUsers(); }catch(_){} }
                 loginBox.style.visibility='';
                 snapUnveil();   // 1019-U：真的首屏（或登录页）出来了，拿掉快照、收启动画面
+                if(currentUser){ const id=currentUser; setTimeout(()=>{ impDraftExpire(id).catch(()=>{}); }, 3000); }   // 1019-V：超过 24 小时的导入草稿删掉（等首屏出来一会儿再读库，不挡打开）
             }));
         })();
 
