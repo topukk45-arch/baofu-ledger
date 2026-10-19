@@ -88,7 +88,8 @@ async function boot(o) {
   t.select = (sel, v) => { sel.value = v; sel.dispatchEvent(new w.Event('change')); };
   t.snapshot = async () => {
     const db = await IDB.dumpDb(t.phone);
-    const ls = {}; for (let i = 0; i < t.ls.length; i++) { const k = t.ls.key(i); ls[k] = t.ls.getItem(k); }
+    // 1019-M 的性能记录（开发开关里、只是计时，不是账本数据）不算进来；其余照旧逐字节比
+    const ls = {}; for (let i = 0; i < t.ls.length; i++) { const k = t.ls.key(i); if (k !== 'app_perf_log') ls[k] = t.ls.getItem(k); }
     const n = w.__files.length; $('exportBtn').click(); await until(() => w.__files.length > n);
     if ($('askMask').style.display === 'flex') $('askOk').click();
     const bk = (w.__files[n] || '').replace(/"exportedAt": "[^"]*"/, '');

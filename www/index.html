@@ -1436,6 +1436,8 @@
         .storage-warn { flex-direction:column; align-items:stretch; gap:4px; color:var(--c-neg); }
         .storage-warn span { font-size:13px; color:var(--c-text); }
         .bg-suggest-same { font-size:13px; color:var(--c-text-soft); padding:6px 0 2px; line-height:1.6; }
+        .perf-list { margin:0; white-space:pre-wrap; word-break:break-all; font-size:12px; line-height:1.6; color:var(--c-text);
+            font-family:ui-monospace, Menlo, Consolas, monospace; background:var(--c-surface); border:1px solid var(--c-border); border-radius:8px; padding:8px 10px; }
         .bg-sel-all { min-height:var(--ui-tap); margin:8px 0 2px; padding:0 18px; }   /* 1019-G：预算建议的全选 / 全不选 */
     </style>
 </head>
@@ -1443,7 +1445,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-L</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-M</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1618,6 +1620,7 @@
                     <button class="set-item" id="devRestoreBtn" style="display:none"><span>恢复备份（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devLogsBtn" style="display:none"><span>导入记录（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devRulesBtn" style="display:none"><span>管理导入规则（开发中）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="devPerfBtn" style="display:none"><span>性能记录（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
                 </div>
@@ -2234,6 +2237,34 @@
     </div>
 
     <script>
+        // ===== 1019-M：性能记录（开发开关里的「性能记录」页看、复制）=====
+        //   App 自己记：启动各段耗时（网页脚本开始跑、打开数据库、读账本、画出首屏）、点输入框到能输入用了多久、
+        //   键盘弹起过程中面板位置变了几次、每次打开 / 关闭面板用了多久。只在开发开关开着时记，
+        //   存在这台手机的 localStorage（app_perf_log，最多留最近 PERF_MAX 条），不进备份。
+        window.JiwenPerf=(function(){
+            const KEY='app_perf_log', PERF_MAX=50;
+            const now=()=>(window.performance && performance.now) ? performance.now() : Date.now();
+            const T0=now();          // 网页脚本开始跑（相对页面开始加载）
+            const boot={ script:Math.round(T0) };
+            function on(){ try{ return localStorage.getItem('app_dev_import')==='1'; }catch(_){ return false; } }
+            function list(){ try{ const a=JSON.parse(localStorage.getItem(KEY)||'[]'); return Array.isArray(a) ? a : []; }catch(_){ return []; } }
+            function add(e){
+                if(!on()) return;
+                const a=list(); a.push(Object.assign({ at:new Date().toISOString().slice(5, 19).replace('T', ' ') }, e));
+                while(a.length>PERF_MAX) a.shift();
+                try{ localStorage.setItem(KEY, JSON.stringify(a)); }catch(_){}
+            }
+            // 启动：各段到「网页开始加载」多少毫秒
+            function bootMark(k){ if(!(k in boot)) boot[k]=Math.round(now()); }
+            function bootDone(){
+                if(boot.done) return; boot.done=1;
+                const f=()=>{ boot.paint=Math.round(now()); const e={ kind:'启动', ms:boot.paint };
+                    ['script','db','read','render','paint'].forEach(k=>{ if(boot[k]!=null) e[k]=boot[k]; });
+                    e.n=window.__perfRecs; add(e); };
+                if(window.requestAnimationFrame) requestAnimationFrame(()=>setTimeout(f, 0)); else setTimeout(f, 0);
+            }
+            return { now, add, list, on, bootMark, bootDone, clear(){ try{ localStorage.removeItem(KEY); }catch(_){} }, T0 };
+        })();
         // ===== 软键盘处理（极简、稳健版） =====
         // 关键教训：之前"先把弹窗设透明、等键盘信号再淡入"的做法，会在键盘弹起、WebView 重排的
         // 那一帧里露出透明弹窗下的底部空白 —— 这正是"先白图、后弹窗"的真正来源。
@@ -5576,8 +5607,11 @@
             const key=storeKey(id);
             return trackBusy(ledgerLoad(key).then(()=>{
                 if(seq!==__loginSeq) return;          // 读的过程中又点了别的账号：以最后一次为准
+                const boot=!!window.__autoLogin;
+                if(boot) window.JiwenPerf.bootMark('read');
                 ledgerEvictExcept(key);
                 enterAccount(id);
+                if(boot){ window.JiwenPerf.bootMark('render'); try{ window.__perfRecs=getUserData().length; }catch(_){} window.JiwenPerf.bootDone(); }
                 // 【1013-H】账本有读不出来的地方：如实告诉用户（同一处只说一次）
                 const dmg=ledgerDamageNotice(id);
                 if(dmg) customAlert(dmg, '有数据读不出来');
@@ -6549,7 +6583,7 @@ ${detail}
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = devImportOn() ? '' : 'none'; }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devPerfBtn').style.display = devImportOn() ? '' : 'none'; }
         $('setBuild').textContent=$('loginBuild').textContent;
         renderDevImport();
         // 2 秒内连点 5 次版本号：开 / 关
@@ -11243,6 +11277,87 @@ ${detail}
             }
         });
 
+        // ===== 1019-M：性能记录：点输入框到能输入、键盘弹起时面板动了几次、面板打开用了多久 =====
+        (function(){
+            const P=window.JiwenPerf;
+            const nameOf=el=>{ if(!el) return ''; const m=el.closest && el.closest('.mask'); return (el.id||el.tagName.toLowerCase())+(m ? '@'+m.id : ''); };
+            // 点输入框 → 获得焦点 → 再过两帧（键盘这时已经在动了）算「能输入」
+            let downAt=0;
+            document.addEventListener('pointerdown', e=>{ const el=e.target && e.target.closest && e.target.closest('input,textarea'); downAt=el ? P.now() : 0; }, true);
+            document.addEventListener('focusin', e=>{
+                const el=e.target; if(!downAt || !el.matches || !el.matches('input,textarea')) return;
+                const t0=downAt; downAt=0;
+                requestAnimationFrame(()=>requestAnimationFrame(()=>P.add({ kind:'点输入框', ms:Math.round(P.now()-t0), what:nameOf(el) })));
+            }, true);
+            // 键盘弹起 / 收起：可视区一变，就一帧一帧看最上面那个面板的顶边，900 毫秒里变了几次、最慢一帧多久
+            const vv=window.visualViewport;
+            function topSheet(){
+                const ms=[...document.querySelectorAll('.mask')].filter(m=>m.style.display==='flex');
+                ms.sort((a, b)=>(parseInt(getComputedStyle(b).zIndex)||0)-(parseInt(getComputedStyle(a).zIndex)||0));
+                return ms[0] ? (ms[0].querySelector('.sheet') || ms[0].firstElementChild) : null;
+            }
+            let watching=false, lastH=vv ? vv.height : 0;
+            if(vv) vv.addEventListener('resize', ()=>{
+                const h0=lastH; lastH=vv.height;
+                if(watching || !P.on()) return;
+                const sh=topSheet(); if(!sh) return;
+                watching=true;
+                const t0=P.now(), tops=[], frames=[]; let last=null, prev=t0;
+                const tick=()=>{
+                    const top=Math.round(sh.getBoundingClientRect().top), n=P.now();
+                    if(top!==last){ tops.push(top); last=top; }
+                    frames.push(n-prev); prev=n;
+                    if(n-t0<900) requestAnimationFrame(tick);
+                    else { watching=false; const fs=frames.slice(1);
+                        P.add({ kind:'键盘', moves:Math.max(0, tops.length-1), maxFrame:Math.round(Math.max(0, ...fs)), avgFrame:fs.length ? Math.round(fs.reduce((a, b)=>a+b, 0)/fs.length) : 0, vv:Math.round(h0)+'→'+Math.round(vv.height), what:nameOf(sh) }); }
+                };
+                requestAnimationFrame(tick);
+            });
+            // 面板打开：display 变成 flex 到面板滑入动画走完（没有动画就是下一帧）
+            function watchMask(m){
+                if(m.__perfWatch) return; m.__perfWatch=1;
+                let was=m.style.display;
+                new MutationObserver(()=>{
+                    const nowD=m.style.display;
+                    if(nowD==='flex' && was!=='flex' && P.on()){
+                        const t0=P.now(), sh=m.querySelector('.sheet') || m.firstElementChild; let done=false;
+                        const fin=()=>{ if(done) return; done=true; P.add({ kind:'打开面板', ms:Math.round(P.now()-t0), what:m.id }); };
+                        if(sh){ sh.addEventListener('animationend', fin, { once:true }); sh.addEventListener('transitionend', fin, { once:true }); }
+                        setTimeout(()=>requestAnimationFrame(fin), 450);   // 没有动画（或动画被打断）的兜底
+                    }
+                    was=nowD;
+                }).observe(m, { attributes:true, attributeFilter:['style'] });
+            }
+            document.querySelectorAll('.mask').forEach(watchMask);
+            new MutationObserver(ms=>ms.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.classList.contains('mask')) watchMask(n); }))).observe(document.body, { childList:true });
+            // 「性能记录（开发中）」页：一行一条，能一键复制全部、清空
+            function fmt(e){
+                if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}）`;
+                if(e.kind==='点输入框') return `${e.at} 点输入框到能输入 ${e.ms}ms（${e.what}）`;
+                if(e.kind==='键盘') return `${e.at} 键盘 面板位置变了 ${e.moves} 次，最慢一帧 ${e.maxFrame}ms、平均 ${e.avgFrame}ms，可视区 ${e.vv}（${e.what}）`;
+                if(e.kind==='打开面板' || e.kind==='关闭面板') return `${e.at} ${e.kind} ${e.ms}ms（${e.what}）`;
+                return e.at+' '+JSON.stringify(e);
+            }
+            function openPerfPage(){
+                const rows=P.list().slice().reverse();
+                const text=['记问性能记录（'+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1')+'）'].concat(rows.map(fmt)).join('\n');
+                window.JiwenSheet.open({ title:'性能记录（开发中）', sub:rows.length ? `最近 ${rows.length} 条，新的在上（最多留 50 条，只在这台手机）` : '还没有记录：关掉 App 再打开、点几个输入框、开关几个面板，这里就有了。',
+                    body(box){ const pre=document.createElement('pre'); pre.id='perfList'; pre.className='perf-list'; pre.textContent=rows.map(fmt).join('\n'); box.appendChild(pre); },
+                    foot(box, done){
+                        const st=document.createElement('div'); st.className='ui-stack';
+                        const cp=document.createElement('button'); cp.type='button'; cp.className='ui-btn primary block'; cp.id='perfCopy'; cp.textContent='复制全部';
+                        cp.addEventListener('click', ()=>{ const ok=()=>{ cp.textContent='已复制'; }; try{ navigator.clipboard.writeText(text).then(ok, ()=>{ window.prompt && window.prompt('复制下面的文字', text); }); }catch(_){ } });
+                        const cl=document.createElement('button'); cl.type='button'; cl.className='ui-btn block'; cl.id='perfClear'; cl.textContent='清空';
+                        cl.addEventListener('click', ()=>{ P.clear(); done(); openPerfPage(); });
+                        const x=document.createElement('button'); x.type='button'; x.className='ui-btn block'; x.id='perfClose'; x.textContent='关闭';
+                        x.addEventListener('click', ()=>done());
+                        st.appendChild(cp); st.appendChild(cl); st.appendChild(x); box.appendChild(st);
+                    } });
+            }
+            window.openPerfPage=openPerfPage;
+            const b=$('devPerfBtn'); if(b) b.addEventListener('click', openPerfPage);
+        })();
+
         // ===== 系统返回键 / 侧滑返回 =====
         // 【问题】日子管理页是「记账页的子页」——只是把 pageLedger 藏起来、pageDays 显示，
         //   并没有产生任何浏览器历史。安卓的返回手势只认 WebView 的 history，看不到这层 UI 状态，
@@ -11636,6 +11751,7 @@ ${detail}
             trackBusy((async()=>{
                 let dbOk=true;
                 try{ (await idbKeys()).forEach(k=>__ledgerKeys.add(String(k))); }catch(_){ dbOk=false; }
+                window.JiwenPerf.bootMark('db');
                 // 账号列表坏了先找回（要看 IndexedDB 里有哪些账本）
                 try{ await recoverAccountsIfBroken(); }catch(_){}
                 // 1010-K7：先把老的「按名字存」的数据搬到账号编号下（只跑一次；没搬完下次接着搬）
