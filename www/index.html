@@ -836,7 +836,7 @@
         .kp-grid { display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 56px); gap:8px; }
         .kp-key { border:none; border-radius:10px; background:var(--c-surface); color:var(--c-text); font-size:24px; font-family:inherit;
             box-shadow:0 1px 0 rgba(var(--c-shadow-rgb),0.25); cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:manipulation; }
-        .kp-key:active { filter:brightness(0.92); transform:scale(0.98); }
+        .kp-key:active, .kp-key.kp-pressed { filter:brightness(0.92); transform:scale(0.98); }   /* 1019-Z2：长按退格时一直是按下的样子 */
         .kp-del { font-size:22px; grid-column:4; grid-row:1; }
         .kp-ok { grid-column:4; grid-row:2 / span 3; background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); color:var(--c-on-primary);
             font-size:18px; font-weight:bold; }
@@ -1528,7 +1528,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z1</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z2</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -11737,6 +11737,7 @@ ${detail}
             if(shownNow) kpReveal(); else requestAnimationFrame(kpReveal);
         }
         function kpClose(){
+            kpDelStop();   // 1019-Z2：长按退格时键盘关了，停下
             if($('kpMask').style.display!=='flex' && !kpTarget) return;
             $('kpMask').style.display='none';
             if(kpTarget) kpTarget.classList.remove('kp-on');
@@ -11747,8 +11748,38 @@ ${detail}
         $('kpGrid').addEventListener('click', e=>{
             const b=e.target.closest('.kp-key'); if(!b) return;
             if(b.id==='kpOk'){ const f=kpOnOk; kpClose(); if(f) f(); return; }
+            if(b.id==='kpDel' && kpDelSkipClick){ kpDelSkipClick=false; return; }   // 1019-Z2：按下时已经删过了（长按那套），这一下 click 不再删
             kpKey(b.dataset.k);
         });
+        // 1019-Z2：退格长按连续删：按下先删一个，停 KP_DEL_FIRST（400 毫秒）后开始连续删，先每 100 毫秒一个，按住超过 1 秒后每 50 毫秒一个，
+        //   删到空为止；松手、被打断、手指滑出按键立刻停（触屏按下以后事件一直送给这个键，所以每次移动都看手指还在不在键上）
+        const KP_DEL_FIRST=400, KP_DEL_SLOW=100, KP_DEL_FAST=50, KP_DEL_SPEEDUP=1000;
+        var kpDelT=null, kpDelAt=0, kpDelSkipClick=false;   // var：kpClose 在上面，早调用也不会因为还没初始化报错
+        function kpDelStop(){ if(kpDelT){ clearTimeout(kpDelT); kpDelT=null; } $('kpDel').classList.remove('kp-pressed'); }
+        function kpDelTick(){
+            kpDelT=null;
+            if(!kpTarget || !(kpTarget.value||'')){ kpDelStop(); return; }
+            kpKey('del');
+            if(!(kpTarget.value||'')){ kpDelStop(); return; }
+            kpDelT=setTimeout(kpDelTick, (performance.now()-kpDelAt)>=KP_DEL_SPEEDUP ? KP_DEL_FAST : KP_DEL_SLOW);
+        }
+        (function(){
+            const del=$('kpDel');
+            del.addEventListener('pointerdown', e=>{
+                if(e.button!=null && e.button>0) return;
+                kpDelSkipClick=true; kpDelStop();
+                del.classList.add('kp-pressed');
+                kpDelAt=performance.now();
+                kpKey('del');
+                if(kpTarget && (kpTarget.value||'')) kpDelT=setTimeout(kpDelTick, KP_DEL_FIRST);
+            });
+            del.addEventListener('pointermove', e=>{
+                if(!del.classList.contains('kp-pressed') || e.clientX==null) return;
+                const r=del.getBoundingClientRect();
+                if(r.width && (e.clientX<r.left || e.clientX>r.right || e.clientY<r.top || e.clientY>r.bottom)) kpDelStop();
+            });
+            ['pointerup','pointercancel','pointerleave'].forEach(ev=>del.addEventListener(ev, kpDelStop));
+        })();
         // 键盘外面点一下 / 开始滑：收起键盘，这一下照常交给页面（不拦）；点的是另一个金额框就换过去
         const kpOutside=e=>{
             if($('kpMask').style.display!=='flex') return;
