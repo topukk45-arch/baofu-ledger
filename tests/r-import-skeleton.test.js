@@ -140,7 +140,7 @@ const importReqs = t => t.log.filter(p => p.startsWith('import/'));
   const t = await bootIn();
   ok(t.$('mainBox').style.display === 'block', '3 进了账号');
   ok(importReqs(t).length === 0, '3 启动时没去加载 import/ 下的文件（请求：' + t.log.join(',') + '）');
-  ok(/^build \d{4}-[A-Z0-9]+$/.test(t.$('loginBuild').textContent) && t.$('setBuild').textContent === t.$('loginBuild').textContent, '3 设置页底部的版本号和登录页一样：' + t.$('setBuild').textContent);
+  ok(/^build \d{4}-[A-Z0-9]+(-M\d+)?$/.test(t.$('loginBuild').textContent) && t.$('setBuild').textContent === t.$('loginBuild').textContent, '3 设置页底部的版本号和登录页一样：' + t.$('setBuild').textContent);
   ok(!shown(t), '3 「导入（开发中）」默认藏着');
   ok(t.w.JiwenImport === undefined && t.w.JiwenImportCore === undefined, '3 页面里没有导入模块');
   ok(!t.errs.length && !t.jsdomErrs.length, '3 无报错 ' + t.errs.concat(t.jsdomErrs).join('|'));

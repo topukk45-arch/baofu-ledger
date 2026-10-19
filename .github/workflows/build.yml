@@ -101,3 +101,27 @@ jobs:
           else
             gh release create latest-build "$APK" --title "最新测试版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
           fi
+
+      # 【modules 分支专用，合并进 main 之前删掉这一段】10-19：模块重构分支一推送就打包，
+      # 放进单独的「模块测试版」发行页（标签 modules-build，文件 jiwen-modules.apk），和「最新测试版」分开，main 上的流程不受影响。
+      - name: 发布到「模块测试版」
+        if: github.ref == 'refs/heads/modules'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          VER=$(grep -oE 'build [0-9]{4}-[A-Z0-9]+(-M[0-9]+)?' www/index.html | head -1 | cut -d' ' -f2)
+          APK="$RUNNER_TEMP/jiwen-modules.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          WHEN=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')
+          NOTES="模块重构分支 modules 的测试包：版本 $VER，打包于 $WHEN（北京时间），对应提交 ${GITHUB_SHA::7}：$(git log -1 --format=%s)
+
+          直接下载下面的 jiwen-modules.apk 安装即可，签名和正式版一样，可以覆盖升级（也能装回「最新测试版」）。
+          这里是还没合并进 main 的重构版本，日常用请装「最新测试版」。"
+          git push -f origin "$GITHUB_SHA:refs/tags/modules-build"
+          if gh release view modules-build >/dev/null 2>&1; then
+            gh release edit modules-build --title "模块测试版 $VER" --notes "$NOTES" --prerelease
+            gh release upload modules-build "$APK" --clobber
+          else
+            gh release create modules-build "$APK" --title "模块测试版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
+          fi
