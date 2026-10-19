@@ -42,12 +42,14 @@ const MASKS = ['addMask', 'editMask', 'detailMask', 'refundMask', 'tplMask', 'ca
 
   // 2. 记一笔：没填直接往下拉 → 关掉，不问
   tab('ledger');
-  $('fabAdd').click(); await t.idle();
+  // 1019-P 起记一笔滑上来以后（约 0.26 秒）自动弹数字键盘，返回键会先收它；这里先等它弹出来再收掉，再按返回
+  const openAdd = async () => { $('fabAdd').click(); await t.idle(); await new Promise(r => setTimeout(r, 320)); w.kpClose(); };
+  await openAdd();
   ok(shown('addMask'), '2 打开记一笔');
   swipe($('addSheet'));
   ok(!shown('addMask') && !t.ask(), '2 没填过：往下拉直接关、不问');
   // 填了金额再往下拉 → 问「放弃这次填写？」；「接着填」留着，「放弃，关掉」关掉
-  $('fabAdd').click(); await t.idle();
+  await openAdd();
   $('billMoney').value = '23.5'; $('billMoney').dispatchEvent(new w.Event('input'));
   swipe($('addSheet'));
   ok(t.ask() && t.ask().title === '放弃这次填写？' && $('askOk').textContent === '放弃，关掉' && $('askOk').classList.contains('warn') && $('askCancel').textContent === '接着填', '2 填过：往下拉先问「放弃这次填写？」');
@@ -59,10 +61,10 @@ const MASKS = ['addMask', 'editMask', 'detailMask', 'refundMask', 'tplMask', 'ca
   await t.askOk();
   ok(!shown('addMask'), '2 点「放弃，关掉」：关掉');
   // 点「关闭」按钮照旧直接关
-  $('fabAdd').click(); await t.idle(); $('billMoney').value = '9'; $('closeAdd').click();
+  await openAdd(); $('billMoney').value = '9'; $('closeAdd').click();
   ok(!shown('addMask') && !t.ask(), '2 点「关闭」按钮照旧直接关');
   // 选了分类也算填过
-  $('fabAdd').click(); await t.idle();
+  await openAdd();
   const chip = [...$('billCatChips').children].find(c => c.textContent === '吃饭'); chip.click();
   await t.back();
   ok(t.ask() && t.ask().title === '放弃这次填写？', '2 只选了分类：按返回也先问');

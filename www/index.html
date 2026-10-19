@@ -1485,7 +1485,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-P</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Q</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2411,7 +2411,9 @@
                 if(dlg){ dlg.style.opacity = '1'; dlg.style.transition = ''; }
                 mask.style.display = 'flex';
                 // 1019-O：等面板滑上来的动画走完再聚焦（原来 50 毫秒就聚焦，打开动画和键盘动画一起跑）
-                if(focusEl) afterOpenAnim(mask, ()=>{ try{ if(mask.style.display==='flex') focusEl.focus(); }catch(e){} });
+                // 1019-Q：滑上来之前上面又盖了一层（放弃确认、文字输入、日期选择、共用面板）就不聚焦了，免得数字键盘弹到那一层上面
+                const above=()=>['askMask','txtMask','dtMask','uiSheetMask'].some(id=>{ const e=document.getElementById(id); return e && e!==mask && e.style.display==='flex'; });
+                if(focusEl) afterOpenAnim(mask, ()=>{ try{ if(mask.style.display==='flex' && !above()){ if(document.activeElement===focusEl) focusEl.blur(); focusEl.focus(); } }catch(e){} });
             };
         })();
 
@@ -11544,6 +11546,8 @@ ${detail}
         function sheetGhostsFinish(){ [...__ghosts].forEach(g=>g.__fin && g.__fin()); }
         window.__sheetGhosts=()=>__ghosts.size;   // 给测试用
         function sheetGhost(m){
+            // 1019-Q：面板关了，对着它里面金额框的数字键盘一起收起（不然下一层按返回先收的是它）
+            if(m.querySelector('.kp-on') && window.kpClose) window.kpClose();
             const sh=m.querySelector('.sheet') || m.firstElementChild;
             if(!sh || !document.body) return;
             const t0=window.JiwenPerf ? window.JiwenPerf.now() : Date.now();

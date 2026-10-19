@@ -97,6 +97,18 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   [...$('sysMoneyKbSeg').children].find(b => b.dataset.v === 'off').click();
   ok(!w.localStorage.getItem('app_sys_money_kb') && $('billMoney').readOnly, '6 关掉（默认）：回到 App 的数字键盘');
 
+  // 7.（1019-Q）记一笔还没滑上来就盖了一层（比如放弃确认）：不再自动弹数字键盘；面板关了，对着它的数字键盘一起收
+  d.querySelector('.tab-btn[data-tab="ledger"]').click();
+  $('fabAdd').click(); w.customConfirm('虚构的确认', () => {}, '虚构');
+  await wait(320);
+  ok(!shown('kpMask') && shown('askMask'), '7 滑上来之前盖了一层：数字键盘不弹到那一层上面');
+  await t.askCancel(); $('closeAdd').click(); await wait(10);
+  $('fabAdd').click(); await wait(320);
+  ok(shown('kpMask'), '7 正常打开：照旧自动弹');
+  $('addMask').style.display = 'none'; await wait(10);
+  ok(!shown('kpMask') && !$('billMoney').classList.contains('kp-on'), '7 记一笔关了（不管怎么关）：数字键盘一起收起');
+  await wait(300);
+
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`\n${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
