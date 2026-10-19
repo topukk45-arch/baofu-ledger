@@ -136,14 +136,24 @@ function run(key, opt) {
   getters.forEach(n => legacyUses.delete(n));
   const getterSites = [];
   if (getters.length) {
-    const re = new RegExp(`(^|[^\\w$.])(${getters.join('|')})(?![\\w$])`, 'g');
+    // 按语法树找到旧文件里用到这几个名字的地方（自由标识符，不是对象的键、不是别处的局部变量），从后往前换成「入口.名字」
+    const gset = new Set(getters);
     newLegacy.forEach(b => {
-      const lines = b.text.split('\n');
-      b.text = lines.map((l, i) => { if (/^\s*\/\//.test(l)) return l; const nl = l.replace(re, (m, pre, nm) => `${pre}${mod.entry}.${nm}`); if (nl !== l) getterSites.push(`${b.file}:${i + 1}  ${l.trim()}  →  ${nl.trim()}`); return nl; }).join('\n');
+      const sites = [];
+      D.freeRefs(S.parse(D.unwrap(b.text)), sites);
+      const mine = sites.filter(x => gset.has(x.name)).sort((x, y) => y.start - x.start);
+      if (!mine.length) return;
+      let t = b.text;
+      mine.forEach(x => {
+        const ln = t.slice(0, x.start).split('\n').length;
+        const rep = x.shorthand ? `${x.name}: ${mod.entry}.${x.name}` : `${mod.entry}.${x.name}`;
+        t = t.slice(0, x.start) + rep + t.slice(x.end);
+        getterSites.push(`${b.file}:${ln}`);
+      });
+      const before = b.text.split('\n'), after = t.split('\n');
+      b.text = t;
+      [...new Set(getterSites.filter(g => g.startsWith(b.file + ':')))].forEach(g => { const ln = +g.split(':')[1]; getterSites.push(`    ${before[ln - 1].trim()}  →  ${after[ln - 1].trim()}`); });
     });
-    const declared = newLegacy.some(b => new RegExp(`(let|const|var|function)\\s+(${getters.join('|')})\\b|\\((${getters.join('|')})[,)]`).test(b.text));
-    if (declared) throw new Error('旧文件里有同名的局部变量，不能直接按名字改：' + getters.join('、'));
-    if (/\+\+|--/.test(getterSites.join('\n'))) throw new Error('读写口的地方有 ++ / --，要手动看：' + getterSites.join(' | '));
   }
   const refLine2 = legacyUses.size ? `${IND}const { ${[...legacyUses].sort().join(', ')} } = window.${mod.entry};   // 旧代码引用表：${mod.key} 已搬进 ${mod.file}，旧文件都搬完时删掉\n` : '';
   { let at = 0, mm; while ((mm = ALIAS_LINE.exec(first.text.slice(at, at + 4000)))) at += mm[0].length; first.text = first.text.slice(0, at) + refLine2 + first.text.slice(at); }

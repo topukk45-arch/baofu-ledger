@@ -29,7 +29,7 @@ const file = d => [['微信' + d + '.csv', B.bill('wechat', [wx(d, 1000 + d)], {
   await t.importFiles(file(3), null, { stay: true });
   $('impNextOpening').click(); await t.idle();
   ok($('impPage').style.display === 'none' && $('addMask').style.display === 'flex', '4 补期初余额：打开记一笔');
-  ok(t.w.eval('billTypeSel') === 'income' && $('billMode').dataset.mode === 'flow' && $('billRemark').value === '期初余额', '4 记一笔里已经选好：收入、只算结余、备注「期初余额」');
+  ok(t.w.eval('JiwenForms.billTypeSel') === 'income' && $('billMode').dataset.mode === 'flow' && $('billRemark').value === '期初余额', '4 记一笔里已经选好：收入、只算结余、备注「期初余额」');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

@@ -157,16 +157,6 @@
             ymMask:()=>{ $('ymMask').style.display='none'; },
         };
         const FORM_ASK=['addMask','editMask','dayMask','tplEditMask','txtMask'];
-        const formSnaps={};
-        // 表单现在的样子：输入框、日期、选中的标签、开关（打开时记一份，关的时候比一比）
-        function formState(id){
-            const m=$(id); if(!m) return '';
-            const parts=[];
-            m.querySelectorAll('input,textarea,select').forEach(e=>parts.push(e.value));
-            m.querySelectorAll('.dt-input').forEach(e=>parts.push(e.dataset.day||'', e.dataset.value||'', e.value||'', e.textContent));
-            m.querySelectorAll('.cc, .day-switch').forEach(e=>parts.push(e.className));
-            return JSON.stringify(parts);
-        }
         function formDirty(id){ return formSnaps[id]!=null && formState(id)!==formSnaps[id]; }
         function formBackClose(id){
             const close=FORM_CLOSE[id]; if(!close) return;

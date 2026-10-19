@@ -20,7 +20,8 @@ function names(p) {
 }
 
 // 一段语法树里用到的「自由」标识符（不在里面声明过的），分读和写；不分当场 / 以后（依赖关系都算）
-function freeRefs(node) {
+function freeRefs(node, sites) {
+  // sites：要的话传一个数组进来，记下每个自由标识符的位置 { name, start, end, shorthand }（改写法用）
   const reads = new Set(), writes = new Set(), winSet = new Set(), winGet = new Set();
   const scopes = [];
   const declared = n => scopes.some(s => s.has(n));
@@ -35,10 +36,10 @@ function freeRefs(node) {
     walk.simple(fnBody, { VariableDeclaration(d) { if (d.kind === 'var') d.declarations.forEach(x => names(x.id).forEach(n => sc.add(n))); } },
       { ...walk.base, FunctionExpression() {}, ArrowFunctionExpression() {}, FunctionDeclaration() {} });
   }
-  function ref(name, isWrite) { if (declared(name)) return; (isWrite ? writes : reads).add(name); }
+  function ref(name, isWrite, node, shorthand) { if (declared(name)) return; (isWrite ? writes : reads).add(name); if (sites && node) sites.push({ name, start: node.start, end: node.end, shorthand: !!shorthand }); }
   function pattern(p, isDecl) {
     if (!p) return;
-    if (p.type === 'Identifier') { if (!isDecl) ref(p.name, true); return; }
+    if (p.type === 'Identifier') { if (!isDecl) ref(p.name, true, p); return; }
     if (p.type === 'MemberExpression') { visit(p); return; }
     if (p.type === 'AssignmentPattern') { pattern(p.left, isDecl); visit(p.right); return; }
     if (p.type === 'ObjectPattern') { p.properties.forEach(x => { if (x.computed) visit(x.key); pattern(x.value || x.argument, isDecl); }); return; }
@@ -60,7 +61,7 @@ function freeRefs(node) {
   function visit(n) {
     if (!n || typeof n.type !== 'string') return;
     switch (n.type) {
-      case 'Identifier': ref(n.name, false); return;
+      case 'Identifier': ref(n.name, false, n); return;
       case 'FunctionDeclaration': fn(n); return;
       case 'FunctionExpression': case 'ArrowFunctionExpression': fn(n); return;
       case 'BlockStatement': block(n.body); return;
@@ -79,16 +80,16 @@ function freeRefs(node) {
       case 'MemberExpression':
         if (isWin(n.object) && !n.computed) { winGet.add(n.property.name); return; }
         visit(n.object); if (n.computed) visit(n.property); return;
-      case 'Property': if (n.computed) visit(n.key); visit(n.value); return;
+      case 'Property': if (n.computed) visit(n.key); if (n.shorthand && n.value.type === 'Identifier') { ref(n.value.name, false, n.value, true); return; } visit(n.value); return;
       case 'PropertyDefinition': case 'MethodDefinition': if (n.computed) visit(n.key); visit(n.value); return;
       case 'LabeledStatement': visit(n.body); return;
       case 'BreakStatement': case 'ContinueStatement': return;
       case 'AssignmentExpression':
         if (n.left.type === 'MemberExpression' && isWin(n.left.object) && !n.left.computed) { winSet.add(n.left.property.name); visit(n.right); return; }
-        if (n.left.type === 'Identifier') { ref(n.left.name, true); if (n.operator !== '=') ref(n.left.name, false); visit(n.right); return; }
+        if (n.left.type === 'Identifier') { ref(n.left.name, true, n.left); if (n.operator !== '=') ref(n.left.name, false); visit(n.right); return; }
         pattern(n.left, false); visit(n.right); return;
       case 'UpdateExpression':
-        if (n.argument.type === 'Identifier') { ref(n.argument.name, true); ref(n.argument.name, false); return; }
+        if (n.argument.type === 'Identifier') { ref(n.argument.name, true, n.argument); ref(n.argument.name, false); return; }
         visit(n.argument); return;
       default:
         for (const k of Object.keys(n)) {

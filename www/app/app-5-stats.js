@@ -482,12 +482,6 @@
             });
             f.appendChild(b);
         }
-        // 一笔关联记录的一行：时间 / 备注 / 金额（详情与修改弹窗共用）
-        function refundLineHtml(r, sign){
-            return `<div class="dr-line"><span class="dr-when">${String(r.time).slice(5,16).replace('T',' ')}</span>`
-                + `<span class="dr-what">${escapeHtml((r.remark||'').trim()||r.cat||'未分类')}</span>`
-                + `<span class="dr-amt ${sign>0?'pos':'neg'}">${sign>0?'+':'−'}${safeNum(r.money).toFixed(2)}</span></div>`;
-        }
         function paintDetailRefund(rec, data){
             const f=$('detailRefundField'), lab=$('detailRefundLabel'), val=$('detailRefundVal');
             const line=refundLineHtml;

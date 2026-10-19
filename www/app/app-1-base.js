@@ -8,31 +8,7 @@
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, closeDtPicker, getDtInput, openDtPicker, openDtPickerDate, playSlide, setDtInput } = window.JiwenDate;   // 旧代码引用表：date 已搬进 app/date.js，旧文件都搬完时删掉
         const { askImportOtherDays, importDaysSuffix, importFixSuffix, openAiExport } = window.JiwenAiExport;   // 旧代码引用表：ai 已搬进 app/ai-export.js，旧文件都搬完时删掉
         const { DEV_IMPORT_KEY, devImportOn, impOpenFile, loadImportUI, renderDevImport, scrollChipIntoView } = window.JiwenImportEntry;   // 旧代码引用表：impentry 已搬进 app/import-entry.js，旧文件都搬完时删掉
-
-        // ===== 1010-K5：点「备注」后，把保存按钮也露出来 =====
-        // 键盘弹起时弹窗被压到半屏，WebView 只把备注框本身滚进视野，紧挨着的「添加记录 / 保存」
-        // 正好卡在下沿外，得手动再滑一下。这里在备注聚焦后，把弹窗内部再往上滚一点。
-        // 只滚弹窗自己（scrollTop），不用 scrollIntoView，免得连带滚动整个页面。
-        (function(){
-            const PAIRS = [['billRemark','addBill'], ['editRemark','saveEdit']];
-            function revealSave(ta, btn){
-                const dlg = ta && ta.closest('.edit-dialog');
-                if(!dlg || !btn) return;
-                const d = dlg.getBoundingClientRect(), b = btn.getBoundingClientRect(), t = ta.getBoundingClientRect();
-                let delta = b.bottom + 12 - d.bottom;          // 按钮底边离弹窗可视下沿还差多少
-                if(delta <= 0) return;                          // 已经看得见，不动
-                delta = Math.min(delta, t.top - d.top - 8);     // 屏幕再小也别把备注框本身滚出顶部
-                if(delta > 0) dlg.scrollTop += delta;
-            }
-            window.__revealSave = revealSave;   // 给测试用
-            // 1019-O：备注改成点了弹文字输入小面板，大面板在输入时不动；写完（小面板点「确定」）才让保存按钮露出来（见 txtOk）
-            if(false && window.visualViewport){
-                window.visualViewport.addEventListener('resize', ()=>{
-                    const a = document.activeElement;
-                    PAIRS.forEach(([taId, btnId])=>{ if(a && a.id===taId) revealSave(a, document.getElementById(btnId)); });
-                });
-            }
-        })();
+        const { closeEditModal, closeRefund, closeTplEditor, formSnaps, formState, getModeChips, openAddModal, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, setModeChips } = window.JiwenForms;   // 旧代码引用表：forms 已搬进 app/forms.js，旧文件都搬完时删掉
 
 
         let currentUser = '';

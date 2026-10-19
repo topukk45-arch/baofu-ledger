@@ -58,11 +58,11 @@ const recs = [
   ok(!hintShown('billMode'), '3 计入时不写说明');
   [...$('billMode').children].find(c => c.dataset.v === 'flow').click();
   ok(hintShown('billMode') && /资金往来/.test($('billModeHint').textContent), '3 点「只算结余」：说明出来');
-  w.resetBillForm();
+  w.JiwenForms.resetBillForm();
   ok($('billMode').querySelector('.cc.sel').dataset.v === 'normal' && !hintShown('billMode'), '3 重新开一笔：回到计入、说明收起');
-  w.setModeChips($('billMode'), 'skip');
+  w.JiwenForms.setModeChips($('billMode'), 'skip');
   ok(hintShown('billMode') && /重复记录/.test($('billModeHint').textContent), '3 不是「计入」（模板、草稿带来的）：说明照样写');
-  w.setModeChips($('billMode'), 'normal');
+  w.JiwenForms.setModeChips($('billMode'), 'normal');
   ok(!hintShown('billMode'), '3 换回计入：说明收起');
 
   // 4. 照旧记得进去：选收支、分类、填金额，点保存
