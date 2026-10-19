@@ -1515,7 +1515,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-R</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-S</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -7228,9 +7228,12 @@ ${detail}
             window.JiwenSheet.open({ title:c, sub,
                 body(box, done){
                     const st=document.createElement('div'); st.className='ui-stack'; st.id='catActList';
-                    st.appendChild(btn('catActBudget', bv!=null ? '改预算' : '设预算', '', ()=>{ done(); editBudget(c); }));
-                    st.appendChild(btn('catActRename', '改名', '', ()=>{ done(); renameCat(c); }));
-                    if(c!=='未分类') st.appendChild(btn('catActDelete', '删除这个分类', 'warn', ()=>{ done(); deleteCat(c); }));
+                    // 1019-S：设预算 / 改名的输入框存好、取消、返回、往下拉都回到这个分类的面板（改了名就是新名字的面板），再按返回才回列表；
+                    //   删除的确认框取消也回这个面板，删掉了回列表
+                    const back=name=>openCatActions(name||c);
+                    st.appendChild(btn('catActBudget', bv!=null ? '改预算' : '设预算', '', ()=>{ done(); editBudget(c, { back }); }));
+                    st.appendChild(btn('catActRename', '改名', '', ()=>{ done(); renameCat(c, { back }); }));
+                    if(c!=='未分类') st.appendChild(btn('catActDelete', '删除这个分类', 'warn', ()=>{ done(); deleteCat(c, { back }); }));
                     else { const p=document.createElement('div'); p.className='ui-msg ui-msg-soft'; p.textContent='「未分类」是保留分类，不能删除。'; st.appendChild(p); }
                     box.appendChild(st);
                 },
@@ -7250,18 +7253,20 @@ ${detail}
                 if(!saveStoreSafe(store)) return;
                 if(!(opts && opts.fromStats)) openCatManager();
                 if(currentTab==='stats') renderStats();
+                if(opts && opts.back) opts.back(cat);
             }, '分类预算', (v)=>{
                 const n=Number(v);
                 if(!isFinite(n) || n<0) return '请输入 0 或正数金额';
                 if(n>99999999) return '金额太大啦，确认一下没多打几个 0？';
                 return '';
-            }, { inputmode:'decimal', placeholder:'例如 200', kpOk:'保存' });
+            }, { inputmode:'decimal', placeholder:'例如 200', kpOk:'保存', onCancel:(opts && opts.back) ? ()=>opts.back(cat) : null });
         }
 
-        function renameCat(oldName){
+        function renameCat(oldName, opts){
+            const back=opts && opts.back;
             customPrompt('', oldName, (name)=>{
                 name=name.trim();
-                if(!name || name===oldName) return;
+                if(!name || name===oldName){ if(back) back(oldName); return; }
                 const store=loadStore(); const a=curArchive(store);
                 a.cats=a.cats.map(c=>c===oldName?name:c);
                 a.records=a.records.map(r=>r.cat===oldName ? Object.assign({}, r, { cat:name }) : r);
@@ -7276,6 +7281,7 @@ ${detail}
                 impRulesRenameCat(a, oldName, name);
                 saveStoreSafe(store);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
+                if(back) back(name);
             }, '重命名分类', (name)=>{
                 name=name.trim();
                 if(!name) return '分类名不能为空';
@@ -7283,9 +7289,9 @@ ${detail}
                 if(charLen(name) > 8) return '分类名最多 8 个字～';
                 if(curArchive(loadStore()).cats.includes(name)) return '该分类已存在';
                 return '';
-            }, { placeholder:'输入新分类名（最多 8 字）', maxchars:8 });
+            }, { placeholder:'输入新分类名（最多 8 字）', maxchars:8, onCancel:back ? ()=>back(oldName) : null });
         }
-        function deleteCat(name){
+        function deleteCat(name, opts){
             if(name==='未分类'){ customAlert('「未分类」是保留分类，不能删除哦～'); return; }
             const store=loadStore(); const a=curArchive(store);
             if(a.cats.length<=1){ customAlert('至少保留一个分类！'); return; }
@@ -7307,7 +7313,7 @@ ${detail}
                 impRulesDropCat(ar, name);
                 saveStoreSafe(s);
                 refreshCatSelectors(); openCatManager(); refreshAllViews(); refreshBillCatChipsIfOpen(); refreshEditCatChipsIfOpen();
-            }, '删除分类', { danger:true, okText:`删除分类「${name}」` });
+            }, '删除分类', { danger:true, okText:`删除分类「${name}」`, onCancel:(opts && opts.back) ? ()=>opts.back(name) : null });
         }
 
         // 【1013-G】只拷当前存档的记录数组（浅拷贝），不用把整个 store 都拼出来
@@ -8341,20 +8347,22 @@ ${detail}
                 { value:'normal', label:'恢复计入',     desc:'取消上面两种标记：'+MODE_HINT.normal }
             ], (act)=>{
                 if(act==='cat'){
-                    customChoose('改成哪个分类？', getCats().map(c=>({ value:c, label:c })), (cat)=>{
+                    const onCat=(cat)=>{
                         const targets=list.filter(r=>r.cat!==cat);
                         if(!targets.length){ customAlert(`这 ${list.length} 条已经都是「${cat}」了。`); return; }
                         customConfirm(`把下面这 ${targets.length} 条记录的分类改成「${cat}」（挂在上面的退款跟着改）。改完可以马上「撤销这次操作」。`,
                             ()=>applyBatch(targets.map(r=>r.id), { cat }), '批量改分类',
-                            { okText:`改这 ${targets.length} 条`, list:targets, danger:true });
-                    }, '选择分类', openBatchMenu, { layout:'list' });
+                            { okText:`改这 ${targets.length} 条`, list:targets, danger:true, onCancel:pickCat });   // 1019-S：取消回到选分类
+                    };
+                    const pickCat=()=>customChoose('改成哪个分类？', getCats().map(c=>({ value:c, label:c })), onCat, '选择分类', openBatchMenu, { layout:'list' });
+                    pickCat();
                 } else {
                     const NAME={ normal:'计入', flow:'只算结余', skip:'不计入' };
                     const targets=list.filter(r=>recMode(r)!==act);   // 已经是目标口径的不重复改
                     if(!targets.length){ customAlert(`这 ${list.length} 条已经都是「${NAME[act]}」了。`); return; }
                     customConfirm(`把下面这 ${targets.length} 条记录改成「${NAME[act]}」（挂在上面的退款跟着改）。改完可以马上「撤销这次操作」。`,
                         ()=>applyBatch(targets.map(r=>r.id), { mode:act }), '批量修改统计口径',
-                        { okText:`改这 ${targets.length} 条`, list:targets, danger:true });
+                        { okText:`改这 ${targets.length} 条`, list:targets, danger:true, onCancel:openBatchMenu });   // 1019-S：取消回到批量操作
                 }
             }, '批量操作', null, { layout:'list' });
         }
@@ -10518,7 +10526,7 @@ ${detail}
                         top.textContent=`${r.time.slice(5, 16).replace('T', ' ')} · ${r.cat||'未分类'} · ${safeNum(r.money).toFixed(2)}`;
                         const why=document.createElement('div'); why.style.fontSize='12.5px'; why.style.color='var(--c-text-soft)'; why.textContent=aiFlagText(r, all);
                         row.appendChild(top); row.appendChild(why);
-                        row.addEventListener('click', ()=>{ done(); openDetail(r.id); });
+                        row.addEventListener('click', ()=>{ done(); openDetail(r.id, { onClose:()=>openAiFlagList(month) }); });   // 1019-S：详情关掉回这张列表（标记都去掉了就不回）
                         box.appendChild(row);
                     });
                 },
@@ -10826,6 +10834,8 @@ ${detail}
             paintDetailAiFlag(rec, all);
             const rk=(rec.remark||'').trim();
             $('detailRemark').textContent = rk || '（无备注）';
+            // 1019-S：从别的列表点进来的，关掉回那个列表；详情里刷新同一条（去掉 AI 标记、拆开）时照旧留着
+            detailOnClose=(opts && opts.onClose) || (detailCurId===id && $('detailMask').style.display==='flex' ? detailOnClose : null);
             detailCurId=id;
             $('detailMask').style.display='flex';
         }
@@ -10917,19 +10927,20 @@ ${detail}
             val.innerHTML=rs.map(r=>line(r, 1)).join('');
             f.style.display='';
         }
-        let detailCurId=null;
+        let detailCurId=null, detailOnClose=null;
         // 详情「关闭」。抽成具名函数：返回键也要走这个正规出口，不能只 display='none'
         // —— 那样 detailCurId 不会复位。
         function closeDetail(){
             $('detailMask').style.display='none';
             detailCurId=null;
+            const f=detailOnClose; detailOnClose=null; if(f) f();
         }
         $('detailClose').addEventListener('click', closeDetail);
         // 详情「修改」→ 关详情、打开修改弹窗。保存/删除后由 closeEditModal 统一刷新视图。
         $('detailEdit').addEventListener('click', ()=>{
             const id=detailCurId;
             $('detailMask').style.display='none';
-            detailCurId=null;
+            detailCurId=null; detailOnClose=null;   // 去修改了，不再回原来的列表
             if(id) window.openEdit(id, { fromDetail:true });
         });
 

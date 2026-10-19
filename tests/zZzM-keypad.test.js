@@ -84,6 +84,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   keys('300'); ok($('askInput').value === '300', '5 输入框实时变 300');
   $('kpOk').click(); await t.idle();
   ok(!shown('kpMask') && !shown('askMask') && w.loadStore(A.ID).archives['默认存档'].budgets['吃饭'] === 300, '5 点「保存」：预算存好、提示框和键盘都收起');
+  $('catActCancel').click();   // 1019-S 起存好回到这个分类的面板，先关掉面板
   $('closeCat').click();
 
   // 6. 设置里「用系统键盘输入金额」：切回系统输入法
