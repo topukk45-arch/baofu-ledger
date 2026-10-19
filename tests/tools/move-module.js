@@ -106,6 +106,7 @@ function run(key, opt) {
   pick.forEach(st => { const r = D.freeRefs(st.type === 'VariableDeclaration' ? { type: 'Program', body: st.declarations.map(d => d.init).filter(Boolean).map(e => ({ type: 'ExpressionStatement', expression: e })) } : st); [...r.writes].forEach(n => { if (mutable.has(n)) reassigned.add(n); }); });
   const stale = exportsList.filter(n => mutable.has(n) && reassigned.has(n));
   // 会变的变量：入口上给一个只读口（get 名字(){ return 名字; }），别处读的地方改成「入口.名字」（只读不写，上面查过没人在外面写）
+  testUse.forEach(n => { if (mutable.has(n) && !setters.includes(n)) setters.push(n); });   // 测试里会直接改的（eval('statYear=2027')）也给写口
   setters.forEach(n => { if (!exportsList.includes(n)) exportsList.push(n); });
   exportsList.sort();
   const getters = [...new Set(stale.concat(setters))];

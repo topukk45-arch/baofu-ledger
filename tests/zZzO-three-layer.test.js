@@ -78,7 +78,7 @@ const recs = [
   $('closeCat').click(); await settle();
 
   // 5. AI 标记列表 → 详情：关掉详情回列表（「关闭」、返回键都是）；去掉标记以后列表跟着少一条
-  w.openAiFlagList('2026-12'); await settle();
+  w.JiwenStats.openAiFlagList('2026-12'); await settle();
   const rows = () => [...d.querySelectorAll('.ai-flag-row')];
   ok(rows().length === 2, '5 AI 标记列表两条');
   rows()[0].click(); await settle();
@@ -95,7 +95,7 @@ const recs = [
   await t.back(); await settle();
   ok(!w.JiwenSheet.isOpen(), '5 再按返回：列表关掉');
   // 详情里点「修改」去了修改账单：关掉修改不再回列表
-  w.openAiFlagList('2026-12'); await settle();
+  w.JiwenStats.openAiFlagList('2026-12'); await settle();
   rows()[0].click(); await settle();
   $('detailEdit').click(); await settle();
   $('cancelEdit').click(); await settle();

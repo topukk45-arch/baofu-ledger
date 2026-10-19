@@ -1,11 +1,4 @@
 
-        // 清单行 → 只读详情。批量确认还没执行，此时允许改记录会让清单和即将执行的范围对不上，
-        // 所以从这里进的详情隐藏「修改」按钮，只看不改。
-        $('askList').addEventListener('click', e=>{
-            const row=e.target.closest('.al-row');
-            if(row && row.dataset.id) openDetail(row.dataset.id, { readonly:true });
-        });
-
         $('newAccountBtn').addEventListener('click', ()=>promptNewAccount());
 
         // ===== 登录页：从文件导入存档（先选文件，再指定要导入到哪个账号）=====
@@ -270,7 +263,7 @@
         archiveSelect.addEventListener('change', () => {
             currentArchive = archiveSelect.value;
             const store=loadStore(); store.last=currentArchive; saveStoreSafe(store);
-            curPage=1; statSelDay=null; resetSearch(); refreshCatSelectors(); refreshAllViews();
+            curPage=1; JiwenStats.statSelDay=null; resetSearch(); refreshCatSelectors(); refreshAllViews();
             odRefreshStatusUI();
         });
         $('newArchive').addEventListener('click', () => {

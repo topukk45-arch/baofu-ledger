@@ -1,7 +1,7 @@
         // 1016-T：导入结果页「接下来」的三个去处（import/ui.js 调）：去看统计、去设预算、补一笔期初余额（只算结余的收入）
         window.JiwenImportNext={
             stats(){ const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('flow'); },
-            budget(){ bgSuggestOpen=true; const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('budget'); },   // 1016-Z9：直接打开预算建议
+            budget(){ JiwenStats.bgSuggestOpen=true; const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('budget'); },   // 1016-Z9：直接打开预算建议
             opening(){
                 const b=document.querySelector('.tab-btn[data-tab="ledger"]'); if(b) b.click();
                 openAddModal();
@@ -262,7 +262,7 @@
             if(tab==='stats'){
                 if(tab!==currentTab) return false;   // 统计页不在屏幕上，内容不一定是最新的
                 const n=new Date();
-                return statYear===n.getFullYear() && statMonth===n.getMonth() && statSelDay==null && statTab==='flow' && statMonthCatMode==='expense';
+                return JiwenStats.statYear===n.getFullYear() && JiwenStats.statMonth===n.getMonth() && JiwenStats.statSelDay==null && JiwenStats.statTab==='flow' && JiwenStats.statMonthCatMode==='expense';
             }
             if(tab==='settings') return tab===currentTab;
             return false;

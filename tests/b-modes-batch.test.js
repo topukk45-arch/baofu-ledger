@@ -207,7 +207,7 @@ function bootSync(records, extra){
 // ===== 8. 详情 + 云备份文件名说明 =====
 {
     const t=await boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_小明.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
-    t.w.openDetail('a5');
+    t.w.JiwenStats.openDetail('a5');
     ok(t.$('detailType').textContent.includes('不计入收支') && t.$('detailMoney').querySelector('.amt-skip'), '详情显示不计入');
     ok(t.$('odStatus').textContent.includes('（云盘文件名不随存档改名）'), '文件名对不上时有说明');
     const t2=await boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_默认存档.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);

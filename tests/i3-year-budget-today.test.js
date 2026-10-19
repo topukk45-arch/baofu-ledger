@@ -87,11 +87,11 @@ const B={'游戏':200,'餐饮':1200};
 {
   const t=await boot({ records:[R('a','2025-03-01T10:00',100,'expense','餐饮'), R('b','2026-10-01T10:00',10,'expense','餐饮')], budgets:{'餐饮':1000} });
   t.toBudget();
-  t.w.eval('statYear=2025; statMonth=5; renderStats()');
+  t.w.eval('JiwenStats.statYear=2025; JiwenStats.statMonth=5; JiwenStats.renderStats()');
   const y=t.yrow();
   ok(y.querySelector('.bgo-k').textContent==='年度预算（3–12月）›', '2025 年从 3 月起');
   ok(y.querySelector('.bgo-sub').textContent==='至今应花 10000.00（10 个月），结余 9900.00', '往年只有至今应花：'+y.querySelector('.bgo-sub').textContent);
-  t.w.eval('statYear=2027; statMonth=0; renderStats()');
+  t.w.eval('JiwenStats.statYear=2027; JiwenStats.statMonth=0; JiwenStats.renderStats()');
   ok(t.yrow() && t.yrow().querySelector('.bgo-v').textContent==='0 / 12000 · 0%' && !t.d.querySelectorAll('.bgy-row').length, '未来年份：全年预算、无月度列表');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
@@ -121,7 +121,7 @@ const B={'游戏':200,'餐饮':1200};
   t.toStats();
   ok(t.fab(), '回到统计页（还在 6 月）再出现');
   // 跨年
-  t.w.eval('statYear=2025; statMonth=9; renderStats()');
+  t.w.eval('JiwenStats.statYear=2025; JiwenStats.statMonth=9; JiwenStats.renderStats()');
   ok(t.fab(), '去年同月也算不在本月');
   ok(/body\.kb-open \.clear-filter-fab/.test(html), '键盘弹出时一并隐藏（共用样式）');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));

@@ -28,12 +28,12 @@ const M1 = { id: 'm1', time: '2026-10-05T08:30', money: 30, type: 'expense', cat
   const [lg0] = await t.logs();
   ok(lg0.chg[0].bills && lg0.chg[0].bills[0].fen === 3000 && lg0.chg[0].bills[0].time === '2026-10-05T12:10', '准备：导入记录里存了合并进去的账单');
   // 详情
-  t.w.openDetail('m1');
+  t.w.JiwenStats.openDetail('m1');
   ok($('detailSrc') && /已和微信账单合并/.test($('detailSrc').textContent) && $('detailSplit'), '1 详情里写「已和微信账单合并」，有「拆开」');
   const other = t.recs().find(r => r.money === 12);
-  t.w.openDetail(other.id);
+  t.w.JiwenStats.openDetail(other.id);
   ok(/^来自微信账单$/.test($('detailSrc').textContent) && !$('detailSplit'), '1 导入新建的：「来自微信账单」，没有拆开');
-  t.w.openDetail('m1');
+  t.w.JiwenStats.openDetail('m1');
   $('detailSplit').click();
   await t.until(() => t.ask()); await t.askOk();
   await t.until(() => t.ask()); const msg = t.ask().msg; await t.askOk();
@@ -54,7 +54,7 @@ const M1 = { id: 'm1', time: '2026-10-05T08:30', money: 30, type: 'expense', cat
   const logs = await t.logs();
   logs[0].chg.forEach(c => { delete c.bills; });
   await t.st().importsWrite(undefined, logs);
-  t.w.openDetail('m1');
+  t.w.JiwenStats.openDetail('m1');
   $('detailSplit').click();
   await t.until(() => t.ask()); await t.askOk();
   await t.until(() => t.ask()); const msg2 = t.ask().msg; await t.askOk();
@@ -64,9 +64,9 @@ const M1 = { id: 'm1', time: '2026-10-05T08:30', money: 30, type: 'expense', cat
   // 开关关着：再合并一次，关掉开关看详情
   await t.importFiles(F);
   t.w.localStorage.removeItem('app_dev_import');
-  t.w.openDetail('m1');
+  t.w.JiwenStats.openDetail('m1');
   ok($('detailSrc') && /已和微信账单合并/.test($('detailSrc').textContent) && !$('detailSplit'), '6 开发开关关着：只写来源，没有「拆开」');
-  t.w.openDetail('m2');
+  t.w.JiwenStats.openDetail('m2');
   ok(!$('detailSrcField'), '6 没来源的手记：不显示这一行');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);

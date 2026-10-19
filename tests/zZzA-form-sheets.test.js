@@ -104,7 +104,7 @@ const MASKS = ['addMask', 'editMask', 'detailMask', 'refundMask', 'tplMask', 'ca
     ok(!shown(id) && !t.ask(), `5 ${id} 往下拉直接关`);
   }
   // 详情：返回键关
-  w.openDetail && w.openDetail('r1'); await t.idle();
+  w.JiwenStats.openDetail && w.JiwenStats.openDetail('r1'); await t.idle();
   if (shown('detailMask')) { await t.back(); ok(!shown('detailMask'), '5 详情：返回键关'); }
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));

@@ -165,6 +165,7 @@
   - 1019-Z4-M14 记一笔 `app/forms.js`（`JiwenForms`，68 条、对外 billCatSel / billTypeSel / closeEditModal / closeRefund / closeTplEditor / editCatSel / editId / editTypeSel / formSnaps / formState / getModeChips / openAddModal / refreshBillCatChipsIfOpen / refreshEditCatChipsIfOpen / refundLineHtml / renderEditCatChips / renderEditTypeChips / resetBillForm / setModeChips）。
   - 1019-Z4-M15 账单页 `app/ledger.js`（`JiwenLedger`，50 条、对外 applyBatch / clearAllFilters / goPage / openBatchMenu / renderBill / renderFilterChips / resetSearch / undoBatch）。
   - 1019-Z4-M16 分类管理 `app/cats.js`（`JiwenCats`，10 条、对外 deleteCat / editBudget / openCatManager / renameCat）。
+  - 1019-Z4-M17 统计页 `app/stats.js`（`JiwenStats`，70 条、对外 bgSuggestOpen / calcDay / closeDetail / dayNumHtml / fmtDayDate / openAiFlagList / openDetail / renderStats / saveDays / setStatTab / sortedDays / statMonth / statMonthCatMode / statSelDay / statTab / statYear）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。
