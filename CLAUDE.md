@@ -167,6 +167,7 @@
   - 1019-Z4-M16 分类管理 `app/cats.js`（`JiwenCats`，10 条、对外 deleteCat / editBudget / openCatManager / renameCat）。
   - 1019-Z4-M17 统计页 `app/stats.js`（`JiwenStats`，70 条、对外 bgSuggestOpen / calcDay / closeDetail / dayNumHtml / fmtDayDate / openAiFlagList / openDetail / renderStats / saveDays / setStatTab / sortedDays / statMonth / statMonthCatMode / statSelDay / statTab / statYear）。
   - 1019-Z4-M18 日子 `app/days.js`（`JiwenDays`，41 条、对外 closeDayDialog / closeDayMgr / daysSelecting / exitSelectMode / openDayDialog / renderDaysCard / renderDaysList）。
+  - 1019-Z4-M19 设置页 `app/settings.js`（`JiwenSettings`，12 条、对外 refreshArchiveSelect / renderStorageUse）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

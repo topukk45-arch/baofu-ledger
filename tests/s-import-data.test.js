@@ -345,7 +345,7 @@ let backupText;
   ok(impKeys(db).filter(k => k.includes('_' + aidT + '_')).length === 3, '6 「旅行」有单号表、待处理池、导入记录');
   // 改名：不用动
   const s1 = (t.w.JiwenStore || t.w).loadStore(); s1.archives['出差'] = s1.archives['旅行']; delete s1.archives['旅行']; await (t.w.JiwenStore || t.w).saveStoreDurable(s1);
-  t.w.refreshArchiveSelect();
+  t.w.JiwenSettings.refreshArchiveSelect();
   db = await t.db();
   ok(aidOf(db, ID_A, '出差') === aidT && impKeys(db).filter(k => k.includes('_' + aidT + '_')).length === 3 && (await S.ordersRead('出差')).size === 1, '6 存档改名：存档号不变，导入数据不用动');
   // 删存档（走界面）

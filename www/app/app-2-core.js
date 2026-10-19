@@ -248,18 +248,6 @@
                 return accountNameError(newName, id);
             }, { placeholder:'输入新用户名（最多 8 字）', maxchars:8 });
         });
-
-        function refreshArchiveSelect(){
-            const store = loadStore();
-            archiveSelect.innerHTML='';
-            Object.keys(store.archives).forEach(name => {
-                const opt=document.createElement('option');
-                opt.value=name; opt.textContent=name;
-                if(name===currentArchive) opt.selected=true;
-                archiveSelect.appendChild(opt);
-            });
-            odRefreshStatusUI();
-        }
         archiveSelect.addEventListener('change', () => {
             currentArchive = archiveSelect.value;
             const store=loadStore(); store.last=currentArchive; saveStoreSafe(store);
@@ -394,115 +382,6 @@
                 tip: '无法直接写入文件，请点「复制」或「分享」，把内容保存到记事本 / 云笔记 / 聊天收藏。这段文本就是完整备份，之后可用「导入存档」还原。'
             });
         }
-        if($('odConnectBtn')){
-            $('odConnectBtn').addEventListener('click', async () => {
-                const plugin = odPlugin();
-                if(!plugin){ customAlert('这个功能目前只支持安装到手机上的 App，网页版暂不支持。'); return; }
-                try{
-                    const suggested = `记问存档_${currentArchive}.json`;
-                    const res = await plugin.pickFile({ mode:'create', suggestedName: suggested });
-                    if(!res || !res.uri) return;
-                    // 重新选择 = 明确的用户意图，解除守卫（含损坏名单），否则一旦拦下就再也恢复不了
-                    __corruptedStores.delete(storeKey(currentUser));
-                    ledgerAcceptDamage(currentUser, currentArchive);   // 这个存档读不出来的月份按现在的样子重写，以后不再暂停
-                    odSetLink(currentUser, currentArchive, { uri: res.uri, name: res.name || suggested,
-                        lastSyncAt:null, lastError:null, blocked:false, lastCount:0 });
-                    odRefreshStatusUI();
-                    customAlert('已连接，之后每次记账/修改会自动同步到这个文件。现在先手动同步一次试试。', '连接成功');
-                    odSyncNow();
-                }catch(err){
-                    // 用户取消选择时也会走到这里，静默即可，不用报错打扰
-                }
-            });
-        }
-        // 1016-W：单号表云端文件：另选（新建）一个文件；恢复时从那个文件读（没连过就让你选一个）
-        $('odOrdersBtn').addEventListener('click', async () => {
-            const plugin=odPlugin(); if(!plugin) return;
-            try{
-                const suggested=`记问单号表_${currentArchive}.json`;
-                const res=await plugin.pickFile({ mode:'create', suggestedName:suggested });
-                if(!res || !res.uri) return;
-                odSetOrdLink(currentUser, currentArchive, { uri:res.uri, name:res.name || suggested, lastSyncAt:null, lastError:null });
-                await odOrdersSync();
-                odRefreshStatusUI();
-                const ol=odGetOrdLink();
-                customAlert(ol && ol.lastError ? '已连接，但这次没传上：' + ol.lastError + '\n\n下次导入后会再试。' : '已连接，现在的单号表传上去了。以后每次导入、撤销、处理待处理后更新这个文件，平时记账不碰它。', '单号表上云');
-            }catch(_){ /* 取消选择 */ }
-        });
-        $('odOrdersRestoreBtn').addEventListener('click', async () => {
-            const plugin=odPlugin(); if(!plugin) return;
-            let uri=null, ol=odGetOrdLink();
-            try{
-                if(ol && ol.uri) uri=ol.uri;
-                else { const res=await plugin.pickFile({ mode:'open' }); if(!res || !res.uri) return; uri=res.uri; }
-            }catch(_){ return; }
-            customConfirm('从云端的单号表文件恢复这个存档的单号表：按记录内容一条条认回来，认不出来的当作没导过。\n\n只在这个存档还没有单号表时恢复，已经有的不覆盖。', async () => {
-                try{
-                    const r=await plugin.readText({ uri });
-                    const out=await impOrdersRestoreFromCloud(r && r.text);
-                    customAlert(`恢复好了：认回 ${out.kept} 个单号` + (out.dropped ? `，${out.dropped} 个对应的记录不在了，当作没导过` : '') + '。', '恢复单号表');
-                }catch(err){
-                    const c=err && (err.code || err.message);
-                    customAlert(c==='notempty' ? '这个存档已经有单号表了，没有覆盖。' : c==='badfile' ? '这个文件不是记问的单号表。' : '没恢复成，什么都没改：' + c, '恢复单号表');
-                }
-            }, '恢复单号表', { okText:'从云盘恢复单号表' });
-        });
-        if($('odDisconnectBtn')){
-            $('odDisconnectBtn').addEventListener('click', () => {
-                customConfirm('停止把这个存档自动备份到云盘。云盘上已有的文件不删，需要的话可以重新连接。', () => {
-                    const plugin = odPlugin();
-                    const link = odGetLink();
-                    if(plugin && link && link.uri){ plugin.forget({ uri: link.uri }).catch(()=>{}); }
-                    odClearLink(currentUser, currentArchive);
-                    odRefreshStatusUI();
-                }, '取消自动同步', { okText:'停止自动同步', cancelText:'继续同步' });
-            });
-        }
-        $('setBuild').addEventListener('click', () => {
-            const now=Date.now();
-            JiwenImportEntry.__buildTaps=JiwenImportEntry.__buildTaps.filter(t=>now-t<2000); JiwenImportEntry.__buildTaps.push(now);
-            if(JiwenImportEntry.__buildTaps.length<5) return;
-            JiwenImportEntry.__buildTaps=[];
-            const on=!devImportOn();
-            try{ if(on) localStorage.setItem(DEV_IMPORT_KEY,'1'); else localStorage.removeItem(DEV_IMPORT_KEY); }catch(_){}
-            renderDevImport();
-            try{ if(currentUser) renderBill(); }catch(_){}     // 1016-R：空账本的小入口跟着开关出现 / 消失
-            renderStorageUse();
-            try{ odRefreshStatusUI(); }catch(_){}
-            customAlert(on ? '已打开「导入（开发中）」，入口在上面「存档管理」里。只在这台手机上有效。' : '已关闭「导入（开发中）」。', '开发开关');
-        });
-        $('importFile').addEventListener('change', e => {
-            const file=e.target.files[0]; if(!file) return;
-            if(file.size > IMPORT_MAX_BYTES){
-                customAlert('文件太大啦（超过 24MB），请确认是否为正确的备份文件。');
-                $('importFile').value=''; return;
-            }
-            const reader=new FileReader();
-            reader.onload=ev=>trackBusy((async()=>{
-                try{
-                    const { finalName, stats, daysAdded, daysPending }=await importArchiveFromText(ev.target.result, currentUser);
-                    // importArchiveFromText 内部已把新存档写盘并设好 store.last，无需再重读重写一遍
-                    currentArchive=finalName;
-                    // refreshAllViews 里已含 renderDaysCard，导进来的倒数日会一并刷新到入口卡
-                    refreshArchiveSelect(); refreshCatSelectors(); refreshAllViews();
-                    const user=currentUser;
-                    askImportOtherDays(daysPending, user, (asked)=>{
-                        if(asked && user===currentUser) refreshAllViews();
-                        customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}${importDaysSuffix(daysAdded+asked)}`, '导入成功', 'left');
-                    });
-                }catch(err){
-                    const msg = err && err.message;
-                    let tip;
-                    if(msg==='empty')      tip='导入失败：文件里没有有效记录';
-                    else if(msg==='toomany') tip='导入失败：记录条数过多（上限 5 万条），请拆分后再导入';
-                    else if(msg==='quota')   tip='导入失败：存储空间不足，已放弃本次导入。请删除部分存档或记录后重试。';
-                    else                     tip='导入失败：文件格式不正确';
-                    customAlert(tip);
-                }
-                $('importFile').value='';
-            })());
-            reader.readAsText(file);
-        });
         function refreshCatSelectors(){
             const cats=getCats();
             fillSelect(billCat, cats, cats[0]);
@@ -517,8 +396,6 @@
             renderFilterChips();
             if(window.syncFilterFab) window.syncFilterFab();
         }
-        // 「管理分类」入口已从筛选浮层移到设置页（分类属于存档配置，与筛选语义分离）
-        $('manageCatSetting').addEventListener('click', openCatManager);
         // 数据变更后统一刷新：账单页总是刷新；统计页若正在显示也立即重算，
         // 避免「新增/删除记录后切到统计页数字没更新」的问题
         function refreshAllViews(){
