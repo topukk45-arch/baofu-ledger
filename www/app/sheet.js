@@ -1,0 +1,413 @@
+(function(){
+        const { $, SHEET_MS } = window.JiwenBase;   // 用到前面模块的
+        // ===== 底部浮层的「往下拉关闭」（1017-UI1 从筛选浮层里抽出来，筛选浮层和导入页的选择面板共用）=====
+        //   sheetMask：遮罩（带 .open 时才接手势）；sheet：面板（.sheet）；grip：顶部抓手区（鼠标拖拽用）；onDismiss：拉够了要关时调
+        //   返回 { reset }：把拖到一半的位移、过渡复位（打开 / 关闭时调）
+        // 1019-B：.form-mask（老弹窗换成的底部面板）显示出来（display:flex）就算开着，不靠 .open 类
+        function sheetShown(m){ return m.classList.contains('open') || (m.classList.contains('form-mask') && m.style.display==='flex'); }
+        function bindSheetDrag(sheetMask, sheet, grip, onDismiss){
+            // ===== 下滑手势关闭 =====
+            // 【1010-F】触屏上整片面板都能下拉关闭（此前只有顶部抓手区能拉）。
+            //   规则：手指向下、偏竖直、且面板内容已滚到顶 → 接管为「下拉关闭」；
+            //         否则交还给原生滚动（面板内容没到顶时往下拉就是往回滚）。
+            //   点按不受影响：位移不超过 DRAG_SLOP 不算拖。
+            //   刻意不做「点面板外关闭」：误触一下就丢掉填好的条件，代价太大。
+            // 灵敏度比之前调低一档：
+            //   · 关闭距离：至少 140px，且不少于面板高度的 28%
+            //   · 快速甩动：要拉过 80px 且末段速度 > 0.8px/ms 才算
+            //   · 跟手有 0.8 的阻尼，拉起来略「沉」，不容易一碰就飞
+            const DRAG_SLOP=10, DISMISS_MIN=140, DISMISS_RATIO=0.28, FLING_MIN_PX=80, FLING_V=0.8, DRAG_RESIST=0.8;
+            function dismissDistance(){ return Math.max(DISMISS_MIN, (sheet.offsetHeight||0)*DISMISS_RATIO); }
+            let tCand=false, tDrag=false, tY0=0, tX0=0, tDY=0, tLastY=0, tLastT=0, tVel=0;
+            function touchReset(){ tCand=false; tDrag=false; tDY=0; tVel=0; }
+            sheet.addEventListener('touchstart', e=>{
+                if(!sheetShown(sheetMask) || e.touches.length!==1){ touchReset(); return; }
+                const p=e.touches[0];
+                tCand=true; tDrag=false; tY0=p.clientY; tX0=p.clientX; tDY=0;
+                tLastY=p.clientY; tLastT=Date.now(); tVel=0;
+            }, {passive:true});
+            sheet.addEventListener('touchmove', e=>{
+                if(!tCand) return;
+                const p=e.touches[0];
+                const dy=p.clientY-tY0, dx=p.clientX-tX0;
+                if(!tDrag){
+                    const atTop = sheet.scrollTop<=0;
+                    // 已在顶部还往下拉：原生这时也滚不动，先拦住，免得浏览器把这次手势「认领」成滚动
+                    if(dy>0 && atTop && e.cancelable) e.preventDefault();
+                    if(Math.abs(dy)<DRAG_SLOP && Math.abs(dx)<DRAG_SLOP) return;
+                    if(dy>0 && atTop && Math.abs(dy)>Math.abs(dx)*1.2){
+                        tDrag=true; sheet.style.transition='none';
+                    } else { tCand=false; return; }   // 横向 / 向上 / 内容没到顶：交给原生
+                }
+                if(e.cancelable) e.preventDefault();
+                tDY=Math.max(0, dy-DRAG_SLOP)*DRAG_RESIST;
+                sheet.style.transform=`translateY(${tDY}px)`;
+                const now=Date.now();
+                if(now>tLastT){ tVel=(p.clientY-tLastY)/(now-tLastT); tLastY=p.clientY; tLastT=now; }
+            }, {passive:false});
+            sheet.addEventListener('touchend', ()=>{
+                if(!tDrag){ touchReset(); return; }
+                const close = tDY>dismissDistance() || (tDY>FLING_MIN_PX && tVel>FLING_V);
+                if(close) sheet.__dragY=tDY;   // 1019-N：关掉时的影子从手指拉到的地方接着往下滑
+                sheet.style.transition=''; sheet.style.transform='';
+                touchReset();
+                if(close) onDismiss();
+            }, {passive:true});
+            sheet.addEventListener('touchcancel', ()=>{
+                sheet.style.transition=''; sheet.style.transform=''; touchReset();
+            }, {passive:true});
+
+            // 鼠标（桌面调试）仍走抓手区拖拽；触屏的 pointer 事件交给上面的 touch 逻辑，避免双触发。
+            const DRAG_DISMISS_PX = DISMISS_MIN;   // 与触屏同一档
+            const DRAG_FLING_PX   = FLING_MIN_PX;
+            let dragStartY=0, dragDY=0, dragging=false, dragStartT=0, dragId=null;
+
+            function resetSheetDrag(){
+                dragging=false; dragDY=0; dragId=null;
+                touchReset();
+                sheet.style.transition='';
+                sheet.style.transform='';
+            }
+            function onDragStart(e){
+                if(!sheetShown(sheetMask)) return;
+                if(e.pointerType && e.pointerType!=='mouse') return;   // 触屏走 touch 那套
+                const pt=e.touches?e.touches[0]:e;
+                dragging=true; dragStartY=pt.clientY; dragDY=0; dragStartT=Date.now();
+                dragId = (e.pointerId!=null)?e.pointerId:null;
+                sheet.style.transition='none';
+                // 锁定后续 pointer 事件到 grip，保证 move/up 一定收得到
+                if(dragId!=null && grip.setPointerCapture){
+                    try{ grip.setPointerCapture(dragId); }catch(_){}
+                }
+            }
+            function onDragMove(e){
+                if(!dragging) return;
+                const pt=e.touches?e.touches[0]:e;
+                dragDY=(pt.clientY-dragStartY)*DRAG_RESIST;
+                if(dragDY<0) dragDY=0;             // 只允许下拉
+                // 非 passive：阻止默认滚动/回弹，手势完全归我们
+                if(e.cancelable) e.preventDefault();
+                sheet.style.transform=`translateY(${dragDY}px)`;
+            }
+            function onDragEnd(){
+                if(!dragging) return;
+                const dt=Date.now()-dragStartT;
+                const fling = dragDY>DRAG_FLING_PX && dt<200;   // 快速下滑也算关闭（门槛与触屏同档）
+                sheet.style.transition='';
+                sheet.style.transform='';
+                if(dragId!=null && grip.releasePointerCapture){
+                    try{ grip.releasePointerCapture(dragId); }catch(_){}
+                }
+                const shouldClose = dragDY>DRAG_DISMISS_PX || fling;
+                if(shouldClose) sheet.__dragY=dragDY;
+                dragging=false; dragDY=0; dragId=null;
+                if(shouldClose) onDismiss();
+            }
+            // 有 PointerEvent 用 pointer 一套，否则回退 touch，避免双触发。
+            // move 用 {passive:false} 才能 preventDefault。
+            if(window.PointerEvent){
+                grip.addEventListener('pointerdown', onDragStart, {passive:true});
+                grip.addEventListener('pointermove', onDragMove, {passive:false});
+                grip.addEventListener('pointerup', onDragEnd, {passive:true});
+                grip.addEventListener('pointercancel', onDragEnd, {passive:true});
+            }
+            // 没有 PointerEvent 的老 WebView：触屏已由上面整片面板的 touch 逻辑覆盖，这里不再重复绑。
+            return { reset: resetSheetDrag };
+        }
+        // ===== 1017-UI1：共用的底部面板（选分类 / 选一项 / 确认）=====
+        //   和「筛选」浮层同一套样式和代码：.mask.sheet-mask > .sheet（顶上 .sheet-grip 拖动条 + 标题），往下拉关闭用 bindSheetDrag。
+        //   JiwenSheet.open({ title, sub, body(容器, 关面板), foot(容器, 关面板), onDismiss, busy })：
+        //     onDismiss：下拉 / 返回键 / 取消时调（等于「取消 / 再看看 / 继续导入」）；busy()：为真时（正在写入）下拉、返回键都不关
+        //   JiwenSheet.pick({ title, sub, options:[{ value, label }], value, chips, onPick })：单选，点一下就选中并关掉；底部只有「取消」
+        //     chips 为真时用筛选里分类那种圆角块（一行几个、自动换行），否则一行一个
+        window.JiwenSheet=(function(){
+            let mask=null, sheet=null, grip=null, titleEl=null, subEl=null, bodyEl=null, footEl=null, drag=null, cur=null;
+            function build(){
+                if(mask) return;
+                mask=document.createElement('div'); mask.className='mask sheet-mask'; mask.id='uiSheetMask';
+                sheet=document.createElement('div'); sheet.className='sheet ui-sheet'; sheet.id='uiSheet';
+                grip=document.createElement('div'); grip.className='sheet-grip'; grip.id='uiSheetGrip';
+                const hd=document.createElement('div'); hd.className='sheet-handle'; hd.setAttribute('aria-hidden','true');
+                const head=document.createElement('div'); head.className='sheet-head';
+                titleEl=document.createElement('h3'); titleEl.id='uiSheetTitle'; head.appendChild(titleEl);
+                grip.appendChild(hd); grip.appendChild(head);
+                subEl=document.createElement('div'); subEl.className='ui-sheet-sub'; subEl.id='uiSheetSub';
+                bodyEl=document.createElement('div'); bodyEl.className='sheet-body ui-sheet-body'; bodyEl.id='uiSheetBody';
+                footEl=document.createElement('div'); footEl.className='ui-sheet-foot'; footEl.id='uiSheetFoot';
+                sheet.appendChild(grip); sheet.appendChild(subEl); sheet.appendChild(bodyEl); sheet.appendChild(footEl);
+                mask.appendChild(sheet); document.body.appendChild(mask);
+                sheetGhostWatch(mask);   // 1019-N：关掉时的收起动画（马上接上，不等观察者）
+                drag=bindSheetDrag(mask, sheet, grip, ()=>dismiss());
+            }
+            function isOpen(){ return !!mask && mask.classList.contains('open'); }
+            function close(){
+                if(!mask) return;
+                const was=cur; cur=null;
+                mask.classList.remove('open'); drag.reset();
+                mask.style.display='none';
+                bodyEl.textContent=''; footEl.textContent='';
+                return was;
+            }
+            function dismiss(){
+                if(!cur || (cur.busy && cur.busy())) return;
+                const fn=cur.onDismiss; close(); if(fn) fn();
+            }
+            function open(o){
+                build();
+                if(cur) close();
+                cur=o||{};
+                titleEl.textContent=cur.title||'';
+                subEl.textContent=cur.sub||''; subEl.style.display=cur.sub?'':'none';
+                bodyEl.textContent=''; footEl.textContent='';
+                if(cur.body) cur.body(bodyEl, close);
+                if(cur.foot) cur.foot(footEl, close);
+                mask.style.display='flex';
+                drag.reset();
+                sheet.scrollTop=0;
+                mask.classList.add('open');
+            }
+            function pick(o){
+                const opts=o.options||[];
+                open({ title:o.title, sub:o.sub, onDismiss:o.onCancel,
+                    body(box, done){
+                        const wrap=document.createElement('div');
+                        wrap.className=o.chips ? 'filter-chips ui-pick-chips' : 'ui-pick-list';
+                        wrap.id='uiPickList';
+                        opts.forEach(x=>{
+                            const el=document.createElement(o.chips?'div':'button');
+                            if(!o.chips) el.type='button';
+                            el.className=(o.chips?'cc':'ui-btn block ui-pick-opt')+(x.value===o.value?' sel':'');
+                            el.dataset.value=x.value; el.textContent=x.label;
+                            el.addEventListener('click', ()=>{ done(); if(o.onPick) o.onPick(x.value); });
+                            wrap.appendChild(el);
+                        });
+                        box.appendChild(wrap);
+                        // 当前那项滚进可视区（分类很多时）
+                        const sel=wrap.querySelector('.sel');
+                        if(sel) requestAnimationFrame(()=>{ const sh=sheet; const top=sel.offsetTop - sh.clientHeight/2; if(top>0) sh.scrollTop=top; });
+                    },
+                    foot(box){
+                        const row=document.createElement('div'); row.className='dialog-btn';
+                        const c=document.createElement('button'); c.type='button'; c.className='cancel'; c.id='uiSheetCancel'; c.textContent='取消';
+                        c.addEventListener('click', ()=>dismiss());
+                        row.appendChild(c); box.appendChild(row);
+                    } });
+            }
+            return { open, pick, close, isOpen, back:dismiss, _sheet:()=>sheet };
+        })();
+
+        // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====
+        (function(){
+            const masks=Array.from(document.querySelectorAll('.mask'));
+            let savedScrollY=0, locked=false;
+
+            function anyMaskOpen(){
+                return masks.some(m=>{
+                    const d=getComputedStyle(m).display;
+                    return d && d!=='none';
+                });
+            }
+            function lock(){
+                if(locked) return;
+                savedScrollY=window.scrollY || window.pageYOffset || 0;
+                document.body.style.position='fixed';
+                document.body.style.top=`-${savedScrollY}px`;
+                document.body.style.left='0';
+                document.body.style.right='0';
+                document.body.style.width='100%';
+                locked=true;
+            }
+            function unlock(){
+                if(!locked) return;
+                document.body.style.position='';
+                document.body.style.top='';
+                document.body.style.left='';
+                document.body.style.right='';
+                document.body.style.width='';
+                window.scrollTo(0, savedScrollY);
+                locked=false;
+            }
+            function update(){ anyMaskOpen()?lock():unlock(); }
+
+            // 监听每个弹窗的显示状态变化
+            masks.forEach(m=>{
+                new MutationObserver(update).observe(m, {attributes:true, attributeFilter:['style']});
+            });
+
+            // 弹窗内列表（可滚动区域）到顶/到底时，阻止滚动冒泡到背景，进一步防穿透
+            document.querySelectorAll('.cat-list, .ask-msg, .edit-dialog, .dt-dialog').forEach(el=>{
+                el.addEventListener('touchmove', e=>{ e.stopPropagation(); }, {passive:true});
+            });
+        })();
+
+        // ===== 点击按下反馈：用事件委托给可点元素加 .pressed（WebView 里 :active 不稳，故用 JS）=====
+        (function(){
+            const SEL = 'button, .mini-btn, .link-btn, .cs-display, .dt-day, .dt-now, '
+                      + '.pager button, .user-chip, .login-btn, .add-btn, .save, .cancel, '
+                      + '.operate-btn, .logout, .cat-item button, .archive-bar select';
+            let cur=null;
+            function press(e){
+                const t=e.target.closest(SEL);
+                if(!t || t.disabled) return;
+                cur=t; t.classList.add('pressed');
+            }
+            function release(){
+                if(cur){ cur.classList.remove('pressed'); cur=null; }
+            }
+            // 有 PointerEvent 就只用 pointer 一套（覆盖鼠标/触摸/触控笔），
+            // 否则回退 touch；避免同一次按压在触屏上被 pointer+touch 触发两次。
+            if(window.PointerEvent){
+                document.addEventListener('pointerdown', press, {passive:true});
+                document.addEventListener('pointerup', release, {passive:true});
+                document.addEventListener('pointercancel', release, {passive:true});
+            } else {
+                document.addEventListener('touchstart', press, {passive:true});
+                document.addEventListener('touchend', release, {passive:true});
+                document.addEventListener('touchcancel', release, {passive:true});
+            }
+            // 滚动时若手指离开按钮，确保还原
+            document.addEventListener('scroll', release, {passive:true, capture:true});
+        })();
+
+        // ===== 1019-N：所有底部面板关闭都有收起动画 =====
+        //   不管怎么关（返回键、侧滑返回、取消 / 确定、往下拉、代码里关），面板一 display:none，就在原地放一个「影子」：
+        //   照着关之前的样子复制一份（没有 id、点不动），往下滑走 + 遮罩淡出（SHEET_OUT_MS，和往下拉松手后差不多），收完就移除。
+        //   真正的面板当场就关了，所以关掉以后的状态、逻辑和以前完全一样，不用每个面板各写一份。
+        //   影子在的时候再按返回：先把影子立刻收完，再收下一层（handleBack 里调 sheetGhostsFinish）。系统设了「减少动画」时改成很短的淡出。
+        const SHEET_OUT_MS=SHEET_MS, SHEET_FADE_MS=80;   // 1019-Z3：收起和打开同一个时长（SHEET_MS），减少动画时照旧 80 毫秒淡出
+        const SHEET_GHOST_SKIP={};
+        const __ghosts=new Set();
+        function reduceMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){ return false; } }
+        function sheetGhostsFinish(){ [...__ghosts].forEach(g=>g.__fin && g.__fin()); }
+        window.__sheetGhosts=()=>__ghosts.size;   // 给测试用
+        function sheetGhost(m){
+            // 1019-Q：面板关了，对着它里面金额框的数字键盘一起收起（不然下一层按返回先收的是它）
+            if(m.querySelector('.kp-on') && window.kpClose) window.kpClose();
+            const sh=m.querySelector('.sheet') || m.firstElementChild;
+            if(!sh || !document.body) return;
+            const t0=window.JiwenPerf ? window.JiwenPerf.now() : Date.now();
+            const g=m.cloneNode(true);
+            g.removeAttribute('id'); g.querySelectorAll('[id]').forEach(x=>x.removeAttribute('id'));
+            g.querySelectorAll('[name]').forEach(x=>x.removeAttribute('name'));
+            // 输入框里填的字（cloneNode 不带）照抄过去，免得滑走时一下子空了
+            const src=m.querySelectorAll('input,textarea,select'), dst=g.querySelectorAll('input,textarea,select');
+            src.forEach((x, i)=>{ if(dst[i]){ if(x.type==='checkbox' || x.type==='radio') dst[i].checked=x.checked; else dst[i].value=x.value; } });
+            g.classList.remove('mask', 'open', 'closing');
+            g.classList.add('sheet-ghost', reduceMotion() ? 'ghost-fade' : 'ghost-down');
+            g.setAttribute('aria-hidden', 'true');
+            g.style.display='flex'; g.style.zIndex=getComputedStyle(m).zIndex || '1000';
+            g.style.height=m.__ghostH || '';
+            document.body.appendChild(g);
+            const gs=g.querySelector('.sheet') || g.firstElementChild;
+            if(gs){ gs.scrollTop=sh.__lastScroll || 0; gs.style.transform=''; g.style.setProperty('--gy', (sh.__dragY||0)+'px'); }
+            sh.__dragY=0;
+            __ghosts.add(g);
+            let done=false;
+            g.__fin=()=>{ if(done) return; done=true; __ghosts.delete(g); g.remove();
+                if(window.JiwenPerf) window.JiwenPerf.add({ kind:'关闭面板', ms:Math.round((window.JiwenPerf.now())-t0), what:m.id }); };
+            if(gs) gs.addEventListener('animationend', ()=>g.__fin(), { once:true });
+            setTimeout(()=>g.__fin(), (reduceMotion() ? SHEET_FADE_MS : SHEET_OUT_MS)+60);   // 动画事件没来（被打断、没有布局）的兜底
+        }
+        function sheetGhostWatch(m){
+            if(m.__ghostWatch || SHEET_GHOST_SKIP[m.id]) return; m.__ghostWatch=1;
+            const sh=()=>m.querySelector('.sheet') || m.firstElementChild;
+            // 面板里滚到哪了（关掉以后读不到了，影子要照着摆）
+            m.addEventListener('scroll', e=>{ const x=sh(); if(x && e.target===x) x.__lastScroll=x.scrollTop; }, true);
+            // 按每次改动之前的样子判断（同一拍里开了又关也认得出）
+            new MutationObserver(recs=>{
+                const now=m.style.display;
+                if(now==='flex'){ m.__ghostH=m.style.height || ''; return; }   // 键盘弹起时 mask 被收成可视区高度，影子照着
+                if(!m.__noGhost && recs.some(r=>/display:\s*flex/.test(r.oldValue||''))) sheetGhost(m);
+            }).observe(m, { attributes:true, attributeFilter:['style'], attributeOldValue:true });
+        }
+        document.querySelectorAll('.mask').forEach(sheetGhostWatch);
+        new MutationObserver(ms=>ms.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.classList && n.classList.contains('mask')) sheetGhostWatch(n); }))).observe(document.body, { childList:true });
+
+        // ===== 1019-M：性能记录：点输入框到能输入、键盘弹起时面板动了几次、面板打开用了多久 =====
+        (function(){
+            const P=window.JiwenPerf;
+            const nameOf=el=>{ if(!el) return ''; const m=el.closest && el.closest('.mask'); return (el.id||el.tagName.toLowerCase())+(m ? '@'+m.id : ''); };
+            // 点输入框 → 获得焦点 → 再过两帧（键盘这时已经在动了）算「能输入」
+            let downAt=0;
+            document.addEventListener('pointerdown', e=>{ const el=e.target && e.target.closest && e.target.closest('input,textarea'); downAt=el ? P.now() : 0; }, true);
+            document.addEventListener('focusin', e=>{
+                const el=e.target; if(!downAt || !el.matches || !el.matches('input,textarea')) return;
+                const t0=downAt; downAt=0;
+                requestAnimationFrame(()=>requestAnimationFrame(()=>P.add({ kind:'点输入框', ms:Math.round(P.now()-t0), what:nameOf(el) })));
+            }, true);
+            // 键盘弹起 / 收起：可视区一变，就一帧一帧看最上面那个面板的顶边，900 毫秒里变了几次、最慢一帧多久
+            const vv=window.visualViewport;
+            function topSheet(){
+                const ms=[...document.querySelectorAll('.mask')].filter(m=>m.style.display==='flex');
+                ms.sort((a, b)=>(parseInt(getComputedStyle(b).zIndex)||0)-(parseInt(getComputedStyle(a).zIndex)||0));
+                return ms[0] ? (ms[0].querySelector('.sheet') || ms[0].firstElementChild) : null;
+            }
+            let watching=false, lastH=vv ? vv.height : 0;
+            if(vv) vv.addEventListener('resize', ()=>{
+                const h0=lastH; lastH=vv.height;
+                if(watching || !P.on()) return;
+                const sh=topSheet(); if(!sh) return;
+                watching=true;
+                const t0=P.now(), tops=[], frames=[]; let last=null, prev=t0, blank=0;
+                const tick=()=>{
+                    const r=sh.getBoundingClientRect(), top=Math.round(r.top), n=P.now();
+                    if(top!==last){ tops.push(top); last=top; }
+                    // 1019-W：这一帧露没露出空白底：面板（或它的遮罩）下沿够不到看得见的屏幕底
+                    const vis=(vv.offsetTop||0)+vv.height, mk=sh.closest('.mask'), mb=mk ? mk.getBoundingClientRect().bottom : r.bottom;
+                    if(Math.min(r.bottom, mb) < vis-1) blank++;
+                    frames.push(n-prev); prev=n;
+                    if(n-t0<900) requestAnimationFrame(tick);
+                    else { watching=false; const fs=frames.slice(1);
+                        P.add({ kind:'键盘', moves:Math.max(0, tops.length-1), blank, maxFrame:Math.round(Math.max(0, ...fs)), avgFrame:fs.length ? Math.round(fs.reduce((a, b)=>a+b, 0)/fs.length) : 0, vv:Math.round(h0)+'→'+Math.round(vv.height), what:nameOf(sh) }); }
+                };
+                requestAnimationFrame(tick);
+            });
+            // 面板打开：display 变成 flex 到面板滑入动画走完（没有动画就是下一帧）
+            function watchMask(m){
+                if(m.__perfWatch) return; m.__perfWatch=1;
+                let was=m.style.display;
+                new MutationObserver(()=>{
+                    const nowD=m.style.display;
+                    if(nowD==='flex' && was!=='flex' && P.on()){
+                        const t0=P.now(), sh=m.querySelector('.sheet') || m.firstElementChild; let done=false;
+                        const fin=()=>{ if(done) return; done=true; P.add({ kind:'打开面板', ms:Math.round(P.now()-t0), what:m.id }); };
+                        if(sh){ sh.addEventListener('animationend', fin, { once:true }); sh.addEventListener('transitionend', fin, { once:true }); }
+                        setTimeout(()=>requestAnimationFrame(fin), 450);   // 没有动画（或动画被打断）的兜底
+                    }
+                    was=nowD;
+                }).observe(m, { attributes:true, attributeFilter:['style'] });
+            }
+            document.querySelectorAll('.mask').forEach(watchMask);
+            new MutationObserver(ms=>ms.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.classList.contains('mask')) watchMask(n); }))).observe(document.body, { childList:true });
+            // 「性能记录（开发中）」页：一行一条，能一键复制全部、清空
+            function fmt(e){
+                if(typeof e.ts==='number') e=Object.assign({}, e, { at:P.localAt(e.ts) });   // 1019-Z4：有时间戳的按当地时间重新写（老记录没有，照原样）
+                if(e.kind==='启动' && e.nat){ const n=e.nat, v=x=>x!=null ? x : '-';
+                    return `${e.at} 启动全程（${n.proc ? '从点图标' : '从 Activity 创建'}算）：Activity 创建 ${v(n.act)} · WebView 建好 ${v(n.web)} · 网页开始 ${v(n.page)} · 首屏画好 ${v(n.first)} · 收到画好了 ${v(n.ready)} · 启动画面收起 ${n.wait ? v(n.gone) : '（没等首屏，系统第一帧就收）'}｜网页里：${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}`; }
+                if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}）`;
+                if(e.kind==='点输入框') return `${e.at} 点输入框到能输入 ${e.ms}ms（${e.what}）`;
+                if(e.kind==='键盘') return `${e.at} 键盘 面板位置变了 ${e.moves} 次${e.blank!=null ? `，露出空白 ${e.blank} 帧` : ''}，最慢一帧 ${e.maxFrame}ms、平均 ${e.avgFrame}ms，可视区 ${e.vv}（${e.what}）`;
+                if(e.kind==='打开面板' || e.kind==='关闭面板') return `${e.at} ${e.kind} ${e.ms}ms（${e.what}）`;
+                return e.at+' '+JSON.stringify(e);
+            }
+            function openPerfPage(){
+                const rows=P.list().slice().reverse();
+                const text=['记问性能记录（'+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1')+'）'].concat(rows.map(fmt)).join('\n');
+                window.JiwenSheet.open({ title:'性能记录（开发中）', sub:rows.length ? `最近 ${rows.length} 条，新的在上（最多留 50 条，只在这台手机）` : '还没有记录：关掉 App 再打开、点几个输入框、开关几个面板，这里就有了。',
+                    body(box){ const pre=document.createElement('pre'); pre.id='perfList'; pre.className='perf-list'; pre.textContent=rows.map(fmt).join('\n'); box.appendChild(pre); },
+                    foot(box, done){
+                        const st=document.createElement('div'); st.className='ui-stack';
+                        const cp=document.createElement('button'); cp.type='button'; cp.className='ui-btn primary block'; cp.id='perfCopy'; cp.textContent='复制全部';
+                        cp.addEventListener('click', ()=>{ const ok=()=>{ cp.textContent='已复制'; }; try{ navigator.clipboard.writeText(text).then(ok, ()=>{ window.prompt && window.prompt('复制下面的文字', text); }); }catch(_){ } });
+                        const cl=document.createElement('button'); cl.type='button'; cl.className='ui-btn block'; cl.id='perfClear'; cl.textContent='清空';
+                        cl.addEventListener('click', ()=>{ P.clear(); done(); openPerfPage(); });
+                        const x=document.createElement('button'); x.type='button'; x.className='ui-btn block'; x.id='perfClose'; x.textContent='关闭';
+                        x.addEventListener('click', ()=>done());
+                        st.appendChild(cp); st.appendChild(cl); st.appendChild(x); box.appendChild(st);
+                    } });
+            }
+            window.openPerfPage=openPerfPage;
+            const b=$('devPerfBtn'); if(b) b.addEventListener('click', openPerfPage);
+        })();
+        window.JiwenPanel = { bindSheetDrag, sheetGhostsFinish };   // sheet 模块对外只有这一个入口
+})();

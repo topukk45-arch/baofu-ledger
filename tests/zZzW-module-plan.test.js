@@ -17,6 +17,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   const P = PL.plan(WWW);
   ok(P.unassigned.length === 0, '1 每一节都归了模块：' + P.unassigned.join('、'));
   const keys = PL.MODULES.map(m => m.key), entries = PL.MODULES.map(m => m.entry).filter(Boolean);
+  ok(entries.every(e => !PL.LEGACY.includes(e)), '1 入口不和老入口重名（重名会把老入口盖掉）：' + entries.filter(e => PL.LEGACY.includes(e)).join('、'));
   ok(new Set(keys).size === keys.length && new Set(entries).size === entries.length && entries.every(e => /^Jiwen[A-Z]\w+$/.test(e)), '1 模块名、入口不重复，入口都叫 JiwenXxx');
   const missing = PL.MODULES.flatMap(m => m.names.filter(n => !P.R.decls.has(n)).map(n => m.key + ':' + n));
   ok(missing.length === 0, '1 单独挪的名字都真有：' + missing.join('、'));

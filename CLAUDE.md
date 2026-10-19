@@ -132,7 +132,7 @@
   | --- | --- | --- |
   | 0 基础 | base（`JiwenBase`） | 性能记录（入口 `JiwenPerf` 不变）、`$`、常量、页面元素句柄、软键盘、金额输入过滤、dt-input 垫片、数字字号、时间解析、口径计算、补零 / 四舍五入 / 转义这些小工具 |
   | 1 存储 | store（`JiwenStore`） | 账本存储（IndexedDB 分块、写入队列）、loadStore / saveStore、账号、老数据迁移、搬家、退款和预算的计算、分类 / 模板 / 日子的数据、导入数据和写入（入口 `JiwenImportStore` 不变）、云备份、单号表上云、备份文件导出 / 导入 |
-  | 2 面板底座 | select（`JiwenSelect`）→ keypad（`JiwenKeypad`）→ text（`JiwenText`）→ sheet（`JiwenSheet`）→ ask（`JiwenAsk`）→ date（`JiwenDate`） | 金色下拉、数字键盘、文字小面板、共用底部面板（往下拉关闭、收起动画、滚动锁、按下反馈）、提示 / 确认 / 输入框（要用面板的往下拉）、日期时间选择（要用提示框）（1019-Z4-M5 调了先后） |
+  | 2 面板底座 | select（`JiwenSelect`）→ keypad（`JiwenKeypad`）→ text（`JiwenText`）→ sheet（`JiwenPanel`，共用面板的老入口 `JiwenSheet` 不变）→ ask（`JiwenAsk`）→ date（`JiwenDate`） | 金色下拉、数字键盘、文字小面板、共用底部面板（往下拉关闭、收起动画、滚动锁、按下反馈）、提示 / 确认 / 输入框（要用面板的往下拉）、日期时间选择（要用提示框）（1019-Z4-M5 调了先后） |
   | 3 业务 | ai（`JiwenAiExport`）→ impentry（`JiwenImportEntry`） | 导出账单给 AI、导入入口（开发开关、`loadImportUI`、用记问打开、空账本入口、月初提醒、待处理横幅） |
   | 4 页面 | forms（`JiwenForms`）→ ledger（`JiwenLedger`）→ stats（`JiwenStats`）→ days（`JiwenDays`）→ cats（`JiwenCats`） | 记一笔 / 修改 / 退款 / 口径 / 模板；账单页（列表、翻页、搜索筛选、分类汇总、批量）；统计页（预算、预算建议、年月选择、账单详情）；日子；分类管理 |
   | 5 外壳 | settings（`JiwenSettings`）→ tabs（`JiwenTabs`）→ login（`JiwenLogin`）→ back（`JiwenBack`）→ boot（不对外） | 设置页、外观、存储用量；页签切换、进账号、日子管理页进出、刷新所有页面、被杀回来、首屏快照、历史脏数据自检；登录页；返回键层级表和弹窗关闭表（要认得每一种弹窗，所以放最上面）；启动 |
@@ -157,6 +157,7 @@
   - 1019-Z4-M6 金色下拉 `app/select.js`（`JiwenSelect`，10 条、对外 `closeAllCs`）。同时：搬家工具能把同一行上的几条语句一起搬；入口可以带只读口（会变的变量写成 `get 名字(){ return 名字; }`，别处读的地方改成 `入口.名字`，搬数字键盘时用）；搬之前自查用到排在后面的模块（不是回调口就不搬）。
   - 1019-Z4-M7 数字键盘 `app/keypad.js`（`JiwenKeypad`，24 条、对外 `kpOpen` / `kpClose` / `kpOn` 和只读口 `kpTarget`）。提示框关掉时看「数字键盘是不是在给提示框的输入框打字」那一句改成读 `JiwenKeypad.kpTarget`（唯一改了写法的一行）；提示框的输入框弹数字键盘那两个绑定登记归提示框。
   - 1019-Z4-M8 文字小面板 `app/text.js`（`JiwenText`，14 条、对外 `closeText`，老入口 `window.openTextPanel` 照旧）。同时设计表：分类管理排到统计页前面（统计页的预算要调「设预算」「管理分类」），回调口加 `cats → stats: renderStats`、`settings → tabs: snapDrop`（同两种老回调）；登记了几处跟着页面走的绑定（管理分类按钮归设置页、进 / 出日子管理页和「接下来可以」归外壳）；搬家工具支持读写口（别处会改的变量，入口上 get / set，读写的地方改成「入口.名字」，统计页搬的时候用）。
+  - 1019-Z4-M9 共用面板的底座 `app/sheet.js`（`JiwenPanel`，16 条、对外 bindSheetDrag / sheetGhostsFinish）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

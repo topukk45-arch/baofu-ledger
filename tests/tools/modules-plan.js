@@ -15,7 +15,7 @@ const MODULES = [
   { key: 'select', layer: 2, entry: 'JiwenSelect', file: 'app/select.js', what: '金色下拉（包住原生 select）', secs: ['自定义金色下拉：包裹原生 select，保留全部 value/事件逻辑'], names: [] },
   { key: 'keypad', layer: 2, entry: 'JiwenKeypad', file: 'app/keypad.js', what: '数字键盘（老入口 window.kpOpen / kpClose 留着）', secs: ['1019-P：金额用 App 自己的数字键盘'], names: [] },
   { key: 'text', layer: 2, entry: 'JiwenText', file: 'app/text.js', what: '文字输入小面板（老入口 window.openTextPanel 留着）', secs: ['1019-O：文字输入的小面板'], names: [] },
-  { key: 'sheet', layer: 2, entry: 'JiwenSheet', file: 'app/sheet.js', what: '共用底部面板（入口 JiwenSheet 不变）、往下拉关闭、收起动画、滚动锁、按下反馈', secs: ['底部浮层的「往下拉关闭」（1017-UI1 从筛选浮层里抽出来，筛选浮层和导入页的选择面板共用）', '1017-UI1：共用的底部面板（选分类 / 选一项 / 确认）', '弹窗打开时锁定背景滚动，防止滚动穿透到主页面', '点击按下反馈：用事件委托给可点元素加 .pressed（WebView 里 :active 不稳，故用 JS）', '1019-N：所有底部面板关闭都有收起动画', '1019-M：性能记录：点输入框到能输入、键盘弹起时面板动了几次、面板打开用了多久'], names: [] },
+  { key: 'sheet', layer: 2, entry: 'JiwenPanel', file: 'app/sheet.js', what: '共用底部面板的底座（入口 JiwenPanel；共用面板本身的老入口 window.JiwenSheet 不变）、往下拉关闭、收起动画、滚动锁、按下反馈', secs: ['底部浮层的「往下拉关闭」（1017-UI1 从筛选浮层里抽出来，筛选浮层和导入页的选择面板共用）', '1017-UI1：共用的底部面板（选分类 / 选一项 / 确认）', '弹窗打开时锁定背景滚动，防止滚动穿透到主页面', '点击按下反馈：用事件委托给可点元素加 .pressed（WebView 里 :active 不稳，故用 JS）', '1019-N：所有底部面板关闭都有收起动画', '1019-M：性能记录：点输入框到能输入、键盘弹起时面板动了几次、面板打开用了多久'], names: [] },
   { key: 'ask', layer: 2, entry: 'JiwenAsk', file: 'app/ask.js', what: '提示 / 确认 / 输入 / 选择框（customAlert…，老入口 window.customAlert / customConfirm / customPrompt 留着给 import/ 用）', secs: ['自定义 确认 / 输入 弹窗'], names: [] },
   { key: 'date', layer: 2, entry: 'JiwenDate', file: 'app/date.js', what: '日期时间选择（日 / 月 / 年三级、左右滑、时分滚轮）', secs: ['自定义时间选择器', '三级下钻：日 → 月 → 年', '网格内左右滑动翻页', '1019-T：时 / 分滚轮'], names: [] },
   { key: 'ai', layer: 3, entry: 'JiwenAiExport', file: 'app/ai-export.js', what: '导出账单给 AI 分析', secs: ['导出账单给 AI 分析'], names: [] },
@@ -48,7 +48,12 @@ const BIND = [
   ["$('manageCatSetting').addEventListener('click', openCatManager);", 'settings'],   // 设置页「管理账单分类」
   ["$('daysManageBtn').addEventListener('click', gotoDaysPage);", 'tabs'],         // 进日子管理页 / 回来（外壳管页面切换）
   ["$('daysBack').addEventListener('click', backFromDaysPage);", 'tabs'],
-  ["window.JiwenImportNext={", 'tabs'],                                             // 导入结果页「接下来可以」：去统计 / 设预算 / 期初余额，跨几个页面
+  ["window.JiwenImportNext={", 'tabs'],
+  ["$('setBuild').addEventListener('click', () => {", 'settings'],                // 版本号连点开开发开关
+  ["$('importFile').addEventListener('change', e => {", 'settings'],              // 设置页「导入备份文件」
+  ["$('newCatName').addEventListener('input', ()=>showCatErr(''));", 'cats'],      // 分类管理里新增分类
+  ["$('addCatBtn').addEventListener('click', () => {", 'cats'],
+  ["$('daysEntryRows').addEventListener('click', e=>{", 'tabs'],                   // 账单页的日子卡（点「添加」要进日子管理页）                                             // 导入结果页「接下来可以」：去统计 / 设预算 / 期初余额，跨几个页面
 ];
 
 // 主程序以外直接用的老入口（import/、测试、原生层以外的页面代码按名字找），搬完也要留在 window 上

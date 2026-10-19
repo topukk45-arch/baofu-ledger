@@ -21,6 +21,7 @@ function run(key, opt) {
   const ROOT = path.join(__dirname, '..', '..'), WWW = path.join(ROOT, 'www');
   const mod = PL.MODULES.find(m => m.key === key);
   if (!mod) throw new Error('没有这个模块：' + key);
+  if (PL.LEGACY.includes(mod.entry)) throw new Error('入口名和老入口重名，会把老入口盖掉：' + mod.entry);
   const P = PL.plan(WWW), R = P.R;
   const ast = S.parse(R.code);
   // 每个旧文件在接起来的代码里的起止

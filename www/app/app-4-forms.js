@@ -737,50 +737,6 @@
             }
         });
 
-        // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====
-        (function(){
-            const masks=Array.from(document.querySelectorAll('.mask'));
-            let savedScrollY=0, locked=false;
-
-            function anyMaskOpen(){
-                return masks.some(m=>{
-                    const d=getComputedStyle(m).display;
-                    return d && d!=='none';
-                });
-            }
-            function lock(){
-                if(locked) return;
-                savedScrollY=window.scrollY || window.pageYOffset || 0;
-                document.body.style.position='fixed';
-                document.body.style.top=`-${savedScrollY}px`;
-                document.body.style.left='0';
-                document.body.style.right='0';
-                document.body.style.width='100%';
-                locked=true;
-            }
-            function unlock(){
-                if(!locked) return;
-                document.body.style.position='';
-                document.body.style.top='';
-                document.body.style.left='';
-                document.body.style.right='';
-                document.body.style.width='';
-                window.scrollTo(0, savedScrollY);
-                locked=false;
-            }
-            function update(){ anyMaskOpen()?lock():unlock(); }
-
-            // 监听每个弹窗的显示状态变化
-            masks.forEach(m=>{
-                new MutationObserver(update).observe(m, {attributes:true, attributeFilter:['style']});
-            });
-
-            // 弹窗内列表（可滚动区域）到顶/到底时，阻止滚动冒泡到背景，进一步防穿透
-            document.querySelectorAll('.cat-list, .ask-msg, .edit-dialog, .dt-dialog').forEach(el=>{
-                el.addEventListener('touchmove', e=>{ e.stopPropagation(); }, {passive:true});
-            });
-        })();
-
         // 页面初始化逻辑见脚本末尾 initApp()（在所有函数与外观主题就绪后执行）
 
         // ===== 外观：主题色（全局，所有账号共用，存 localStorage）=====
@@ -929,35 +885,6 @@
             // —— 启动时应用已保存的外观 ——
             const pf=loadPrefs();
             if(pf.primary) applyPrimary(pf.primary);
-        })();
-
-        // ===== 点击按下反馈：用事件委托给可点元素加 .pressed（WebView 里 :active 不稳，故用 JS）=====
-        (function(){
-            const SEL = 'button, .mini-btn, .link-btn, .cs-display, .dt-day, .dt-now, '
-                      + '.pager button, .user-chip, .login-btn, .add-btn, .save, .cancel, '
-                      + '.operate-btn, .logout, .cat-item button, .archive-bar select';
-            let cur=null;
-            function press(e){
-                const t=e.target.closest(SEL);
-                if(!t || t.disabled) return;
-                cur=t; t.classList.add('pressed');
-            }
-            function release(){
-                if(cur){ cur.classList.remove('pressed'); cur=null; }
-            }
-            // 有 PointerEvent 就只用 pointer 一套（覆盖鼠标/触摸/触控笔），
-            // 否则回退 touch；避免同一次按压在触屏上被 pointer+touch 触发两次。
-            if(window.PointerEvent){
-                document.addEventListener('pointerdown', press, {passive:true});
-                document.addEventListener('pointerup', release, {passive:true});
-                document.addEventListener('pointercancel', release, {passive:true});
-            } else {
-                document.addEventListener('touchstart', press, {passive:true});
-                document.addEventListener('touchend', release, {passive:true});
-                document.addEventListener('touchcancel', release, {passive:true});
-            }
-            // 滚动时若手指离开按钮，确保还原
-            document.addEventListener('scroll', release, {passive:true, capture:true});
         })();
         // ============================================================
         // ===== 底部标签切换 =====
