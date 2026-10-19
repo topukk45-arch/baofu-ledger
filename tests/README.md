@@ -131,6 +131,7 @@ GitHub Actions 每次打包前都会先跑 `npm test`，不通过就不出包。
 | `zZzS-launch-native.test.js` | 1019-X 启动全程（jsdom，原生层是假的）：「启动」那条带上原生那段、都从进程启动算（Activity 创建 100、WebView 建好 400、网页开始按系统时间换算 ≈ 500、首屏画好 = 网页开始 + 网页里的首屏、收到画好了、启动画面还没收起时过一会儿再问直到收起）；性能记录页一行写全程；开发开关里「启动画面等首屏」默认开、点了写进原生那边、写明下次打开生效、再点打开；关着时那一行写「没等首屏」、问一次就记；开发开关关着没入口不记；没有原生层只记网页那段。原生层本身只在打包机上编译 |
 | `zZzT-kp-del-hold.test.js` | 1019-Z2 退格长按（jsdom）：短按只删一个（补的 click 不多删）、按住时是按下的样子；按住 0.3 秒还只删一个、过了停顿开始连续删、删到空自动停；排的间隔先 400、不到 1 秒 100、超过 1 秒 50（看代码排的间隔，机器忙时不会误报）；中途松手停在对的位置不再删；手指滑出按键立刻停；长按中数字键盘关了停下 |
 | `zZzU-perf-local-time.test.js` | 1019-Z4 性能记录按当地时间（jsdom，子进程分别带 TZ=Asia/Shanghai / America/New_York / UTC 各跑一遍）：当地 16:11 记下的写「12-20 16:1x:xx」、页面上和复制出来的都是当地时间、没有时间戳的老记录照原样 |
+| `zZzV-split-files.test.js` | modules 分支 1019-Z4-M2 原样切开以后：①引用写法（普通同步 `<script src>`、不带 defer / async / type、按编号一行一个挨着放、`?v=` 等于登录页版本号、样式一个 `<link>`、只剩首屏快照那段内联脚本且在前面、引用的文件都在）；②全局重名（acorn 扫每个文件的顶层声明，两个文件定义同一个名字、或同一个文件定义两次就报错）；③跨文件先用后定义（`tools/scan.js`：顶层当场跑的代码、当场调用的函数里用到后面文件的名字报错；顶层登记的计时器 / Promise.then / 观察器要用后面文件的名字也报错；事件监听只列不报；切后台的 `resumeSave` 开头没进账号就返回、`ledgerFlushOnHide` 只在读进来的账本上做，这两点锁住）；④真按外部文件加载（读字节不经过拼回钩子，jsdom 照安卓地址一个个读 `app/*.js`、`app.css`，自动进账号、账单页列出记录、能切到统计页、不报错）。老版本单文件只查没有 `app/` 引用 |
 | `zz-import-golden.test.js` | 1016-F「导入以后的账本」逐字节对比：固定的虚构手记 + 账单真导一遍（多笔合一确认、转账往来标不计入），账单列表、分类汇总、统计、当日明细、备份文件和 `fixtures/import-golden.json` 一致；同一版本跑两次一样。有意改了导入行为时 `UPDATE_GOLDEN=1` 重新生成。1016-U 起导入记录多了 `rng`（每个来源的账单起止）；1016-K 起导入记录多了 `h`（指纹含批次号，跟时区走，换成「<指纹 N 个>」占位）、`now`、`cpEnd` / `pmEnd` |
 
 ## 界面量尺寸（手动跑，不进 npm test）
@@ -146,6 +147,8 @@ NODE_PATH=$(npm root -g) node ui/audit.js 输出目录 [--only main|narrow|dark|
 ```bash
 git show HEAD~1:www/index.html > /tmp/old.html
 node regress.js /tmp/old.html ../www/index.html
+# modules 分支（1019-Z4-M2 起）index.html 拆成了 www/app/*.js + app.css：run-all.js、regress.js 读的时候自动拼回单文件；
+# 单独跑一个测试要带上拼回钩子：node -r ./tools/inline-hook.js a-basics.test.js
 ```
 
 用 `fixtures/sample-records.js` 生成的同一份假账单（约 130 条），对比两个版本的账单列表、分类汇总、筛选、统计页、当日明细和 AI 导出。新旧版本都能比（老版本同步启动，新版本等它准备好再取）。

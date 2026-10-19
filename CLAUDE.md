@@ -7,7 +7,7 @@
 
 ## 项目结构
 - App 的代码都在 `www/` 下，Capacitor 把整个 `www/` 打包成安卓 APK（以 `www/` 为准；仓库根目录那个 `index.html` 是老拷贝，不参与打包，别改它）。
-  - `www/index.html`：主程序（记账、统计、设置、存储），启动时只加载这一个文件。
+  - `www/index.html`：主程序（记账、统计、设置、存储），启动时只加载这一个文件。modules 分支（1019-Z4-M2 起）：大脚本和大样式剪到了 `www/app/` 下（见「模块重构分支 modules」那一节），`index.html` 里只剩 HTML、首屏快照那一小段内联脚本和几行引用。
   - `www/import/`：账单导入（1015-A 起），**启动时一个都不加载**，打开导入时 `index.html` 的 `loadImportModule()` 才插入 `import/import.js`：
     - `core.js`：纯计算（解析、配对、分类都放这里或同样写法的兄弟文件）；
     - `merchants.js`：内置商户词表（分类推荐的第 4 层；只放全国性的公开品牌和具体的商品词，不放宽词和两种意思的词）；1016-Z4 起另有 `games`（游戏词：强的 8 个 → 游戏把握中，「礼包」→ 游戏把握低、排最后，说明里有流量 / 零食这类词时不算；存档里没有「游戏」分类就不推荐、不新建，`classify.js` 里处理）；
@@ -118,6 +118,12 @@
 - 从 main 的 1019-Z4（7d6605d）拉出来，开着 PR 不合并；版本号写成「1019-Z4-M1」「-M2」……，每推一版加一（登录页 `loginBuild`）。
 - 打包：分支上的 `build.yml` 多一段「发布到「模块测试版」」：只在 `refs/heads/modules` 推送时跑，发到标签 `modules-build`、文件 `jiwen-modules.apk`，和「最新测试版」分开；main 那段一点没改。**合并前把这一段删掉。**
 - 规矩：只搬家、不改逻辑、不顺手修 bug（看到的记进「还要确认」）；整页测试、逐字节对比、导入标准答案原则上一条不改，直接调全局函数的测试只改调用写法；测试条数只增不减，每个提交前后各数一次写进说明。每次停下来分支都要能打包、能用。
+- 原样切开（1019-Z4-M2）：`index.html` 第二段 `<style>` 剪成 `www/app/app.css`，大脚本按原来的分节剪成 7 个文件（只剪不改，拼回去和 1019-Z4 逐字节一样，只差版本号）：
+  - `app-1-base.js`（性能记录、`$`、常量）→ `app-2-core.js`（提示框、数字键盘、存储、账本、云备份、设置、分类、日期选择……最大的一块）→ `app-3-sheet-ledger.js`（底部面板、账单页、批量）→ `app-4-forms.js`（记一笔 / 修改 / 退款 / 模板、切页签、首屏快照、恢复现场）→ `app-5-stats.js`（统计页）→ `app-6-days-sheets.js`（日子、共用面板 `JiwenSheet`、导入入口）→ `app-7-init.js`（`initApp`，最后跑）。
+  - 引用：`<link rel="stylesheet" href="app/app.css?v=版本号">`、`<script src="app/app-N-….js?v=版本号"></script>` 一行一个、挨着放、按编号顺序，普通同步脚本（不加 defer / async / module），`?v=` 和登录页版本号一样，每推一版一起改。首屏快照那一小段留在原位（在这几个脚本前面）。
+  - 切的位置：顶层有三处「先调用、后面才定义」（`bindSheetDrag`、`openCatManager`、`gotoDaysPage`），切口保证每对在同一个文件里；顶层没有跨文件用 let / const 的。几个文件之间浏览器会先跑别的任务（真 Chromium 试过：前一个文件的 setTimeout 0 会在后几个文件跑之前触发；Promise.then 在每个文件跑完马上跑），所以：顶层当场跑的代码、顶层登记的计时器 / Promise.then / 观察器都不许用后面文件的名字（`zZzV` 管）；顶层登记的事件监听可以（空档里主界面、登录框都没露出来；切后台那两个开头就看没进账号直接返回）。首屏快照盖着时，快照里的底栏是克隆的、`querySelectorAll('.tab-btn')` 也绑上了，空档里点快照底栏可能报一次错（见还要确认）。
+  - 测试怎么读：测试进程预先载入 `tests/tools/inline-hook.js`（`run-all.js` 每个都带上；单独跑一个时 `node -r ./tools/inline-hook.js xxx.test.js`），读 `index.html` 时按引用把 `app/*.js`、`app.css` 拼回单文件，老测试一条不改；`regress.js` 自己装这个钩子。要读拆开原样的（`zZzV`）用 `fs.readFileSync(文件)` 读字节再转字（钩子只管读成字的）。
+  - 工具：`tests/tools/split-index.js`（一次性的切分脚本，切完自查拼回去逐字节一样）、`tests/tools/inline.js`（拼回去）、`tests/tools/scan.js`（acorn 扫顶层：每条顶层语句当场用到哪些名字、登记了哪些以后才跑的回调；`zZzV` 和以后的依赖检查共用）。`tests/package.json` 多了 acorn、acorn-walk 两个开发依赖。`tests/ui/audit.js` 的小服务器给 `.css` 回 `text/css`（不然 Chromium 不认这个样式表）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

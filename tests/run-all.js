@@ -7,7 +7,8 @@ const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.test.js')).sort
 let bad = 0, total = 0;
 const failed = [];   // 失败的条目：[文件, 那一条的名字]
 for (const f of files) {
-  const r = spawnSync(process.execPath, [path.join(__dirname, f), html], { encoding: 'utf8' });
+  // modules 分支：先载入 inline-hook，读 index.html 时把拆开的 app/*.js、app/*.css 拼回单文件（老测试一条不改）
+  const r = spawnSync(process.execPath, ['-r', path.join(__dirname, 'tools', 'inline-hook.js'), path.join(__dirname, f), html], { encoding: 'utf8' });
   const out = (r.stdout || '') + (r.stderr || '');
   const m = out.match(/(\d+) 通过，(\d+) 失败/);
   const pass = m ? +m[1] : 0, fail = m ? +m[2] : 1;

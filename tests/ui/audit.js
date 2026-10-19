@@ -191,7 +191,7 @@ function serve() {
       let p = decodeURIComponent(q.url.split('?')[0]); if (p === '/') p = '/index.html';
       const f = path.join(WWW, p);
       if (!f.startsWith(WWW) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { r.writeHead(404); r.end(); return; }
-      r.writeHead(200, { 'content-type': f.endsWith('.html') ? 'text/html; charset=utf-8' : f.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'application/octet-stream' });
+      r.writeHead(200, { 'content-type': f.endsWith('.html') ? 'text/html; charset=utf-8' : f.endsWith('.js') ? 'text/javascript; charset=utf-8' : f.endsWith('.css') ? 'text/css; charset=utf-8' : 'application/octet-stream' });
       fs.createReadStream(f).pipe(r);
     });
     srv.listen(0, () => res(srv));

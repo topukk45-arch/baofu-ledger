@@ -1,0 +1,1505 @@
+        /* ===== 主题色变量：换肤只需改这几个，全站跟着变 =====
+           语义色（收入绿/支出红/错误红）不在此处，保持固定不随主题变化 */
+        :root {
+            --c-tab-accent:#b4942d;     /* 1010-K3：底栏选中图标的重点笔画，随主题算出 */
+            --c-primary:#d4af37;      /* 主金色：按钮、强调 */
+            --c-primary-dark:#b8860b; /* 深主色：渐变深端、标题 */
+            --c-primary-deep:#8b6914; /* 更深：正文强调字 */
+            --c-accent:#ffd700;       /* 高亮：聚焦光晕 */
+            --c-accent-soft:#ffe488;  /* 柔高亮：次按钮底 */
+            --c-text:#a07500;         /* 主文字色 */
+            --c-text-soft:#a07d1a;    /* 次文字/标签 */
+            --c-border:#e6d080;       /* 浅边框 */
+            --c-border-mid:#e6c86a;   /* 中边框 */
+            --c-surface:#fffdf0;      /* 输入框/卡片底 */
+            --c-surface-2:#fffdf3;    /* 浮层底 */
+            --c-bg:#fdf8e8;           /* 页面背景 */
+            --c-card-1:#fff9e6;       /* 卡片渐变浅 */
+            --c-card-2:#fff1c1;       /* 卡片渐变深 */
+            --sheet-ms:300ms;          /* 1019-Z3：底部面板打开 / 收起的时长（和脚本里的 SHEET_MS 一致，脚本启动时按它重写一次） */
+            --sheet-ease:cubic-bezier(.2,.8,.2,1);   /* 先快后慢 */
+            --c-sheet:#fff5d4;        /* 1019-T：底部面板的底色（一整块纯色，顶上钉住的拖动条 / 标题和贴底的按钮排用同一个色，不出接缝） */
+            --c-chip:#fff5cc;         /* 标签/选项悬停底 */
+            --c-on-primary:#fff;      /* 主色上的文字（白） */
+            --c-primary-mid:#e6c200;  /* 渐变起始/次要描边 */
+            --c-shadow-rgb:212,175,55;/* 阴影/光晕用的主色 RGB */
+            --c-pos:#3a7a2e;          /* 收入/正值（语义色，固定） */
+            --c-neg:#b5482e;          /* 支出/负值（语义色，固定） */
+            /* ===== 选中态专属语义色：日历选中、以及后续任何「当前选中」处统一复用 =====
+               跟主色同色系但固定为明快的一档（不随主色深浅漂移），保证选中格清爽好看、
+               红/绿盈亏字在其上始终清晰。由 buildPalette 按主题自动派生。 */
+            --c-sel-bg:#f5dd8f;       /* 选中底：中浅染，明显深于未选中 */
+            --c-sel-border:#d4af37;   /* 选中描边：主色（备用，日历当前不描边） */
+            --c-sel-text:#6e5200;     /* 选中格内日期数字色 */
+        }
+
+        * { margin:0; padding:0; box-sizing:border-box; font-family:"Microsoft Yahei", sans-serif; }
+
+        /* ===== 去网页味：让它更像原生 App ===== */
+        /* 点击不再出现蓝色/灰色高亮方块 */
+        * { -webkit-tap-highlight-color:transparent; -webkit-touch-callout:none; }
+        /* ===== 文字选择策略：默认全局禁选，避免长按 UI 文字弹出系统「复制/分享/全选/朗读」菜单 =====
+           这是移动端「类原生」应用的标准做法。逐个给标题/标签/提示补禁选总会有漏网（已踩坑多次），
+           故反过来：整体禁选，再对「确实需要选中/复制」的元素显式开放。 */
+        body {
+            -webkit-user-select:none; user-select:none;
+            -webkit-touch-callout:none;   /* 兜底安卓/iOS WebView 长按弹出的系统选择菜单 */
+        }
+        /* 仅输入框/多行框可选中文字（编辑需要）。其余只读文本一律禁选——
+           导出当月/当日报表功能会另行覆盖「取数」需求，无需长按复制。 */
+        input, textarea {
+            -webkit-user-select:text; user-select:text;
+            -webkit-touch-callout:default;
+        }
+        /* .dt-input 是日期/时间选择器的触发框：readonly 展示 + 点击弹出自定义面板，从不接受键入。
+           【为什么是 div 而不是 input】此前它是 <input readonly>，长按仍会弹出系统选字手柄与复制条，
+           CSS 的 user-select:none 与 JS 的 selectstart 拦截都挡不住——原因是这两道打的都不是
+           真正的路径：Blink 中 user-select 明确不作用于表单控件的内部文本，而长按选字由 WebView
+           的原生 selection controller 处理，位于 DOM 事件层之下，selectstart 不保证派发。
+           既然它本质是「只读展示」，就不该是文本编辑控件。换成 div 后没有可编辑控件供平台挂手柄，
+           user-select:none 也真正生效。JS 侧通过 value 属性垫片保持读写接口不变（见 dtShim）。 */
+        .dt-input {
+            -webkit-user-select:none; user-select:none;
+            -webkit-touch-callout:none;
+            cursor:pointer;
+            font-size:16px;
+            /* 空值时也要撑住与 input 等高的行高，否则未选日期的框会塌陷 */
+            min-height:1.2em; line-height:1.2;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+        }
+        /* 占位符：div 没有 ::placeholder，用 data-placeholder + :empty 模拟 */
+        .dt-input:empty::before {
+            content:attr(data-placeholder);
+            color:var(--c-text-soft); opacity:0.7;
+        }
+        /* 让 div 版触发框继承与同弹窗内 input 完全一致的盒子外观 */
+        .edit-dialog .dt-input { width:100%; margin:8px 0; padding:10px;
+            border:1px solid var(--c-primary); border-radius:6px; outline:none;
+            background:var(--c-surface); }
+        /* 去掉聚焦时的浏览器默认蓝色描边（保留我们自己的金色高亮） */
+        button:focus, button:focus-visible, select:focus-visible,
+        .cs-display:focus, .cs-display:focus-visible { outline:none; }
+        /* 输入框去除 iOS 默认圆角阴影、统一字号防止聚焦时页面缩放 */
+        input, textarea, select, button { -webkit-appearance:none; appearance:none; }
+        input, textarea { font-size:16px; }
+        /* 滚动更顺滑，去掉移动端下拉回弹露白 */
+        html {
+            background: var(--c-bg);
+            overscroll-behavior:none;
+            -webkit-text-size-adjust:100%;
+            /* 禁双击缩放兜底：iOS Safari 会忽略 viewport 的 user-scalable=no，
+               touch-action:manipulation 保留单击与滚动，仅去掉双击/长按缩放，是可靠手段。
+               局部需要更细手势的区域（如拖拽排序）已各自设置 touch-action，优先级更高不受影响。 */
+            touch-action:manipulation;
+        }
+
+        body {
+            background: var(--c-bg);
+            min-height: 100dvh;
+            padding:20px;
+            position:relative;
+            overflow-x:hidden;
+        }
+
+        /* 按下时的轻微回弹，让点击有原生般的反馈（.pressed 由 JS 在 touch 时切换，WebView 里可靠） */
+        .mini-btn.pressed, .add-btn.pressed, .save.pressed, .cancel.pressed,
+        .pager button.pressed, .login-btn.pressed, .archive-bar select.pressed,
+        .cs-display.pressed, .dt-now.pressed, .link-btn.pressed, .fab.pressed,
+        .dt-day.pressed, .user-chip.pressed,
+        .cat-item button.pressed, .operate-btn.pressed,
+        .logout.pressed, .ask-dialog button.pressed {
+            transform:scale(0.95); filter:brightness(0.95); transition:transform .04s, filter .04s;
+        }
+
+        .container {
+            max-width:760px; margin:0 auto;
+            background:linear-gradient(135deg, var(--c-card-1) 0%, var(--c-card-2) 100%);
+            border:1px solid var(--c-primary-mid); border-radius:16px; padding:30px;
+            box-shadow:0 4px 18px rgba(var(--c-shadow-rgb),0.35);
+        }
+
+        @media (max-width: 600px) {
+            body { padding:10px; }
+            .container { padding:18px 14px; border-radius:14px; }
+        }
+
+        /* 登录页：让金色卡片在视口内垂直居中（仅登录态生效，不影响登录后会变长的主界面） */
+        body.login-mode { display:flex; flex-direction:column; min-height:100dvh; }
+        body.login-mode .container { margin:auto; width:100%; }
+        @media (max-width: 600px) {
+            /* 手机端登录框上下内边距收一点，配合居中更稳 */
+            body.login-mode .login-box { padding:30px 0; }
+        }
+
+        h2 { text-align:center; color:var(--c-primary-dark); margin-bottom:30px; font-weight:600;
+             letter-spacing:3px; text-shadow:0 0 6px rgba(var(--c-shadow-rgb),0.5); }
+
+        .login-box { text-align:center; padding:50px 0; }
+        .login-btn { padding:12px 32px; border:none; border-radius:8px; font-size:16px;
+            cursor:pointer; transition:0.3s; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
+        .login-btn:hover { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.5); }
+
+        /* 登录页：从文件导入存档（次要按钮，弱于登录按钮） */
+        .login-import-row { margin-top:16px; }
+        .login-import-btn { padding:9px 20px; border:1px solid var(--c-border-mid); border-radius:8px;
+            font-size:14px; cursor:pointer; transition:0.25s; background:var(--c-surface); color:var(--c-text-soft); }
+        .login-import-btn:hover { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.35); color:var(--c-primary-deep); }
+
+        /* 最近账号 */
+        .recent-users { margin:6px 0 26px; }
+        .recent-users .hidden-toggle { margin-top:16px; border:none; background:transparent; color:var(--c-text-soft);
+            font-size:12.5px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; font-family:inherit; }
+        .recent-users .hidden-list { margin-top:12px; opacity:0.75; }
+        .recent-users .recent-title { color:var(--c-text-soft); font-size:13px; margin-bottom:12px; letter-spacing:1px; }
+        .recent-list { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+        .user-chip { display:flex; align-items:center; gap:8px; padding:8px 14px 8px 8px;
+            background:var(--c-surface); border:1px solid var(--c-border); border-radius:30px; cursor:pointer;
+            transition:0.2s; color:var(--c-primary-deep); font-size:14px; }
+        .user-chip:hover { border-color:var(--c-accent); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.4); transform:translateY(-1px); }
+        .user-chip .avatar { width:30px; height:30px; border-radius:50%; flex:0 0 30px;
+            display:flex; align-items:center; justify-content:center; color:var(--c-on-primary); font-weight:600;
+            font-size:15px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); }
+        .user-chip .u-del { border:none; background:transparent; color:var(--c-border-mid); cursor:pointer;
+            font-size:16px; line-height:1; padding:0 0 0 2px; }
+        .user-chip .u-del:hover { color:var(--c-primary-dark); }
+
+        .main-box { display:none; }
+
+        .user-info { display:flex; justify-content:space-between; align-items:center;
+            margin-bottom:25px; padding-bottom:15px; border-bottom:1px solid var(--c-border); }
+        .user-info h3 { color:var(--c-text); }
+        .logout { padding:6px 15px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); border:none; border-radius:6px; cursor:pointer; transition:0.3s; }
+        .logout:hover { box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+
+        .archive-bar { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+        .archive-bar select {
+            flex:1; min-width:140px; padding:12px; border:1px solid var(--c-primary);
+            border-radius:8px; font-size:14px; outline:none; background:var(--c-surface);
+            color:var(--c-primary-deep); cursor:pointer; }
+        .archive-bar select:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+
+        .mini-btn { padding:10px 14px; border:none; border-radius:8px; cursor:pointer;
+            font-size:13px; transition:0.3s; background:var(--c-accent-soft); color:#5c4500; white-space:nowrap; }
+        .mini-btn:hover { filter:brightness(1.05); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .mini-btn.gold { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
+
+        .form-box { display:flex; flex-direction:column; gap:14px; margin-bottom:18px; }
+        .form-box input, .form-box select {
+            padding:12px; border:1px solid var(--c-primary); border-radius:8px; font-size:14px;
+            outline:none; transition:0.3s; background:var(--c-surface); }
+        .form-box input:focus, .form-box select:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+
+        /* 表单字段分组：标签 + 控件，让弹窗结构清晰不杂乱 */
+        .field { display:flex; flex-direction:column; gap:6px; }
+        .field-label { font-size:12.5px; color:var(--c-text-soft); font-weight:600; padding-left:2px; }
+        .field-label-row { display:flex; align-items:center; justify-content:space-between; }
+        .link-btn { background:none; border:none; color:var(--c-primary-dark); font-size:12.5px; cursor:pointer;
+            padding:2px 4px; text-decoration:underline; text-underline-offset:2px; transition:0.2s; }
+        .link-btn:hover { color:var(--c-primary-deep); }
+
+        /* 自定义金色下拉：统一手机/电脑样式，避免系统全屏面板 */
+        .cs-wrap { position:relative; display:inline-block; }
+        .cs-wrap.cs-block { display:block; width:100%; }
+        .cs-native { position:absolute; opacity:0; width:1px; height:1px; pointer-events:none; }
+        .cs-display {
+            display:flex; align-items:center; justify-content:space-between; gap:8px;
+            width:100%; padding:12px; border:1px solid var(--c-primary); border-radius:8px;
+            background:var(--c-surface); color:var(--c-primary-deep); font-size:14px; cursor:pointer;
+            transition:border-color .25s, box-shadow .25s; user-select:none; }
+        .cs-display:hover { border-color:var(--c-primary-mid); }
+        .cs-wrap.open .cs-display { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .cs-display .cs-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .cs-display .cs-arrow { flex:0 0 auto; color:var(--c-primary); transition:transform .25s; font-size:12px; }
+        .cs-wrap.open .cs-display .cs-arrow { transform:rotate(180deg); }
+        .cs-panel {
+            position:absolute; left:0; right:0; top:calc(100% + 4px); z-index:1200;
+            background:var(--c-surface-2); border:1px solid var(--c-border-mid); border-radius:10px;
+            box-shadow:0 6px 20px rgba(var(--c-shadow-rgb),0.35);
+            max-height:240px; overflow-y:auto; padding:4px; display:none; }
+        /* 展开态：面板打开时会被「传送」到 <body> 下并改为 fixed 定位（见 enhanceSelect 的 open()），
+           目的是让它能画到弹窗外面去——既不被 .dt-dialog 的 overflow 裁掉，也不会把弹窗从内部撑高。
+           因此显隐不能再靠「.cs-wrap.open .cs-panel」这种后代选择器（面板一旦离开 wrap 就不匹配了），
+           改用挂在面板自身上的 .cs-open，父级是谁都成立。 */
+        .cs-panel.cs-open { display:block; }
+        .cs-panel.cs-portal {
+            position:fixed; right:auto;      /* right:auto 覆盖上面的 right:0，宽度改由 JS 按触发器实测 */
+            z-index:2000;                    /* 盖过所有弹窗：.mask(999) / #dtMask(1005) 等 */
+        }
+        .cs-opt { padding:10px 12px; border-radius:7px; cursor:pointer; color:var(--c-primary-deep);
+            font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .cs-opt:hover { background:var(--c-chip); }
+        .cs-opt.sel { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; }
+        /* 让自定义下拉在各布局里占据原 select 的位置 */
+        .archive-bar .cs-wrap { flex:1; min-width:140px; }
+        /* 1010-J3：设置页的存档栏——下拉框独占一行，三个按钮一行等分 */
+        .arc-bar { display:grid; grid-template-columns:repeat(3, 1fr); }
+        .arc-bar > :first-child { grid-column:1 / -1; }
+        .arc-bar .mini-btn { width:100%; margin:0; }
+        .edit-dialog .cs-wrap { display:block; width:100%; margin:8px 0; }
+        .dt-time .cs-wrap { flex:1; width:100%; }
+        .dt-time .cs-display { padding:8px 10px; }
+
+
+        /* 备注多行框：可纵向拖拽缩放，内容多时内部滚动，不撑爆弹窗 */
+        .remark-area {
+            width:100%; padding:12px; border:1px solid var(--c-primary); border-radius:8px;
+            font-size:14px; font-family:inherit; outline:none; transition:border-color .3s, box-shadow .3s;
+            background:var(--c-surface); resize:vertical; min-height:46px; max-height:220px;
+            overflow-y:auto; line-height:1.5; }
+        .remark-area:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .edit-dialog .remark-area { margin:8px 0; }
+
+
+        /* 分类标签：横排，常用靠前，一点即选；多了可横向滑动 */
+        .cat-chips { display:flex; gap:8px; flex-wrap:wrap; }
+        /* 选项很多时（如 AI 导出选日期/月份）限高滚动，避免撑破弹窗；选项少时无影响 */
+        #askChoices { max-height:46vh; overflow-y:auto; }
+        .cat-chips .cc {
+            padding:9px 16px; border:1px solid var(--c-border-mid); border-radius:20px;
+            background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer;
+            white-space:nowrap; transition:0.15s; -webkit-user-select:none; user-select:none; }
+        .cat-chips .cc:hover { border-color:var(--c-accent); }
+        /* 【1013-E】选中时不再改字重：有的手机没有这个字重，会换一种字体来画粗体，行高、字宽都跟着变，
+           选中的那颗变高变宽，同一行别的标签被拉高、字贴到顶上（看着像跳了一下）。
+           改成固定行高 + 描一圈细边来加粗，选中前后大小一点都不变。 */
+        .cat-chips .cc.sel {
+            background:var(--c-sel-bg);
+            border-color:var(--c-sel-border); -webkit-text-stroke:0.45px currentColor; }
+        .cat-chips .cc, .filter-chips .cc { line-height:20px; }
+        .cat-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
+
+        /* 收支标签：复用 cat-chips 布局，但选中态用语义色（支出红 / 收入绿）便于一眼区分 */
+        /* 收支只有两个，平分一行各占一半、撑满，尺寸放大与分类区视觉平衡 */
+        .io-chips { display:flex; gap:10px; flex-wrap:nowrap; }
+        /* 收支按钮左右对调（左撇子偏好）：选「收入在左」时整行 row-reverse */
+        .io-chips.io-rev { flex-direction:row-reverse; }
+        .io-chips .cc {
+            flex:1 1 0; text-align:center; padding:13px 0; font-size:15px; }
+        .io-chips .cc.sel-out {
+            background:linear-gradient(135deg,#c25a3e,#a8432b); color:#fff;
+            border-color:#a8432b; box-shadow:0 0 8px rgba(181,72,46,0.35); }
+        .io-chips .cc.sel-in {
+            background:linear-gradient(135deg,#4a9a3c,#357a2a); color:#fff;
+            border-color:#357a2a; box-shadow:0 0 8px rgba(58,122,46,0.35); }
+
+        /* 收入/支出选择行 */
+
+        /* 收支标签与正负金额颜色 */
+        .io-tag { display:inline-block; border-radius:10px; padding:2px 9px; font-size:13px; }
+        .io-in  { background:#e3f3e0; border:1px solid #b9e0b0; color:#3a7a2e; }
+        .io-out { background:#fbe6e0; border:1px solid #f0c2b4; color:#b5482e; }
+        .pos { color:#3a7a2e; }
+        .neg { color:#b5482e; }
+
+        .add-btn { padding:12px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); border:none; border-radius:8px; cursor:pointer; font-size:15px; transition:0.3s; }
+        .add-btn:hover { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); box-shadow:0 0 10px rgba(var(--c-shadow-rgb),0.5); }
+
+        /* ===== 1016-UI：共用的「拇指够得着」样式。新页面都用这一套，不要每个页面各写一份 =====
+           规矩（见 CLAUDE.md「界面规矩」）：
+           1. 能点的东西点击区域至少 48×48px（字、图标本身可以小，用内边距或 .ui-hit 撑大），相邻两个之间至少 8px；
+           2. 每页的主按钮放进固定在底部的操作栏 .ui-bar（留出系统手势条 env(safe-area-inset-bottom)），
+              页面内容在底部让出操作栏的高度，不挡住最后一行；顶上的「‹ 返回」保留，但不是唯一的出口；
+           3. 几个选项的页面用整宽的 .ui-btn / .ui-choice 竖着排，主要的那个最靠下、最显眼。 */
+        :root { --ui-tap:48px; --ui-gap:8px; }
+        .ui-bar { position:fixed; left:0; right:0; bottom:0; z-index:991; display:flex; flex-wrap:wrap; gap:var(--ui-gap);
+            padding:10px 14px calc(10px + env(safe-area-inset-bottom)); background:var(--c-bg);
+            border-top:1px solid var(--c-border); box-shadow:0 -2px 12px rgba(var(--c-shadow-rgb),0.15); }
+        .ui-bar > * { flex:1 1 0; min-width:0; }
+        .ui-bar > .ui-full { flex-basis:100%; }          /* 主按钮单独占一行，放在最下面 */
+        @media (min-width:761px){ .ui-bar { padding-left:calc(50% - 366px); padding-right:calc(50% - 366px); } }
+        .ui-btn { min-height:var(--ui-tap); padding:11px 16px; border-radius:12px; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-text); font-size:16px; line-height:1.3; cursor:pointer;
+            font-family:inherit; text-align:center; transition:transform .1s, filter .1s; }
+        .ui-btn.primary { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); color:var(--c-on-primary);
+            border-color:transparent; font-weight:bold; box-shadow:0 3px 10px rgba(var(--c-shadow-rgb),0.35); }
+        .ui-btn.danger { color:var(--c-neg); }
+        /* 1017-O：危险操作的确认按钮（覆盖、删除、清空、撤销、恢复、批量改）：警示色实心，文案写清做什么 */
+        .ui-btn.warn { background:var(--c-neg); color:#fff; border-color:transparent; font-weight:bold; box-shadow:0 3px 10px rgba(181,72,46,0.3); }
+        /* 底部面板里的说明文字：左对齐、分段，第一段是结论，后面一条一条写影响 */
+        .ui-msg { text-align:left; font-size:15px; line-height:1.6; color:var(--c-text); }
+        .ui-msg p { margin:0 0 8px; }
+        .ui-msg ul { margin:0 0 8px; padding-left:20px; }
+        .ui-msg li { margin:2px 0; }
+        .ui-msg .ui-msg-soft { font-size:13px; color:var(--c-text-soft); }
+        .ui-msg .ui-msg-warn { color:var(--c-neg); font-weight:bold; }
+        .ui-btn.small { font-size:14px; padding:8px 14px; }
+        .ui-btn.block { display:block; width:100%; }
+        .ui-btn[disabled] { opacity:.45; cursor:not-allowed; box-shadow:none; }
+        .ui-btn:active:not([disabled]) { transform:scale(0.97); filter:brightness(0.96); }
+        .ui-stack { display:flex; flex-direction:column; gap:var(--ui-gap); }
+        /* 大卡片按钮：标题 + 一行说明，整块都能点 */
+        .ui-choice { display:flex; flex-direction:column; align-items:flex-start; gap:3px; width:100%; min-height:64px;
+            padding:12px 16px; border-radius:14px; border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-text); font-family:inherit; text-align:left; cursor:pointer; }
+        .ui-choice b { font-size:16px; color:var(--c-primary-deep); }
+        .ui-choice span { font-size:13px; color:var(--c-text-soft); line-height:1.5; }
+        .ui-choice:active { transform:scale(0.98); }
+        /* 文字链接、小图标：外观不变，点击区域撑到 48 */
+        .ui-tap { display:inline-flex; align-items:center; min-height:var(--ui-tap); min-width:var(--ui-tap); }
+        /* 老页面不改布局时用：外观一点不变，在元素上叠一块看不见的、至少 48×48 的点击区域（居中） */
+        .ui-hit { position:relative; }
+        .ui-hit::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:max(100%, var(--ui-tap)); height:max(100%, var(--ui-tap)); }
+
+        /* 底部常驻操作栏：左「筛选」右「记一笔」，两个等宽对称按钮 */
+        .action-bar { position:fixed; left:12px; right:12px; z-index:900;
+            bottom:calc(60px + env(safe-area-inset-bottom));
+            display:none; align-items:stretch; gap:10px; }
+        @media (min-width:761px){
+            .action-bar { left:50%; transform:translateX(-50%); width:480px; right:auto; }
+        }
+        /* 两个按钮共用：严格各占一半、同高同圆角，图标+文字横排 */
+        .act-btn { flex:1 1 0; min-width:0; height:50px; border:none; border-radius:14px; cursor:pointer;
+            display:flex; align-items:center; justify-content:center; gap:7px;
+            font-size:16px; font-weight:bold; transition:0.15s; position:relative;
+            box-shadow:0 4px 14px rgba(var(--c-shadow-rgb),0.3); }
+        .act-btn:active { transform:scale(0.97); }
+        /* 左：筛选（次操作，浅底描边） */
+        .act-filter { background:var(--c-surface); color:var(--c-primary-dark);
+            border:1px solid var(--c-border-mid); }
+        /* 右：记一笔（主操作，实心金色） */
+        .act-add { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark));
+            color:var(--c-on-primary); box-shadow:0 4px 14px rgba(var(--c-shadow-rgb),0.45); }
+        /* 有筛选生效时，筛选按钮右上角小红点提示 */
+        .act-filter.active-filter::after { content:""; position:absolute; top:7px; right:9px;
+            width:9px; height:9px; border-radius:50%; background:var(--c-neg,#d05a52);
+            border:1.5px solid var(--c-surface); }
+
+        /* 回到顶部按钮：滚动后出现，位于操作栏上方右侧 */
+        .to-top { position:fixed; right:16px; z-index:910;
+            bottom:calc(122px + env(safe-area-inset-bottom));
+            width:44px; height:44px; border-radius:50%; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-primary-dark);
+            font-size:22px; line-height:1; cursor:pointer; padding:0;
+            box-shadow:0 3px 12px rgba(var(--c-shadow-rgb),0.3);
+            opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
+        .to-top.show { opacity:1; pointer-events:auto; }
+        .to-top:active { transform:scale(0.92); }
+
+        /* 清除筛选浮钮：与回到顶部同款圆钮，位于其正上方；仅在筛选生效（或不在第 1 页）时浮现。
+           1017-N 起和统计页 ✕ 一样：有动作（滑动、翻页、改筛选）才出现，停下 1.5 秒淡出（fabWake），不常驻挡记录。 */
+        .clear-filter-fab { position:fixed; right:16px; z-index:910;
+            bottom:calc(176px + env(safe-area-inset-bottom));
+            width:44px; height:44px; border-radius:50%; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-neg);
+            font-size:20px; line-height:1; cursor:pointer; padding:0;
+            display:flex; align-items:center; justify-content:center;
+            box-shadow:0 3px 12px rgba(var(--c-shadow-rgb),0.3);
+            opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
+        .clear-filter-fab.show { opacity:1; pointer-events:auto; }
+        .clear-filter-fab:active { transform:scale(0.92); }
+
+        /* ===== 底部标签栏 ===== */
+        .tab-bar { position:fixed; left:0; right:0; bottom:0; z-index:950;
+            display:flex; background:var(--c-surface-2);
+            border-top:1px solid var(--c-border);
+            padding-bottom:env(safe-area-inset-bottom);
+            box-shadow:0 -2px 12px rgba(var(--c-shadow-rgb),0.18); }
+        .tab-btn { flex:1; border:none; background:transparent; cursor:pointer;
+            padding:9px 0 8px; display:flex; flex-direction:column; align-items:center; gap:2px;
+            color:var(--c-text-soft); transition:0.15s; }
+        /* 1010-K3：底栏文字用霞鹜文楷（LXGW WenKai，SIL OFL 1.1，可商用），
+           只裁出「统计记账设置」6 个字内嵌，不随系统字体变；其他字照常用系统字体。 */
+        @font-face { font-family:'JiwenTab'; font-weight:400; font-display:swap;
+            src:url(data:font/woff2;base64,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) format('woff2'); }
+        @font-face { font-family:'JiwenTab'; font-weight:700; font-display:swap;
+            src:url(data:font/woff2;base64,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) format('woff2'); }
+        /* 图标：统计 = Lucide chart-spline（ISC 授权）；记账 = Tabler list-check、设置 = Tabler adjustments-horizontal（MIT 授权）。
+           选中时每个图标只有一笔（.acc）变 --c-tab-accent：统计=曲线，记账=中间的勾，设置=中间的圆钮。 */
+        .tab-btn .tab-ico { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:1.8;
+            stroke-linecap:round; stroke-linejoin:round; }
+        .tab-btn .tab-txt { font-size:13px; font-family:'JiwenTab', serif; letter-spacing:1px; }
+        .tab-btn.active { color:var(--c-primary-dark); }
+        .tab-btn:not(.active) .tab-ico, .tab-btn:not(.active) .tab-txt { opacity:.62; }   /* 未选中再淡一档，选中项更跳 */
+        .tab-btn.active .tab-ico { stroke-width:2; }
+        .tab-btn.active .tab-ico .acc { stroke:var(--c-tab-accent); }
+        .tab-btn.active .tab-txt { font-weight:bold; }
+        /* 键盘弹出时，隐藏会被顶起的常驻底栏与悬浮按钮 */
+        body.kb-open .tab-bar,
+        body.kb-open .action-bar,
+        body.kb-open .to-top,
+        body.kb-open .clear-filter-fab { display:none !important; }
+
+        /* 主界面给底栏留出空间，避免最后内容被遮住 */
+        body:not(.login-mode) .container { padding-bottom:84px; }
+        /* 记账页底部还有「记一笔」常驻条，需再多留空间（确保翻页器不被遮住） */
+        body.tab-ledger:not(.login-mode) .container { padding-bottom:165px; }
+        /* 统计页无底部操作栏，但有回顶浮钮（bottom 122px + 44 高）；留出底部空间，
+           让内容滚到底时最后一行不被浮钮盖住，浮钮落在这段留白里。 */
+        body.tab-stats:not(.login-mode) .container { padding-bottom:150px; }
+
+        /* ===== 设置页 ===== */
+        .set-group { margin-bottom:20px; }
+        .set-group-title { color:var(--c-text-soft); font-size:13px; margin:0 4px 8px; }
+        .set-item { width:100%; display:flex; justify-content:space-between; align-items:center;
+            background:var(--c-surface); border:1px solid var(--c-border); border-radius:10px;
+            padding:14px 16px; margin-bottom:8px; cursor:pointer; font-size:15px;
+            color:var(--c-text); transition:0.15s; }
+        .set-item:hover { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.25); }
+        .set-item .set-arrow { color:var(--c-text-soft); font-size:18px; }
+        .set-item.set-danger { color:var(--c-neg, #d05a52); }
+        .set-item.set-danger .set-arrow { color:var(--c-neg, #d05a52); }
+        .set-item.set-static { cursor:default; }
+        .set-item.set-static:hover { border-color:var(--c-border); box-shadow:none; }
+        /* 1015-A：设置页最底下的版本号。连点 5 次开关「导入（开发中）」 */
+        .set-build { text-align:center; font-size:11px; color:var(--c-text-soft); padding:6px 0 14px;
+            -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+        .dev-imp-out { font-size:13px; line-height:1.7; color:var(--c-text); margin:6px 0 4px; white-space:pre-wrap; word-break:break-all; }
+        .seg { display:flex; border:1px solid var(--c-border-mid); border-radius:9px; overflow:hidden; }
+        .seg button { border:none; background:transparent; cursor:pointer; padding:6px 12px;
+            font-size:13px; color:var(--c-text-soft); transition:0.12s; }
+        .seg button.on { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:bold; }
+
+        /* ===== 统计页 ===== */
+        .stat-card { background:var(--c-surface); border:1px solid var(--c-border);
+            border-radius:14px; padding:14px; margin-bottom:12px; }
+        .stat-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+        .stat-cal-head span { font-size:16px; font-weight:bold; color:var(--c-text); }
+        #statMonthLabel { cursor:pointer; padding:4px 12px; border-radius:9px; border:1px solid var(--c-border); }
+        #statMonthLabel:active { background:var(--c-chip); }
+        .imp-empty-entry { display:block; width:100%; margin:0 0 10px; padding:8px 10px; font-size:13px; text-align:left; border:1px dashed var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-primary-deep); cursor:pointer; }
+                .stat-pend-banner { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 10px; margin-bottom:10px; border:1px solid var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-text); }
+        .stat-pend-banner span { flex:1; }
+        .stat-pend-banner button { border:none; background:none; color:var(--c-primary-deep); text-decoration:underline; font-size:12.5px; padding:0; cursor:pointer; }
+        /* 年月选择器 */
+        .ym-year-row { display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:14px; }
+        /* 等高盒：月网格与年网格都是 12 格，切层级时弹窗高度不跳变。
+           240px 与日期选择器的网格区高度相当，两个选择器视觉体量一致。 */
+        .ym-box { min-height:240px; display:flex; flex-direction:column; touch-action:pan-y;
+            user-select:none; -webkit-user-select:none; }
+        /* 「有记账数据」的标记用 ::before（左上角），避开 .dt-cell 的 today 标记（::after 右上角），
+           否则同一个格子既是今天又有数据时，两个点会重叠成一个。 */
+        .dt-cell.has::before { content:''; position:absolute; top:5px; left:6px;
+            width:5px; height:5px; border-radius:50%; background:var(--c-accent); }
+        .dt-cell.selected.has::before { background:var(--c-sel-text); }
+        .stat-week { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; margin-bottom:5px; }
+        .stat-week span { text-align:center; font-size:11px; color:var(--c-text-soft); }
+        .stat-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:3px; }
+        .stat-cal .day { aspect-ratio:1; border-radius:8px; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; border:1px solid transparent; }
+        .stat-cal .day .dn { font-size:12px; color:var(--c-text); }
+        .stat-cal .day .da { font-size:9px; font-weight:bold; line-height:1.1; }
+        .stat-cal .day.has { background:var(--c-chip); border-color:var(--c-border); cursor:pointer; }
+        .stat-cal .day.has:active { transform:scale(0.93); }
+        /* 选中态：使用专属语义色变量（--c-sel-*），全站「当前选中」统一复用。
+           只换一个柔和底色来区分，不加边框/描边/阴影，最干净。 */
+        .stat-cal .day.sel {
+            background:var(--c-sel-bg);
+            border-color:transparent;   /* 覆盖 .has 的可见边框，确保选中态真正无描边 */
+        }
+        .stat-cal .day.sel .dn { color:var(--c-sel-text); font-weight:700; }
+        .stat-cal .day.today .dn { text-decoration:underline; }
+
+        .stat-month-row { display:flex; gap:10px; margin-bottom:12px; }
+        .stat-month-box { flex:1; background:var(--c-card-1); border:1px solid var(--c-border);
+            border-radius:12px; padding:12px; text-align:center; }
+        .smb-label { font-size:12px; color:var(--c-text-soft); margin-bottom:4px; }
+        .smb-val { font-size:20px; font-weight:bold; }
+
+        .stat-day-title { font-size:15px; font-weight:bold; color:var(--c-text); margin-bottom:12px; }
+        .stat-month-cat-head { display:flex; align-items:center; justify-content:space-between;
+            gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+        #statMonthCatSeg button { padding:5px 12px; font-size:13px; }
+        .stat-pie-row { display:flex; gap:12px; align-items:center; }
+        .stat-pie-holder { width:140px; height:140px; flex-shrink:0; }
+        .stat-cat-list { flex:1; min-width:0; }
+        .stat-cat-list .sc-item { display:flex; flex-direction:column; align-items:stretch; gap:2px;
+            padding:6px 0; font-size:13px; border-bottom:1px dashed var(--c-border); }
+        .stat-cat-list .sc-item:last-child { border-bottom:none; }
+        .sc-top { display:flex; align-items:center; gap:8px; min-width:0; }
+        .sc-name { display:flex; align-items:center; gap:6px; min-width:0; flex:1 1 auto; color:var(--c-text); }
+        .sc-dot { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
+        .sc-cat-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .sc-pct { flex:0 0 auto; text-align:right; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .sc-amt { align-self:flex-end; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+        /* 当日收支明细：一条一「行卡」。上行=时间/类型/分类/备注，金额错位到右下角。整行可点进账单详情 */
+        .stat-flow { display:flex; flex-direction:column; }
+        .stat-flow .sf-item { display:flex; flex-direction:column; align-items:stretch;
+            gap:4px; padding:9px 6px; margin:0 -6px; border-radius:6px;
+            border-bottom:1px dashed var(--c-border); cursor:pointer; transition:background 0.15s; }
+        .stat-flow .sf-item:last-child { border-bottom:none; }
+        .stat-flow .sf-item:hover { background:var(--c-chip); }
+        .stat-flow .sf-item:active { background:var(--c-chip); filter:brightness(0.97); }
+        .sf-top { display:flex; align-items:center; gap:6px; min-width:0; }
+        .sf-time { flex:0 0 auto; font-size:12px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .sf-io { flex:0 0 auto; font-size:11px; line-height:1; padding:2px 5px; border-radius:3px;
+            border:1px solid var(--c-accent-soft); }
+        .sf-io.in { color:#3a7a2e; background:rgba(58,122,46,0.08); }
+        .sf-io.out { color:#b5482e; background:rgba(181,72,46,0.08); }
+        .sf-cat { flex:0 0 auto; font-size:13px; color:var(--c-text); font-weight:600;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:96px; }
+        /* 备注：宽度跟着文字走（虚线只包住文字，不拖满整行），过长则在上限内省略号；仍带虚线，跟记账详情统一 */
+        .sf-remark { flex:0 1 auto; min-width:0; max-width:100%; font-size:12px;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+            color:var(--c-primary-dark); border-bottom:1px dashed var(--c-primary); }
+        /* 金额：错位到右下角，完整显示不截断 */
+        .sf-amt { align-self:flex-end; font-weight:bold; white-space:nowrap;
+            font-variant-numeric:tabular-nums; font-size:15px; }
+
+        .stat-day-empty { text-align:center; color:var(--c-text-soft); font-size:13px; }
+
+        /* AI 分析导出弹窗 */
+        .ai-exp-dialog { max-width:440px; width:92%; }
+        .ai-exp-sub { font-size:13px; color:var(--c-text-soft); text-align:center; margin:-2px 0 10px; }
+        #aiExpText { width:100%; box-sizing:border-box; height:240px; resize:none;
+            font-size:12.5px; line-height:1.5; padding:10px 12px; border-radius:10px;
+            border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-text); font-family:inherit;
+            -webkit-user-select:text; user-select:text; }
+        .ai-exp-tip { font-size:12px; color:var(--c-text-soft); line-height:1.5; margin:10px 2px 4px; }
+        .ai-exp-btns { flex-wrap:wrap; }
+
+        /* 分页控件 */
+        .pager { display:flex; align-items:center; justify-content:center; gap:14px;
+            margin-top:16px; flex-wrap:wrap; }
+        .pager button { padding:8px 16px; border:1px solid var(--c-primary); border-radius:8px;
+            background:var(--c-surface); color:var(--c-primary-deep); cursor:pointer; font-size:14px; transition:0.2s; }
+        .pager button:hover:not(:disabled) { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .pager button:disabled { opacity:0.4; cursor:not-allowed; }
+        .pager .page-info { color:var(--c-text); font-size:14px; }
+
+        /* ===== 筛选浮层内的字段样式（关键词/金额/日期） ===== */
+        .search-input {
+            flex:1; min-width:0; padding:11px 12px; border:1px solid var(--c-primary);
+            border-radius:8px; font-size:14px; outline:none; background:var(--c-surface);
+            color:var(--c-primary-deep); transition:border-color .25s, box-shadow .25s; }
+        .search-input::placeholder { color:var(--c-text-soft); opacity:0.7; }
+        .search-input:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .search-field { display:flex; flex-direction:column; gap:6px; }
+        .search-label { font-size:12.5px; color:var(--c-text-soft); font-weight:600; padding-left:2px; }
+        .search-range { display:flex; align-items:center; gap:8px; }
+        .search-sep { color:var(--c-text-soft); flex:0 0 auto; }
+
+
+        /* 筛选分类标签：横排、不换行、可横向滑动；复用 cat-chips 的标签外观 */
+        .filter-chips {
+            display:flex; gap:8px; flex-wrap:nowrap; overflow-x:auto; margin-bottom:12px;
+            padding-bottom:4px;                              /* 给滚动条/阴影留点呼吸 */
+            -webkit-overflow-scrolling:touch;                /* iOS 顺滑惯性滚动 */
+            scrollbar-width:none; }                           /* Firefox 隐藏滚动条 */
+        .filter-chips::-webkit-scrollbar { display:none; }    /* WebKit 隐藏滚动条 */
+        .filter-chips .cc {
+            flex:0 0 auto;                                    /* 不被压缩，超出即可横向滑动 */
+            padding:8px 16px; border:1px solid var(--c-border-mid); border-radius:20px;
+            background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer;
+            white-space:nowrap; transition:0.15s; -webkit-user-select:none; user-select:none; }
+        .filter-chips .cc:hover { border-color:var(--c-accent); }
+        .filter-chips .cc.sel {
+            background:var(--c-sel-bg);
+            border-color:var(--c-sel-border); -webkit-text-stroke:0.45px currentColor; }
+        .filter-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
+
+        /* 上栏：全局总览（中性卡片底，始终显示） */
+        .summary-overall { text-align:center; color:var(--c-text); font-size:14px;
+            background:var(--c-card-1); border:1px solid var(--c-border);
+            border-radius:12px; padding:9px 12px; margin-bottom:8px; }
+        .summary-overall b { color:var(--c-primary-dark); font-size:16px; }
+        /* 下栏：当前筛选小计（主题浅色底 + 左上角分类角标，仅筛选时显示） */
+        .summary-filter { display:flex; align-items:center; gap:10px;
+            background:var(--c-chip); border:1px solid var(--c-border-mid);
+            border-radius:12px; padding:8px 12px; margin-bottom:10px;
+            color:var(--c-text); font-size:14px; }
+        .summary-filter .filter-badge { flex-shrink:0; background:var(--c-sel-bg);
+            color:var(--c-sel-text); font-size:13px; font-weight:bold;
+            padding:3px 11px; border-radius:9px; }
+        .summary-filter .filter-nums b { color:var(--c-primary-dark); font-size:15px; }
+
+        .cat-stats { text-align:center; color:var(--c-text); font-size:13px; margin-bottom:12px; }
+        .bill-head { font-size:16px; font-weight:bold; color:var(--c-primary-dark);
+            padding:4px 2px 8px; border-bottom:2px solid var(--c-border); margin-bottom:4px;
+            scroll-margin-top:12px; }
+
+        table { width:100%; border-collapse:collapse; margin-top:10px; }
+        th, td { padding:12px 8px; text-align:center; border:1px solid var(--c-border); font-size:14px; }
+        th { background:linear-gradient(135deg,var(--c-chip),var(--c-accent-soft)); color:var(--c-primary-deep); }
+
+        /* 手机端：表格变卡片 */
+        @media (max-width: 600px) {
+            table, tbody, tr, td { display:block; width:100%; }
+            thead { display:none; }                      /* 隐藏表头 */
+            table { border:none; margin-top:6px; }
+            tbody tr {
+                background:var(--c-surface-2); border:1px solid var(--c-border-mid); border-radius:12px;
+                box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),0.18);
+                margin-bottom:14px; padding:6px 4px; overflow:hidden;
+            }
+            tbody td {
+                display:flex; justify-content:space-between; align-items:center; gap:10px;
+                border:none; border-bottom:1px dashed var(--c-border);
+                padding:10px 14px; text-align:right; font-size:14px;
+            }
+            tbody td:last-child { border-bottom:none; }
+            /* 左侧标签 */
+            tbody td::before {
+                content:attr(data-label);
+                font-weight:600; color:var(--c-text); text-align:left;
+                flex:0 0 auto; white-space:nowrap;
+            }
+            /* 操作按钮一行居右 */
+            tbody td.ops-cell { justify-content:flex-end; }
+            tbody td.ops-cell .operate-btn { padding:10px 20px; font-size:15px; margin:0 4px; }
+            /* 空记录提示：去掉标签、居中 */
+            tbody td.empty-tip { display:block; text-align:center; }
+            tbody td.empty-tip::before { content:none; }
+            tbody tr:has(td.empty-tip) { box-shadow:none; border-style:dashed; }
+        }
+
+        .cat-tag { display:inline-block; background:var(--c-chip); border:1px solid var(--c-accent-soft);
+            border-radius:10px; padding:2px 9px; color:var(--c-primary-deep); font-size:13px; }
+
+        .remark-view { color:var(--c-primary-dark); cursor:pointer; border-bottom:1px dashed var(--c-primary); }
+        .remark-view:hover { color:var(--c-text); }
+        .remark-empty { color:var(--c-text-soft); }
+        .ask-msg { word-break:break-word; }
+
+        .operate-btn { padding:5px 10px; margin:0 3px; border:none; border-radius:4px;
+            cursor:pointer; font-size:13px; transition:0.2s; }
+        .edit { background:var(--c-accent-soft); color:#5c4500; }
+        .del { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark)); color:var(--c-on-primary); }
+        .operate-btn:hover { filter:brightness(1.1); }
+
+        /* 弹窗在可视区内居中。height 用 dvh：键盘弹出时浏览器自动把它收缩到键盘上方，
+           居中点随之上移，因此「先弹键盘、后显示弹窗」时，弹窗一次性出现在最终居中位置，全程不动。 */
+        /* ===== 弹窗层级阶梯 =====
+           此前是一路「哪儿盖住了就给哪儿加一档」堆出来的，每加一个新弹窗就要再打一个补丁。
+           这里一次列清楚，新增弹窗照着挑一档即可，不要再就地 +1。
+
+             1000  普通表单弹窗（.mask 默认）：记一笔、修改、分类、外观、日子、日子管理…
+                   它们互不叠加，同级即可。
+             1010  内容型二级弹窗：从某个一级弹窗「点进去」的下一层内容。
+                   —— 批量确认清单(askMask.as-page) → 账单详情(detailMask) 就是这条链。
+             1020  从二级弹窗再点进去的三级：详情里点「修改」。
+             1030  选择器：日期/时间。它永远由某个表单弹窗唤起，必须盖过上面所有。
+             1040  瞬时提示/确认（askMask 默认）：校验失败、删除确认、复制成功…
+                   任何层里都可能唤起它，所以它必须在最顶。
+
+           【为什么 askMask 要分两档】它身兼二职：既是「批量确认清单」这种内容页，
+             又是全局的提示/确认框。之前统一给了 1010，结果从内容页里点开的
+             detailMask(1000) 反而被压在底下 —— 就是「点了列表没反应」的真相。
+             现在：默认 1040（当提示用）；当内容页用时加 .as-page 降到 1010，
+             让它上面的 detailMask/editMask 能正常盖住它。 */
+        .mask { position:fixed; top:0; left:0; width:100%; bottom:0;   /* 1019-O：上下贴住可视区（系统缩网页时跟着走），不用 100dvh、不用代码追 */
+            background:rgba(0,0,0,0.3); display:none;
+            align-items:center; justify-content:center; z-index:1000;
+            padding:16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        #askMask            { z-index:1040; }   /* 提示/确认：永远最顶 */
+        #askMask.as-page    { z-index:1010; }   /* 当内容页用（批量确认清单）：降档，好让详情盖上来 */
+        #detailMask         { z-index:1020; }   /* 账单详情：从清单/当日明细点进来的下一层 */
+        #editMask.over-detail { z-index:1030; } /* 详情里点「修改」：再上一层 */
+        #aiExpMask          { z-index:1010; }
+        #refundMask         { z-index:1032; }   /* 退款：从修改账单打开，盖过它；日期选择器还要盖过它 */
+        #dtMask             { z-index:1035; }   /* 日期选择器：盖过所有表单弹窗，但低于提示 */
+        .edit-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:25px;
+            border:1px solid var(--c-primary); border-radius:12px; width:90%; max-width:400px;
+            max-height:80vh; max-height:80dvh; overflow-y:auto;
+            box-shadow:0 4px 20px rgba(var(--c-shadow-rgb),0.4); }
+        .edit-dialog h3 { margin-bottom:15px; text-align:center; color:var(--c-primary-dark); }
+        .edit-dialog input, .edit-dialog select { width:100%; margin:8px 0; padding:10px;
+            border:1px solid var(--c-primary); border-radius:6px; outline:none; background:var(--c-surface); }
+        .dialog-btn { display:flex; gap:10px; margin-top:15px; }
+        .save { flex:1; padding:10px; background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); border:none; border-radius:6px; cursor:pointer; }
+        .cancel { flex:1; padding:10px; background:var(--c-border); color:#5c4500; border:none;
+            border-radius:6px; cursor:pointer; }
+        .edit-del-btn { width:100%; margin-top:10px; padding:9px; background:none; border:none;
+            color:#b5482e; font-size:13px; cursor:pointer; border-radius:6px; transition:0.2s; }
+        .edit-del-btn:hover { background:rgba(181,72,46,0.08); }
+
+        /* ===== 筛选浮层（bottom sheet）：从底部上滑 ===== */
+        .sheet-mask { align-items:flex-end; justify-content:center; padding:0; }
+        .sheet {
+            width:100%; max-width:760px;
+            background:var(--c-sheet);   /* 1019-T：原来是斜着的渐变，顶上钉住的那块是纯色，往右越来越对不上，看着像一道缝 */
+            border-top-left-radius:18px; border-top-right-radius:18px;
+            border:1px solid var(--c-primary); border-bottom:none;
+            box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4);
+            padding:8px 18px calc(20px + env(safe-area-inset-bottom));
+            max-height:85dvh; overflow-y:auto;
+            transform:translateY(100%); transition:transform var(--sheet-ms) var(--sheet-ease); }   /* 1019-N：打开往上滑入；1019-Z3 起和收起同一个时长、先快后慢 */
+        .sheet-mask.open .sheet { transform:translateY(0); }   /* 打开时滑入 */
+        .sheet-handle { width:40px; height:4px; border-radius:2px; background:var(--c-border-mid);
+            margin:6px auto 12px; }
+        /* 顶部抓手区：把手 + 标题行作为下滑关闭的拖拽区。touch-action:none 让浏览器
+           不要把这块的手势当成滚动，否则 passive 监听下手势会被滚动抢走、拖不动。 */
+        .sheet-grip { touch-action:none; cursor:grab; }
+        .sheet-grip:active { cursor:grabbing; }
+        .sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+        .sheet-head h3 { color:var(--c-primary-dark); }
+        .sheet-body { display:flex; flex-direction:column; gap:16px; }
+        .sheet .field-label-row { display:flex; align-items:center; }
+        /* 浮层里分类标签允许换行铺开（不像顶部那样强制单行），一眼看全 */
+        .sheet .filter-chips { flex-wrap:wrap; overflow-x:visible; }
+        .sheet .dialog-btn { margin-top:18px; }
+
+        /* 1017-UI1：共用的底部面板（JiwenSheet）：和筛选浮层同一套 .sheet 外观；最高约 70% 屏幕，内容多时在面板里滚，底部按钮贴底 */
+        #uiSheetMask { z-index:1000; }
+        .ui-sheet { max-height:72vh; max-height:72dvh; padding-bottom:0; }
+        .ui-sheet .sheet-head { margin-bottom:6px; }
+        .ui-sheet-sub { font-size:13px; color:var(--c-text-soft); margin:-2px 0 10px; overflow-wrap:anywhere; }
+        .ui-sheet-body { padding:2px 0 6px; }
+        /* 底部按钮贴在面板底边：面板自己滚（往下拉关闭靠「面板已滚到顶」判断，所以不另开一层滚动） */
+        .ui-sheet-foot { position:sticky; bottom:0; margin:0 -18px; padding:10px 18px calc(14px + env(safe-area-inset-bottom));
+            background:var(--c-sheet); border-top:1px solid var(--c-border); }
+        .ui-sheet-foot .dialog-btn { margin-top:0; }
+        .ui-pick-chips { margin-bottom:0; }
+        .ui-pick-list { display:flex; flex-direction:column; gap:var(--ui-gap); }
+        .ui-pick-opt { text-align:left; }
+        .ui-pick-opt.sel { background:var(--c-sel-bg); border-color:var(--c-sel-border); color:var(--c-sel-text); font-weight:bold; }
+        /* 1019-B：所有弹窗（记一笔、修改、详情、退款、模板、分类、外观、日子、日子管理、AI 导出、导入自检、日期 / 年月选择器）
+           都和「筛选」同一套结构：.mask.sheet-mask.form-mask > .sheet（顶上 .sheet-grip 拖动条 + 标题，往下拉关闭用 bindSheetDrag）。
+           .form-mask 的面板显示出来（display:flex）就在位，从下面滑上来用动画，不靠 .open 类。
+           键盘弹起时和筛选一样：mask 高度由 syncMaskHeight 收成可视区，面板贴着键盘上沿、最高占满可视区、里面滑，
+           不再顶部对齐（原来顶部对齐时面板下沿和键盘之间会露缝）。 */
+        .form-mask > .sheet { background:var(--c-sheet); transform:none; animation:askUp var(--sheet-ms) var(--sheet-ease); max-height:88vh; max-height:88dvh;
+            width:100%; max-width:760px; padding:8px 18px calc(20px + env(safe-area-inset-bottom));
+            border-radius:18px 18px 0 0; border-bottom:none; box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4); }
+        /* 拖动条和标题钉在面板顶上：键盘弹起、面板里滑到备注时，标题照样看得见、照样能往下拉 */
+        /* 1019-U：首屏快照（上次离开时的首屏，打开 App 时大脚本还没跑完就先画出来；真的画好了就拿掉）。点不动、盖在最上面 */
+        .boot-snap { position:fixed; inset:0; z-index:990; overflow:hidden; background:var(--c-bg); }
+        .boot-snap > .container { position:relative; }
+        .form-mask .sheet-grip { position:sticky; top:-8px; z-index:2; margin:-8px -18px 0; padding:8px 18px 0;
+            background:var(--c-sheet); border-radius:18px 18px 0 0; }
+        .form-mask .sheet-head h3 { text-align:left; margin:0; }
+        .form-mask .sheet-head { margin-bottom:10px; }
+        .form-mask .form-btns { margin-top:16px; }
+        .form-mask .form-btns > * { margin:0; flex:none; }
+        /* 1019-Q：记一笔 / 修改排紧：金额一行在最上（大字 + 小的收支切换），时间一行小字，口径收进「更多」，保存贴在面板底边 */
+        .rec-sheet { padding-bottom:0; }
+        .rec-form .field { margin-bottom:10px; }
+        .rec-time { display:inline-flex; align-items:center; gap:4px; min-height:var(--ui-tap); margin:-4px 0 0 -6px; padding:0 6px;
+            background:none; border:none; color:var(--c-text-soft); font-size:14px; font-family:inherit; cursor:pointer; border-radius:8px; }
+        .rec-time:active { background:var(--c-chip); }
+        .rec-time-arrow { font-size:16px; }
+        .rec-time-raw { display:none !important; }
+        .rec-money-row { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+        .rec-cur { font-size:26px; color:var(--c-text-soft); flex:none; }
+        .edit-dialog input.rec-money { flex:1 1 auto; min-width:0; width:auto; margin:0; padding:4px 2px; height:56px;
+            font-size:32px; line-height:48px; border:none; border-bottom:2px solid var(--c-border-mid); border-radius:0; background:transparent; outline:none; }
+        .io-chips.io-mini { flex:none; gap:8px; margin:0; }
+        .io-chips.io-mini .cc { flex:none; min-width:56px; height:var(--ui-tap); padding:0 12px; line-height:46px; font-size:14px; margin:0; }
+        /* 1019-Z：统计口径一行三个小按钮（计入 / 只算结余 / 不计入），说明只在不是「计入」时显示 */
+        .mode-chips.mode-mini { display:flex; gap:8px; flex-wrap:nowrap; margin:0; }
+        .mode-chips.mode-mini .cc { flex:1 1 0; min-width:0; margin:0; padding:0 6px; height:var(--ui-tap); line-height:46px; font-size:14px; text-align:center; white-space:nowrap; }
+        .rec-mode .skip-hint { margin-top:6px; }
+        .edit-dialog textarea.rec-remark { margin:4px 0 0; min-height:var(--ui-tap); height:var(--ui-tap); padding:12px 10px; line-height:22px;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; resize:none; }
+        .rec-form .tpl-save-btn { margin-top:8px; }
+        .rec-extra { display:flex; flex-direction:column; gap:var(--ui-gap); margin-top:8px; }
+        .rec-extra .tpl-save-btn, #editMask .rec-extra .tpl-save-btn { margin-top:0; }
+        .form-mask .rec-foot { position:sticky; bottom:0; z-index:2; margin:12px -18px 0; padding:10px 18px calc(12px + env(safe-area-inset-bottom));
+            background:var(--c-sheet); border-top:1px solid var(--c-border); }
+        /* 1019-Y：数字键盘开着时记一笔 / 修改不垫空白、保存那排照旧贴在面板底边，数字键盘（原来的高度，不往短里收）整个盖住它；
+           原来（1019-R）保存那排不贴底、挪到内容最后，高屏上正好卡在键盘顶边，露出半截 */
+        /* 筛选浮层和上面这些在键盘弹起时：保持贴底，高度收进可视区，内部滚动 */
+        body.kb-open .sheet-mask { align-items:flex-end; }
+        body.kb-open .sheet { max-height:100%; }
+        /* 1019-O：键盘弹起 / 收起时先把所有开着的层按原来的高度冻住（不跟着缩），等键盘停下再只放开最上面那层，
+           它只动一次；下面几层一直不动。--hold-h 是键盘动之前的高度 */
+        .mask.kb-hold { bottom:auto; height:max(var(--hold-h), 100%); }   /* 1019-W：冻住的层永远不比屏幕矮（键盘一段里先变矮又变高时，原来会露出一截页面底色） */
+        .mask.kb-hold > .sheet, .mask.kb-hold > .edit-dialog, .mask.kb-hold > .dt-dialog { max-height:var(--hold-max) !important; }
+        /* 1019-O：文字输入的小面板（只有一个输入框），和日期选择同一套外观，贴在键盘上面 */
+        #txtMask { z-index:1036; }
+        .txt-sheet .txt-input { width:100%; margin:4px 0 2px; padding:12px; border:1px solid var(--c-primary); border-radius:8px;
+            outline:none; background:var(--c-surface); font-size:16px; font-family:inherit; color:var(--c-text); }
+        .txt-sheet textarea.txt-input { min-height:96px; resize:none; line-height:1.6; }
+        .txt-sheet .txt-count { font-size:12px; color:var(--c-text-soft); text-align:right; }
+        .txt-field { cursor:pointer; caret-color:transparent; }
+        /* 1019-P：数字键盘：照微信转账，左边三列 1–9、最下一行 0（两列宽）和小数点，最右一列退格 + 占三行高的主色大按钮；按键 56px 高 */
+        #kpMask { z-index:1045; background:transparent; pointer-events:none; }
+        #kpMask .kp-sheet { pointer-events:auto; padding-left:12px; padding-right:12px; }
+        .kp-show { display:flex; align-items:baseline; justify-content:flex-end; gap:6px; padding:2px 6px 10px; }
+        .kp-cur { font-size:20px; color:var(--c-text-soft); }
+        .kp-val { font-size:34px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; letter-spacing:0.5px; }
+        .kp-val.kp-empty { color:var(--c-text-soft); opacity:0.55; }
+        .kp-grid { display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 56px); gap:8px; }
+        .kp-key { border:none; border-radius:10px; background:var(--c-surface); color:var(--c-text); font-size:24px; font-family:inherit;
+            box-shadow:0 1px 0 rgba(var(--c-shadow-rgb),0.25); cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:manipulation; }
+        .kp-key:active, .kp-key.kp-pressed { filter:brightness(0.92); transform:scale(0.98); }   /* 1019-Z2：长按退格时一直是按下的样子 */
+        .kp-del { font-size:22px; grid-column:4; grid-row:1; }
+        .kp-ok { grid-column:4; grid-row:2 / span 3; background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); color:var(--c-on-primary);
+            font-size:18px; font-weight:bold; }
+        .kp-zero { grid-column:1 / span 2; }
+        .kp-field { cursor:pointer; caret-color:transparent; }
+        /* 1019-Z1：正在用数字键盘输的金额框不加方框，只把下面那条线换成主色、加粗（用内阴影加粗，框的大小不变） */
+        .kp-field.kp-on { outline:none; border-bottom-color:var(--c-primary) !important; box-shadow:inset 0 -2px 0 var(--c-primary) !important; }
+        /* 金额框所在的面板临时在底下垫一块键盘那么高的空白，好把金额框滚到键盘上面 */
+        .sheet.kp-lift { padding-bottom:calc(var(--kp-h, 320px) + 12px) !important; }
+        .sheet-ghost.kp-mask { background:transparent !important; animation:none !important; }
+
+        .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
+        .cat-item { display:flex; justify-content:space-between; align-items:center;
+            padding:8px 10px; border:1px solid var(--c-border); border-radius:6px; margin-bottom:6px;
+            background:var(--c-surface); color:var(--c-primary-deep);
+            touch-action:pan-y; }
+        .cat-item button { border:none; background:var(--c-primary); color:var(--c-on-primary); border-radius:4px;
+            padding:3px 9px; cursor:pointer; font-size:12px; }
+        .cat-add-row { display:flex; gap:8px; margin-top:8px; }
+        .cat-add-row input { flex:1; margin:0; }
+        /* 拖动手柄与左侧名称 */
+        .cat-item .cat-left { display:flex; align-items:center; gap:8px; min-width:0; }
+        .cat-item .drag-handle { flex:0 0 auto; cursor:grab; color:var(--c-text-soft);
+            font-size:18px; line-height:1; padding:2px 4px; -webkit-user-select:none; user-select:none;
+            touch-action:none; }
+        .cat-item .cat-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        /* 长按拖起时的视觉：浮起、半透明、压暗背景占位 */
+        .cat-item.dragging { opacity:0.92; box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.4);
+            border-color:var(--c-primary); position:relative; z-index:5; }
+        .cat-item.drag-placeholder { opacity:0.35; }
+        .cat-reorder-tip { font-size:11.5px; color:var(--c-text-soft); margin:2px 2px 8px; }
+        /* 1019-C：分类管理一行 = 拖动手柄 + 分类名（16px）+ 每月预算（14px）+ ›，整行点开操作面板。
+           地方不够时先省略预算那一段，分类名最后才省略；文字区和右边的 › 之间至少 8px。 */
+        #catMask .cat-reorder-tip { font-size:13px; }
+        #catList { padding-bottom:4px; }
+        #catList .cat-item { min-height:52px; padding:6px 12px 6px 6px; gap:8px; cursor:pointer; }
+        #catList .cat-item .cat-left { flex:1 1 auto; min-width:0; gap:10px; }
+        #catList .cat-item .drag-handle { display:inline-flex; align-items:center; justify-content:center; min-width:40px; min-height:var(--ui-tap); padding:0; }
+        #catList .cat-item .cat-name { flex:0 0 auto; max-width:100%; font-size:16px; }
+        #catList .cat-item .cat-budget { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:14px; }
+        #catList .cat-item .cat-more { flex:0 0 auto; color:var(--c-text-soft); font-size:20px; line-height:1; }
+        #catMask .cat-add-row { margin-top:12px; padding-top:14px; border-top:1px solid var(--c-border); }
+        #catMask .cat-add-row .mini-btn { min-height:var(--ui-tap); padding:0 18px; }
+
+        .empty-tip { text-align:center; padding:30px; color:var(--c-text); }
+
+        /* 自定义时间选择器 */
+        .dt-input { cursor:pointer; }
+        .dt-dialog { background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); padding:20px;
+            border:1px solid var(--c-primary); border-radius:14px; width:92%; max-width:340px;
+            max-height:90vh; overflow-y:auto;
+            box-shadow:0 6px 24px rgba(var(--c-shadow-rgb),0.45); }
+        .dt-preview { text-align:center; font-size:18px; color:var(--c-primary-deep); font-weight:600;
+            margin-bottom:14px; letter-spacing:1px; }
+        /* 头部：‹ 标题 ›。标题是按钮（点击下钻一级），做成看不出边框的样子。 */
+        .dt-head { display:flex; justify-content:center; align-items:center; gap:6px; margin-bottom:10px; }
+        .dt-label { flex:1; border:none; background:transparent; cursor:pointer;
+            color:var(--c-primary-deep); font-weight:600; font-size:15px; text-align:center;
+            font-variant-numeric:tabular-nums; padding:7px 4px; border-radius:8px; transition:0.15s;
+            font-family:inherit; letter-spacing:0.5px; }
+        .dt-label:hover  { background:var(--c-chip); }
+        .dt-label:active { background:var(--c-accent-soft); }
+        /* 标题右侧的小三角，提示「这里可以点」——否则用户不会发现这是个入口 */
+        .dt-label::after { content:' ⌄'; font-size:12px; color:var(--c-text-soft); }
+        .dt-label.top::after { content:''; }   /* 已在最顶层(年)，没得再钻了 */
+        .dt-nav { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer;
+            background:var(--c-accent-soft); color:#5c4500; font-size:18px; line-height:1; transition:0.2s;
+            flex-shrink:0; }
+        .dt-nav:hover { filter:brightness(1.06); }
+
+        /* ★ 等高容器：日/月/年三个网格共用同一高度，切层级时弹窗高度不跳变。
+           高度 = 星期表头(约26) + 6 行日期(6×34 + 5×3 间距) ≈ 245px。
+           月/年网格只有 12 格，在这个高度里撑开——格子更大、更好点，而不是挤在顶上一小块。
+           touch-action:pan-y —— 保留纵向滚动，横向手势交给 JS 处理（网格内左右滑动翻页）。 */
+        .dt-grid-box { min-height:245px; display:flex; flex-direction:column;
+            touch-action:pan-y; user-select:none; -webkit-user-select:none; }
+        .dt-pane { flex:1; display:flex; flex-direction:column; }
+
+        /* 翻页入场动画：只做「切换后的方向性入场」，不做跟手拖拽。
+           跟手拖拽必须预渲染左右邻页（日网格 42 个节点 × 3 页 = 126 个，每次滑动重建），
+           在 WebView 里不划算；而且翻月份时用户根本不关心「11月到12月的过渡过程」，
+           只关心「到了没」——跟手带来的信息量是零。
+           真正缺的信息只有一个：往哪边翻的。方向性入场就把它补上了，这就是全部。
+           ‹ › 按钮与左右滑动共用 dtNav，所以两个入口都能吃到同一个动画。 */
+        @keyframes dtSlideFromRight { from { opacity:0; transform:translateX(14px); } }
+        @keyframes dtSlideFromLeft  { from { opacity:0; transform:translateX(-14px); } }
+        /* 下一页（左滑 / ›）：新内容从右侧进来 */
+        .dt-pane.in-next, #ymGrid.in-next, #ymYearGrid.in-next { animation:dtSlideFromRight 0.18s ease-out; }
+        /* 上一页（右滑 / ‹）：新内容从左侧进来 */
+        .dt-pane.in-prev, #ymGrid.in-prev, #ymYearGrid.in-prev { animation:dtSlideFromLeft 0.18s ease-out; }
+        /* 尊重系统的「减少动态效果」设置 */
+        @media (prefers-reduced-motion: reduce){
+            .dt-pane.in-next, .dt-pane.in-prev,
+            #ymGrid.in-next, #ymGrid.in-prev,
+            #ymYearGrid.in-next, #ymYearGrid.in-prev { animation:none; }
+        }
+
+        .dt-week { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px; }
+        .dt-week span { text-align:center; font-size:12px; color:var(--c-text-soft); padding:4px 0; }
+        .dt-days { display:grid; grid-template-columns:repeat(7,1fr); gap:3px;
+            grid-auto-rows:34px; align-content:start; }
+
+        /* 月/年网格：4 列 × 3 行，在等高容器里平分空间 */
+        .dt-grid-12 { flex:1; display:grid; grid-template-columns:repeat(4,1fr);
+            grid-template-rows:repeat(3,1fr); gap:8px; }
+        .dt-cell { display:flex; align-items:center; justify-content:center;
+            border:1px solid var(--c-border); border-radius:10px; cursor:pointer;
+            background:var(--c-surface); color:var(--c-primary-deep);
+            font-size:15px; font-weight:500; transition:0.15s;
+            font-variant-numeric:tabular-nums; position:relative; }
+        .dt-cell:hover  { background:var(--c-chip); }
+        .dt-cell:active { background:var(--c-accent-soft); }
+        .dt-cell.selected { background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-sel-text); border-color:var(--c-primary-dark); font-weight:bold; }
+        /* 「今天」所在的月/年：右上角一个小点，和日网格里的 today 标记呼应 */
+        .dt-cell.today::after { content:''; position:absolute; top:5px; right:6px;
+            width:5px; height:5px; border-radius:50%; background:var(--c-primary); }
+        .dt-cell.selected.today::after { background:var(--c-sel-text); }
+        .dt-cell.muted { color:var(--c-border); cursor:default; }
+        .dt-cell.muted:hover { background:var(--c-surface); }
+
+        .dt-day { text-align:center; padding:8px 0; border-radius:8px; cursor:pointer;
+            font-size:14px; color:var(--c-primary-deep); transition:0.15s; }
+        /* AI 导出日期选择：格子下方的当日笔数小字 */
+        .dt-day .dt-cnt { display:block; font-size:9px; line-height:1; margin-top:2px;
+            color:var(--c-text-soft); font-weight:400; }
+        .dt-day.selected .dt-cnt { color:var(--c-sel-text); }
+        .dt-day:hover { background:var(--c-chip); }
+        .dt-day.muted { color:var(--c-border); cursor:default; }
+        .dt-day.muted:hover { background:transparent; }
+        .dt-day.today { border:1px solid var(--c-primary); }
+        .dt-day.selected { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; }
+        .dt-time { display:flex; align-items:flex-end; gap:10px; margin:14px 0 4px; }
+        .dt-time-col { display:flex; flex-direction:column; gap:4px; flex:1; min-width:0; }
+        .dt-time-col label { font-size:12px; color:var(--c-text-soft); }
+        /* 1019-T：时 / 分滚轮：三格高（每格 48px），中间那格选中（主色细框 + 深色字），上下两格淡一点；滑停了吸到格上 */
+        .dt-wheel-box { position:relative; height:144px; border:1px solid var(--c-border); border-radius:10px; background:var(--c-surface); overflow:hidden; }
+        .dt-wheel-box::after { content:''; position:absolute; left:6px; right:6px; top:48px; height:48px; border-radius:8px;
+            border:1.5px solid var(--c-primary); background:rgba(var(--c-shadow-rgb),.08); pointer-events:none; }
+        .dt-wheel { height:100%; overflow-y:auto; scroll-snap-type:y mandatory; overscroll-behavior:contain; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+        .dt-wheel::-webkit-scrollbar { display:none; }
+        .dt-wheel .dw-pad { height:48px; }
+        .dt-wheel .dw-item { height:48px; line-height:48px; text-align:center; scroll-snap-align:center; font-size:18px;
+            color:var(--c-text-soft); opacity:.55; cursor:pointer; font-variant-numeric:tabular-nums; }
+        .dt-wheel .dw-item.sel { color:var(--c-primary-deep); opacity:1; font-weight:600; }
+        .dt-now { min-height:var(--ui-tap); min-width:var(--ui-tap); padding:0 14px; border:none; border-radius:8px; cursor:pointer;
+            background:var(--c-accent-soft); color:#5c4500; font-size:14px; white-space:nowrap; transition:0.2s; }
+        /* 1019-T：翻月 ‹ ›、标题按钮也撑到 48 */
+        .dt-head .dt-nav { min-width:var(--ui-tap); min-height:var(--ui-tap); }
+        .dt-head .dt-label { min-height:var(--ui-tap); }
+        .dt-now:hover { filter:brightness(1.06); }
+
+        /* 自定义确认/输入弹窗（1017-S 起是底部面板：.sheet 外观，文字左对齐，按钮竖排、贴底） */
+        #askMask .ask-dialog { transform:translateY(0); max-height:85vh; max-height:85dvh; padding-bottom:0; }
+        #askMask.open .ask-dialog { animation:askUp var(--sheet-ms) var(--sheet-ease); }
+        @keyframes askUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+        /* 1019-N：面板关掉时的影子：往下滑走 + 遮罩淡出（约 200 毫秒），点不动；减少动画时只很快地淡出 */
+        .sheet-ghost { position:fixed; top:0; left:0; width:100%; height:100vh; height:100dvh; display:flex; align-items:flex-end; justify-content:center;
+            background:rgba(0,0,0,0.3); pointer-events:none; overflow:hidden; }
+        .sheet-ghost.ghost-down { animation:ghostBgOut var(--sheet-ms) var(--sheet-ease) forwards; }
+        .sheet-ghost.ghost-down > * { animation:ghostDown var(--sheet-ms) var(--sheet-ease) forwards !important; }
+        .sheet-ghost.ghost-fade { animation:ghostFade .08s linear forwards; }
+        .sheet-ghost.ghost-fade > * { animation:none !important; }
+        @keyframes ghostDown { from { transform:translateY(var(--gy, 0px)); } to { transform:translateY(100%); } }
+        @keyframes ghostBgOut { from { background-color:rgba(0,0,0,0.3); } to { background-color:rgba(0,0,0,0); } }
+        @keyframes ghostFade { from { opacity:1; } to { opacity:0; } }
+        .ask-dialog .sheet-head { margin-bottom:6px; }
+        .ask-msg { color:var(--c-text); text-align:left; margin:2px 0 6px; line-height:1.65; font-size:15px; white-space:pre-line; }
+        .ask-btns { position:sticky; bottom:0; margin:12px -18px 0; padding:10px 18px calc(14px + env(safe-area-inset-bottom));
+            background:var(--c-sheet); border-top:1px solid var(--c-border); }
+        #askInput { width:100%; margin:12px 0 4px; padding:12px; border:1px solid var(--c-primary);
+            border-radius:8px; outline:none; background:var(--c-surface); font-size:15px; font-family:inherit; }
+        #askInput:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
+        .ask-err { color:#c0392b; font-size:13px; margin:4px 0 0; text-align:left; }
+
+        /* ===== 外观设置弹窗 ===== */
+        .theme-presets { display:flex; flex-wrap:wrap; gap:10px; }
+        .theme-swatch { width:42px; height:42px; border-radius:50%; cursor:pointer;
+            border:2px solid transparent; box-shadow:0 1px 4px rgba(0,0,0,0.15);
+            transition:transform .15s, border-color .15s; position:relative; }
+        .theme-swatch:hover { transform:scale(1.08); }
+        .theme-swatch.active { border-color:#5c4500; }
+        .theme-swatch.active::after { content:"✓"; position:absolute; inset:0;
+            display:flex; align-items:center; justify-content:center; color:var(--c-on-primary);
+            font-size:18px; text-shadow:0 1px 2px rgba(0,0,0,0.4); }
+        .theme-custom-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+        .theme-custom-row input[type=color] { width:48px; height:40px; padding:0;
+            border:1px solid var(--c-border); border-radius:8px; background:var(--c-surface);
+            cursor:pointer; }
+        .theme-tip { color:var(--c-text-soft); font-size:12px; margin-top:8px; }
+
+        /* ===== 日子（倒数日）=====
+           全部走既有主题变量，换肤时自动跟随，不引入任何写死的颜色。 */
+        /* 记账页的入口卡 */
+        .days-card { background:linear-gradient(135deg,var(--c-card-1) 0%,var(--c-card-2) 100%);
+            border:1px solid var(--c-primary-mid); border-radius:14px;
+            padding:10px 12px 6px; margin-bottom:12px;
+            box-shadow:0 2px 10px rgba(var(--c-shadow-rgb),.2); }
+        .days-card-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+        .days-card-title { font-size:14px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; }
+        .days-card-more { font-size:12px; color:var(--c-text-soft); cursor:pointer; padding:4px 6px; margin:-4px -6px; }
+        .days-card-more:active { color:var(--c-primary-dark); }
+        .days-row { display:flex; justify-content:space-between; align-items:center;
+            padding:8px 2px; border-top:1px dashed var(--c-border); cursor:pointer; }
+        .days-row:first-of-type { border-top:none; }
+        .days-row:active { background:var(--c-chip); border-radius:6px; }
+        .days-row .d-name { font-size:14px; color:var(--c-primary-deep); font-weight:500;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; }
+        .days-row .d-name .pin { font-size:11px; color:var(--c-primary); margin-right:3px; }
+        .days-row .d-right { display:flex; align-items:baseline; gap:5px; flex-shrink:0; }
+        .days-row .d-word { font-size:12px; color:var(--c-text-soft); }
+        .days-row .d-num { font-size:19px; font-weight:bold; color:var(--c-primary-dark);
+            font-variant-numeric:tabular-nums; }
+        .days-row .d-num.future { color:var(--c-pos); }
+        .days-row .d-unit { font-size:12px; color:var(--c-text-soft); }
+        /* 「就是今天」：不显示数字，整句话当作一个高亮标签 */
+        .days-row .d-today { font-size:14px; font-weight:bold; color:var(--c-pos); }
+        /* 空态：整卡变成一个添加入口 */
+        .days-empty-row { text-align:center; padding:10px 2px 12px; font-size:13px;
+            color:var(--c-text-soft); cursor:pointer; }
+
+        /* 管理页 */
+        .days-head { display:flex; align-items:center; gap:10px; margin-bottom:16px;
+            padding-bottom:15px; border-bottom:1px solid var(--c-border); }
+        .days-back { border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-text-soft); border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; }
+        .days-title { font-size:17px; font-weight:bold; color:var(--c-primary-dark);
+            letter-spacing:1px; flex:1; }
+        .days-add { border:none; border-radius:8px; padding:8px 16px; font-size:14px; cursor:pointer;
+            background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
+            color:var(--c-on-primary); box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),.35); }
+        /* 「管理」按钮：跟「＋添加」并排在右侧。头部原本三格已铺满，
+           所以它做成弱化的次级按钮（无填充、字号小），两个加起来才占一格的视觉重量。 */
+        .days-manage { border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-text-soft); border-radius:8px; padding:6px 10px; font-size:13px; cursor:pointer; }
+        .days-manage:active { background:var(--c-chip); }
+
+        /* ===== 选择模式（批量删除）=====
+           不新开弹窗，而是把同一个列表就地切成可勾选状态：
+           小屏上「弹窗里再套一个可滚动列表」会产生嵌套滚动，且要再压一层 z-index。 */
+        .days-sel-head { display:flex; align-items:center; justify-content:space-between;
+            gap:10px; margin-bottom:16px; padding:10px 12px; border-radius:10px;
+            background:var(--c-chip); border:1px solid var(--c-border-mid); }
+        .days-sel-head .ds-btn { border:none; background:none; color:var(--c-text);
+            font-size:14px; cursor:pointer; padding:4px 6px; }
+        .days-sel-head .ds-count { font-size:15px; font-weight:bold; color:var(--c-primary-dark); }
+        /* 勾选圈：未选是空心描边，选中填主色 */
+        .day-item .di-check { width:22px; height:22px; border-radius:50%; flex-shrink:0;
+            border:1px solid var(--c-border-mid); display:none;
+            align-items:center; justify-content:center;
+            font-size:13px; color:var(--c-on-primary); }
+        body.days-selecting .day-item .di-check { display:flex; }
+        body.days-selecting .day-item.sel { border-color:var(--c-primary);
+            background:var(--c-chip); }
+        body.days-selecting .day-item.sel .di-check {
+            background:var(--c-primary); border-color:var(--c-primary); }
+        /* 底部删除条：选择模式下常驻页面底部 */
+        .days-del-bar { display:none; position:sticky; bottom:0; padding:10px 0 4px;
+            background:linear-gradient(to top, var(--c-bg) 70%, transparent); }
+        body.days-selecting .days-del-bar { display:block; }
+        .days-del-btn { width:100%; padding:12px; border:none; border-radius:10px;
+            font-size:15px; cursor:pointer; background:var(--c-neg); color:#fff; }
+        .days-del-btn:disabled { background:var(--c-border); color:var(--c-text-soft); cursor:default; }
+
+        /* ===== 日子管理弹窗：入口卡条数 ===== */
+        .dm-label { font-size:13px; color:var(--c-primary-deep); font-weight:500; }
+        .dm-hint { font-size:11px; color:var(--c-text-soft); margin:4px 0 10px; line-height:1.5; }
+        /* 数字输入：居中、大字号，inputmode=numeric 让手机直接弹数字键盘 */
+        .dm-num { width:100%; text-align:center; font-size:22px; font-weight:bold;
+            color:var(--c-primary-deep); padding:10px; border:1px solid var(--c-border-mid);
+            border-radius:8px; background:var(--c-surface); outline:none;
+            font-variant-numeric:tabular-nums; }
+        .dm-num:focus { border-color:var(--c-primary); box-shadow:0 0 6px rgba(var(--c-shadow-rgb),.4); }
+        .dm-sep { border-top:1px solid var(--c-border); margin:16px 0 14px; }
+        .dm-batch { width:100%; padding:11px; border:1px solid var(--c-border-mid);
+            border-radius:8px; background:var(--c-surface); color:var(--c-text);
+            font-size:14px; cursor:pointer; }
+        .dm-batch:active { background:var(--c-chip); }
+        .dm-batch:disabled { color:var(--c-text-soft); opacity:.55; cursor:default; }
+        .day-item { background:var(--c-surface); border:1px solid var(--c-border);
+            border-radius:12px; padding:12px 14px; margin-bottom:10px; cursor:pointer;
+            display:flex; justify-content:space-between; align-items:center; gap:10px; }
+        .day-item:active { box-shadow:0 0 8px rgba(var(--c-shadow-rgb),.4); }
+        .day-item.pinned { border-color:var(--c-primary-mid);
+            background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); }
+        .day-item .di-l { min-width:0; }
+        .day-item .di-name { font-size:15px; font-weight:600; color:var(--c-primary-deep);
+            margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .day-item .di-name .pin { font-size:11px; color:var(--c-primary); margin-right:4px; }
+        .day-item .di-date { font-size:12px; color:var(--c-text-soft); }
+        .day-item .di-r { text-align:right; flex-shrink:0; }
+        .day-item .di-word { font-size:12px; color:var(--c-text-soft); }
+        .day-item .di-num { font-size:24px; font-weight:bold; color:var(--c-primary-dark);
+            font-variant-numeric:tabular-nums; line-height:1.1; }
+        .day-item .di-num.future { color:var(--c-pos); }
+        .day-item .di-unit { font-size:12px; color:var(--c-text-soft); }
+        .day-item .di-today { font-size:17px; font-weight:bold; color:var(--c-pos); }
+        .days-empty { text-align:center; padding:40px 20px; color:var(--c-text-soft);
+            font-size:14px; line-height:2; }
+
+        /* 编辑弹窗里的预览行与置顶开关 */
+        .day-preview { font-size:12.5px; color:var(--c-text-soft); background:var(--c-chip);
+            border-radius:8px; padding:9px 11px; line-height:1.6; }
+        .day-pin-row { display:flex; align-items:center; justify-content:space-between; }
+        .day-switch { width:46px; height:26px; border-radius:13px; background:var(--c-border);
+            position:relative; cursor:pointer; transition:.2s; flex-shrink:0; }
+        .day-switch.on { background:var(--c-primary); }
+        .day-switch::after { content:''; position:absolute; top:3px; left:3px; width:20px; height:20px;
+            border-radius:50%; background:#fff; transition:.2s; }
+        .day-switch.on::after { left:23px; }
+
+        /* 账单详情（只读）的值：外观近似输入框，但不可编辑，保持与修改弹窗视觉连贯 */
+        .detail-val {
+            padding:12px; border:1px solid var(--c-border); border-radius:8px;
+            background:var(--c-surface); color:var(--c-primary-deep); font-size:14px;
+            min-height:44px; display:flex; align-items:center; }
+        .detail-val.detail-remark {
+            align-items:flex-start; white-space:pre-wrap; word-break:break-word;
+            line-height:1.5; max-height:160px; overflow-y:auto; }
+
+        /* 「记账成功」弹窗里的可选补充入口（添加备注）：单独占一行、居中、轻量描边，
+           不挤占「再记一笔 / 关闭」那一行，也不与主操作抢视觉。 */
+        .ask-extra-btn {
+            display:block; width:auto; margin:14px auto 2px; padding:7px 18px;
+            background:var(--c-surface); color:var(--c-primary-deep);
+            border:1px solid var(--c-border-mid); border-radius:20px;
+            font-size:13.5px; cursor:pointer; transition:0.2s; }
+        .ask-extra-btn:hover { border-color:var(--c-accent);
+            box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.3); }
+
+        /* ===== 不计入收支 / 批量操作（1010-B）=====
+           「不计入」一律用中性灰：它既不是收入也不是支出，不该沾语义色的红/绿。 */
+        .io-skip { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
+            background:#efefef; border:1px solid #d6d6d6; color:#888; }
+        .amt-skip, .pos.amt-skip, .neg.amt-skip { color:#9a9a9a !important; }
+        .sf-io.skip { color:#888; background:#efefef; border-color:#d6d6d6; }
+        .skip-hint { font-size:11.5px; color:var(--c-text-soft); line-height:1.5; }
+        .summary-filter { flex-wrap:wrap; }
+        .summary-filter .filter-nums { min-width:0; flex:1 1 auto; }
+
+        /* ===== 只算结余 / 统计口径选择 / 确认弹窗清单（1010-C）=====
+           「只算结余」用灰蓝，和「不计入」的灰区分开；都不沾语义色的红/绿。 */
+        .io-flow { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
+            background:#e8eef5; border:1px solid #c9d5e3; color:#5a6f87; }
+        .sf-io.flow { color:#5a6f87; background:#e8eef5; border-color:#c9d5e3; }
+        .amt-flow, .pos.amt-flow, .neg.amt-flow { color:#7d8ea3 !important; }
+        .mode-chips { flex-wrap:nowrap; gap:8px; }
+        .mode-chips .cc { flex:1 1 0; text-align:center; padding:9px 0; font-size:14px; }
+        /* 确认弹窗里的记录清单：四列固定（时间 / 分类 / 备注 / 金额），
+           时间和金额用等宽数字，金额靠右；分类标签定宽，备注过长省略。多了在框内滑动。 */
+        .ask-list { margin:12px 0 2px; max-height:50vh; overflow-y:auto; text-align:left;
+            border:1px solid var(--c-border); border-radius:10px; background:var(--c-surface);
+            -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+        .ask-list .al-row { display:flex; align-items:center; gap:8px; padding:9px 10px;
+            border-bottom:1px dashed var(--c-border); font-size:13px; }
+        .ask-list .al-row:last-child { border-bottom:none; }
+        .al-time { flex:0 0 auto; color:var(--c-text-soft); font-size:12px; font-variant-numeric:tabular-nums; }
+        .al-cat { flex:0 0 auto; }
+        .al-cat .cat-tag { display:inline-block; width:4.6em; text-align:center; padding:2px 4px;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; vertical-align:middle; font-size:12px; }
+        .al-remark { flex:1 1 0; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--c-text); }
+        .al-amt { flex:0 0 auto; margin-left:auto; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
+
+        /* ===== 1010-D：分类汇总卡片 / 列表式选项 / 可点清单 / 不计日 ===== */
+        /* 分类汇总：与「日子」入口卡同一套卡片语言；一行一类，名称左、金额右，多了框内滑动 */
+        .cat-card { background:var(--c-card-1); border:1px solid var(--c-border); border-radius:12px;
+            padding:10px 12px 6px; margin-bottom:12px; }
+        .cat-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
+        .cat-card-title { font-size:14px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; }
+        #catSortSeg button { padding:4px 10px; font-size:12px; }
+        .cat-card .cat-stats { text-align:left; margin:0; max-height:212px; overflow-y:auto;
+            -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+        .cs-row { display:flex; justify-content:space-between; align-items:center; gap:10px;
+            padding:8px 2px; border-bottom:1px dashed var(--c-border); font-size:14px; }
+        .cs-row:last-child { border-bottom:none; }
+        .cs-name { color:var(--c-text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .cs-amt { flex-shrink:0; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .cs-empty { color:var(--c-text-soft); font-size:13px; padding:8px 2px; }
+        /* 1019-H：分类汇总框里还能往下滑的提示：比右下角圆钮小一号，叠在框的右下角；点击区域照样撑到 48（.ui-hit） */
+        .cat-card { position:relative; }
+        .cs-hint { position:absolute; right:12px; bottom:10px; z-index:2; width:36px; height:36px; border-radius:50%; padding:0;
+            border:1px solid var(--c-border-mid); background:var(--c-surface); color:var(--c-primary-dark); font-size:18px; line-height:1;
+            box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),0.3); cursor:pointer; opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
+        .cs-hint.show { opacity:1; pointer-events:auto; }
+        .cs-hint:active { transform:scale(0.92); }
+
+        /* 列表式选项：一行一个、左对齐，多了框内滑动（批量菜单、选分类） */
+        #askChoices.choose-list { flex-direction:column; flex-wrap:nowrap; gap:0; max-height:52vh;
+            border:1px solid var(--c-border); border-radius:10px; background:var(--c-surface);
+            -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+        #askChoices.choose-list .cc { border:none; border-bottom:1px dashed var(--c-border); border-radius:0;
+            padding:13px 14px; text-align:left; background:transparent; white-space:normal; flex:0 0 auto; }
+        #askChoices.choose-list .cc:last-child { border-bottom:none; }
+        #askChoices.choose-list .cc.sel { background:var(--c-sel-bg); color:var(--c-sel-text); font-weight:600; -webkit-text-stroke:0; }
+
+        /* 确认清单的行可点开看详情 */
+        .ask-list .al-row { cursor:pointer; transition:background .15s; }
+        .ask-list .al-row:active { background:var(--c-chip); }
+        .al-go { flex:0 0 auto; color:var(--c-text-soft); font-size:15px; line-height:1; margin-left:-2px; }
+
+        /* 统计日历：当天只有「不计入 / 只算结余」的记录——有账，但不进收支 */
+        .stat-cal .day.has.excl { background:#eef0f3; border:1px dashed #c6cdd5; }
+        .stat-cal .day.excl.sel { background:var(--c-sel-bg); border:1px solid transparent; }
+
+        /* ===== 1010-E：账户总览 / 日历重构 / 批量入口 ===== */
+        /* 账户总览：标题行 + 结余大字 + 收入支出两栏。数字各占一格、尽量撑满，
+           放不下时由 fitNums() 逐级缩字号（下限 12px），而不是挤成一行小字或折行。 */
+        .summary-overall { text-align:left; padding:12px 14px; }
+        .ov-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+        .ov-title { font-size:14px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; }
+        .ov-count { font-size:12.5px; color:var(--c-text-soft); }
+        .summary-overall .ov-count b { font-size:13px; color:var(--c-text); }
+        .ov-label { font-size:12px; color:var(--c-text-soft); margin-bottom:2px; }
+        .ov-num { display:block; font-weight:bold; font-variant-numeric:tabular-nums; white-space:nowrap;
+            overflow:hidden; line-height:1.25; }
+        .ov-bal { padding:2px 0 10px; margin-bottom:10px; border-bottom:1px dashed var(--c-border); }
+        .ov-net { font-size:30px; color:var(--c-primary-deep); letter-spacing:.3px; }
+        .ov-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .ov-cell { min-width:0; }
+        .ov-cell + .ov-cell { padding-left:12px; border-left:1px dashed var(--c-border); }
+        .ov-cell .ov-num { font-size:20px; }
+
+        /* 筛选小计：按「段」折行，一段内不拆开 */
+        .summary-filter .filter-nums { display:flex; flex-wrap:wrap; column-gap:12px; row-gap:2px; }
+        .fn-seg { white-space:nowrap; }
+        .fn-ex { font-style:normal; font-size:12px; color:var(--c-text-soft); }
+
+        /* 批量入口：日子与账单之间的整行按钮，不再挤在小计条里 */
+        .batch-bar { margin:0 0 12px; }
+        .batch-btn { width:100%; display:flex; justify-content:space-between; align-items:center; gap:10px;
+            padding:11px 14px; border:1px solid var(--c-border-mid); border-radius:12px;
+            background:var(--c-surface); color:var(--c-primary-dark); font-size:14.5px; font-weight:bold;
+            cursor:pointer; box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),.15); }
+        .batch-btn .bb-sub { font-size:12.5px; font-weight:normal; color:var(--c-text-soft); white-space:nowrap; }
+
+        /* 统计日历：格子加高，三层——日期 / 计入净额 / 口径标签（结余、不计） */
+        .stat-cal { gap:4px; }
+        .stat-cal .day { aspect-ratio:auto; min-height:62px; padding:5px 1px 4px; justify-content:flex-start; gap:2px; }
+        .stat-cal .day .dn { font-size:13.5px; line-height:1.2; }
+        .stat-cal .day .da { font-size:10.5px; line-height:1.2; }
+        .day-tags { display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:1px; }
+        .dtag { font-size:9px; line-height:1; padding:2px 4px; border-radius:4px; white-space:nowrap; }
+        .dtag.flow { background:#e1e9f3; color:#4b6380; }
+        .dtag.skip { background:#e9e9e9; color:#767676; }
+        .stat-cal .day.sel .dtag.flow { background:#d2deec; }
+        .stat-cal .day.sel .dtag.skip { background:#dcdcdc; }
+        .dtag.refund { background:#dcefea; color:#2f7a6a; }
+        .stat-cal .day.sel .dtag.refund { background:#cde6df; }
+
+        /* ===== 1010-F：选项说明 / 筛选口径 ===== */
+        /* 列表式选项下方的灰色说明（与记一笔里的口径说明同一口吻） */
+        #askChoices .cc .cc-label { display:block; }
+        #askChoices .cc .cc-desc { display:block; margin-top:3px; font-size:12px; line-height:1.45;
+            font-weight:normal; color:var(--c-text-soft); }
+        #askChoices.choose-list .cc.sel .cc-desc { color:var(--c-sel-text); opacity:.8; }
+        .filter-mode-chips .cc { font-size:13.5px; }
+
+        /* ===== 1010-G：收支标签靠右 / 分类预算 ===== */
+        /* 手机卡片里「收支」一行：多一个口径标签时，两枚标签一起靠右，不再被两端对齐挤到中间 */
+        @media (max-width: 600px) {
+            tbody td[data-label="收支"] { gap:6px; }
+            tbody td[data-label="收支"]::before { margin-right:auto; }
+        }
+
+        /* 统计页：本月预算 */
+        .bg-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:4px; }
+        .bg-legend { font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; }
+        .bg-row { padding:9px 0; border-bottom:1px dashed var(--c-border); }
+        .bg-row:last-child { border-bottom:none; padding-bottom:2px; }
+        .bg-top { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom:6px; }
+        .bg-name { font-size:14px; font-weight:600; color:var(--c-text); min-width:0;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .bg-num { font-size:12.5px; color:var(--c-text-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .bg-num b { font-size:15px; color:var(--c-text); }
+        .bg-bar { position:relative; height:8px; border-radius:4px; background:var(--c-chip); }
+        .bg-fill { height:100%; border-radius:4px; background:var(--c-primary); transition:width .3s; }
+        .bg-fill.warn { background:#c9973a; }
+        .bg-fill.over { background:var(--c-neg); }
+        /* 竖线：本月时间进度。花销条超过竖线 = 花得比时间快 */
+        .bg-mark { position:absolute; top:-3px; bottom:-3px; width:2px; margin-left:-1px;
+            border-radius:1px; background:var(--c-text); opacity:.45; }
+        .bg-foot { display:flex; justify-content:space-between; gap:10px; margin-top:5px;
+            font-size:12px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .bg-foot .over { color:var(--c-neg); font-weight:600; }
+        .bg-foot .fast { color:#b07a1c; }
+
+        /* 分类管理：每行显示当前预算 */
+        .cat-item .cat-budget { flex:0 0 auto; font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; }
+
+        /* ===== 1010-G：统计页「收支 | 预算」页签 ===== */
+        .stat-tabs { margin:-10px 0 14px; }
+        .stat-tabs button { flex:1 1 0; padding:9px 0; font-size:14.5px; }
+        /* 收支页签里的一行预算入口 */
+        .bg-entry { display:flex; align-items:center; gap:10px; cursor:pointer; }
+        .bg-entry-title { font-size:15px; font-weight:bold; color:var(--c-text); flex-shrink:0; }
+        .bg-entry-sum { flex:1 1 auto; min-width:0; text-align:right; font-size:13px; color:var(--c-text-soft);
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .bg-entry-sum b { font-size:14px; }
+        .bg-entry-sum .over { color:var(--c-neg); }
+        .bg-entry-sum .warn { color:#b07a1c; }
+        .bg-go { flex-shrink:0; color:var(--c-text-soft); font-size:18px; line-height:1; }
+        /* 预算页签：总览 */
+        .bgo-main { display:flex; justify-content:space-between; align-items:flex-end; gap:10px; margin:6px 0 8px; }
+        .bgo-num { font-size:13px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .bgo-num b { font-size:24px; color:var(--c-primary-deep); }
+        .bgo-pct { font-size:22px; font-weight:bold; font-variant-numeric:tabular-nums; color:var(--c-text); }
+        .bgo-pct.over { color:var(--c-neg); }
+        .bgo-pct.warn { color:#b07a1c; }
+        .bgo-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+        .bgc { font-size:12px; padding:3px 9px; border-radius:10px; border:1px solid var(--c-border); color:var(--c-text-soft); background:var(--c-surface); }
+        .bgc.over { color:var(--c-neg); border-color:#f0c2b4; background:#fbe6e0; }
+        .bgc.warn { color:#9a6a12; border-color:#ecd5a6; background:#fbf1dc; }
+        .bgc.ok { color:var(--c-pos); border-color:#b9e0b0; background:#e3f3e0; }
+        .bgo-legend { margin-top:8px; font-size:11.5px; color:var(--c-text-soft); }
+        /* 预算页签：分组 */
+        .bg-gtitle { display:flex; align-items:center; gap:8px; }
+        .bg-gtitle .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+        .bg-gtitle.over .dot { background:var(--c-neg); }
+        .bg-gtitle.warn .dot { background:#c9973a; }
+        .bg-gtitle.ok .dot { background:var(--c-pos); }
+        .bg-row.bg-click { cursor:pointer; }
+        .bg-row.bg-click:active { background:var(--c-chip); }
+        .bg-chev { display:inline-block; margin-left:4px; font-style:normal; color:var(--c-text-soft);
+            font-size:15px; transition:transform .2s; }
+        .bg-row.open .bg-chev { transform:rotate(90deg); }
+        .bg-detail { margin:2px 0 8px; padding:4px 10px 8px; border:1px solid var(--c-border);
+            border-radius:10px; background:var(--c-surface); }
+        .bg-detail .stat-flow .sf-item { padding:8px 6px; }
+        .bg-detail-empty { padding:10px 2px; font-size:13px; color:var(--c-text-soft); }
+        .bg-detail-head { display:flex; justify-content:space-between; align-items:center; gap:10px;
+            padding:6px 0 8px; margin-bottom:2px; border-bottom:1px solid var(--c-border); font-size:12px; color:var(--c-text-soft); }
+        /* 【1013-E】展开明细顶部的「改预算」：小一号，和「设预算」一个样子 */
+        .bg-detail-head .bg-edit { flex-shrink:0; padding:5px 12px; font-size:12.5px; border:1px solid var(--c-border-mid);
+            background:var(--c-surface); color:var(--c-primary-dark); border-radius:8px; }
+        .bgu-row.bg-click { cursor:pointer; }
+        .bgu-row.bg-click:active { background:var(--c-chip); }
+        .bgu-row + .bg-detail { margin-top:6px; }
+        /* 预算页签：未设预算的分类 */
+        .bgu-head { width:100%; display:flex; justify-content:space-between; align-items:center; border:none;
+            background:none; padding:0; cursor:pointer; font-family:inherit; }
+        .bgu-head .stat-day-title { margin-bottom:0; }
+        .bgu-arrow { color:var(--c-text-soft); font-size:13px; transition:transform .2s; }
+        .bgu-open .bgu-arrow { transform:rotate(180deg); }
+        .bgu-list { margin-top:8px; }
+        .bgu-row { display:flex; align-items:center; gap:10px; padding:8px 2px; border-bottom:1px dashed var(--c-border); font-size:14px; }
+        .bgu-row:last-child { border-bottom:none; }
+        .bgu-name { flex:1 1 auto; min-width:0; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .bgu-amt { flex-shrink:0; font-weight:bold; color:var(--c-neg); font-variant-numeric:tabular-nums; }
+        .bgu-set { flex-shrink:0; border:1px solid var(--c-border-mid); background:var(--c-surface);
+            color:var(--c-primary-dark); border-radius:8px; padding:5px 10px; font-size:12.5px; cursor:pointer; }
+        .bg-empty { text-align:center; padding:10px 4px 4px; color:var(--c-text-soft); font-size:13.5px; line-height:1.8; }
+        .bg-empty button { margin-top:8px; }
+
+        /* ===== 1010-H：分类占比的「较上月」 ===== */
+        .sc-bot { display:flex; align-items:baseline; gap:8px; }
+        .sc-bot .sc-amt { margin-left:auto; }
+        .sc-delta { font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .sc-delta.bad { color:var(--c-neg); }
+        .sc-delta.good { color:var(--c-pos); }
+
+        /* ===== 1010-J：退款 ===== */
+        .io-refund { background:#e3f1ee; border:1px solid #b5dcd3; color:#2f7a6a; }
+        .sf-io.refund { color:#2f7a6a; background:rgba(47,122,106,0.10); }
+        .io-refunded { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
+            color:#2f7a6a; background:#eef7f4; border:1px dashed #b5dcd3; white-space:nowrap; }
+        .refund-note { font-size:13px; line-height:1.65; color:var(--c-text); background:var(--c-chip);
+            border:1px solid var(--c-border); border-radius:10px; padding:9px 12px; margin-bottom:6px; }
+        .refund-note .detail-refund { margin-top:6px; font-size:13px; }
+        #editMask.is-refund .lock-on-refund { display:none; }
+        .refund-btn { color:#2f7a6a; }
+        .refund-btn:disabled { opacity:0.5; cursor:default; }
+        .refund-sum { background:var(--c-chip); border:1px solid var(--c-border); border-radius:10px;
+            padding:10px 12px; margin:4px 0 6px; font-size:13.5px; }
+        .refund-sum .rs-when { color:var(--c-text-soft); font-size:12px; margin-left:4px; }
+        .refund-sum .rs-nums { display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:12.5px;
+            color:var(--c-text-soft); flex-wrap:wrap; }
+        .refund-sum .rs-nums b { color:var(--c-text); font-variant-numeric:tabular-nums; }
+        .refund-sum .rs-nums b.pos { color:#3a7a2e; }
+        #refundMoney.ro { background:var(--c-chip); color:var(--c-text-soft); }
+
+        .detail-refund { display:block; }
+        .detail-refund .dr-line { display:flex; align-items:baseline; gap:10px; padding:2px 0; width:100%; }
+        .detail-refund .dr-line + .dr-line { border-top:1px dashed var(--c-border); padding-top:6px; margin-top:4px; }
+        .detail-refund .dr-when { flex-shrink:0; color:var(--c-text-soft); font-size:13px; font-variant-numeric:tabular-nums; }
+        .detail-refund .dr-what { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .detail-refund .dr-amt { flex-shrink:0; margin-left:auto; font-variant-numeric:tabular-nums; }
+
+        /* ===== 1010-I：常用模板 ===== */
+        .tpl-chips .cc { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .tpl-chips .cc .tpl-amt { margin-left:5px; font-size:12px; line-height:1; color:var(--c-text-soft); }
+        .tpl-chips .cc.sel .tpl-amt { color:inherit; }
+        .tpl-save-btn { display:block; width:100%; margin-top:10px; padding:11px; border-radius:8px;
+            border:1px solid var(--c-border-mid); background:var(--c-surface); color:var(--c-primary-dark);
+            font-size:15px; cursor:pointer; font-family:inherit; }
+        .tpl-save-btn:active { background:var(--c-chip); }
+        #editMask .tpl-save-btn { margin-top:12px; }
+        .tpl-item .tpl-sub { display:block; font-size:11.5px; color:var(--c-text-soft); margin-top:2px;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .tpl-item .cat-left { flex-direction:column; align-items:flex-start; gap:0; flex:1; }
+        .tpl-item .cat-name { max-width:100%; }
+        .tpl-item button:disabled { opacity:0.35; }
+        .tpl-empty { padding:18px 6px; text-align:left; color:var(--c-text-soft); font-size:13px; line-height:1.7; }
+
+        /* ===== 1010-I：预算总览的「预算外 / 今年至今」 ===== */
+        .bgo-rows { margin-top:12px; border-top:1px dashed var(--c-border); }
+        .bgo-row { display:grid; grid-template-columns:auto 1fr; column-gap:10px; padding:9px 0 2px; }
+        .bgo-row + .bgo-row { border-top:1px dashed var(--c-border); }
+        .bgo-row.bgo-click { cursor:pointer; }
+        .bgo-k { font-size:13.5px; color:var(--c-text); }
+        .bgo-v { text-align:right; font-size:13.5px; font-variant-numeric:tabular-nums; }
+        .bgo-v.neg { color:var(--c-neg); }
+        .bgo-v .over { color:var(--c-neg); }
+        .bgo-v .warn { color:#b07a1c; }
+        .bgo-sub { grid-column:1 / -1; font-size:11.5px; color:var(--c-text-soft); padding-top:3px; }
+        .bgo-row.bgo-click:not(.bgy-head) .bgo-sub::after { content:' ›'; }
+        .bgo-sub .over { color:var(--c-neg); }
+        /* 1010-I3：年度预算展开的月度进度 */
+        .bgy-head.open .bg-chev { transform:rotate(90deg); }
+        .bgy-v-head { white-space:nowrap; }
+        .bgy-list { padding:4px 0 6px; }
+        .bgy-row { display:grid; grid-template-columns:36px 1fr auto; align-items:center; column-gap:10px;
+            padding:7px 4px; border-radius:8px; cursor:pointer; }
+        .bgy-row:active { background:var(--c-chip); }
+        .bgy-row.cur { background:var(--c-chip); }
+        .bgy-m { font-size:13px; color:var(--c-text); }
+        .bgy-row.cur .bgy-m { font-weight:bold; }
+        .bgy-v { font-size:12px; color:var(--c-text-soft); text-align:right; min-width:84px; font-variant-numeric:tabular-nums; }
+        .bgy-v.over { color:var(--c-neg); }
+        .bgy-row.empty .bg-bar { background:repeating-linear-gradient(45deg, var(--c-chip) 0 4px, transparent 4px 8px); }
+        .bgy-row.empty .bgy-v { color:var(--c-text-soft); font-style:italic; }
+        .bgy-note { font-size:11.5px; color:var(--c-text-soft); padding:4px 4px 0; }
+
+        /* ===== 1016-UI3：老页面只把「太小、点不准」的点击区域撑到 48px（布局风格不变）=====
+           能长高一点不碍事的直接加 min-height；长高会挤乱一行的（小字链接、分段按钮、日历翻页箭头）
+           用 ::after 叠一块看不见的点击区域（和 .ui-hit 同一个做法），外观一点不变。 */
+        .login-btn, .login-import-btn, .user-chip, .recent-users .hidden-toggle { min-height:var(--ui-tap); }
+        .save, .cancel, .add-btn, .edit-del-btn, .mini-btn, .ask-extra-btn, .pager button,
+        .days-back, .days-add, .days-manage, .bg-detail-head .bg-edit, .bgu-set, .bgu-head, .tpl-save-btn { min-height:var(--ui-tap); }
+        .days-card-head { margin-bottom:16px; }
+        @media (max-width: 600px) { tbody td.ops-cell { padding-top:12px; } }
+        #askInput, .search-input, .form-box input, .form-box select, .edit-dialog input, .edit-dialog select, .remark-area { min-height:var(--ui-tap); }
+        .edit-dialog .dt-input, .form-box .dt-input { padding-top:14px; padding-bottom:13px; }
+        .cs-display { padding-top:14px; padding-bottom:14px; }
+        .cs-opt { padding-top:14px; padding-bottom:14px; }
+        .cat-chips .cc { padding-top:13px; padding-bottom:13px; }
+        .mode-chips .cc { padding:13px 0; }
+        .filter-chips .cc { padding-top:13px; padding-bottom:13px; }
+        .to-top, .clear-filter-fab { width:var(--ui-tap); height:var(--ui-tap); }
+        .theme-swatch { width:var(--ui-tap); height:var(--ui-tap); }
+        .days-row { min-height:var(--ui-tap); }
+        .days-empty-row { min-height:var(--ui-tap); display:flex; align-items:center; justify-content:center; padding-top:4px; padding-bottom:4px; }
+        @media (max-width: 600px) { tbody td.ops-cell .operate-btn { min-height:var(--ui-tap); } }
+        /* 分段按钮（从大到小 / 默认进入页面 / 收支·预算…）：不改外观，上下各叠一块点击区域；宽度至少 48 */
+        .seg { overflow:visible; }
+        .seg button { position:relative; min-width:var(--ui-tap); }
+        .seg button:first-child { border-radius:8px 0 0 8px; }
+        .seg button:last-child { border-radius:0 8px 8px 0; }
+        .seg button::after { content:''; position:absolute; left:0; right:0; top:50%; height:max(100%, var(--ui-tap)); transform:translateY(-50%); }
+        /* 小字链接、翻页箭头、月份标题、备注：外观不变，点击区域撑到 48×48 */
+        .dt-nav, #statMonthLabel, #bgMonthLabel, .days-card-more, .remark-view, .link-btn, .user-chip .u-del { position:relative; }
+        .dt-nav::after, #statMonthLabel::after, #bgMonthLabel::after, .days-card-more::after, .remark-view::after, .link-btn::after, .user-chip .u-del::after {
+            content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:max(100%, var(--ui-tap)); height:max(100%, var(--ui-tap)); }
+        .days-card-more::after { top:auto; bottom:0; transform:translateX(-50%); }   /* 往上撑，不碰下面那一行 */
+        /* 开发开关里的几处（空账本入口、月初提醒、统计页待处理横幅）：按钮做成正经按钮 */
+        .imp-empty-entry { min-height:var(--ui-tap); }
+        .stat-pend-banner { flex-wrap:wrap; padding:8px 10px; }
+        .stat-pend-banner span { flex:1 1 100%; line-height:1.6; }
+        .stat-pend-banner button { flex:1 1 0; min-height:var(--ui-tap); padding:0 14px; border:1px solid var(--c-border-mid);
+            border-radius:10px; background:var(--c-bg); color:var(--c-primary-deep); text-decoration:none; font-size:14px; }
+        /* 预算建议：每行至少 48 高、行间隔 8；「写入勾上的」贴在屏幕下方（底栏上面），不用滑到底 */
+        #bgSuggestList { display:flex; flex-direction:column; gap:var(--ui-gap); margin-top:8px; }
+        .bg-suggest-row { min-height:var(--ui-tap); padding:6px 10px !important; border:1px solid var(--c-border); border-radius:10px; background:var(--c-bg); cursor:pointer; }
+        .bg-suggest-row input { width:20px; height:20px; flex:0 0 20px; accent-color:var(--c-primary); -webkit-appearance:checkbox; appearance:auto; }
+        .bg-suggest-foot { position:sticky; bottom:calc(64px + env(safe-area-inset-bottom)); z-index:5; display:flex; gap:var(--ui-gap);
+            margin:10px -14px -14px; padding:10px 14px; background:var(--c-surface); border-top:1px solid var(--c-border); border-radius:0 0 14px 14px; }
+        .bg-suggest-foot > * { flex:1 1 0; }
+        /* 1019-I：存储用量：设置页最底下、版本号上面一行灰色小字；快满了才在「导入记录」下面放提醒卡 */
+        .storage-use { text-align:center; font-size:12px; color:var(--c-text-soft); margin:14px 0 -6px; }
+        .storage-warn { flex-direction:column; align-items:stretch; gap:4px; color:var(--c-neg); }
+        .storage-warn span { font-size:13px; color:var(--c-text); }
+        .bg-suggest-same { font-size:13px; color:var(--c-text-soft); padding:6px 0 2px; line-height:1.6; }
+        .perf-list { margin:0; white-space:pre-wrap; word-break:break-all; font-size:12px; line-height:1.6; color:var(--c-text);
+            font-family:ui-monospace, Menlo, Consolas, monospace; background:var(--c-surface); border:1px solid var(--c-border); border-radius:8px; padding:8px 10px; }
+        .bg-sel-all { min-height:var(--ui-tap); margin:8px 0 2px; padding:0 18px; }   /* 1019-G：预算建议的全选 / 全不选 */

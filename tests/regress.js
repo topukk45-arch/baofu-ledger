@@ -4,6 +4,7 @@
 // 与上一次提交对比：git show HEAD~1:www/index.html > /tmp/old.html && node tests/regress.js /tmp/old.html www/index.html
 // 纯重构（不该改变行为）时应「全部一致」；有意的改动只允许预期的那几项不一致。
 const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
+require('./tools/inline').installReadHook();   // modules 分支：拆开的 index.html 拼回单文件再比
 // 1013-D 起账本在 IndexedDB、启动是异步的：装上 IndexedDB，等页面准备好再取（老版本没有 ledgerIdle，直接取）
 const records=require('./fixtures/sample-records');
 const store={archives:{'默认存档':{cats:['未分类','餐饮','购物','出行','其他','红包','工资'],records}},last:'默认存档'};
