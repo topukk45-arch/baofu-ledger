@@ -96,7 +96,7 @@ function bootSync(arc, extraArchives){
   ok((t.$('billTime').dataset.value || t.$('billTime').textContent)===time0, '时间不动');
   t.clickChip('billTplChips','信用卡还款');
   ok(t.$('billMoney').value==='' && t.$('billMode').dataset.mode==='normal', '不带金额 → 金额清空；口径以模板为准（不被转账自动改成不计入）');
-  ok(t.d.activeElement===t.$('billMoney'), '不带金额：聚焦金额弹键盘');
+  ok(t.d.activeElement===t.$('billMoney') || (t.$('kpMask').style.display==='flex' && t.$('billMoney').classList.contains('kp-on')), '不带金额：聚焦金额弹键盘（1019-P 起弹的是 App 的数字键盘）');
   t.clickChip('billTplChips','借出还回500');
   ok(t.$('billTypeChips').querySelector('.sel-in') && t.$('billMode').dataset.mode==='flow', '收入 + 只算结余');
   ok(t.$('billTplChips').querySelectorAll('.cc.sel').length===1, '只高亮当前模板');
@@ -242,7 +242,7 @@ function bootSync(arc, extraArchives){
   ok(dlg.scrollTop===316, '键盘收起后再滚一次也不会多滚');
   dlg.scrollTop=0;
   t.clickChip('billTplChips','午饭');
-  ok(dlg.scrollTop===0 && t.d.activeElement===t.$('billMoney'), '不带金额的模板：不滚，光标在金额框');
+  ok(dlg.scrollTop===0 && (t.d.activeElement===t.$('billMoney') || t.$('billMoney').classList.contains('kp-on')), '不带金额的模板：不滚，光标在金额框（1019-P 起是数字键盘对着金额框）');
   await new Promise(r=>setTimeout(r,400));
   ok(dlg.scrollTop===0, '不带金额的过一会儿也不滚');
   ok(t.errs.length===0, '1013-E 无脚本错误 '+t.errs.join(';'));

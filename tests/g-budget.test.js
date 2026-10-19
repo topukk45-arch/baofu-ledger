@@ -42,7 +42,8 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
   const row=t.catRow('游戏');
   ok(t.btn(row,'预算') && t.btn(row,'改名') && t.btn(row,'删除'), '每行点开有「设预算 / 改名 / 删除这个分类」');
   t.btn(row,'预算').click();
-  ok(t.$('askTitle').textContent==='分类预算' && t.$('askInput').getAttribute('inputmode')==='decimal', '弹出预算输入，数字键盘');
+  // 1019-P 起数字键盘是 App 自己的（输入框标 data-kp，打开以后弹出来），不再是系统的 inputmode=decimal
+  ok(t.$('askTitle').textContent==='分类预算' && t.$('askInput').dataset.kp==='1', '弹出预算输入，数字键盘');
   t.$('askInput').value='-5'; t.$('askOk').click();
   ok(t.$('askErr').style.display==='block' && !t.arc().budgets, '负数被拦下');
   t.$('askInput').value='200'; t.$('askOk').click();

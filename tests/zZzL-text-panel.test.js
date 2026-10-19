@@ -20,7 +20,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
 
   // 1. 备注不直接弹系统键盘：点了弹小面板
-  $('fabAdd').click(); await t.idle();
+  $('fabAdd').click(); await t.idle(); await wait(300); w.kpClose();   // 1019-P 起记一笔打开会自动弹数字键盘，先收起来
   const r = $('billRemark');
   ok(r.readOnly && r.getAttribute('inputmode') === 'none', '1 备注框不直接弹键盘（readonly、inputmode=none）');
   r.value = '原来的';
