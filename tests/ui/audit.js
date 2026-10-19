@@ -456,6 +456,34 @@ async function run(cfg, port, browser) {
     results.push({ name: 'devoff-leaks', cfg: cfg.name, leaks, importRequests: req, errs: page.errs });
     await page.close();
   }
+  // ===== 6. 键盘弹起（1019-B）：记一笔、修改、日子三个弹窗，下沿贴着键盘、没有缝，标题看得见 =====
+  //   安卓上键盘弹起是 WebView 整个变矮（adjustResize），这里把视口高度减掉 320 来模拟。
+  {
+    const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(40), cats: BASE_CATS.slice(0, 10) }) });
+    await tab(page, 'ledger');
+    const KB = 320;
+    const kbCheck = async (name, maskId, focusSel) => {
+      await page.focus(focusSel).catch(() => {});
+      await page.setViewportSize({ width: cfg.w, height: cfg.h - KB }); await page.waitForTimeout(450);
+      const r = await page.evaluate(id => { const m = document.getElementById(id), sh = m.querySelector('.sheet'), b = sh.getBoundingClientRect(), g = m.querySelector('.sheet-grip').getBoundingClientRect();
+        return { kbOpen: document.body.classList.contains('kb-open'), gap: Math.round((window.visualViewport ? visualViewport.height : innerHeight) - b.bottom), top: Math.round(b.top), gripTop: Math.round(g.top), H: innerHeight }; }, maskId);
+      results.push(Object.assign({ name: 'kb-' + name, cfg: cfg.name, kb: true }, r));
+      if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-kb-${name}.png`) });
+      await page.setViewportSize({ width: cfg.w, height: cfg.h }); await page.waitForTimeout(450);
+      await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; }));
+    };
+    await click(page, '.act-add'); await page.waitForTimeout(400);
+    await kbCheck('add-record', 'addMask', '#billRemark');
+    await page.evaluate(() => { const r = document.querySelector('#billList [data-act="edit"]'); if (r) window.openEdit(r.dataset.id); });
+    await page.waitForTimeout(400);
+    const editOpen = await page.evaluate(() => { if (document.getElementById('editMask').style.display !== 'flex') { const b = document.getElementById('detailEdit'); if (b && document.getElementById('detailMask').style.display === 'flex') b.click(); } return document.getElementById('editMask').style.display === 'flex'; });
+    if (editOpen) await kbCheck('edit-record', 'editMask', '#editRemark');
+    await page.evaluate(() => { const b = document.getElementById('daysAdd') || document.querySelector('.days-add'); if (b) b.click(); });
+    await page.waitForTimeout(300);
+    const dayOpen = await page.evaluate(() => document.getElementById('dayMask').style.display === 'flex');
+    if (dayOpen) await kbCheck('day', 'dayMask', '#dayName');
+    await page.close();
+  }
   return results;
 }
 
@@ -478,6 +506,7 @@ async function run(cfg, port, browser) {
     md.push(`## ${c}`, '', '| 页面 | 可点的 | 小于 48 | 间距小于 8 | 主按钮（离底 px） | 主按钮在上半屏 | 内容到 / 屏高 | 下面空着 |', '|---|---|---|---|---|---|---|---|');
     all[c].forEach(m => {
       if (m.name === 'devoff-leaks') return;
+      if (m.kb) { md.push(`| ${m.name} | 键盘弹起：${m.kbOpen ? '认出来了' : '没认出来'} | 下沿离键盘 ${m.gap}px | 标题离顶 ${m.gripTop}px | — | ${m.gap > 1 || m.gripTop < 0 ? '有问题' : ''} | ${m.H} | |`); return; }
       const pr = m.prim.slice(0, 3).map(p => `${p.name.split(' ')[0]} ${p.offscreen ? '要往下滑' : p.fromBottom}`).join('；') || '—';
       md.push(`| ${m.name} | ${m.n} | ${m.small.length} | ${m.tight.length} | ${pr} | ${m.prim.some(p => p.upper) ? '是' : ''} | ${m.contentBottom} / ${m.H} | ${m.blank} |`);
     });

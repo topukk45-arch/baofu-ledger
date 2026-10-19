@@ -767,26 +767,22 @@
         .ui-pick-list { display:flex; flex-direction:column; gap:var(--ui-gap); }
         .ui-pick-opt { text-align:left; }
         .ui-pick-opt.sel { background:var(--c-sel-bg); border-color:var(--c-sel-border); color:var(--c-sel-text); font-weight:bold; }
-        /* 键盘弹起时：居中弹窗（记一笔/修改/时间选择器）改为顶部对齐并限高到可视区，
-           这样标题/时间/金额固定可见，下面的收支、备注可以滑上来，不再被键盘顶出屏幕。
-           mask 的实际高度由 JS(syncMaskHeight) 同步成 visualViewport 高度。
-           注意：底部筛选浮层(.sheet-mask)不参与——它本就贴底，键盘弹起只需让它停在
-           键盘上方、内部滚动即可，绝不能改成顶部对齐（否则会被顶到状态栏后面）。
-           注意：askMask（金额补全/确认/备注等矮弹窗）也不参与顶部对齐——它内容不高，
-           居中时键盘也顶不没它，强行顶部对齐反而会贴死状态栏，难看。 */
-        /* 1017-W：其余弹窗（记一笔、修改、详情、退款、模板、分类、外观、日子、AI 导出、日期 / 年月选择器……）不再居中，
-           照底部面板的样子贴底、上面两个圆角、从下面滑上来；键盘弹起时照旧改成顶部对齐（下面那条规则） */
-        .mask:not(.sheet-mask) { align-items:flex-end; padding:0; }
-        .mask:not(.sheet-mask) > .edit-dialog, .mask:not(.sheet-mask) > .dt-dialog { width:100%; max-width:760px;
-            border-radius:18px 18px 0 0; border-bottom:none; padding-bottom:calc(20px + env(safe-area-inset-bottom));
-            max-height:88vh; max-height:88dvh; animation:askUp .26s ease; box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4); }
-        .mask:not(.sheet-mask) > .edit-dialog h3 { text-align:left; }
-        body.kb-open .mask:not(.sheet-mask):not(#askMask) { align-items:flex-start; padding-top:8px; padding-bottom:8px; }
-        body.kb-open .edit-dialog { max-height:none; }
-        /* 限高交给 mask：弹窗最高占满 mask 可用高度，超出则内部滚动 */
-        body.kb-open .mask .edit-dialog,
-        body.kb-open .mask .dt-dialog { max-height:calc(100% - 16px); overflow-y:auto; }
-        /* 筛选浮层在键盘弹起时：保持贴底，高度收进可视区，内部滚动，顶部留出安全区 */
+        /* 1019-B：所有弹窗（记一笔、修改、详情、退款、模板、分类、外观、日子、日子管理、AI 导出、导入自检、日期 / 年月选择器）
+           都和「筛选」同一套结构：.mask.sheet-mask.form-mask > .sheet（顶上 .sheet-grip 拖动条 + 标题，往下拉关闭用 bindSheetDrag）。
+           .form-mask 的面板显示出来（display:flex）就在位，从下面滑上来用动画，不靠 .open 类。
+           键盘弹起时和筛选一样：mask 高度由 syncMaskHeight 收成可视区，面板贴着键盘上沿、最高占满可视区、里面滑，
+           不再顶部对齐（原来顶部对齐时面板下沿和键盘之间会露缝）。 */
+        .form-mask > .sheet { transform:none; animation:askUp .26s ease; max-height:88vh; max-height:88dvh;
+            width:100%; max-width:760px; padding:8px 18px calc(20px + env(safe-area-inset-bottom));
+            border-radius:18px 18px 0 0; border-bottom:none; box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4); }
+        /* 拖动条和标题钉在面板顶上：键盘弹起、面板里滑到备注时，标题照样看得见、照样能往下拉 */
+        .form-mask .sheet-grip { position:sticky; top:-8px; z-index:2; margin:-8px -18px 0; padding:8px 18px 0;
+            background:var(--c-card-1); border-radius:18px 18px 0 0; }
+        .form-mask .sheet-head h3 { text-align:left; margin:0; }
+        .form-mask .sheet-head { margin-bottom:10px; }
+        .form-mask .form-btns { margin-top:16px; }
+        .form-mask .form-btns > * { margin:0; flex:none; }
+        /* 筛选浮层和上面这些在键盘弹起时：保持贴底，高度收进可视区，内部滚动 */
         body.kb-open .sheet-mask { align-items:flex-end; }
         body.kb-open .sheet { max-height:100%; }
 
@@ -1422,7 +1418,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-A</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-B</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1763,9 +1759,9 @@
     </div>
 
     <!-- 记账弹窗 -->
-    <div class="mask" id="addMask">
-        <div class="edit-dialog">
-            <h3>记一笔</h3>
+    <div class="mask sheet-mask form-mask" id="addMask">
+        <div class="sheet edit-dialog" id="addSheet">
+            <div class="sheet-grip" id="addGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>记一笔</h3></div></div>
             <div class="form-box">
                 <div class="field">
                     <label class="field-label">记账时间</label>
@@ -1810,15 +1806,15 @@
                 <button class="add-btn" id="addBill">添加记录</button>
                 <button class="tpl-save-btn" id="billSaveTpl">存为常用</button>
             </div>
-            <div class="dialog-btn">
-                <button class="cancel" id="closeAdd">关闭</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn block" id="closeAdd">关闭</button>
             </div>
         </div>
     </div>
 
-    <div class="mask" id="editMask">
-        <div class="edit-dialog">
-            <h3>修改账单</h3>
+    <div class="mask sheet-mask form-mask" id="editMask">
+        <div class="sheet edit-dialog" id="editSheet">
+            <div class="sheet-grip" id="editGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>修改账单</h3></div></div>
             <div class="form-box">
                 <!-- 1010-J：退款记录 / 有退款的原账单，在这里说明关联关系 -->
                 <div class="refund-note" id="editRefundNote" style="display:none"></div>
@@ -1853,21 +1849,21 @@
                     <textarea id="editRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
                 </div>
             </div>
-            <div class="dialog-btn">
-                <button class="save" id="saveEdit">保存</button>
-                <button class="cancel" id="cancelEdit">取消</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="saveEdit">保存</button>
+                <button class="tpl-save-btn refund-btn" id="editRefundBtn">退款</button>
+                <button class="tpl-save-btn" id="editSaveTpl">存为常用</button>
+                <button class="ui-btn danger block" id="deleteInEdit">删除这条记录</button>
+                <button class="ui-btn block" id="cancelEdit">取消</button>
             </div>
-            <button class="tpl-save-btn refund-btn" id="editRefundBtn">退款</button>
-            <button class="tpl-save-btn" id="editSaveTpl">存为常用</button>
-            <button class="edit-del-btn" id="deleteInEdit">删除这条记录</button>
         </div>
     </div>
 
     <!-- 账单详情（只读）：从统计页当日明细、预算明细、批量确认清单点条目进入。布局沿用修改弹窗，纯展示。
          「修改」打开修改弹窗（清单里进来的隐藏此按钮）。 -->
-    <div class="mask" id="detailMask">
-        <div class="edit-dialog">
-            <h3>账单详情</h3>
+    <div class="mask sheet-mask form-mask" id="detailMask">
+        <div class="sheet edit-dialog" id="detailSheet">
+            <div class="sheet-grip" id="detailGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>账单详情</h3></div></div>
             <div class="form-box">
                 <div class="field">
                     <label class="field-label">记账时间</label>
@@ -1895,17 +1891,17 @@
                     <div class="detail-val detail-remark" id="detailRemark"></div>
                 </div>
             </div>
-            <div class="dialog-btn">
-                <button class="save" id="detailEdit">修改</button>
-                <button class="cancel" id="detailClose">关闭</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="detailEdit">修改</button>
+                <button class="ui-btn block" id="detailClose">关闭</button>
             </div>
         </div>
     </div>
 
     <!-- 退款（1010-J）：从修改账单进入 -->
-    <div class="mask" id="refundMask">
-        <div class="edit-dialog">
-            <h3>退款</h3>
+    <div class="mask sheet-mask form-mask" id="refundMask">
+        <div class="sheet edit-dialog" id="refundSheet">
+            <div class="sheet-grip" id="refundGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>退款</h3></div></div>
             <div class="refund-sum" id="refundSum"></div>
             <div class="form-box">
                 <div class="field">
@@ -1928,28 +1924,28 @@
                     <textarea id="refundRemark" class="remark-area" placeholder="比如：七天无理由退货" maxlength="5000" rows="2"></textarea>
                 </div>
             </div>
-            <div class="dialog-btn">
-                <button class="save" id="refundOk">确认退款</button>
-                <button class="cancel" id="refundCancel">取消</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="refundOk">确认退款</button>
+                <button class="ui-btn block" id="refundCancel">取消</button>
             </div>
         </div>
     </div>
 
     <!-- 常用模板管理（1010-I） -->
-    <div class="mask" id="tplMask">
-        <div class="edit-dialog">
-            <h3>常用模板</h3>
+    <div class="mask sheet-mask form-mask" id="tplMask">
+        <div class="sheet edit-dialog" id="tplSheet">
+            <div class="sheet-grip" id="tplGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>常用模板</h3></div></div>
             <div class="cat-reorder-tip">在「记一笔」或「修改账单」底部点「存为常用」添加；点 ↑ 往前挪。</div>
             <div class="cat-list" id="tplList"></div>
-            <div class="dialog-btn">
-                <button class="cancel" id="closeTpl">关闭</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn block" id="closeTpl">关闭</button>
             </div>
         </div>
     </div>
 
-    <div class="mask" id="catMask">
-        <div class="edit-dialog">
-            <h3>管理账单分类</h3>
+    <div class="mask sheet-mask form-mask" id="catMask">
+        <div class="sheet edit-dialog" id="catSheet">
+            <div class="sheet-grip" id="catGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>管理账单分类</h3></div></div>
             <div class="cat-reorder-tip">长按左侧 ⠿ 拖动可调整顺序，顺序会用在记账页的标签排列</div>
             <div class="cat-list" id="catList"></div>
             <div class="cat-add-row">
@@ -1957,16 +1953,16 @@
                 <button class="mini-btn gold" id="addCatBtn">添加</button>
             </div>
             <p id="catErr" class="ask-err" style="display:none"></p>
-            <div class="dialog-btn">
-                <button class="cancel" id="closeCat">关闭</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn block" id="closeCat">关闭</button>
             </div>
         </div>
     </div>
 
     <!-- 外观主题弹窗 -->
-    <div class="mask" id="themeMask">
-        <div class="edit-dialog">
-            <h3>外观设置</h3>
+    <div class="mask sheet-mask form-mask" id="themeMask">
+        <div class="sheet edit-dialog" id="themeSheet">
+            <div class="sheet-grip" id="themeGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>外观设置</h3></div></div>
 
             <div class="field">
                 <label class="field-label">预设主题</label>
@@ -1983,16 +1979,16 @@
                 <p class="theme-tip">提示：太浅或太亮的颜色会自动加深，按钮文字也会自动配黑/白，保证清晰。</p>
             </div>
 
-            <div class="dialog-btn">
-                <button class="cancel" id="closeTheme">关闭</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn block" id="closeTheme">关闭</button>
             </div>
         </div>
     </div>
 
     <!-- 自定义时间选择器：日 → 月 → 年 三级下钻 -->
-    <div class="mask" id="dtMask">
-        <div class="dt-dialog">
-            <div class="dt-preview" id="dtPreview">2026-01-01 00:00</div>
+    <div class="mask sheet-mask form-mask" id="dtMask">
+        <div class="sheet dt-dialog" id="dtSheet">
+            <div class="sheet-grip" id="dtGrip"><div class="sheet-handle" aria-hidden="true"></div></div><div class="dt-preview" id="dtPreview">2026-01-01 00:00</div>
             <!-- 头部：‹ 标题 › 三个元素。点标题下钻一级（日→月→年）。
                  此前这里还有一对 « » 翻年按钮，已删除——既然点标题能直接进年份网格，
                  翻年按钮就是冗余入口，还把头部挤成五个元素、显得拥挤。
@@ -2036,9 +2032,9 @@
                 </div>
                 <button class="dt-now" id="dtNow">此刻</button>
             </div>
-            <div class="dialog-btn">
-                <button class="save" id="dtConfirm">确认</button>
-                <button class="cancel" id="dtCancel">取消</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="dtConfirm">确认</button>
+                <button class="ui-btn block" id="dtCancel">取消</button>
             </div>
         </div>
     </div>
@@ -2066,13 +2062,13 @@
 
     <!-- 1015-A：导入（开发中）。现在只做通路自检：加载导入模块、起后台线程、文本和字节各数一遍行数。
          关掉这个弹窗 = 退出导入，停掉后台线程。 -->
-    <div class="mask" id="devImportMask">
-        <div class="edit-dialog">
-            <h3>导入（开发中）</h3>
+    <div class="mask sheet-mask form-mask" id="devImportMask">
+        <div class="sheet edit-dialog" id="devImportSheet">
+            <div class="sheet-grip" id="devImportGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>导入（开发中）</h3></div></div>
             <div class="dev-imp-out" id="devImportOut"></div>
-            <div class="dialog-btn">
-                <button class="save" id="devImportRerun">再测一次</button>
-                <button class="cancel" id="devImportClose">关闭</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="devImportRerun">再测一次</button>
+                <button class="ui-btn block" id="devImportClose">关闭</button>
             </div>
         </div>
     </div>
@@ -2080,27 +2076,24 @@
     <!-- 文本导出结果弹窗：展示生成的文本 + 复制 / 分享。
          两处复用：① 导出账单给 AI 分析；② 存档导出的兜底（文件写入全失败时供手动复制）。
          标题/提示文案由 openAiExport(opts) 按场景填入。 -->
-    <div class="mask" id="aiExpMask">
-        <div class="edit-dialog ai-exp-dialog">
-            <h3 id="aiExpTitle">导出账单给 AI 分析</h3>
+    <div class="mask sheet-mask form-mask" id="aiExpMask">
+        <div class="sheet edit-dialog ai-exp-dialog" id="aiExpSheet">
+            <div class="sheet-grip" id="aiExpGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3 id="aiExpTitle">导出账单给 AI 分析</h3></div></div>
             <div class="ai-exp-sub" id="aiExpSub"></div>
             <textarea id="aiExpText" readonly></textarea>
             <div class="ai-exp-tip" id="aiExpTip">复制或分享后，粘贴给任意 AI（如 Claude、DeepSeek、豆包），让它帮你分析消费、给出建议。</div>
-            <div class="dialog-btn ai-exp-btns">
-                <button class="save" id="aiExpCopy">复制</button>
-                <button class="save" id="aiExpShare">分享</button>
-                <button class="cancel" id="aiExpClose">关闭</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="aiExpCopy">复制</button>
+                <button class="ui-btn block" id="aiExpShare">分享</button>
+                <button class="ui-btn block" id="aiExpClose">关闭</button>
             </div>
         </div>
     </div>
 
-    <!-- 日子 编辑/添加 弹窗。
-         刻意复用现有的 .mask + .edit-dialog（居中弹窗），而非草图里的 bottom sheet：
-         ① 与「记一笔 / 修改账单」形态一致，不引入第二种弹窗交互；
-         ② 直接继承既有的键盘处理(kb-open / syncMaskHeight)与滚动锁定，省掉一堆坑。 -->
-    <div class="mask" id="dayMask">
-        <div class="edit-dialog">
-            <h3 id="dayDlgTitle">添加日子</h3>
+    <!-- 日子 编辑/添加 弹窗。1019-B 起和「记一笔 / 修改账单」一样是底部面板（.sheet-mask > .sheet）。 -->
+    <div class="mask sheet-mask form-mask" id="dayMask">
+        <div class="sheet edit-dialog" id="daySheet">
+            <div class="sheet-grip" id="dayGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3 id="dayDlgTitle">添加日子</h3></div></div>
             <div class="form-box">
                 <div class="field">
                     <label class="field-label">名称（最多 8 字）</label>
@@ -2118,35 +2111,35 @@
                     </div>
                 </div>
             </div>
-            <div class="dialog-btn">
-                <button class="save" id="daySave">保存</button>
-                <button class="cancel" id="dayCancel">取消</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="daySave">保存</button>
+                <button class="ui-btn warn block" id="dayDelete" style="display:none">删除这个日子</button>
+                <button class="ui-btn block" id="dayCancel">取消</button>
             </div>
-            <button class="edit-del-btn" id="dayDelete" style="display:none">删除这个日子</button>
         </div>
     </div>
 
     <!-- 日子管理弹窗：入口卡条数 + 批量删除入口 -->
-    <div class="mask" id="dayMgrMask">
-        <div class="edit-dialog">
-            <h3>日子管理</h3>
+    <div class="mask sheet-mask form-mask" id="dayMgrMask">
+        <div class="sheet edit-dialog" id="dayMgrSheet">
+            <div class="sheet-grip" id="dayMgrGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>日子管理</h3></div></div>
             <div class="dm-label">记账页入口卡显示条数</div>
             <div class="dm-hint">最少 3 条，最多 99 条。超出的日子仍可在本页看到，不会丢。</div>
             <input type="text" id="dmCount" class="dm-num"
                    inputmode="numeric" maxlength="2" placeholder="3">
             <div class="dm-sep"></div>
             <button class="dm-batch" id="dmBatch">批量删除日子</button>
-            <div class="dialog-btn">
-                <button class="save" id="dmSave">保存</button>
-                <button class="cancel" id="dmClose">取消</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="dmSave">保存</button>
+                <button class="ui-btn block" id="dmClose">取消</button>
             </div>
         </div>
     </div>
 
     <!-- 统计页：年月选择器 -->
-    <div class="mask" id="ymMask">
-        <div class="edit-dialog">
-            <!-- 头部与日期选择器同构：‹ 标题 ›，点标题下钻（月网格 → 年网格）。
+    <div class="mask sheet-mask form-mask" id="ymMask">
+        <div class="sheet edit-dialog" id="ymSheet">
+            <div class="sheet-grip" id="ymGrip"><div class="sheet-handle" aria-hidden="true"></div></div><!-- 头部与日期选择器同构：‹ 标题 ›，点标题下钻（月网格 → 年网格）。
                  统计页没有「日」这一级，所以从月开始，只有两级。 -->
             <div class="ym-year-row">
                 <button class="dt-nav" id="ymPrevY">‹</button>
@@ -2157,9 +2150,9 @@
                 <div class="dt-grid-12" id="ymGrid"></div>
                 <div class="dt-grid-12" id="ymYearGrid" style="display:none"></div>
             </div>
-            <div class="dialog-btn">
-                <button class="save" id="ymToCurrent">回到当月</button>
-                <button class="cancel" id="ymCancel">取消</button>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="ymToCurrent">回到当月</button>
+                <button class="ui-btn block" id="ymCancel">取消</button>
             </div>
         </div>
     </div>
@@ -7390,6 +7383,8 @@ ${detail}
         // ===== 底部浮层的「往下拉关闭」（1017-UI1 从筛选浮层里抽出来，筛选浮层和导入页的选择面板共用）=====
         //   sheetMask：遮罩（带 .open 时才接手势）；sheet：面板（.sheet）；grip：顶部抓手区（鼠标拖拽用）；onDismiss：拉够了要关时调
         //   返回 { reset }：把拖到一半的位移、过渡复位（打开 / 关闭时调）
+        // 1019-B：.form-mask（老弹窗换成的底部面板）显示出来（display:flex）就算开着，不靠 .open 类
+        function sheetShown(m){ return m.classList.contains('open') || (m.classList.contains('form-mask') && m.style.display==='flex'); }
         function bindSheetDrag(sheetMask, sheet, grip, onDismiss){
             // ===== 下滑手势关闭 =====
             // 【1010-F】触屏上整片面板都能下拉关闭（此前只有顶部抓手区能拉）。
@@ -7406,7 +7401,7 @@ ${detail}
             let tCand=false, tDrag=false, tY0=0, tX0=0, tDY=0, tLastY=0, tLastT=0, tVel=0;
             function touchReset(){ tCand=false; tDrag=false; tDY=0; tVel=0; }
             sheet.addEventListener('touchstart', e=>{
-                if(!sheetMask.classList.contains('open') || e.touches.length!==1){ touchReset(); return; }
+                if(!sheetShown(sheetMask) || e.touches.length!==1){ touchReset(); return; }
                 const p=e.touches[0];
                 tCand=true; tDrag=false; tY0=p.clientY; tX0=p.clientX; tDY=0;
                 tLastY=p.clientY; tLastT=Date.now(); tVel=0;
@@ -7453,7 +7448,7 @@ ${detail}
                 sheet.style.transform='';
             }
             function onDragStart(e){
-                if(!sheetMask.classList.contains('open')) return;
+                if(!sheetShown(sheetMask)) return;
                 if(e.pointerType && e.pointerType!=='mouse') return;   // 触屏走 touch 那套
                 const pt=e.touches?e.touches[0]:e;
                 dragging=true; dragStartY=pt.clientY; dragDY=0; dragStartT=Date.now();
@@ -10837,6 +10832,59 @@ ${detail}
         $('daysBack').addEventListener('click', backFromDaysPage);
         $('daysAdd').addEventListener('click', ()=>openDayDialog(null));
 
+        // ===== 1019-B：底部面板式的弹窗，往下拉 / 返回键关闭走同一个出口 =====
+        //   记一笔、修改账单、日子这三个填表的：填过东西（和打开时比变了）先问「放弃这次填写？」，没填过直接关；
+        //   别的弹窗直接关（和点它的「关闭 / 取消」一样）。点弹窗里的「关闭 / 取消」按钮照旧直接关，不问。
+        const FORM_CLOSE={
+            addMask:()=>{ $('addMask').style.display='none'; },
+            editMask:()=>closeEditModal(),
+            detailMask:()=>closeDetail(),
+            refundMask:()=>closeRefund(),
+            tplMask:()=>{ $('tplMask').style.display='none'; },
+            catMask:()=>{ $('catMask').style.display='none'; },
+            themeMask:()=>{ $('themeMask').style.display='none'; },
+            dtMask:()=>closeDtPicker(),   // 和原来返回键一样：直接关，不算「取消」回调
+            devImportMask:()=>{ const c=$('devImportClose'); if(c) c.click(); },
+            aiExpMask:()=>{ $('aiExpMask').style.display='none'; },
+            dayMask:()=>closeDayDialog(),
+            dayMgrMask:()=>closeDayMgr(),
+            ymMask:()=>{ $('ymMask').style.display='none'; },
+        };
+        const FORM_ASK=['addMask','editMask','dayMask'];
+        const formSnaps={};
+        // 表单现在的样子：输入框、日期、选中的标签、开关（打开时记一份，关的时候比一比）
+        function formState(id){
+            const m=$(id); if(!m) return '';
+            const parts=[];
+            m.querySelectorAll('input,textarea,select').forEach(e=>parts.push(e.value));
+            m.querySelectorAll('.dt-input').forEach(e=>parts.push(e.dataset.day||'', e.dataset.value||'', e.value||'', e.textContent));
+            m.querySelectorAll('.cc, .day-switch').forEach(e=>parts.push(e.className));
+            return JSON.stringify(parts);
+        }
+        function formDirty(id){ return formSnaps[id]!=null && formState(id)!==formSnaps[id]; }
+        function formBackClose(id){
+            const close=FORM_CLOSE[id]; if(!close) return;
+            if(!FORM_ASK.includes(id) || !formDirty(id)){ close(); return; }
+            customConfirm('填的内容还没保存，关掉就没了。', ()=>{ if($(id).style.display==='flex') close(); },
+                '放弃这次填写？', { danger:true, okText:'放弃，关掉', cancelText:'接着填' });
+        }
+        window.__formDirty=formDirty;   // 给测试用
+        Object.keys(FORM_CLOSE).forEach(id=>{
+            const m=$(id); if(!m) return;
+            const sheet=m.querySelector('.sheet'), grip=m.querySelector('.sheet-grip');
+            if(sheet && grip) bindSheetDrag(m, sheet, grip, ()=>{ if(m.style.display==='flex') formBackClose(id); });
+            if(FORM_ASK.includes(id)){
+                // 一打开就记下表单的样子（打开的代码同步写完值以后，MutationObserver 才回调）
+                let was=m.style.display;
+                new MutationObserver(()=>{
+                    const now=m.style.display;
+                    if(now==='flex' && was!=='flex') formSnaps[id]=formState(id);
+                    if(now!=='flex') delete formSnaps[id];
+                    was=now;
+                }).observe(m, { attributes:true, attributeFilter:['style'] });
+            }
+        });
+
         // ===== 系统返回键 / 侧滑返回 =====
         // 【问题】日子管理页是「记账页的子页」——只是把 pageLedger 藏起来、pageDays 显示，
         //   并没有产生任何浏览器历史。安卓的返回手势只认 WebView 的 history，看不到这层 UI 状态，
@@ -10884,28 +10932,29 @@ ${detail}
                 // 1016-B 导入页（整页，盖在别的页面上面）：里面先关哪一层（行详情 → 进度 → 整页）由它自己定
                 { can:()=>!!(window.JiwenImportUI && window.JiwenImportUI.canBack()), close:()=>window.JiwenImportUI.back() },
                 // 1035 日期时间选择器
-                { can:()=>isOpen('dtMask'),     close:()=>closeDtPicker() },
+                { can:()=>isOpen('dtMask'),     close:()=>formBackClose('dtMask') },
                 // 1032 退款弹窗（从修改账单里打开）
-                { can:()=>isOpen('refundMask'), close:()=>closeRefund() },
-                // 1030 详情里点进来的「修改」：必须走唯一出口，
-                //      否则 editId / over-detail 等状态复位不掉
-                { can:()=>isOpen('editMask'),   close:()=>closeEditModal() },
+                { can:()=>isOpen('refundMask'), close:()=>formBackClose('refundMask') },
+                // 1030 详情里点进来的「修改」：必须走唯一出口（closeEditModal），
+                //      否则 editId / over-detail 等状态复位不掉；1019-B 起填过东西先问一句
+                { can:()=>isOpen('editMask'),   close:()=>formBackClose('editMask') },
                 // 1020 账单详情
-                { can:()=>isOpen('detailMask'), close:()=>closeDetail() },
+                { can:()=>isOpen('detailMask'), close:()=>formBackClose('detailMask') },
                 // 1010 批量确认清单（askMask 当内容页用）—— 排在详情之后
                 { can:askIsPage,                close:()=>closeAsk(null) },
-                { can:()=>isOpen('aiExpMask'),  close:()=>hide('aiExpMask') },
+                { can:()=>isOpen('aiExpMask'),  close:()=>formBackClose('aiExpMask') },
+                { can:()=>isOpen('devImportMask'), close:()=>formBackClose('devImportMask') },
                 // 1000 普通表单弹窗，互不叠加
-                { can:()=>isOpen('dayMask'),    close:()=>closeDayDialog() },
-                { can:()=>isOpen('dayMgrMask'), close:()=>closeDayMgr() },
-                { can:()=>isOpen('catMask'),    close:()=>hide('catMask') },
-                { can:()=>isOpen('tplMask'),    close:()=>hide('tplMask') },
-                { can:()=>isOpen('themeMask'),  close:()=>hide('themeMask') },
+                { can:()=>isOpen('dayMask'),    close:()=>formBackClose('dayMask') },
+                { can:()=>isOpen('dayMgrMask'), close:()=>formBackClose('dayMgrMask') },
+                { can:()=>isOpen('catMask'),    close:()=>formBackClose('catMask') },
+                { can:()=>isOpen('tplMask'),    close:()=>formBackClose('tplMask') },
+                { can:()=>isOpen('themeMask'),  close:()=>formBackClose('themeMask') },
                 // 统计页的年月选择器。它和 dtMask 是两套独立实现，别忘了这一个
                 // —— 漏掉的后果不是"关不掉"，而是 handleBack 返回 false、
                 // Capacitor 直接 exitApp()：选择器开着时按返回键会退出整个 App。
-                { can:()=>isOpen('ymMask'),     close:()=>hide('ymMask') },
-                { can:()=>isOpen('addMask'),    close:()=>hide('addMask') },
+                { can:()=>isOpen('ymMask'),     close:()=>formBackClose('ymMask') },
+                { can:()=>isOpen('addMask'),    close:()=>formBackClose('addMask') },
                 // 筛选浮层是 class 驱动（.open），不是 display
                 { can:()=>{ const m=$('filterSheetMask'); return !!m && m.classList.contains('open'); },
                   close:()=>{ if(window.closeFilterSheet) window.closeFilterSheet(); } },
