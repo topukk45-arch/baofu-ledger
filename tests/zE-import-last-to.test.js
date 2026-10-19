@@ -38,7 +38,7 @@ const lastTo = t => [...t.d.querySelectorAll('.imp-last-to')].map(x => x.textCon
   await t.importFiles(NOV, () => { txt = lastTo(t); }, { noGo: true });
   ok(txt.length === 1 && /导到 2026-10-31/.test(txt[0]), '3 只对账导过 11 月：「上次导到」还是 10-31 ' + JSON.stringify(txt));
   // 撤销以后退回去
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   for (const l of (await t.logs()).reverse()) { const p = await t.st().undoPlan(l.b); await t.st().undo(p); await t.idle(); }
   await t.importFiles(NOV, () => { txt = lastTo(t); }, { noGo: true });
   ok(txt.length === 0, '4 都撤了：没有「上次导到」');

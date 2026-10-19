@@ -102,7 +102,7 @@ const F = [['微信.csv', B.bill('wechat', TX, { range: RANGE }).bytes]];
   t.w.JiwenSheet && t.w.JiwenSheet.isOpen() && t.w.JiwenSheet.close();
   t.w.JiwenImportUI.close(); await t.idle();
   await t.importFiles(F, () => {}, {});
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   t.w.JiwenImportUI.openPending();
   await t.until(() => $('impPendSearch'));
   const pc = () => qa('.imp-pend').filter(n => n.style.display !== 'none');

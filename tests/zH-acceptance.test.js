@@ -84,7 +84,7 @@ const diffZero = p => p.files.filter(f => !f.fatal).every(f => ['expense', 'inco
   await t.importFiles([['微信分分捐补.csv', B.bill('wechat', W4, { range: RANGE }).bytes]]);
   const pet = () => t.recs().find(r => r.src && r.src.sum === 'petty');
   ok(pet().money === 0.08, '7 分分捐追加到 0.08（5 笔 + 3 笔）');
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   const logs = await t.logs();
   {
     const p = await t.st().undoPlan(logs[0].b);

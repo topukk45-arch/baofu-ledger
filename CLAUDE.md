@@ -161,6 +161,7 @@
   - 1019-Z4-M10 提示框 `app/ask.js`（`JiwenAsk`，22 条、对外 askCancel / askMask / closeAsk / customAlert / customAlertHtml / customChoose / customConfirm / customPrompt）。
   - 1019-Z4-M11 日期选择 `app/date.js`（`JiwenDate`，55 条、对外 DT_YEAR_MAX / DT_YEAR_MIN / attachSwipe / closeDtPicker / getDtInput / openDtPicker / openDtPickerDate / playSlide / setDtInput）。
   - 1019-Z4-M12 AI 导出 `app/ai-export.js`（`JiwenAiExport`，17 条、对外 askImportOtherDays / buildAiText / importDaysSuffix / importFixSuffix / openAiExport）。
+  - 1019-Z4-M13 导入入口 `app/import-entry.js`（`JiwenImportEntry`，34 条、对外 DEV_IMPORT_KEY / __buildTaps / devImportOn / impOpenFile / loadImportUI / renderDevImport / scrollChipIntoView）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

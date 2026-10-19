@@ -91,7 +91,7 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
   // ===== 4. 撤销第一次（第二次用了它没有？类型规则不算依赖）：规则一起删 =====
   {
     const logs = await t.logs();
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     let p = await t.st().undoPlan(logs[1].b); await t.st().undo(p); await t.idle();
     p = await t.st().undoPlan(logs[0].b);
     ok(p.chain.length === 1 && p.steps[0].typesRemoved === 2, '4 撤第一次：删掉 2 条类型规则');

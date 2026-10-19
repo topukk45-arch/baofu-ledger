@@ -54,7 +54,7 @@ const RANGE = { from: '2026-01-01 00:00:00', to: '2026-12-31 23:59:59' };
   const r = await t.importFiles([['微信.csv', bill]], null, { noGo: true });
   ok(r.plan.rows.find(x => x.cp === '某虚构书店').cat === '杂项', '4 下一次导入：照改过的规则归到杂项');
   // 开关关着看不到
-  t.w.localStorage.removeItem('app_dev_import'); t.w.eval('renderDevImport')();
+  t.w.localStorage.removeItem('app_dev_import'); t.w.eval('JiwenImportEntry.renderDevImport')();
   ok($('devRulesBtn').style.display === 'none', '5 开发开关关着：看不到入口');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);

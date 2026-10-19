@@ -216,7 +216,7 @@ const restoreKind = async (t, kind, nth) => { const L = await t.st().backupList(
     $('bkDoneClose').click(); await t.idle();
     ok(t.recs().length === 3 && t.d.getElementById('billList'), '6 账本页跟着刷新');
     // 开发开关关着：入口不露
-    t.w.localStorage.setItem('app_dev_import', '0'); t.w.renderDevImport();
+    t.w.localStorage.setItem('app_dev_import', '0'); t.w.JiwenImportEntry.renderDevImport();
     ok($('devRestoreBtn').style.display === 'none', '6 开发开关关着：没有「恢复备份」');
     ok(!t.errs.length, '6 无报错 ' + t.errs.join('|'));
   }

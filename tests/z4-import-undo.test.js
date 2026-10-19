@@ -97,7 +97,7 @@ async function boot(o) {
   };
   t.keyOf = (S, txn) => { const it = S.matched.items.find(x => x.src === 'row' && S.parsed.files[x.file].rows[x.row].no === txn.no); return it && it.key; };
   t.logs = async () => t.st().importsRead();
-  t.undoPlan = async b => { await w.eval('loadImportUI')(); return t.st().undoPlan(b); };
+  t.undoPlan = async b => { await w.eval('JiwenImportEntry.loadImportUI')(); return t.st().undoPlan(b); };
   t.undo = async b => { const p = await t.undoPlan(b); const r = await t.st().undo(p); await t.idle(); return { p, r }; };
   t.dump = async () => { await t.idle(); const db = await IDB.dumpDb(t.phone); const o = {}; Object.keys(db).sort().forEach(k => { if (!/_bk_/.test(k)) o[k] = db[k]; }); return o; };
   t.save = async fn => { const s = (w.JiwenStore || w).loadStore(ID); fn(s.archives['默认存档']); (w.JiwenStore || w).saveStore(s, ID); await t.idle(); };

@@ -105,7 +105,7 @@ const F = [['微信.csv', B.bill('wechat', BILL, { range: RANGE }).bytes]];
   ok(g('n1').money === 30 && !g('n1').src && R.some(x => x.src && !x.src.merged && Math.round(x.money * 100) === 2800), '6 分开记：手记 n1 不动，28.00 另记一条');
   ok(g('n2').money === 18.5 && g('n2').src && g('n2').src.merged, '6 改成实付：n2 金额改成 18.50');
   ok(g('n3').money === 50 && g('n3').src && g('n3').src.merged, '6 不动的：n3 合并、金额按手记');
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   const [lg] = await t.logs(); const pl = await t.st().undoPlan(lg.b); await t.st().undo(pl); await t.idle();
   ok(same(await t.dump(), D0), '6 撤销：和导入前逐字节一样');
   // ===== 7. 什么都不点：和以前一样（手记金额都不动）=====

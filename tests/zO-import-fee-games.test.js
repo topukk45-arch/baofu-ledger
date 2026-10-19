@@ -58,7 +58,7 @@ const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户', 
     ok(wd.length === 3 && f && f.type === 'expense' && !f.skip && !f.flow && f.cat === '其他' && f.remark === '零钱提现服务费' && wd.filter(x => x.skip).length === 2, '2 提现两笔照旧不计入；服务费 2.20 记成支出（计入）');
     const again = await t.importFiles(F, null, { noGo: true });
     ok(again.plan.records === 0 && !again.plan.sections.fees.length, '2 再导：提现跳过，服务费也不再记');
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     const [lg] = await t.logs(); const p = await t.st().undoPlan(lg.b); await t.st().undo(p); await t.idle();
     ok(same(await t.dump(), D0), '2 撤销：服务费一起删，和导入前逐字节一样');
     ok(!t.errs.length, '2 无报错 ' + t.errs.join('|'));

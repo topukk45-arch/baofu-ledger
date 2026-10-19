@@ -86,7 +86,7 @@ async function round(seed, mode) {
   const R = rng(seed * 7919 + mode), pick = a => a[Math.floor(R() * a.length)];
   const t = await A.boot({ html, www: WWW, seed: A.seedOf(MAN, CATS), now: '2026-10-20T10:00:00' });
   const ARCH = '默认存档';
-  await t.w.eval('loadImportUI')();      // 待处理、撤销、AI 修改要的几个文件（真人打开导入页时载入）
+  await t.w.eval('JiwenImportEntry.loadImportUI')();      // 待处理、撤销、AI 修改要的几个文件（真人打开导入页时载入）
   const D0 = await t.dump();
   const trace = [];
   let manual = false, capped = false;    // capped：导入记录到过 10 次（最旧的被挤掉了，它写进去的记录撤不掉了）

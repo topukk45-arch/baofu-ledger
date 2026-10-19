@@ -46,7 +46,7 @@ const M1 = { id: 'm1', time: '2026-10-05T08:30', money: 30, type: 'expense', cat
   ok(!lg1.chg.length && lg1.add.includes(nb.id) && lg1.h.length === lg1.add.length, '2 导入记录：不再记这条手记的改动，新的那条记进新增');
   const r2 = await t.importFiles(F, null, { noGo: true });
   ok(r2.plan.counts.add === 0 && r2.plan.counts.merge === 0, '3 再导同一份账单：一条不新增、不再合并');
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   const p = await t.st().undoPlan(lg1.b); await t.st().undo(p); await t.idle();
   ok(same(await t.dump(), D0), '4 撤销那次导入：和导入前逐字节一样');
   // 旧的导入记录没存账单

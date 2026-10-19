@@ -23,7 +23,7 @@ const bill = tx => [['微信' + (++seq) + '.csv', B.bill('wechat', tx, { range: 
   {
     const MAN = [{ id: 'm1', time: '2026-10-06T09:30', money: 36, type: 'expense', cat: '购物', remark: '买书' }];
     const t = await A.boot({ html, www: WWW, seed: A.seedOf(MAN, ['未分类', '吃饭', '购物', '零食']), now: '2026-10-20T10:00:00' });
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     const D0 = await t.dump();
     await t.importFiles(bill([wx({ time: T(6, 9), cp: '某虚构书店', fen: 3600, desc: '书' })]));
     const [lg] = await t.st().importsRead();
@@ -42,7 +42,7 @@ const bill = tx => [['微信' + (++seq) + '.csv', B.bill('wechat', tx, { range: 
   {
     const MAN = [{ id: 'm2', time: '2026-10-01T08:30', money: 50, type: 'expense', cat: '吃饭', remark: '聚餐' }];
     const t = await A.boot({ html, www: WWW, seed: A.seedOf(MAN, ['未分类', '吃饭', '其他']), now: '2026-10-20T10:00:00' });
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     await t.importFiles(bill([wx({ time: T(6, 12), cp: '某虚构饭店', fen: 5000 })]));         // 比手记晚 5 天 → 待处理，不进名单
     const [l1] = await t.st().importsRead();
     ok((await t.st().pendingRead()).length === 1 && !(t.arch().cps || []).includes('某虚构饭店'), '2 第一次：饭店那笔进待处理，名字不进名单');
@@ -63,7 +63,7 @@ const bill = tx => [['微信' + (++seq) + '.csv', B.bill('wechat', tx, { range: 
   // ===== 3 =====
   {
     const t = await A.boot({ html, www: WWW, seed: A.seedOf([], ['未分类', '吃饭', '购物', '零食']), now: '2026-10-20T10:00:00' });
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     await t.importFiles(bill([wx({ time: T(6, 9), cp: '某虚构书店', fen: 3600, desc: '书' })]));
     const [lg] = await t.st().importsRead(), id = lg.add[0];
     await t.st().aiApply({ of: lg.b, changes: [{ id, set: { cat: '购物' } }] }, {});
@@ -79,7 +79,7 @@ const bill = tx => [['微信' + (++seq) + '.csv', B.bill('wechat', tx, { range: 
   {
     const MAN = [{ id: 'm2', time: '2026-10-01T08:30', money: 50, type: 'expense', cat: '吃饭', remark: '聚餐' }];
     const t = await A.boot({ html, www: WWW, seed: A.seedOf(MAN, ['未分类', '吃饭', '其他']), now: '2026-10-20T10:00:00' });
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     const F = bill([wx({ time: T(6, 12), cp: '某虚构饭店', fen: 5000 }), wx({ time: T(7, 12), cp: '某虚构茶馆', fen: 900 })]);
     await t.importFiles(F);
     ok((await t.st().pendingRead()).length === 1, '4 第一次：饭店那笔进待处理');

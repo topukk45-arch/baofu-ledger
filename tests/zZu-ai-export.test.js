@@ -93,7 +93,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   const r2 = await t.st().aiExportRows(lg.b);
   ok(r1.rows.length === 2 && JSON.stringify(r1.rows.map(r => [r.n, r.id])) === JSON.stringify(r2.rows.map(r => [r.n, r.id])), '4 同一批两次导出（中间又导了一批）：编号一样');
   // 导入记录「AI 检查」：只带写进账本的
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   t.w.JiwenImportUI.openLogs();
   await t.until(() => t.d.querySelector('.imp-log-ai'));
   const row = Array.from(t.d.querySelectorAll('.imp-log')).find(x => x.dataset.batch === lg.b);

@@ -33,7 +33,7 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
     ok(same(ir.cat, [{ kw: '某虚构早点', cat: '吃饭' }]), '1 合并上 2 次的「某虚构早点 → 吃饭」存成规则，只合并上 1 次的「某虚构文具」不存 ' + JSON.stringify(ir.cat));
     const [lg] = await t.logs();
     ok(same(lg.rulesAdded.cat, [{ kw: '某虚构早点', cat: '吃饭' }]), '1 导入记录里记了这条规则（撤销用）');
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     const p = await t.st().undoPlan(lg.b); await t.st().undo(p); await t.idle();
     ok(!t.arch().importRules && same(await t.dump(), D0), '1 撤销：规则一起删，和导入前逐字节一样');
     ok(!t.errs.length, '1 无报错 ' + t.errs.join('|'));
@@ -82,7 +82,7 @@ const select = (t, sel, v) => { sel.value = v; sel.dispatchEvent(new t.w.Event('
       ok(same(rule, [{ kw: '某虚构书店', cat: '杂项' }]) && /改了你的 1 条规则/.test(rc), '3 以后都改：规则改成杂项（没多加一条），结果页写改了 1 条规则');
       const [lg] = await t.logs();
       ok(same(lg.rulesChanged, [{ kw: '某虚构书店', from: '购物', to: '杂项' }]), '3 导入记录记下规则原来的分类');
-      await t.w.eval('loadImportUI')();
+      await t.w.eval('JiwenImportEntry.loadImportUI')();
       const p = await t.st().undoPlan(lg.b); await t.st().undo(p); await t.idle();
       ok(same(t.arch().importRules.cat, [{ kw: '某虚构书店', cat: '购物' }]) && same(await t.dump(), D0), '3 撤销：规则改回购物，和导入前逐字节一样');
     } else {

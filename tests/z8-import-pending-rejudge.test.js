@@ -63,7 +63,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   // ===== 4. 撤这一次：拿掉的放回原处，和这次导入前逐字节一样 =====
   {
     const [, l2] = await t.logs();
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     const p = await t.st().undoPlan(l2.b);
     ok(p.chain.length === 1 && /放回待处理/.test(t.w.JiwenImportUndo.describe(p)), '4 摘要写明放回待处理');
     await t.st().undo(p); await t.idle();

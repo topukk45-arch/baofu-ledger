@@ -52,7 +52,7 @@ async function openRow(t, key) {
     t.$('impBackToLedger').click(); await t.idle();
     const o = t.recs().find(r => r.money === 400), rf = t.recs().find(r => r.money === 300);
     ok(rf && rf.refundOf === o.id && rf.cat === o.cat && rf.type === 'income', '1 写成挂在 400 那笔上的退款，分类跟着原单');
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     const [lg] = await t.logs(); const p = await t.st().undoPlan(lg.b); await t.st().undo(p); await t.idle();
     ok(same(await t.dump(), D0), '1 撤销：和导入前逐字节一样');
     ok(!t.errs.length, '1 无报错 ' + t.errs.join('|'));

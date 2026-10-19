@@ -26,7 +26,7 @@ const F = [['微信.csv', B.bill('wechat', TX, { range: RANGE }).bytes]];
   const rows = (await t.st().aiExportRows(lg.b)).rows;
   const idOf = cp => rows.find(r => r.cp === cp).id, nOf = cp => rows.find(r => r.cp === cp).n;
   // 导出一次（记下导出时间），再删一条、改一条
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   t.w.JiwenImportUI.openLogs(); await t.until(() => q('.imp-log-ai'));
   q('.imp-log-ai').click(); await t.until(() => $('impAiText'));
   const at = t.S().ai.at;

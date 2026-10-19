@@ -26,7 +26,7 @@ const MAN = [{ id: 'm1', time: '2026-10-06T09:30', money: 36, type: 'expense', c
   const { $ } = t, q = s => t.d.querySelector(s), qa = s => Array.from(t.d.querySelectorAll(s));
   await t.importFiles(F);
   const [lg] = await t.st().importsRead();
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   // 走一遍：导入记录 →「AI 检查」→ 复制（记下导出时间）→ 粘贴回复 → 勾 → 改
   const tickAll = () => { for (let i = 0; i < 20; i++) { const x = qa('.imp-ai-item input').find(y => !y.disabled && !y.checked); if (!x) return; x.click(); } };
   const toReview = async reply => {

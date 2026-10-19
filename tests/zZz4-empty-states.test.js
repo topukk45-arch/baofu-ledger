@@ -14,7 +14,7 @@ const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '某虚构店', 
 (async () => {
   const t = await A.boot({ html, www: WWW, seed: A.seedOf([], ['未分类', '吃饭', '购物']), now: '2026-10-20T10:00:00' });
   const { $ } = t, qa = s => Array.from(t.d.querySelectorAll(s));
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   await t.w.JiwenImportUI.openLogs(); await t.until(() => $('impLogs'));
   ok(!$('impLogs').classList.contains('imp-push') && /还没有导入记录/.test($('impLogs').textContent) && /每次都会记在这里/.test($('impLogs').textContent), '1 导入记录空：卡片不沉到底，写以后会记什么');
   await t.w.JiwenImportUI.openPending(); await t.until(() => $('impPendHead'));

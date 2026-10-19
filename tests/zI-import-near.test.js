@@ -43,7 +43,7 @@ const man = (id, d, money, o) => Object.assign({ id, time: `2026-10-${p2(d)}T08:
   const n1 = t.recs().find(x => x.id === 'n1');
   ok(n1.money === 30 && n1.time === '2026-10-05T12:10' && n1.src.merged, '3 合并：手记金额不动、时间改账单的');
   // 撤掉，再导一次选「改成实付」
-  await t.w.eval('loadImportUI')();
+  await t.w.eval('JiwenImportEntry.loadImportUI')();
   let [lg] = await t.logs(); let p = await t.st().undoPlan(lg.b); await t.st().undo(p); await t.idle();
   ok(same(await t.dump(), D0), '4 撤销：回到导入前');
   await t.importFiles(F, S => { $('impNearPay').click(); });

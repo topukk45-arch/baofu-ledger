@@ -139,7 +139,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   await t.back();
   // 撤销第一批（要先撤第二批：退款挂在第一批的记录上）→ 回到导入前（m2 是你自己删的，不回来）
   {
-    await t.w.eval('loadImportUI')();
+    await t.w.eval('JiwenImportEntry.loadImportUI')();
     const p = await t.st().undoPlan(L1.b);
     ok(p.chain.length === 2, '8 撤第一批要连着撤第二批');
     await t.st().undo(p); await t.idle();
