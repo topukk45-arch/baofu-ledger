@@ -39,17 +39,17 @@ const recs = [
 
   // 2. 时间：昨天 / 今年别的日子 / 往年；点那一行弹日期时间选择，选完那一行跟着变
   const y = new w.Date(now.getTime()); y.setDate(y.getDate() - 1); y.setHours(9, 5);
-  w.setDtInput($('billTime'), dt(y));
+  w.JiwenDate.setDtInput($('billTime'), dt(y));
   ok($('billTimeTxt').textContent === '昨天 09:05', '2 昨天：' + $('billTimeTxt').textContent);
-  w.setDtInput($('billTime'), '2024-02-03T21:30');
+  w.JiwenDate.setDtInput($('billTime'), '2024-02-03T21:30');
   ok($('billTimeTxt').textContent === '2024年2月3日 21:30', '2 往年带年份：' + $('billTimeTxt').textContent);
   const far = new w.Date(now.getFullYear(), now.getMonth(), now.getDate() - 10, 7, 0);
-  w.setDtInput($('billTime'), dt(far));
+  w.JiwenDate.setDtInput($('billTime'), dt(far));
   const farTxt = far.getFullYear() === now.getFullYear() ? `${far.getMonth() + 1}月${far.getDate()}日 07:00` : `${far.getFullYear()}年${far.getMonth() + 1}月${far.getDate()}日 07:00`;
   ok($('billTimeTxt').textContent === farTxt, '2 别的日子写几月几日：' + $('billTimeTxt').textContent);
   $('billTimeLine').click();
   ok(shown('dtMask'), '2 点时间那一行：弹日期时间选择');
-  w.closeDtPicker && w.closeDtPicker(); if (shown('dtMask')) $('dtMask').style.display = 'none';
+  w.JiwenDate.closeDtPicker && w.JiwenDate.closeDtPicker(); if (shown('dtMask')) $('dtMask').style.display = 'none';
 
   // 3. 1019-Z：统计口径一行三个小按钮，直接看得见；说明只在不是「计入」时显示；选了信用卡还款这类分类照旧自动变「不计入」
   const modes = () => [...$('billMode').children].map(c => c.textContent).join();

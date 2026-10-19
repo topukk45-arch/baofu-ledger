@@ -159,6 +159,7 @@
   - 1019-Z4-M8 文字小面板 `app/text.js`（`JiwenText`，14 条、对外 `closeText`，老入口 `window.openTextPanel` 照旧）。同时设计表：分类管理排到统计页前面（统计页的预算要调「设预算」「管理分类」），回调口加 `cats → stats: renderStats`、`settings → tabs: snapDrop`（同两种老回调）；登记了几处跟着页面走的绑定（管理分类按钮归设置页、进 / 出日子管理页和「接下来可以」归外壳）；搬家工具支持读写口（别处会改的变量，入口上 get / set，读写的地方改成「入口.名字」，统计页搬的时候用）。
   - 1019-Z4-M9 共用面板的底座 `app/sheet.js`（`JiwenPanel`，16 条、对外 bindSheetDrag / sheetGhostsFinish；共用面板本身 `window.JiwenSheet` 也在里面，老入口照旧挂着）。
   - 1019-Z4-M10 提示框 `app/ask.js`（`JiwenAsk`，22 条、对外 askCancel / askMask / closeAsk / customAlert / customAlertHtml / customChoose / customConfirm / customPrompt）。
+  - 1019-Z4-M11 日期选择 `app/date.js`（`JiwenDate`，55 条、对外 DT_YEAR_MAX / DT_YEAR_MIN / attachSwipe / closeDtPicker / getDtInput / openDtPicker / openDtPickerDate / playSlide / setDtInput）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

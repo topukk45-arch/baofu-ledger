@@ -37,8 +37,8 @@ const recs = [{ id: 'r1', time: '2026-12-01T12:00', money: 18, type: 'expense', 
   $('themeClose') ? $('themeClose').click() : (d.getElementById('themeMask').style.display = 'none');
 
   // 2. 时 / 分滚轮
-  w.setDtInput($('billTime'), '2026-10-03T14:37');
-  w.openDtPicker($('billTime')); await t.idle();
+  w.JiwenDate.setDtInput($('billTime'), '2026-10-03T14:37');
+  w.JiwenDate.openDtPicker($('billTime')); await t.idle();
   ok(shown('dtMask'), '2 打开日期选择');
   ok($('dtHour').hidden && $('dtMin').hidden && !$('dtTimeRow').querySelector('.cs-wrap'), '2 时 / 分不再是下拉（select 藏起来当取值）');
   const hw = $('dtHourWheel'), mw = $('dtMinWheel');
