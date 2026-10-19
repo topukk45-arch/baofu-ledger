@@ -147,9 +147,9 @@ function bootSync(arc, extraArchives){
 {
   const tpls=[ {id:'a',type:'expense',cat:'游戏',remark:'游戏充值',money:null,mode:'normal'} ];
   const t=await boot({ tpls });
-  t.w.eval("renameCat('游戏')"); t.$('askInput').value='娱乐'; t.$('askOk').click();
+  t.w.eval("JiwenCats.renameCat('游戏')"); t.$('askInput').value='娱乐'; t.$('askOk').click();
   ok(t.arcOf().tpls[0].cat==='娱乐', '分类改名，模板跟着改');
-  t.w.eval("deleteCat('娱乐')"); t.$('askOk').click();
+  t.w.eval("JiwenCats.deleteCat('娱乐')"); t.$('askOk').click();
   ok(t.arcOf().tpls[0].cat==='未分类', '分类删除，模板归未分类');
 }
 

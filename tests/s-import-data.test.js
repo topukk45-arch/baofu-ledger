@@ -319,11 +319,11 @@ let backupText;
 // ===== 5. 分类改名 / 删除对规则的影响 =====
 {
   const t = await boot(SEED());
-  t.w.renameCat('餐饮'); t.$('askInput').value = '吃饭'; t.$('askOk').click(); await t.idle();
+  t.w.JiwenCats.renameCat('餐饮'); t.$('askInput').value = '吃饭'; t.$('askOk').click(); await t.idle();
   let a = t.store().archives['默认存档'];
   ok(JSON.stringify(a.importRules.cat) === JSON.stringify([{ kw: '青禾', cat: '吃饭' }, { kw: '公交', cat: '出行' }, { kw: '橘子', cat: '购物' }]), '5 分类改名：规则里的分类跟着改');
   ok(JSON.stringify(a.importRules.type) === JSON.stringify(RULES.type), '5 类型规则不受影响');
-  t.w.deleteCat('出行'); t.$('askOk').click(); await t.idle();
+  t.w.JiwenCats.deleteCat('出行'); t.$('askOk').click(); await t.idle();
   a = t.store().archives['默认存档'];
   ok(JSON.stringify(a.importRules.cat) === JSON.stringify([{ kw: '青禾', cat: '吃饭' }, { kw: '橘子', cat: '购物' }]), '5 分类删除：指向它的规则一起删');
   const t2 = await reboot(t);

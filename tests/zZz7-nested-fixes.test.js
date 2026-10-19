@@ -68,7 +68,7 @@ const bill = tx => [['微信' + (++seq) + '.csv', B.bill('wechat', tx, { range: 
     const [lg] = await t.st().importsRead(), id = lg.add[0];
     await t.st().aiApply({ of: lg.b, changes: [{ id, set: { cat: '购物' } }] }, {});
     await t.st().aiApply({ of: lg.b, changes: [{ id, set: { cat: '零食' } }] }, {});     // 第二次 AI 修改：原来是「购物」
-    t.w.deleteCat('购物'); t.$('askOk').click(); await t.idle();
+    t.w.JiwenCats.deleteCat('购物'); t.$('askOk').click(); await t.idle();
     const logs = await t.st().importsRead();
     const p = await t.st().undoPlan(logs[2].b);
     await t.st().undo(p);

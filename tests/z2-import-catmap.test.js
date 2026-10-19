@@ -310,11 +310,11 @@ const recOf = (S, pred) => {
     st9.archives['默认存档'].importRules = { cat: [{ kw: '某虚构', cat: '杂项' }], type: [], map: [{ from: '交通出行', cat: '杂项' }, { from: '充值缴费', cat: '其他' }] };
     s9['store_' + ID] = JSON.stringify(st9);
     const t9 = await boot({ seed: s9 });
-    t9.w.renameCat('杂项'); t9.$('askInput').value = '零碎'; t9.$('askOk').click(); await t9.idle();
+    t9.w.JiwenCats.renameCat('杂项'); t9.$('askInput').value = '零碎'; t9.$('askOk').click(); await t9.idle();
     ok(same(t9.arch().importRules.map, [{ from: '交通出行', cat: '零碎' }, { from: '充值缴费', cat: '其他' }]) && same(t9.arch().importRules.cat, [{ kw: '某虚构', cat: '零碎' }]), '9 分类改名：对照、规则跟着改');
-    t9.w.deleteCat('零碎'); t9.$('askOk').click(); await t9.idle();
+    t9.w.JiwenCats.deleteCat('零碎'); t9.$('askOk').click(); await t9.idle();
     ok(same(t9.arch().importRules.map, [{ from: '充值缴费', cat: '其他' }]), '9 分类删掉：指向它的对照作废');
-    t9.w.deleteCat('其他'); t9.$('askOk').click(); await t9.idle();
+    t9.w.JiwenCats.deleteCat('其他'); t9.$('askOk').click(); await t9.idle();
     const ir = t9.arch().importRules;
     ok(!ir || !ir.map, '9 对照删光了：不留空的 map ' + JSON.stringify(ir));
     ok(!t9.errs.length, '9 无报错 ' + t9.errs.join('|'));

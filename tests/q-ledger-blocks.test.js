@@ -216,7 +216,7 @@ const merged=(db,id)=>JSON.parse(db['store_'+id]);
   const t=await boot(OLD_LS);
   const aid=aidOf(await t.db(), ID_A, '默认存档');
   let log=logOps();
-  t.w.eval("renameCat('餐饮')"); t.prompt('吃饭'); await t.idle();
+  t.w.eval("JiwenCats.renameCat('餐饮')"); t.prompt('吃饭'); await t.idle();
   restore();
   const db=await t.db();
   ok(merged(db, ID_A).archives['默认存档'].records.filter(r=>r.cat==='吃饭').length===3, '6 改分类名：三条记录跟着改了');

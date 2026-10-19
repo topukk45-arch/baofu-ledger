@@ -42,7 +42,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   ok(t.recs().length === 1 && $('editMask').style.display === 'flex', '2 返回键只关确认框：记录还在、修改弹窗还开着');
   $('cancelEdit').click();
   // ===== 3. 设置和存档（1017-U）=====
-  w.deleteCat('购物');
+  w.JiwenCats.deleteCat('购物');
   ok(/^删除分类「购物」。\n\n有 1 条记录用着这个分类，删了以后这些记录会变成「未分类」，金额和备注都不动。$/.test($('askMsg').textContent) && $('askOk').textContent === '删除分类「购物」' && $('askOk').classList.contains('warn'), '3 删除分类：写几条会变未分类、按钮写分类名、警示色');
   $('askCancel').click(); await t.idle();
   { const st = w.JiwenStore.loadStore(A.ID); st.archives['另一个'] = { cats: ['未分类'], records: [] }; w.JiwenStore.saveStore(st, A.ID); await t.idle(); }
