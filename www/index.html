@@ -796,7 +796,7 @@
         .rec-money-row { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
         .rec-cur { font-size:26px; color:var(--c-text-soft); flex:none; }
         .edit-dialog input.rec-money { flex:1 1 auto; min-width:0; width:auto; margin:0; padding:4px 2px; height:56px;
-            font-size:32px; line-height:48px; border:none; border-bottom:2px solid var(--c-primary); border-radius:0; background:transparent; }
+            font-size:32px; line-height:48px; border:none; border-bottom:2px solid var(--c-border-mid); border-radius:0; background:transparent; outline:none; }
         .io-chips.io-mini { flex:none; gap:8px; margin:0; }
         .io-chips.io-mini .cc { flex:none; min-width:56px; height:var(--ui-tap); padding:0 12px; line-height:46px; font-size:14px; margin:0; }
         /* 1019-Z：统计口径一行三个小按钮（计入 / 只算结余 / 不计入），说明只在不是「计入」时显示 */
@@ -842,7 +842,8 @@
             font-size:18px; font-weight:bold; }
         .kp-zero { grid-column:1 / span 2; }
         .kp-field { cursor:pointer; caret-color:transparent; }
-        .kp-field.kp-on { border-color:var(--c-accent) !important; box-shadow:0 0 0 2px rgba(var(--c-shadow-rgb),0.25); }
+        /* 1019-Z1：正在用数字键盘输的金额框不加方框，只把下面那条线换成主色、加粗（用内阴影加粗，框的大小不变） */
+        .kp-field.kp-on { outline:none; border-bottom-color:var(--c-primary) !important; box-shadow:inset 0 -2px 0 var(--c-primary) !important; }
         /* 金额框所在的面板临时在底下垫一块键盘那么高的空白，好把金额框滚到键盘上面 */
         .sheet.kp-lift { padding-bottom:calc(var(--kp-h, 320px) + 12px) !important; }
         .sheet-ghost.kp-mask { background:transparent !important; animation:none !important; }
@@ -1527,7 +1528,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z1</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
