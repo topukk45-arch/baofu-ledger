@@ -699,8 +699,7 @@
              detailMask(1000) 反而被压在底下 —— 就是「点了列表没反应」的真相。
              现在：默认 1040（当提示用）；当内容页用时加 .as-page 降到 1010，
              让它上面的 detailMask/editMask 能正常盖住它。 */
-        .mask { position:fixed; top:0; left:0; width:100%;
-            height:100vh; height:100dvh;
+        .mask { position:fixed; top:0; left:0; width:100%; bottom:0;   /* 1019-O：上下贴住可视区（系统缩网页时跟着走），不用 100dvh、不用代码追 */
             background:rgba(0,0,0,0.3); display:none;
             align-items:center; justify-content:center; z-index:1000;
             padding:16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
@@ -785,6 +784,17 @@
         /* 筛选浮层和上面这些在键盘弹起时：保持贴底，高度收进可视区，内部滚动 */
         body.kb-open .sheet-mask { align-items:flex-end; }
         body.kb-open .sheet { max-height:100%; }
+        /* 1019-O：键盘弹起 / 收起时先把所有开着的层按原来的高度冻住（不跟着缩），等键盘停下再只放开最上面那层，
+           它只动一次；下面几层一直不动。--hold-h 是键盘动之前的高度 */
+        .mask.kb-hold { bottom:auto; height:var(--hold-h); }
+        .mask.kb-hold > .sheet, .mask.kb-hold > .edit-dialog, .mask.kb-hold > .dt-dialog { max-height:var(--hold-max) !important; }
+        /* 1019-O：文字输入的小面板（只有一个输入框），和日期选择同一套外观，贴在键盘上面 */
+        #txtMask { z-index:1036; }
+        .txt-sheet .txt-input { width:100%; margin:4px 0 2px; padding:12px; border:1px solid var(--c-primary); border-radius:8px;
+            outline:none; background:var(--c-surface); font-size:16px; font-family:inherit; color:var(--c-text); }
+        .txt-sheet textarea.txt-input { min-height:96px; resize:none; line-height:1.6; }
+        .txt-sheet .txt-count { font-size:12px; color:var(--c-text-soft); text-align:right; }
+        .txt-field { cursor:pointer; caret-color:transparent; }
 
         .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
         .cat-item { display:flex; justify-content:space-between; align-items:center;
@@ -1455,7 +1465,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-N</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-O</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1992,6 +2002,20 @@
         </div>
     </div>
 
+    <!-- 1019-O：文字输入的小面板：备注、分类名、模板名、日子名……点了弹这个，只有一个输入框，贴在系统键盘上面，后面的大面板不动 -->
+    <div class="mask sheet-mask form-mask" id="txtMask">
+        <div class="sheet edit-dialog txt-sheet" id="txtSheet">
+            <div class="sheet-grip" id="txtGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3 id="txtTitle">备注</h3></div></div>
+            <input type="text" id="txtInput" class="txt-input" enterkeyhint="done">
+            <textarea id="txtArea" class="txt-input" rows="3" style="display:none"></textarea>
+            <div class="txt-count" id="txtCount"></div>
+            <div class="dialog-btn ui-stack form-btns">
+                <button class="ui-btn primary block" id="txtOk">确定</button>
+                <button class="ui-btn block" id="txtCancel">取消</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 1019-K：模板面板（新建 / 编辑）：只填模板要的，没有记账时间；保存只存模板、不写账本 -->
     <div class="mask sheet-mask form-mask" id="tplEditMask">
         <div class="sheet edit-dialog" id="tplEditSheet">
@@ -2286,28 +2310,53 @@
         // 这里的 JS 只做一件事：用浏览器原生的 visualViewport 检测键盘开/关，借此隐藏底栏与
         // 悬浮按钮，并给极旧 webview 兜底 mask 高度。不依赖任何 Capacitor 插件的 JS 引用
         // （纯 HTML 项目里 window.Capacitor.Plugins.Keyboard 不一定存在，依赖它会判断失灵）。
+        // 1019-O：等面板滑入的动画走完再做（没动画、被打断的 260 毫秒兜底）
+        function afterOpenAnim(mask, fn){
+            const sh=mask && (mask.querySelector('.sheet') || mask.firstElementChild); let done=false;
+            const go=()=>{ if(done) return; done=true; fn(); };
+            if(sh) sh.addEventListener('animationend', go, { once:true });
+            setTimeout(go, 260);
+        }
         (function(){
             const vv = window.visualViewport;
 
-            // 兜底：极旧、不支持 dvh 的 webview 在键盘弹起时 100dvh 不收缩，这里同步 mask 高度。
-            // 现代 webview（含本 App 的 adjustResize）下 dvh 会自动收缩，这步是无害的双保险。
-            function syncMaskHeight(kb){
-                if(!vv) return;
-                document.querySelectorAll('.mask').forEach(m=>{
-                    if(getComputedStyle(m).display==='none'){ m.style.height=''; return; }
-                    m.style.height = kb ? vv.height+'px' : '';
-                });
+            // 1019-O：原来每次可视区一变（键盘动画里一帧一次）就把每一层 mask 的高度改成可视区高度，
+            //   加上系统（adjustResize）自己也在缩网页，两边叠成两次移动，叠几层每层都跟着动，看着抖。
+            //   现在：可视区一开始变，先把所有开着的层按变之前的高度冻住（.kb-hold），不跟着动；
+            //   等可视区停下来（KB_SETTLE_MS 没再变），只放开最上面那一层——它只动一次，贴到键盘上面；下面几层一直不动。
+            //   键盘收起、可视区回到原来的高度，全部放开（冻住的高度本来就是原来的，不会再动）。
+            const KB_SETTLE_MS=120;
+            function openMasks(){
+                const ms=[...document.querySelectorAll('.mask')].filter(m=>m.style.display==='flex');
+                ms.sort((a, b)=>(parseInt(getComputedStyle(a).zIndex)||0)-(parseInt(getComputedStyle(b).zIndex)||0) || (a.compareDocumentPosition(b) & 4 ? -1 : 1));
+                return ms;
             }
+            let holdH=0, settleT=null;
+            function holdAll(h){ openMasks().forEach(m=>{ if(m.classList.contains('kb-hold')) return;
+                const sh=m.querySelector('.sheet') || m.firstElementChild;
+                // 面板的最高高度原来按屏幕百分比算，屏幕一缩它也缩：冻住时一起按现在的像素定住
+                // 这时屏幕已经缩了（按屏幕百分比算的最高高度也跟着缩了），按比例换回键盘动之前的高度
+                if(sh){ const mx=getComputedStyle(sh).maxHeight, cur=(vv && vv.height) || window.innerHeight || h;
+                    m.style.setProperty('--hold-max', /px$/.test(mx) ? Math.round(parseFloat(mx)/cur*h)+'px' : Math.round(h*0.88)+'px'); }
+                m.style.setProperty('--hold-h', h+'px'); m.classList.add('kb-hold'); }); }
+            function releaseTop(shrunk){
+                const ms=openMasks();
+                if(!shrunk){ document.querySelectorAll('.mask.kb-hold').forEach(m=>m.classList.remove('kb-hold')); return; }
+                const top=ms[ms.length-1]; if(top) top.classList.remove('kb-hold');
+            }
+            window.__kbHoldInfo=()=>({ holdH, held:[...document.querySelectorAll('.mask.kb-hold')].map(m=>m.id) });   // 给测试用
 
             if(vv){
-                let baseH = vv.height;
+                let baseH = vv.height, lastH = vv.height;
                 vv.addEventListener('resize', ()=>{
                     const shrunk = (baseH - vv.height) > 120;   // 可视区明显变矮 = 键盘弹起
+                    if(!settleT){ holdH=Math.round(lastH); holdAll(holdH); }   // 这一轮刚开始变：按变之前的高度冻住（先冻再改 kb-open，免得量到变了以后的高度）
                     document.body.classList.toggle('kb-open', shrunk);
-                    if(!shrunk) baseH = vv.height;               // 键盘收起后更新基准（应对横竖屏切换）
-                    syncMaskHeight(shrunk);
+                    lastH=vv.height;
+                    clearTimeout(settleT);
+                    settleT=setTimeout(()=>{ settleT=null; releaseTop(shrunk); if(!shrunk) baseH=vv.height; }, KB_SETTLE_MS);
                 });
-                window.__relayoutMasks = ()=>syncMaskHeight((baseH - vv.height) > 120);
+                window.__relayoutMasks = ()=>{};
             } else {
                 window.__relayoutMasks = ()=>{};
             }
@@ -2318,8 +2367,8 @@
                 const dlg = mask.firstElementChild;
                 if(dlg){ dlg.style.opacity = '1'; dlg.style.transition = ''; }
                 mask.style.display = 'flex';
-                // 稍等一拍再聚焦，让弹窗先完成绘制，键盘随后弹起，不抢在绘制前造成空帧
-                setTimeout(()=>{ try{ focusEl && focusEl.focus(); }catch(e){} }, 50);
+                // 1019-O：等面板滑上来的动画走完再聚焦（原来 50 毫秒就聚焦，打开动画和键盘动画一起跑）
+                if(focusEl) afterOpenAnim(mask, ()=>{ try{ if(mask.style.display==='flex') focusEl.focus(); }catch(e){} });
             };
         })();
 
@@ -2339,16 +2388,8 @@
                 if(delta > 0) dlg.scrollTop += delta;
             }
             window.__revealSave = revealSave;   // 给测试用
-            PAIRS.forEach(([taId, btnId])=>{
-                const ta = document.getElementById(taId), btn = document.getElementById(btnId);
-                if(!ta || !btn) return;
-                // 等两拍：WebView 先自己滚一次；键盘若是刚弹起，还要等可视区收缩落定
-                ta.addEventListener('focus', ()=>{
-                    setTimeout(()=>revealSave(ta, btn), 120);
-                    setTimeout(()=>revealSave(ta, btn), 400);
-                });
-            });
-            if(window.visualViewport){
+            // 1019-O：备注改成点了弹文字输入小面板，大面板在输入时不动；写完（小面板点「确定」）才让保存按钮露出来（见 txtOk）
+            if(false && window.visualViewport){
                 window.visualViewport.addEventListener('resize', ()=>{
                     const a = document.activeElement;
                     PAIRS.forEach(([taId, btnId])=>{ if(a && a.id===taId) revealSave(a, document.getElementById(btnId)); });
@@ -2604,7 +2645,7 @@
             askValidate=validate||null;
             askResolve=(r)=>{ if(r!==null && onOk) onOk(r); };
             askShow();
-            setTimeout(()=>{ askInput.focus(); askInput.select(); }, 50);
+            afterOpenAnim(askMask, ()=>{ if(askMask.style.display==='flex' && askInput.style.display!=='none'){ askInput.focus(); askInput.select(); } });   // 1019-O：等滑上来再聚焦
         }
         // 选项弹窗：在弹窗里就地渲染一组可点选标签，选中点确定回调所选值。
         //   options: [{ value, label, cls }]  cls 用于收支的红/绿选中态（sel-out/sel-in）
@@ -11246,6 +11287,7 @@ ${detail}
             refundMask:()=>closeRefund(),
             tplMask:()=>{ $('tplMask').style.display='none'; },
             tplEditMask:()=>closeTplEditor(),
+            txtMask:()=>closeText(),
             catMask:()=>{ $('catMask').style.display='none'; },
             themeMask:()=>{ $('themeMask').style.display='none'; },
             dtMask:()=>closeDtPicker(),   // 和原来返回键一样：直接关，不算「取消」回调
@@ -11255,7 +11297,7 @@ ${detail}
             dayMgrMask:()=>closeDayMgr(),
             ymMask:()=>{ $('ymMask').style.display='none'; },
         };
-        const FORM_ASK=['addMask','editMask','dayMask','tplEditMask'];
+        const FORM_ASK=['addMask','editMask','dayMask','tplEditMask','txtMask'];
         const formSnaps={};
         // 表单现在的样子：输入框、日期、选中的标签、开关（打开时记一份，关的时候比一比）
         function formState(id){
@@ -11289,6 +11331,55 @@ ${detail}
                 }).observe(m, { attributes:true, attributeFilter:['style'] });
             }
         });
+
+        // ===== 1019-O：文字输入的小面板 =====
+        //   这些输入框不再直接弹系统键盘（readonly + inputmode=none）：点了弹 #txtMask（标题、一个输入框、确定 / 取消），
+        //   等小面板滑上来再聚焦；确定把字写回原来的框（发 input / change），取消什么都不改；回到原来的面板。
+        //   返回键：键盘开着时系统先收键盘，再按关小面板，再按才关原来的面板。
+        const TXT_FIELDS={
+            billRemark:{ title:'备注', multi:true }, editRemark:{ title:'备注', multi:true }, refundRemark:{ title:'备注（选填）', multi:true },
+            tplEditName:{ title:'模板名字（最多 10 字）' }, tplEditRemark:{ title:'备注', multi:true },
+            dayName:{ title:'日子名称（最多 8 字）' }, newCatName:{ title:'新分类名称（最多 8 字）' }, searchKeyword:{ title:'备注关键词' },
+        };
+        // 写完以后让原来面板的保存按钮露出来（原来 1010-K5 是点备注时滚）
+        const TXT_REVEAL={ billRemark:'addBill', editRemark:'saveEdit' };
+        let txtTarget=null;
+        const txtIn=()=>$(TXT_FIELDS[txtTarget.id].multi ? 'txtArea' : 'txtInput');
+        function txtCount(){ const el=txtIn(), mx=txtTarget && txtTarget.maxLength>0 ? txtTarget.maxLength : 0; $('txtCount').textContent = mx && mx<200 ? `${charLen(el.value)} 字` : ''; }
+        function openTextPanel(el){
+            const cfg=TXT_FIELDS[el.id]; if(!cfg) return;
+            txtTarget=el;
+            $('txtTitle').textContent=cfg.title;
+            const multi=!!cfg.multi;
+            $('txtArea').style.display=multi ? '' : 'none'; $('txtInput').style.display=multi ? 'none' : '';
+            const inp=txtIn();
+            inp.value=el.value; inp.placeholder=el.placeholder||'';
+            if(el.maxLength>0) inp.maxLength=el.maxLength; else inp.removeAttribute('maxlength');
+            txtCount();
+            $('txtMask').style.display='flex';
+            afterOpenAnim($('txtMask'), ()=>{ if($('txtMask').style.display!=='flex' || txtTarget!==el) return; try{ inp.focus(); const n=inp.value.length; inp.setSelectionRange(n, n); }catch(_){} });
+        }
+        function closeText(){ $('txtMask').style.display='none'; try{ txtIn().blur(); }catch(_){} txtTarget=null; }
+        function txtOk(){
+            const el=txtTarget; if(!el) return;
+            el.value=txtIn().value;
+            closeText();
+            el.dispatchEvent(new Event('input', { bubbles:true })); el.dispatchEvent(new Event('change', { bubbles:true }));
+            const b=TXT_REVEAL[el.id];
+            if(b && window.__revealSave){ setTimeout(()=>window.__revealSave(el, $(b)), 60); }
+        }
+        $('txtOk').addEventListener('click', txtOk);
+        $('txtCancel').addEventListener('click', closeText);
+        $('txtInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); txtOk(); } });
+        ['txtInput','txtArea'].forEach(id=>$(id).addEventListener('input', txtCount));
+        Object.keys(TXT_FIELDS).forEach(id=>{
+            const el=$(id); if(!el) return;
+            el.readOnly=true; el.setAttribute('inputmode', 'none'); el.classList.add('txt-field');
+            const go=e=>{ if($('txtMask').style.display==='flex') return; if(e && e.type==='focus') el.blur(); openTextPanel(el); };
+            el.addEventListener('click', go);
+            el.addEventListener('focus', go);
+        });
+        window.openTextPanel=openTextPanel;   // 给测试用
 
         // ===== 1019-N：所有底部面板关闭都有收起动画 =====
         //   不管怎么关（返回键、侧滑返回、取消 / 确定、往下拉、代码里关），面板一 display:none，就在原地放一个「影子」：
@@ -11465,6 +11556,8 @@ ${detail}
             const LAYERS=[
                 // 1040 提示/确认：走 closeAsk(null)，等价于「取消」，会触发它自己的 onCancel
                 { can:askIsPrompt,              close:()=>closeAsk(null) },
+                // 1019-O 文字输入的小面板（盖在记一笔、修改等上面）
+                { can:()=>isOpen('txtMask'),    close:()=>formBackClose('txtMask') },
                 // 1017-UI1 底部选择 / 确认面板（JiwenSheet，z1000 的 sheet-mask，盖在导入页上面）：返回键等于「取消 / 再看看 / 继续导入」，写入中不关
                 { can:()=>!!(window.JiwenSheet && window.JiwenSheet.isOpen()), close:()=>window.JiwenSheet.back() },
                 // 1016-B 导入页（整页，盖在别的页面上面）：里面先关哪一层（行详情 → 进度 → 整页）由它自己定

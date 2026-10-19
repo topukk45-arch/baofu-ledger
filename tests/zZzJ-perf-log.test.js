@@ -41,7 +41,7 @@ const log = w => JSON.parse(w.localStorage.getItem('app_perf_log') || '[]');
   w.visualViewport.height = 650; w.visualViewport.dispatchEvent(new w.Event('resize'));
   await wait(1000);
   const k = log(w).find(e => e.kind === '键盘');
-  ok(k && typeof k.moves === 'number' && k.vv === '970→650' && /addMask/.test(k.what), '4 键盘弹起：记了面板位置变了几次 ' + JSON.stringify(k));
+  ok(k && typeof k.moves === 'number' && k.vv === '970→650' && /txtMask/.test(k.what), '4 键盘弹起：记了面板位置变了几次（1019-O 起点备注弹的是文字输入小面板）' + JSON.stringify(k));
 
   // 5. 页面：设置里有入口（开发开关开着），一行一条，能复制、清空
   t.d.querySelector('.tab-btn[data-tab="settings"]').click();

@@ -462,26 +462,30 @@ async function run(cfg, port, browser) {
     const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(40), cats: BASE_CATS.slice(0, 10) }) });
     await tab(page, 'ledger');
     const KB = 320;
-    const kbCheck = async (name, maskId, focusSel) => {
-      await page.focus(focusSel).catch(() => {});
+    // 1019-O 起点备注 / 日子名弹的是文字输入小面板（#txtMask），量它贴不贴键盘；下面那层（记一笔 / 修改 / 日子）不能跟着动
+    const kbCheck = async (name, maskId, focusSel, lowerId) => {
+      await page.click(focusSel).catch(() => {}); await page.waitForTimeout(400);
+      const lowTop0 = lowerId ? await page.evaluate(id => Math.round(document.getElementById(id).querySelector('.sheet').getBoundingClientRect().top), lowerId) : null;
       await page.setViewportSize({ width: cfg.w, height: cfg.h - KB }); await page.waitForTimeout(450);
       const r = await page.evaluate(id => { const m = document.getElementById(id), sh = m.querySelector('.sheet'), b = sh.getBoundingClientRect(), g = m.querySelector('.sheet-grip').getBoundingClientRect();
         return { kbOpen: document.body.classList.contains('kb-open'), gap: Math.round((window.visualViewport ? visualViewport.height : innerHeight) - b.bottom), top: Math.round(b.top), gripTop: Math.round(g.top), H: innerHeight }; }, maskId);
+      if (lowerId) r.lowerMoved = (await page.evaluate(id => Math.round(document.getElementById(id).querySelector('.sheet').getBoundingClientRect().top), lowerId)) - lowTop0;
       results.push(Object.assign({ name: 'kb-' + name, cfg: cfg.name, kb: true }, r));
       if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-kb-${name}.png`) });
       await page.setViewportSize({ width: cfg.w, height: cfg.h }); await page.waitForTimeout(450);
       await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; }));
+      await page.waitForTimeout(300);
     };
     await click(page, '.act-add'); await page.waitForTimeout(400);
-    await kbCheck('add-record', 'addMask', '#billRemark');
+    await kbCheck('add-record', 'txtMask', '#billRemark', 'addMask');
     await page.evaluate(() => { const r = document.querySelector('#billList [data-act="edit"]'); if (r) window.openEdit(r.dataset.id); });
     await page.waitForTimeout(400);
     const editOpen = await page.evaluate(() => { if (document.getElementById('editMask').style.display !== 'flex') { const b = document.getElementById('detailEdit'); if (b && document.getElementById('detailMask').style.display === 'flex') b.click(); } return document.getElementById('editMask').style.display === 'flex'; });
-    if (editOpen) await kbCheck('edit-record', 'editMask', '#editRemark');
+    if (editOpen) await kbCheck('edit-record', 'txtMask', '#editRemark', 'editMask');
     await page.evaluate(() => { const b = document.getElementById('daysAdd') || document.querySelector('.days-add'); if (b) b.click(); });
     await page.waitForTimeout(300);
     const dayOpen = await page.evaluate(() => document.getElementById('dayMask').style.display === 'flex');
-    if (dayOpen) await kbCheck('day', 'dayMask', '#dayName');
+    if (dayOpen) await kbCheck('day', 'txtMask', '#dayName', 'dayMask');
     await page.close();
   }
   // ===== 7. 分类管理按 1.3 倍字号（1019-C）：分类名完整、不贴边，预算那段先省略 =====
@@ -524,7 +528,7 @@ async function run(cfg, port, browser) {
     all[c].forEach(m => {
       if (m.name === 'devoff-leaks') return;
       if (m.cat) { const bad = m.rows.filter(x => x.cut || x.gap < 8 || x.h < 48); md.push(`| ${m.name} | ${m.rows.length} 行 | 分类名被截 ${m.rows.filter(x => x.cut).length} 行 | 离 › 不到 8px ${m.rows.filter(x => x.gap < 8).length} 行 | 行高 ${Math.min(...m.rows.map(x => x.h))}px 起 | ${bad.length ? '有问题' : ''} | | |`); return; }
-      if (m.kb) { md.push(`| ${m.name} | 键盘弹起：${m.kbOpen ? '认出来了' : '没认出来'} | 下沿离键盘 ${m.gap}px | 标题离顶 ${m.gripTop}px | — | ${m.gap > 1 || m.gripTop < 0 ? '有问题' : ''} | ${m.H} | |`); return; }
+      if (m.kb) { md.push(`| ${m.name} | 键盘弹起：${m.kbOpen ? '认出来了' : '没认出来'} | 小面板下沿离键盘 ${m.gap}px | 标题离顶 ${m.gripTop}px | 下面那层动了 ${m.lowerMoved == null ? '-' : m.lowerMoved}px | ${m.gap > 1 || m.gripTop < 0 || m.lowerMoved ? '有问题' : ''} | ${m.H} | |`); return; }
       const pr = m.prim.slice(0, 3).map(p => `${p.name.split(' ')[0]} ${p.offscreen ? '要往下滑' : p.fromBottom}`).join('；') || '—';
       md.push(`| ${m.name} | ${m.n} | ${m.small.length} | ${m.tight.length} | ${pr} | ${m.prim.some(p => p.upper) ? '是' : ''} | ${m.contentBottom} / ${m.H} | ${m.blank} |`);
     });

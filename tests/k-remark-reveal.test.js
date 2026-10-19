@@ -36,7 +36,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
     const dlg=t.$('addMask').querySelector('.edit-dialog');
     // 弹窗可视区 60~620（键盘顶上来后只剩这么高）；备注 540~610，添加记录 630~680
     const getSt=fakeLayout(dlg,{dlg:[60,620],inner:[[t.$('billRemark'),[540,610]],[t.$('addBill'),[630,680]]]});
-    t.$('billRemark').focus();
+    t.$('billRemark').focus(); t.$('txtOk').click();   // 1019-O 起点备注先弹文字输入小面板，点「确定」回来才滚
     await wait(450);
     ok(getSt()===72, '滚动量刚好让「添加记录」露出（680+12-620=72）：'+getSt());
     const b=t.$('addBill').getBoundingClientRect(), r=t.$('billRemark').getBoundingClientRect();
@@ -51,7 +51,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
     t.$('fabAdd').click();
     const dlg=t.$('addMask').querySelector('.edit-dialog');
     const getSt=fakeLayout(dlg,{dlg:[60,900],inner:[[t.$('billRemark'),[540,610]],[t.$('addBill'),[630,680]]]});
-    t.$('billRemark').focus();
+    t.$('billRemark').focus(); t.$('txtOk').click();   // 1019-O 起点备注先弹文字输入小面板，点「确定」回来才滚
     await wait(450);
     ok(getSt()===0, '键盘没弹 / 屏幕够高时不滚动');
   }
@@ -63,7 +63,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
     const dlg=t.$('addMask').querySelector('.edit-dialog');
     // 需要滚 240+12-200=52，但备注框顶部离弹窗顶只有 100-60-8=32 的余量
     const getSt=fakeLayout(dlg,{dlg:[60,200],inner:[[t.$('billRemark'),[100,170]],[t.$('addBill'),[190,240]]]});
-    t.$('billRemark').focus();
+    t.$('billRemark').focus(); t.$('txtOk').click();   // 1019-O 起点备注先弹文字输入小面板，点「确定」回来才滚
     await wait(450);
     ok(getSt()===32, '滚动量被备注框顶部卡住，只滚 32：'+getSt());
     ok(t.$('billRemark').getBoundingClientRect().top>=60, '备注框仍在可视区');
@@ -76,7 +76,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
     ok(t.$('editMask').style.display!=='none' && t.$('editMask').style.display!=='', '打开了修改弹窗');
     const dlg=t.$('editMask').querySelector('.edit-dialog');
     const getSt=fakeLayout(dlg,{dlg:[60,620],inner:[[t.$('editRemark'),[530,600]],[t.$('saveEdit'),[625,665]]]});
-    t.$('editRemark').focus();
+    t.$('editRemark').focus(); t.$('txtOk').click();   // 同上
     await wait(450);
     ok(getSt()===57, '修改弹窗滚到「保存」可见（665+12-620=57）：'+getSt());
   }
