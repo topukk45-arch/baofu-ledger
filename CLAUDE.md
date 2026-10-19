@@ -135,7 +135,7 @@
   | 2 面板底座 | select（`JiwenSelect`）→ keypad（`JiwenKeypad`）→ text（`JiwenText`）→ sheet（`JiwenPanel`，共用面板的老入口 `JiwenSheet` 不变）→ ask（`JiwenAsk`）→ date（`JiwenDate`） | 金色下拉、数字键盘、文字小面板、共用底部面板（往下拉关闭、收起动画、滚动锁、按下反馈）、提示 / 确认 / 输入框（要用面板的往下拉）、日期时间选择（要用提示框）（1019-Z4-M5 调了先后） |
   | 3 业务 | ai（`JiwenAiExport`）→ impentry（`JiwenImportEntry`） | 导出账单给 AI、导入入口（开发开关、`loadImportUI`、用记问打开、空账本入口、月初提醒、待处理横幅） |
   | 4 页面 | forms（`JiwenForms`）→ ledger（`JiwenLedger`）→ stats（`JiwenStats`）→ days（`JiwenDays`）→ cats（`JiwenCats`） | 记一笔 / 修改 / 退款 / 口径 / 模板；账单页（列表、翻页、搜索筛选、分类汇总、批量）；统计页（预算、预算建议、年月选择、账单详情）；日子；分类管理 |
-  | 5 外壳 | settings（`JiwenSettings`）→ tabs（`JiwenTabs`）→ login（`JiwenLogin`）→ back（`JiwenBack`）→ boot（不对外） | 设置页、外观、存储用量；页签切换、进账号、日子管理页进出、刷新所有页面、被杀回来、首屏快照、历史脏数据自检；登录页；返回键层级表和弹窗关闭表（要认得每一种弹窗，所以放最上面）；启动 |
+  | 5 外壳 | settings（`JiwenSettings`）→ tabs（`JiwenTabs`）→ login（`JiwenLogin`）→ back（`JiwenBack`）→ boot（`JiwenBoot`，空的） | 设置页、外观、存储用量；页签切换、进账号、日子管理页进出、刷新所有页面、被杀回来、首屏快照、历史脏数据自检；登录页；返回键层级表和弹窗关闭表（要认得每一种弹窗，所以放最上面）；启动 |
   按节归、个别名字单独挪（比如 `pad`、`escapeHtml` 原来在日期选择、存储那几节，归基础；`getUserData` 原来在分类拖动那节，归存储），全表见 `modules-plan.js`；`node tests/tools/modules-plan.js` 打印每个模块多大、还有哪些往上调用。
 - 往上调用（回调口）：按这张表算下来只剩三种，暂时留着、测试锁住只减不增：数据改了删首屏快照（存储 → `snapDrop`）、存储写不进去弹提示（存储 → `customAlert`）、数据改了刷新所有页面（分类 / 账单页批量 / 记一笔 / 详情 → `refreshAllViews`、`refreshCatSelectors`）。写法：调用的时候才去 `window.JiwenXxx.fn()` 拿（加载时不取）。以后改成「下层留一个口子、上层登记进来」要你定（见还要确认）。
 - 一个模块的文件长这样：开头 `(function(){`、结尾把入口挂上 `window.JiwenXxx = { … };` 再 `})();`；代码原样剪进去，**不改缩进、不改一个字**（测试里有按原文找的检查，比如 `const SHEET_MS=300;`）。用下层的东西：模块开头一行 `const { a, b, c } = window.JiwenBase;`，取出来的名字和原来一样，调用的地方不用改；只取函数和常量。
@@ -172,6 +172,7 @@
   - 1019-Z4-M21 外壳 `app/tabs.js`（`JiwenTabs`，47 条、对外 backFromDaysPage / enterAccount / refreshAllViews / refreshCatSelectors / snapDrop / snapUnveil / switchTab）。
   - 1019-Z4-M22 登录页 `app/login.js`（`JiwenLogin`，17 条、对外 login / renderRecentUsers）。
   - 1019-Z4-M23 返回键 `app/back.js`（`JiwenBack`，7 条、对外 ）。
+  - 1019-Z4-M24 启动 `app/boot.js`（`JiwenBoot`，1 条、对外 ）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

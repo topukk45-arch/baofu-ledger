@@ -30,7 +30,7 @@ const MODULES = [
   { key: 'tabs', layer: 5, entry: 'JiwenTabs', file: 'app/tabs.js', what: '外壳：页签切换、进账号（enterAccount）、历史脏数据自检、进日子管理页 / 回来、刷新所有页面、被杀回来、首屏快照（老入口 window.snapSave / snapDrop 留着）', secs: ['底部标签切换', '1019-F：切到后台被系统杀掉，回来看不出来', '1019-U：首屏快照'], names: ['gotoDaysPage', 'backFromDaysPage', 'refreshAllViews', 'refreshCatSelectors', 'enterAccount', 'runTimeRepairOnce', 'scanAndRepairStore'] },
   { key: 'login', layer: 5, entry: 'JiwenLogin', file: 'app/login.js', what: '登录页：账号列表、新建账号、从文件导入存档、登录（login）', secs: ['登录页：从文件导入存档（先选文件，再指定要导入到哪个账号）', '登录页：账号列表'], names: ['promptNewAccount', 'login'] },
   { key: 'back', layer: 5, entry: 'JiwenBack', file: 'app/back.js', what: '系统返回键 / 侧滑返回的层级表、弹窗往下拉 / 返回键关闭表（FORM_CLOSE，要认得每一种弹窗，所以放最上面）', secs: ['1019-B：底部面板式的弹窗，往下拉 / 返回键关闭走同一个出口', '系统返回键 / 侧滑返回'], names: [] },
-  { key: 'boot', layer: 5, entry: null, file: 'app/boot.js', what: '启动（initApp）、历史脏数据自检', secs: ['历史脏数据自检与修复：time 字面量 vs Date 解析不一致', '页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页'], names: [] },
+  { key: 'boot', layer: 5, entry: 'JiwenBoot', file: 'app/boot.js', what: '启动（initApp）、历史脏数据自检', secs: ['历史脏数据自检与修复：time 字面量 vs Date 解析不一致', '页面初始化：若上次已登录且未退出，自动进入主界面；否则显示登录页'], names: [] },
 ];
 // 顶层的绑定语句（不定义名字的那种）跟着它服务的页面走：按语句开头的文字认，归到这里写的模块，不管原来在哪一节
 const BIND = [
