@@ -37,6 +37,8 @@
             --c-bg:#fdf8e8;           /* 页面背景 */
             --c-card-1:#fff9e6;       /* 卡片渐变浅 */
             --c-card-2:#fff1c1;       /* 卡片渐变深 */
+            --sheet-ms:300ms;          /* 1019-Z3：底部面板打开 / 收起的时长（和脚本里的 SHEET_MS 一致，脚本启动时按它重写一次） */
+            --sheet-ease:cubic-bezier(.2,.8,.2,1);   /* 先快后慢 */
             --c-sheet:#fff5d4;        /* 1019-T：底部面板的底色（一整块纯色，顶上钉住的拖动条 / 标题和贴底的按钮排用同一个色，不出接缝） */
             --c-chip:#fff5cc;         /* 标签/选项悬停底 */
             --c-on-primary:#fff;      /* 主色上的文字（白） */
@@ -737,7 +739,7 @@
             box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4);
             padding:8px 18px calc(20px + env(safe-area-inset-bottom));
             max-height:85dvh; overflow-y:auto;
-            transform:translateY(100%); transition:transform .22s ease; }   /* 1019-N：打开往上滑入，和关掉滑走差不多快 */
+            transform:translateY(100%); transition:transform var(--sheet-ms) var(--sheet-ease); }   /* 1019-N：打开往上滑入；1019-Z3 起和收起同一个时长、先快后慢 */
         .sheet-mask.open .sheet { transform:translateY(0); }   /* 打开时滑入 */
         .sheet-handle { width:40px; height:4px; border-radius:2px; background:var(--c-border-mid);
             margin:6px auto 12px; }
@@ -772,7 +774,7 @@
            .form-mask 的面板显示出来（display:flex）就在位，从下面滑上来用动画，不靠 .open 类。
            键盘弹起时和筛选一样：mask 高度由 syncMaskHeight 收成可视区，面板贴着键盘上沿、最高占满可视区、里面滑，
            不再顶部对齐（原来顶部对齐时面板下沿和键盘之间会露缝）。 */
-        .form-mask > .sheet { background:var(--c-sheet); transform:none; animation:askUp .22s ease; max-height:88vh; max-height:88dvh;
+        .form-mask > .sheet { background:var(--c-sheet); transform:none; animation:askUp var(--sheet-ms) var(--sheet-ease); max-height:88vh; max-height:88dvh;
             width:100%; max-width:760px; padding:8px 18px calc(20px + env(safe-area-inset-bottom));
             border-radius:18px 18px 0 0; border-bottom:none; box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4); }
         /* 拖动条和标题钉在面板顶上：键盘弹起、面板里滑到备注时，标题照样看得见、照样能往下拉 */
@@ -991,13 +993,13 @@
 
         /* 自定义确认/输入弹窗（1017-S 起是底部面板：.sheet 外观，文字左对齐，按钮竖排、贴底） */
         #askMask .ask-dialog { transform:translateY(0); max-height:85vh; max-height:85dvh; padding-bottom:0; }
-        #askMask.open .ask-dialog { animation:askUp .22s ease; }
+        #askMask.open .ask-dialog { animation:askUp var(--sheet-ms) var(--sheet-ease); }
         @keyframes askUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
         /* 1019-N：面板关掉时的影子：往下滑走 + 遮罩淡出（约 200 毫秒），点不动；减少动画时只很快地淡出 */
         .sheet-ghost { position:fixed; top:0; left:0; width:100%; height:100vh; height:100dvh; display:flex; align-items:flex-end; justify-content:center;
             background:rgba(0,0,0,0.3); pointer-events:none; overflow:hidden; }
-        .sheet-ghost.ghost-down { animation:ghostBgOut .2s ease forwards; }
-        .sheet-ghost.ghost-down > * { animation:ghostDown .2s ease forwards !important; }
+        .sheet-ghost.ghost-down { animation:ghostBgOut var(--sheet-ms) var(--sheet-ease) forwards; }
+        .sheet-ghost.ghost-down > * { animation:ghostDown var(--sheet-ms) var(--sheet-ease) forwards !important; }
         .sheet-ghost.ghost-fade { animation:ghostFade .08s linear forwards; }
         .sheet-ghost.ghost-fade > * { animation:none !important; }
         @keyframes ghostDown { from { transform:translateY(var(--gy, 0px)); } to { transform:translateY(100%); } }
@@ -1528,7 +1530,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z2</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z3</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2441,11 +2443,15 @@
         // 悬浮按钮，并给极旧 webview 兜底 mask 高度。不依赖任何 Capacitor 插件的 JS 引用
         // （纯 HTML 项目里 window.Capacitor.Plugins.Keyboard 不一定存在，依赖它会判断失灵）。
         // 1019-O：等面板滑入的动画走完再做（没动画、被打断的 260 毫秒兜底）
+        // 1019-Z3：底部面板打开 / 收起（往下拉松手、返回键、按钮都是）的时长，改这一个数就行；CSS 里的 --sheet-ms 按它重写
+        const SHEET_MS=300;
+        try{ document.documentElement.style.setProperty('--sheet-ms', SHEET_MS+'ms'); }catch(_){}
+        window.SHEET_MS=SHEET_MS;   // 给测试用
         function afterOpenAnim(mask, fn){
             const sh=mask && (mask.querySelector('.sheet') || mask.firstElementChild); let done=false;
             const go=()=>{ if(done) return; done=true; fn(); };
             if(sh) sh.addEventListener('animationend', go, { once:true });
-            setTimeout(go, 260);
+            setTimeout(go, SHEET_MS+40);   // 没有动画事件（被打断、减少动画）的兜底
         }
         (function(){
             const vv = window.visualViewport;
@@ -11864,7 +11870,7 @@ ${detail}
         //   照着关之前的样子复制一份（没有 id、点不动），往下滑走 + 遮罩淡出（SHEET_OUT_MS，和往下拉松手后差不多），收完就移除。
         //   真正的面板当场就关了，所以关掉以后的状态、逻辑和以前完全一样，不用每个面板各写一份。
         //   影子在的时候再按返回：先把影子立刻收完，再收下一层（handleBack 里调 sheetGhostsFinish）。系统设了「减少动画」时改成很短的淡出。
-        const SHEET_OUT_MS=200, SHEET_FADE_MS=80;
+        const SHEET_OUT_MS=SHEET_MS, SHEET_FADE_MS=80;   // 1019-Z3：收起和打开同一个时长（SHEET_MS），减少动画时照旧 80 毫秒淡出
         const SHEET_GHOST_SKIP={};
         const __ghosts=new Set();
         function reduceMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){ return false; } }

@@ -31,7 +31,7 @@ const recs = [
   // 1. 设预算：存好 → 回「吃饭」的面板（副标题写上预算）；再按返回 → 回列表
   openCat('吃饭');
   ok(panel() === '吃饭', '1 点「吃饭」：开这个分类的面板');
-  $('catActBudget').click(); await wait(320);
+  $('catActBudget').click(); await wait(420);
   ok(shown('askMask') && !w.JiwenSheet.isOpen(), '1 设预算：输入框（面板先收起）');
   ['3', '0', '0'].forEach(k => [...$('kpGrid').querySelectorAll('.kp-key')].find(b => b.dataset.k === k).click());
   $('kpOk').click(); await settle();
@@ -40,28 +40,28 @@ const recs = [
   ok(!w.JiwenSheet.isOpen() && shown('catMask'), '1 再按返回：回分类列表');
 
   // 2. 设预算不存：取消按钮、返回键、往下拉都回面板，预算不变
-  openCat('吃饭'); $('catActBudget').click(); await wait(320); w.kpClose();
+  openCat('吃饭'); $('catActBudget').click(); await wait(420); w.kpClose();
   $('askCancel').click(); await settle();
   ok(panel() === '吃饭' && arc().budgets['吃饭'] === 300, '2 点「取消」：回「吃饭」的面板，预算不变');
-  $('catActBudget').click(); await wait(320);
+  $('catActBudget').click(); await wait(420);
   await t.back(); await settle();
   ok(shown('askMask') && !shown('kpMask'), '2 返回键：先收数字键盘，输入框还在');
   await t.back(); await settle();
   ok(!shown('askMask') && panel() === '吃饭', '2 再按返回：回「吃饭」的面板');
-  $('catActBudget').click(); await wait(320); w.kpClose();
+  $('catActBudget').click(); await wait(420); w.kpClose();
   swipe($('askMask').querySelector('.sheet')); await settle();
   ok(!shown('askMask') && panel() === '吃饭', '2 往下拉：回「吃饭」的面板');
   await t.back(); await settle();
   ok(!w.JiwenSheet.isOpen() && shown('catMask'), '2 再按返回：回列表');
 
   // 3. 改名：存好回新名字的面板；取消 / 没改都回原来的面板
-  openCat('其他'); $('catActRename').click(); await wait(320);
+  openCat('其他'); $('catActRename').click(); await wait(420);
   $('askCancel').click(); await settle();
   ok(panel() === '其他', '3 改名点「取消」：回「其他」的面板');
-  $('catActRename').click(); await wait(320);
+  $('catActRename').click(); await wait(420);
   $('askOk').click(); await settle();
   ok(!shown('askMask') && panel() === '其他', '3 名字没改就点确定：回「其他」的面板');
-  $('catActRename').click(); await wait(320);
+  $('catActRename').click(); await wait(420);
   $('askInput').value = '小项'; $('askOk').click(); await settle();
   ok(arc().cats.includes('小项') && panel() === '小项' && [...$('catList').querySelectorAll('.cat-item')].some(r => r.dataset.cat === '小项'), '3 改成「小项」：回「小项」的面板，列表也换了名字');
   await t.back(); await settle();

@@ -43,7 +43,7 @@ const MASKS = ['addMask', 'editMask', 'detailMask', 'refundMask', 'tplMask', 'ca
   // 2. 记一笔：没填直接往下拉 → 关掉，不问
   tab('ledger');
   // 1019-P 起记一笔滑上来以后（约 0.26 秒）自动弹数字键盘，返回键会先收它；这里先等它弹出来再收掉，再按返回
-  const openAdd = async () => { $('fabAdd').click(); await t.idle(); await new Promise(r => setTimeout(r, 320)); w.kpClose(); };
+  const openAdd = async () => { $('fabAdd').click(); await t.idle(); await new Promise(r => setTimeout(r, 420)); w.kpClose(); };
   await openAdd();
   ok(shown('addMask'), '2 打开记一笔');
   swipe($('addSheet'));

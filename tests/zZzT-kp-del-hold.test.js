@@ -20,7 +20,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   const release = () => { pe('pointerup', 5, 5); del().click(); };   // 松手以后浏览器还会补一下 click
   const keys = s => [...s].forEach(c => [...$('kpGrid').querySelectorAll('.kp-key')].find(b => b.dataset.k === c).click());
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
-  $('fabAdd').click(); await wait(320); await t.idle();
+  $('fabAdd').click(); await wait(420); await t.idle();
   const m = $('billMoney');
 
   // 1. 短按：只删一个

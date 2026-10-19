@@ -21,7 +21,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
 
   // 1. 记一笔一打开就弹数字键盘，不弹系统输入法
-  $('fabAdd').click(); await wait(320); await t.idle();   // 等记一笔滑上来（约 0.22 秒）再弹键盘
+  $('fabAdd').click(); await wait(420); await t.idle();   // 等记一笔滑上来（约 0.22 秒）再弹键盘
   const m = $('billMoney');
   ok(m.readOnly && m.getAttribute('inputmode') === 'none', '1 金额框不弹系统输入法（readonly、inputmode=none）');
   ok(shown('kpMask') && m.classList.contains('kp-on') && $('kpOk').textContent === '确定', '1 打开记一笔：弹数字键盘，对着金额框，大按钮写「确定」');
@@ -85,7 +85,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   // 5. 预算（要金额的提示框）：滑上来以后自动弹数字键盘，大按钮写「保存」、直接提交
   $('manageCatSetting').click();
   [...$('catList').querySelectorAll('.cat-item')].find(r => r.dataset.cat === '吃饭').click();
-  $('catActBudget').click(); await wait(320);
+  $('catActBudget').click(); await wait(420);
   ok(shown('askMask') && shown('kpMask') && $('askInput').classList.contains('kp-on') && $('kpOk').textContent === '保存', '5 设预算：自动弹数字键盘，大按钮「保存」');
   keys('300'); ok($('askInput').value === '300', '5 输入框实时变 300');
   $('kpOk').click(); await t.idle();
@@ -97,7 +97,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   [...$('sysMoneyKbSeg').children].find(b => b.dataset.v === 'on').click();
   ok(w.localStorage.getItem('app_sys_money_kb') === '1' && !$('billMoney').readOnly && $('billMoney').getAttribute('inputmode') === 'decimal', '6 打开：金额框照旧用系统键盘（inputmode=decimal）');
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
-  $('fabAdd').click(); await wait(320);
+  $('fabAdd').click(); await wait(420);
   ok(!shown('kpMask'), '6 打开记一笔：不弹 App 的数字键盘');
   $('closeAdd').click();
   d.querySelector('.tab-btn[data-tab="settings"]').click();
@@ -107,14 +107,14 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   // 7.（1019-Q）记一笔还没滑上来就盖了一层（比如放弃确认）：不再自动弹数字键盘；面板关了，对着它的数字键盘一起收
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
   $('fabAdd').click(); w.customConfirm('虚构的确认', () => {}, '虚构');
-  await wait(320);
+  await wait(420);
   ok(!shown('kpMask') && shown('askMask'), '7 滑上来之前盖了一层：数字键盘不弹到那一层上面');
   await t.askCancel(); $('closeAdd').click(); await wait(10);
-  $('fabAdd').click(); await wait(320);
+  $('fabAdd').click(); await wait(420);
   ok(shown('kpMask'), '7 正常打开：照旧自动弹');
   $('addMask').style.display = 'none'; await wait(10);
   ok(!shown('kpMask') && !$('billMoney').classList.contains('kp-on'), '7 记一笔关了（不管怎么关）：数字键盘一起收起');
-  await wait(300);
+  await wait(400);
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`\n${pass} 通过，${fail} 失败`);

@@ -73,7 +73,7 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   tab(t, 'ledger');
   await hide(t);
   ok(snap(t), '3 切后台：又存上了');
-  t.$('fabAdd').click(); await new Promise(r => setTimeout(r, 320)); t.w.kpClose();
+  t.$('fabAdd').click(); await new Promise(r => setTimeout(r, 420)); t.w.kpClose();
   t.$('billMoney').value = '12.5';
   [...t.$('billTypeChips').children].find(c => c.textContent === '支出').click();
   [...t.$('billCatChips').children].find(c => c.textContent === '吃饭').click();

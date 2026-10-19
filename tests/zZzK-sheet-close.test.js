@@ -1,5 +1,5 @@
 // 1019-N 所有底部面板关闭都有收起动画（jsdom，记录全是虚构的）。node zZzK-sheet-close.test.js [index.html]
-// 不管怎么关（按钮、返回键、往下拉、代码里关），面板当场关掉（状态和以前一样），原地放一个「影子」往下滑走 + 遮罩淡出，约 200 毫秒后移除；
+// 不管怎么关（按钮、返回键、往下拉、代码里关），面板当场关掉（状态和以前一样），原地放一个「影子」往下滑走 + 遮罩淡出，约 300 毫秒后移除（1019-Z3 起，原来 200）；
 // 影子没有 id、点不动；影子还在时再按返回：影子立刻收完、再收下一层；叠三层连按返回一层层收；系统「减少动画」时只很快地淡出。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
@@ -28,29 +28,32 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   ok(ghosts().length === 1 && g.classList.contains('ghost-down') && !g.classList.contains('mask'), '1 原地一个影子往下滑走');
   ok(!g.id && !g.querySelector('[id]') && w.getComputedStyle(g).pointerEvents === 'none', '1 影子没有 id、点不动');
   ok(g.querySelector('input.money-input') && g.querySelector('input.money-input').value === '12', '1 影子照着关之前的样子（填的字还在）');
-  await wait(150);
-  ok(ghosts().length === 1, '1 150 毫秒还在滑');
-  await wait(150);
-  ok(ghosts().length === 0, '1 约 200 毫秒后影子移除');
+  await wait(220);
+  ok(ghosts().length === 1, '1 220 毫秒还在滑（1019-Z3 起收起约 300 毫秒）');
+  await wait(220);
+  ok(ghosts().length === 0, '1 约 300 毫秒后影子移除');
+  const css = [...d.querySelectorAll('style')].map(x => x.textContent).join('\n');
+  ok(w.SHEET_MS === 300 && /--sheet-ms:\s*300ms/.test(css) && w.document.documentElement.style.getPropertyValue('--sheet-ms') === '300ms', '1 时长写成一个常量 SHEET_MS = 300，CSS 的 --sheet-ms 跟着它');
+  ok(/--sheet-ease:\s*cubic-bezier\(\.2,\s*\.8,\s*\.2,\s*1\)/.test(css) && /ghostDown var\(--sheet-ms\) var\(--sheet-ease\)/.test(css) && /askUp var\(--sheet-ms\) var\(--sheet-ease\)/.test(css), '1 收起、打开都用这个时长和先快后慢的曲线');
   ok(/关闭面板/.test(w.localStorage.getItem('app_perf_log') || ''), '1 性能记录里记了「关闭面板」');
 
   // 2. 返回键、往下拉、提示框、共用面板：同一个动画
   $('fabAdd').click(); await t.idle();
   await t.back();
   ok(!shown('addMask') && ghosts().length === 1 && ghosts()[0].classList.contains('ghost-down'), '2 返回键关：同样滑走');
-  await wait(320);
+  await wait(420);
   $('fabAdd').click(); await t.idle();
   swipe($('addSheet')); await Promise.resolve();
   ok(!shown('addMask') && ghosts().length === 1 && /px/.test(ghosts()[0].style.getPropertyValue('--gy')) && parseFloat(ghosts()[0].style.getPropertyValue('--gy')) > 100, '2 往下拉关：影子从手指拉到的地方接着滑 ' + ghosts()[0].style.getPropertyValue('--gy'));
-  await wait(320);
+  await wait(420);
   w.customAlert('虚构的提示', '提示'); await t.idle();
   await t.askOk();
   ok(ghosts().length === 1, '2 提示框点确定：同样滑走');
-  await wait(320);
+  await wait(420);
   w.JiwenSheet.pick({ title: '虚构选项', options: [{ value: 'a', label: '甲' }], value: 'a', onPick() {} });
   d.getElementById('uiSheetCancel').click(); await Promise.resolve();
   ok(ghosts().length === 1, '2 共用底部面板点取消：同样滑走');
-  await wait(320);
+  await wait(420);
 
   // 3. 影子还在时再按返回：影子立刻收完，再收下一层（不会一下跳掉好几层）
   d.querySelector('.tab-btn[data-tab="settings"]').click();
@@ -60,11 +63,11 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   ok(!shown('tplEditMask') && shown('tplMask') && ghosts().length === 1, '3 关掉模板面板：影子在滑，模板列表还开着');
   t.backFn(); await Promise.resolve(); await Promise.resolve();
   ok(!shown('tplMask') && ghosts().length === 1, '3 马上按返回：模板面板的影子立刻收完，模板列表关掉（又一个影子）');
-  await wait(320);
+  await wait(420);
   ok(ghosts().length === 0 && !shown('tplMask'), '3 只收了一层，没有卡住');
 
   // 4. 叠三层（分类管理 → 操作面板 → 输入框），连按返回一层层收
-  await wait(200);
+  await wait(300);
   $('manageCatSetting').click(); await t.idle();
   [...$('catList').querySelectorAll('.cat-item')].find(r => r.dataset.cat === '吃饭').click();
   $('catActBudget').click(); await t.idle();
@@ -76,7 +79,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   await t.back();
   ok(third === true || !shown('catMask'), '4 连按返回一层层收，最后分类管理也关掉');
   ok(!shown('catMask'), '4 三次返回以后都收完了');
-  await wait(320);
+  await wait(420);
   ok(ghosts().length === 0, '4 影子都移除了');
 
   // 5. 系统「减少动画」：只很快地淡出

@@ -69,11 +69,11 @@ function fakeLaunch(w, o) {
   ok(t2.w.__launch.timings === 1, '4 关着时不等启动画面收起，问一次就记');
   t2.$('perfClose').click(); t2.w.close();
   const t3 = await A.boot({ html, www: WWW, seed: Object.assign(A.seedOf(recs), { app_dev_import: '0' }), before(w) { fakeLaunch(w, {}); } });
-  await wait(300);
+  await wait(400);
   ok(t3.$('devSplashBtn').style.display === 'none' && !t3.w.localStorage.getItem('app_perf_log'), '4 开发开关关着：没入口、不记');
   // 5. 不在手机上（没有原生层）：照旧只记网页那段
   const t4 = await A.boot({ html, www: WWW, seed: A.seedOf(recs) });
-  await wait(300);
+  await wait(400);
   const b4 = log(t4.w).find(e => e.kind === '启动');
   ok(b4 && !b4.nat && b4.paint != null, '5 没有原生层：只记网页那段');
 

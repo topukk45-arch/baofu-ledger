@@ -24,7 +24,7 @@ const recs = [
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
 
   // 1. 排法：时间一行小字 → 金额一行（¥ + 大字 + 小的收支）→ 分类 → 统计口径 → 备注；保存在底部那排、主按钮在上
-  $('fabAdd').click(); await wait(320); w.kpClose();
+  $('fabAdd').click(); await wait(420); w.kpClose();
   ok(after('billTimeLine', 'billMoney') && after('billMoney', 'billCatChips') && after('billCatChips', 'billMode') && after('billMode', 'billRemark') && !$('billMoreBtn'), '1 时间 → 金额 → 分类 → 统计口径 → 备注（没有「更多」）');
   const row = $('billMoney').closest('.rec-money-row');
   ok(row && row.contains($('billTypeChips')) && $('billTypeChips').classList.contains('io-mini'), '1 收支是金额旁边一个小切换（同一行）');
@@ -73,12 +73,12 @@ const recs = [
   const saved = w.loadStore(A.ID).archives['默认存档'].records.find(r => r.money === 26.5);
   ok(saved && saved.type === 'expense' && saved.cat === '吃饭' && !shown('addMask'), '4 照旧记进账本、记一笔关掉');
   // 收支没选：照旧拦住
-  $('fabAdd').click(); await wait(320); w.kpClose();
+  $('fabAdd').click(); await wait(420); w.kpClose();
   $('billMoney').value = '3';
   [...$('billCatChips').children].find(c => c.textContent === '吃饭').click();
   $('addBill').click(); await t.idle();
   ok(shown('addMask') && w.loadStore(A.ID).archives['默认存档'].records.length === 3, '4 收支没选：照旧不让存');
-  $('closeAdd').click(); await wait(300);
+  $('closeAdd').click(); await wait(400);
 
   // 5. 修改账单同一套；口径不是「计入」的一打开就展开
   w.openEdit('r2'); await t.idle();
@@ -88,7 +88,7 @@ const recs = [
   const ef = $('saveEdit').parentElement;
   ok(ef.classList.contains('rec-foot') && ef.firstElementChild === $('saveEdit') && ef.lastElementChild === $('cancelEdit'), '5 底部「保存」在上、「取消」在最下');
   ok(!ef.contains($('deleteInEdit')) && !ef.contains($('editRefundBtn')) && !ef.contains($('editSaveTpl')), '5 退款 / 存为常用 / 删除挪进内容里');
-  $('cancelEdit').click(); await wait(300);
+  $('cancelEdit').click(); await wait(400);
   w.openEdit('r1'); await t.idle();
   ok($('editMode').querySelector('.cc.sel').dataset.v === 'normal' && !hintShown('editMode'), '5 计入的记录：选中「计入」、不写说明');
   $('cancelEdit').click();

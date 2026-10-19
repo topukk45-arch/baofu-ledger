@@ -125,8 +125,8 @@ const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b
   ok(sheet.style.transform==='translateY(80px)', '跟手阻尼 0.8：'+sheet.style.transform);
   t.touch(sheet,'touchcancel',200,610);
   ok(sheet.style.transform==='' && mask.classList.contains('open'), 'touchcancel 回弹不关');
-  // 1019-N 起：所有底部面板关掉都用共用的「影子」往下滑走（约 200 毫秒），筛选浮层也是：当场关掉、影子做动画；打开往上滑入 0.22s
-  ok(html.includes('transform:translateY(100%); transition:transform .22s ease;') && html.includes("sheetMask.style.display='none'; loadCommittedIntoControls();   // 1019-N") && html.includes('const SHEET_OUT_MS=200'), '关闭动画统一用共用的收起动画（约 200 毫秒），打开 0.22s 滑入');
+  // 1019-N 起：所有底部面板关掉都用共用的「影子」往下滑走，筛选浮层也是：当场关掉、影子做动画；1019-Z3 起打开 / 收起同一个时长 SHEET_MS（300 毫秒）、先快后慢
+  ok(html.includes('transform:translateY(100%); transition:transform var(--sheet-ms) var(--sheet-ease);') && html.includes("sheetMask.style.display='none'; loadCommittedIntoControls();   // 1019-N") && html.includes('const SHEET_OUT_MS=SHEET_MS') && html.includes('const SHEET_MS=300;'), '关闭动画统一用共用的收起动画，打开 / 收起都是 SHEET_MS（300 毫秒）');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 console.log(`\n1010-F 专项：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);

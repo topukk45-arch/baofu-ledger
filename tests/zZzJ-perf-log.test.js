@@ -34,7 +34,7 @@ const log = w => JSON.parse(w.localStorage.getItem('app_perf_log') || '[]');
   // 3. 点输入框到能输入
   $('billRemark').dispatchEvent(new w.Event('pointerdown', { bubbles: true }));
   $('billRemark').focus();
-  await wait(300);   // 聚焦后再过两帧才记；机器忙时两帧会拖长，多等一会儿（原来 80 毫秒，打包机上偶尔不够）
+  await wait(400);   // 聚焦后再过两帧才记；机器忙时两帧会拖长，多等一会儿（原来 80 毫秒，打包机上偶尔不够）
   ok(log(w).some(e => e.kind === '点输入框' && /billRemark@addMask/.test(e.what)), '3 点备注：记了「点输入框到能输入」');
 
   // 4. 键盘弹起：面板位置变了几次
