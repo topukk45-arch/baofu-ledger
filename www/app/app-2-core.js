@@ -16,7 +16,7 @@
         // opts.danger：覆盖、删除、清空、撤销、恢复、批量改这类，确认按钮用警示色；否则主色
         function askBtnLook(opts){ askOk.className='ui-btn block ' + (opts && opts.danger ? 'warn' : 'primary'); }
         function closeAsk(result){
-            if(kpTarget===askInput) kpClose();   // 1019-P：提示框里的数字键盘跟着收
+            if(JiwenKeypad.kpTarget===askInput) kpClose();   // 1019-P：提示框里的数字键盘跟着收
             askMask.style.display='none'; askMask.classList.remove('open');
             askMask.classList.remove('as-page');   // 复位「当内容页用」的降档，下次当提示用时回到最顶
             askErr.style.display='none';
