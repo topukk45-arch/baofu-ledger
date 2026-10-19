@@ -77,11 +77,6 @@
         // 用户手动点过就清掉标记，之后完全听用户的。
         const SKIP_DEFAULT_CATS=['转账'];
         const MODE_OPTS=[ {v:'normal', t:'计入'}, {v:'flow', t:'只算结余'}, {v:'skip', t:'不计入'} ];
-        const MODE_HINT={
-            normal:'正常计入收支统计和结余',
-            flow:'资金往来：期初存款、垫付报销、借出借入等。算进结余，不算收入或支出',
-            skip:'重复记录：信用卡还款等（消费在刷卡时已记过）。收支和结余都不算'
-        };
         function paintModeChips(box){
             const cur=box.dataset.mode||'normal';
             box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===cur));

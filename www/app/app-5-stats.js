@@ -673,66 +673,6 @@
             });
         })();
 
-        // ============================================================
-        // ===== 历史脏数据自检与修复：time 字面量 vs Date 解析不一致 =====
-        // ============================================================
-        // 背景：旧版导入清洗用 isFinite(new Date(s)) 判定时间是否合法，但 JS 对越界日期
-        //   是「静默滚动」而非报错——'2026-02-30T10:30' 会被解析成 3月2日，isFinite 仍为真，
-        //   于是这个字符串被原样入库。而本 App 对 r.time 有两套读法：
-        //     · 字符串口径（账单列表显示、日期范围筛选 slice(0,10)）→ 认 2月30日
-        //     · Date 口径（统计日历、当月汇总、AI 导出）        → 认 3月2日
-        //   同一条记录在两个页面落到不同月份，且日期筛选永远匹配不到它实际所在的月。
-        //   新版导入已用严格校验堵住入口，但**存量脏数据仍在库里**，故需要这一次性修复。
-        //
-        // 修复口径：钳制到当月最后一天（2月30 → 2月28/29），而不是跟随 Date 的滚动（→3月2）。
-        //   理由：用户记账时想表达的是「二月的这笔支出」，月份归属比具体某天更重要；
-        //   滚动会把它推进下个月，直接改变统计页和 AI 导出的月度口径。
-        //   月份本身就越界的（如 13 月）无法推断意图，回退为「该年 1 月 1 日 00:00」并单独计数。
-
-        // 判定一条 time 是否「脏」（非规范格式，或解析回来与字面量不一致）
-        // ===== 记录时间的唯一解析口 =====
-        // r.time 的规范格式是「YYYY-MM-DDTHH:mm」（由 isDirtyTime / repairTime 保证）。
-        //
-        // 【为什么不直接 new Date(r.time)】按 ES2015+ 规范，这种「日期+时间、不带时区」的串
-        //   应当按本地时间解析；现代 WebView 也确实如此。但同一份代码里，calcDay / isDirtyTime
-        //   都是手写正则拆字段再 new Date(y, m-1, d)，唯独统计那边直接把字符串丢给 Date——
-        //   两套口径并存，等于把「这里依赖引擎按本地时区解析」这个前提藏在了 15 个调用点里。
-        //   一旦哪天喂进来的是「YYYY-MM-DD」（纯日期，规范里按 UTC 解析）或带了尾巴，
-        //   跨月/跨日的记录就会静默错位一格，还极难复现。
-        //   统一走这里：显式按本地时区构造，与 calcDay 同口径，前提写死在一处。
-        function parseRecTime(t){
-            const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(t||''));
-            if(!m) return new Date(t);                       // 兜底：非规范串交回引擎，行为不变
-            return new Date(+m[1], +m[2]-1, +m[3], +m[4], +m[5], 0, 0);
-        }
-
-        function isDirtyTime(t){
-            if(typeof t!=='string') return true;
-            const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(t);
-            if(!m) return true;
-            const y=+m[1], mo=+m[2], d=+m[3], h=+m[4], mi=+m[5];
-            const dt=new Date(y, mo-1, d, h, mi, 0, 0);
-            return !(dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d
-                  && dt.getHours()===h && dt.getMinutes()===mi);
-        }
-
-        // 把一条脏 time 修成合法的规范串。修不出来则返回 null（调用方回退为当前时刻）。
-        function repairTime(t){
-            if(typeof t!=='string') return null;
-            const s=t.trim().replace(' ', 'T');          // 兼容「YYYY-MM-DD HH:mm」显示格式
-            const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(s);   // 宽松：允许尾部有秒/毫秒/时区
-            if(!m) return null;
-            const y=+m[1];
-            let mo=+m[2], d=+m[3], h=+m[4], mi=+m[5];
-            if(!isFinite(y) || y<1970 || y>9999) return null;
-            if(mo<1 || mo>12) return `${y}-01-01T00:00`;  // 月份越界：意图无从推断，落到该年年初
-            const lastDay=new Date(y, mo, 0).getDate();   // 该年该月的最后一天（自动处理闰年）
-            d = Math.min(Math.max(d, 1), lastDay);        // 钳制：2月30 → 2月28/29
-            h = Math.min(Math.max(h, 0), 23);
-            mi= Math.min(Math.max(mi, 0), 59);
-            return `${y}-${pad(mo)}-${pad(d)}T${pad(h)}:${pad(mi)}`;
-        }
-
         // 扫描并修复某用户 store 里所有存档的脏时间。
         // 返回 { scanned, fixed, samples[] }；不写盘（由调用方决定，便于「先看结果再确认」）。
         function scanAndRepairStore(store){

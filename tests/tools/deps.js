@@ -104,11 +104,20 @@ function freeRefs(node) {
 }
 
 // 读 www/index.html 里的 app 脚本，按顺序接起来；返回每个文件的起止
+//   分析时把模块文件（(function(){ … })(); 包着的）拆开包装当顶层看，「旧代码引用表」和模块开头取前面模块的那几行
+//   （const { … } = window.JiwenXxx;）当成空白——都换成同样长的空格，位置不变，名字还算原来定义它的那个模块的
+const MOD_OPEN = '(function(){\n', MOD_CLOSE = '})();\n';
+const ALIAS = /^ *const \{[^}\n]*\} = window\.Jiwen\w+;.*$/gm;
+function unwrap(c) {
+  let t = c;
+  if (t.startsWith(MOD_OPEN) && t.endsWith(MOD_CLOSE)) t = ' '.repeat(MOD_OPEN.length - 1) + '\n' + t.slice(MOD_OPEN.length, t.length - MOD_CLOSE.length) + ' '.repeat(MOD_CLOSE.length - 1) + '\n';
+  return t.replace(ALIAS, m => ' '.repeat(m.length));
+}
 function load(www) {
   const html = fs.readFileSync(path.join(www, 'index.html')).toString('utf8');
   const files = [...html.matchAll(/<script src="(app\/[^"?]+\.js)\?v=[^"]*"><\/script>/g)].map(m => m[1]);
   let code = ''; const bounds = [];
-  files.forEach(f => { const c = fs.readFileSync(path.join(www, f), 'utf8'); bounds.push({ file: f, start: code.length, end: code.length + c.length }); code += c; });
+  files.forEach(f => { const c = unwrap(fs.readFileSync(path.join(www, f), 'utf8')); bounds.push({ file: f, start: code.length, end: code.length + c.length }); code += c; });
   return { html, files, code, bounds };
 }
 
@@ -142,10 +151,10 @@ function analyze(www) {
   });
   // HTML 里 onclick 这类写在属性里的
   const inlineHandlers = [...html.matchAll(/\son([a-z]+)="([^"]*)"/g)].map(m => ({ ev: m[1], code: m[2] }));
-  return { files, code, secs, decls, owner, inlineHandlers };
+  return { files, code, bounds, secs, decls, owner, inlineHandlers };
 }
 
-module.exports = { analyze, freeRefs, load, sections };
+module.exports = { analyze, freeRefs, load, sections, unwrap, ALIAS };
 
 if (require.main === module) {
   const args = process.argv.slice(2);

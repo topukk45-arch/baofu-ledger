@@ -1,5 +1,5 @@
 // modules 分支（1019-Z4-M2 起）：index.html 拆成 www/app/*.js + app.css 以后的几样检查。node zZzV-split-files.test.js [index.html]
-// 1. 引用写法：普通同步 <script src>（不带 defer / async / type=module）、按编号顺序、?v= 和登录页版本号一样；样式是一个 <link>
+// 1. 引用写法：普通同步 <script src>（不带 defer / async / type=module）、先是已经搬好的模块（照 tools/modules-plan.js 的先后）、再是还没搬的 app-N（按编号）、?v= 和登录页版本号一样；样式是一个 <link>
 // 2. 全局重名：两个文件在顶层定义了同一个名字就报错（let / const 重名会让后一个文件整个跑不起来，function 重名会悄悄盖掉前一个）
 // 3. 跨文件先用后定义：前一个文件顶层当场跑的代码（含当场调用的函数）用到后面文件才定义的名字就报错；
 //    前一个文件登记的计时器 / Promise.then / 观察器要用后面文件的名字也报错（文件之间的空档里可能先跑）；
@@ -26,8 +26,12 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   ok(tags.every(m => /^<script src="app\/[^"?]+\.js\?v=[^"]+"><\/script>$/.test(m[0])), '1 每个都是普通的 <script src="…">，没有 defer / async / type：' + tags.filter(m => !/^<script src="[^"]+"><\/script>$/.test(m[0])).map(m => m[0]).join(' '));
   const files = tags.map(m => m[1].split('?')[0]);
   ok(tags.every(m => m[1].endsWith('?v=' + build)), '1 每个 ?v= 都是版本号 ' + build);
-  const nums = files.map(f => +(f.match(/^app\/app-(\d+)-/) || [])[1]);
-  ok(nums.every((n, i) => n === i + 1), '1 按编号顺序：' + files.join(' '));
+  // 1019-Z4-M4 起：前面是搬好的模块文件（照设计表的先后），后面是还没搬的 app-N（编号从小到大、不跳号以外不许乱）
+  const PLAN = require('./tools/modules-plan').MODULES.map(m => m.file);
+  const modFiles = files.filter(f => !/^app\/app-\d+-/.test(f)), oldFiles = files.filter(f => /^app\/app-\d+-/.test(f));
+  const nums = oldFiles.map(f => +f.match(/^app\/app-(\d+)-/)[1]);
+  ok(files.slice(0, modFiles.length).every((f, i) => f === modFiles[i]) && modFiles.every(f => PLAN.includes(f)) && modFiles.every((f, i) => !i || PLAN.indexOf(f) > PLAN.indexOf(modFiles[i - 1])), '1 模块文件在前、照设计表的先后：' + modFiles.join(' '));
+  ok(nums.length > 0 && nums.every((n, i) => !i || n > nums[i - 1]), '1 还没搬的 app-N 在后、按编号顺序：' + oldFiles.join(' '));
   const lines = raw.split('\n'), first = lines.findIndex(l => l.includes(tags[0][0]));
   ok(tags.every((m, i) => lines[first + i].trim() === m[0]), '1 几个脚本一行一个、挨着放');
   const links = [...raw.matchAll(/<link rel="stylesheet" href="(app\/[^"]+)">/g)];

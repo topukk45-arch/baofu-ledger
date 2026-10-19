@@ -596,21 +596,6 @@
             refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
             customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
         }
-
-        // ===== 数字自适应字号 =====
-        // 带 data-fit 的数字先用 CSS 里的大字号；放不下（scrollWidth > clientWidth）就逐级缩小，
-        // 下限 12px。账户结余到 7、8 位时不至于被截断，平时又能用大字撑满格子。
-        function fitNums(root){
-            if(!root) return;
-            root.querySelectorAll('[data-fit]').forEach(el=>{
-                el.style.fontSize='';
-                let size=parseFloat(getComputedStyle(el).fontSize)||16;
-                let guard=0;
-                while(el.scrollWidth>el.clientWidth && size>12 && guard++<30){
-                    size-=1; el.style.fontSize=size+'px';
-                }
-            });
-        }
         window.addEventListener('resize', ()=>fitNums($('summaryOverall')), { passive:true });
 
         // ===== 分类汇总卡片 =====

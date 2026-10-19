@@ -253,44 +253,6 @@
             askResolve=null;
             askShow();
         }
-
-        // 金额规范化：返回 {ok:true, val} 或 {ok:false, why}，why 用于给出对症提示
-        function normMoney(raw){
-            const n = Number(raw);
-            if(!isFinite(n)) return { ok:false, why:'请输入正确的金额数字～' };  // NaN / Infinity
-            if(n > 99999999) return { ok:false, why:'金额太大啦，确认一下没多打几个 0？' };  // 上限挡手滑
-            const val = Math.round(n * 100) / 100;  // 先对齐到分
-            if(val <= 0) return { ok:false, why:'金额要大于 0 哦～' };  // 含 0、负数、以及 0.001 这类四舍五入后归零的值
-            return { ok:true, val };
-        }
-
-        // 安全数值：把可能是脏数据（null/undefined/""/"abc" 等）的金额转成有限数，
-        // 非法一律按 0，避免 NaN 污染整列汇总（导入不规范 JSON 时尤其有用）。
-        function safeNum(x){ const n=Number(x); return isFinite(n) ? n : 0; }
-        // 对齐到「分」：消除多笔浮点累加的尾差（如 2.9999999 → 3.00）。
-        function round2(n){ return Math.round(n*100)/100; }
-
-        // ===== 统计口径（1010-B）=====
-        // 一条记录对「收入 / 支出」各贡献多少。所有求和——账单结余、总览、筛选小计、分类汇总、
-        // 统计页日历/当月/饼图、AI 导出——一律走这里，不再各处自己写 type==='expense' 判断。
-        // 此前这类判断散在 6 处，只要漏改一处，账单页和统计页的数字就会对不上，而且不报错。
-        // 标记了 skip（不计入收支：信用卡还款、内部转账等）的记录贡献为 0：照常显示，不进任何统计。
-        // skip 只认严格的 true，旧数据没有这个字段，行为与之前完全一致。
-        //
-        // 【1010-C】口径分三种：
-        //   normal 计入    ：收支统计、结余都算（默认；旧数据没有任何标记即为此）
-        //   flow   只算结余：资金往来——期初存款、垫付报销、借出借入、退还父母。钱真实进出了账户，
-        //                    结余要算；但它既不是收入也不是消费，收支统计不算。
-        //   skip   不计入  ：重复记录——信用卡还款（消费在刷卡时已经记过）。收支、结余都不算。
-        // 两个字段互斥，都只认严格的 true；同时存在时 skip 优先。
-        function isSkip(r){ return !!(r && r.skip===true); }
-        function isFlow(r){ return !!(r && r.flow===true && r.skip!==true); }
-        function recMode(r){ return isSkip(r) ? 'skip' : (isFlow(r) ? 'flow' : 'normal'); }
-        // 就地改 r：只能用在新对象上（账本缓存里的记录是冻结的，要改先 Object.assign({}, r) 换一个）
-        function setRecMode(r, mode){
-            delete r.skip; delete r.flow;
-            if(mode==='skip') r.skip=true; else if(mode==='flow') r.flow=true;
-        }
         // ===== 退款（1010-J）=====
         // 退款记录 = type:'income' + refundOf:原账单 id。分类、口径永远跟原账单一致（写入时同步）。
         // 统计上它是「同分类的负支出」：买 100 退 30，这个分类就是花了 70；不算收入，结余照常 +30。
@@ -385,12 +347,6 @@
         // 字符数：按 Unicode 码点计（一个汉字算 1）
         function charLen(s){ return Array.from(s).length; }
         function charSlice(s, n){ return Array.from(s).slice(0, n).join(''); }
-        // HTML 转义，防止备注/名称里的特殊字符破坏页面
-        function escapeHtml(s){
-            return String(s).replace(/[&<>"']/g, c => ({
-                '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-            }[c]));
-        }
 
         // 导入相关的共用上限常量（预校验与清洗逻辑共用同一个值，避免两处魔数不一致）：
         //   MAX_IMPORT_RECORDS —— 单次导入记录条数上限
@@ -4429,15 +4385,6 @@ ${detail}
         });
 
         function getCats(){ return curArchive(loadStore()).cats; }
-        function fillSelect(sel, cats, selected){
-            sel.innerHTML='';
-            cats.forEach(c=>{
-                const o=document.createElement('option');
-                o.value=c; o.textContent=c;
-                if(c===selected) o.selected=true;
-                sel.appendChild(o);
-            });
-        }
         function refreshCatSelectors(){
             const cats=getCats();
             fillSelect(billCat, cats, cats[0]);
@@ -4833,8 +4780,6 @@ ${detail}
         for(let h=0; h<24; h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0'); dtHour.appendChild(o); }
         for(let m=0; m<60; m++){ const o=document.createElement('option'); o.value=m; o.textContent=String(m).padStart(2,'0'); dtMin.appendChild(o); }
 
-        function pad(n){ return String(n).padStart(2,'0'); }
-
         // 解析 input 现有值 "YYYY-MM-DDTHH:mm" -> Date 部件；无值则用当前时间
         function parseInputDt(val){
             const m = val && val.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
@@ -5185,11 +5130,6 @@ ${detail}
         }
         // 读取时间输入框的规范值（带T），供保存逻辑使用
         function getDtInput(input){ return input.dataset.value || input.value.replace(' ','T'); }
-        // 当前时刻的规范格式 YYYY-MM-DDTHH:mm
-        function nowDtValue(){
-            const n=new Date();
-            return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}T${pad(n.getHours())}:${pad(n.getMinutes())}`;
-        }
 
         // 绑定两个时间输入框
         billTime.addEventListener('click', ()=>openDtPicker(billTime));
