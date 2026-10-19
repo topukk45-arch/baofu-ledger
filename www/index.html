@@ -1431,6 +1431,10 @@
         .bg-suggest-foot { position:sticky; bottom:calc(64px + env(safe-area-inset-bottom)); z-index:5; display:flex; gap:var(--ui-gap);
             margin:10px -14px -14px; padding:10px 14px; background:var(--c-surface); border-top:1px solid var(--c-border); border-radius:0 0 14px 14px; }
         .bg-suggest-foot > * { flex:1 1 0; }
+        /* 1019-I：存储用量：设置页最底下、版本号上面一行灰色小字；快满了才在「导入记录」下面放提醒卡 */
+        .storage-use { text-align:center; font-size:12px; color:var(--c-text-soft); margin:14px 0 -6px; }
+        .storage-warn { flex-direction:column; align-items:stretch; gap:4px; color:var(--c-neg); }
+        .storage-warn span { font-size:13px; color:var(--c-text); }
         .bg-sel-all { min-height:var(--ui-tap); margin:8px 0 2px; padding:0 18px; }   /* 1019-G：预算建议的全选 / 全不选 */
     </style>
 </head>
@@ -1438,7 +1442,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-H</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-I</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -9856,28 +9860,34 @@ ${detail}
         function renderStorageUse(){
             const my=++__storageSeq;
             let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
-            const old=$('storageUse');
-            if(!on || !navigator.storage || !navigator.storage.estimate){ if(old) old.remove(); return; }
+            const old=$('storageUse'), oldW=$('storageUseWarn');
+            if(!on || !navigator.storage || !navigator.storage.estimate){ if(old) old.remove(); if(oldW) oldW.remove(); return; }
             Promise.resolve().then(()=>navigator.storage.estimate()).then(q=>{
                 if(my!==__storageSeq) return;
-                let b=$('storageUse');
-                if(!q || !q.quota){ if(b) b.remove(); return; }
+                // 1019-I：用量挪到设置页最底下、版本号上面，一行灰色小字，只写占用多少，不写百分比、不写上限
+                //   （系统给网页的上限很大，写出来像记问要占 10 个 G）；超过上限 70% 才在原来的位置放一张提醒卡，也不提上限数字
+                let b=$('storageUse'), w=$('storageUseWarn');
+                if(!q || !q.quota){ if(b) b.remove(); if(w) w.remove(); return; }
                 const used=q.usage||0, pct=used/q.quota;
                 if(!b){
-                    b=document.createElement('div'); b.id='storageUse'; b.className='set-item set-static';
-                    b.style.flexDirection='column'; b.style.alignItems='stretch'; b.style.gap='4px';
-                    const anchor=$('devLogsBtn'); anchor.parentNode.insertBefore(b, anchor.nextSibling);
+                    b=document.createElement('div'); b.id='storageUse'; b.className='storage-use';
+                    const sb=$('setBuild'); sb.parentNode.insertBefore(b, sb);
                 }
                 b.textContent='';
                 const l1=document.createElement('span'); l1.id='storageUsePct';
-                l1.textContent=`存储已用 ${Math.max(pct*100, used ? 0.1 : 0).toFixed(1)}%（约 ${(used/1048576).toFixed(1)} MB / 共 ${(q.quota/1048576).toFixed(0)} MB）`;
+                l1.textContent=`账本和备份占用约 ${Math.max(used/1048576, used ? 0.1 : 0).toFixed(1)} MB`;
                 b.appendChild(l1);
                 if(pct>STORAGE_WARN){
-                    const w=document.createElement('span'); w.id='storageUseWarn'; w.style.color='var(--c-neg)'; w.style.fontSize='12px';
-                    w.textContent='空间快满了：可以先导出备份，再删掉不用的存档或旧的导入前备份。满了以后记账会存不进去。';
-                    b.appendChild(w);
-                }
-            }).catch(()=>{ if(my===__storageSeq){ const b=$('storageUse'); if(b) b.remove(); } });
+                    if(!w){
+                        w=document.createElement('div'); w.id='storageUseWarn'; w.className='set-item set-static storage-warn';
+                        const anchor=$('devLogsBtn'); anchor.parentNode.insertBefore(w, anchor.nextSibling);
+                    }
+                    w.textContent='';
+                    const t1=document.createElement('b'); t1.textContent='手机存储空间不多了，记问可能存不下新的备份';
+                    const t2=document.createElement('span'); t2.textContent='可以先导出备份，再删掉不用的存档或旧的备份。满了以后记账也会存不进去。';
+                    w.appendChild(t1); w.appendChild(t2);
+                } else if(w) w.remove();
+            }).catch(()=>{ if(my===__storageSeq){ const b=$('storageUse'), w=$('storageUseWarn'); if(b) b.remove(); if(w) w.remove(); } });
         }
         // ===== 1019-F：切到后台被系统杀掉，回来看不出来 =====
         //   切到后台（visibilitychange hidden / pagehide / 原生 pause）时，把停在哪个页签、账单页第几页、滚到哪，

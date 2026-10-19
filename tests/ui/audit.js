@@ -444,7 +444,7 @@ async function run(cfg, port, browser) {
   {
     const page = await newPage({ ls: seedOf({ dev: false, recs: oldRecords(3) }) });
     const leaks = [];
-    const KW = /导入（开发中）|导入账单|导入记录|管理导入规则|待确认|可以导了|存储已用|预算建议|单号表|怎么开始|一次导进来|微信、支付宝/;
+    const KW = /导入（开发中）|导入账单|导入记录|管理导入规则|待确认|可以导了|存储已用|账本和备份占用|预算建议|单号表|怎么开始|一次导进来|微信、支付宝/;
     for (const t of ['ledger', 'stats', 'settings']) {
       await tab(page, t);
       if (t === 'stats') { await click(page, '#statTabSeg button[data-v="budget"]'); await page.waitForTimeout(200); }
