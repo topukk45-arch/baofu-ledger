@@ -70,7 +70,7 @@ const namesOf = p => !p ? [] : p.type === 'Identifier' ? [p.name] : p.type === '
     ok(extBad.length === 0, `3 ${m.file}：用到别的模块的名字只从取的那几行来（后面的只能是回调口）：${extBad.map(n => n + '（' + P.nameMod.get(n) + '）').join('、')}`);
     const impBad = Object.entries(imports).flatMap(([e, ns]) => ns.filter(n => !(info[entryOf[e]] && info[entryOf[e]].entryKeys.includes(n))).map(n => e + '.' + n));
     ok(impBad.length === 0, `3 ${m.file}：取的名字都在那个模块的入口上：${impBad.join('、')}`);
-    info[m.key] = { own, entryKeys: entryKeys || [] };
+    info[m.key] = { own, entryKeys: entryKeys || [], winGet: r.winGet };   // winGet：它自己按 window.xxx 读的（外面先放好的开关，比如 __LEDGER_STRICT），不算漏
     // 4
     const aliasRe = new RegExp(`^ *const \\{([^}\\n]*)\\} = window\\.${m.entry};.*$`, 'gm');
     const aliasLines = legacyText.flatMap((t, i) => [...t.matchAll(aliasRe)].map(x => ({ i, names: x[1].split(',').map(s => s.trim()).filter(Boolean), at: x.index })));
@@ -92,7 +92,7 @@ const namesOf = p => !p ? [] : p.type === 'Identifier' ? [p.name] : p.type === '
   for (const m of mods) {
     const e = t.w[m.entry];
     ok(e && info[m.key] && JSON.stringify(Object.keys(e)) === JSON.stringify(info[m.key].entryKeys), `5 ${m.entry}：入口上的名字和文件里写的一样`);
-    const leak = info[m.key] ? [...info[m.key].own].filter(n => !PL.LEGACY.includes(n) && Object.prototype.hasOwnProperty.call(t.w, n)) : [];
+    const leak = info[m.key] ? [...info[m.key].own].filter(n => !PL.LEGACY.includes(n) && !info[m.key].winGet.has(n) && Object.prototype.hasOwnProperty.call(t.w, n)) : [];
     ok(leak.length === 0, `5 ${m.key}：里面的名字没漏到 window 上：${leak.join('、')}`);
   }
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));

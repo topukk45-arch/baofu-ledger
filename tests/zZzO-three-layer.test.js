@@ -23,7 +23,7 @@ const recs = [
   const swipe = el => { touch(el, 'touchstart', 200, 300); for (let i = 1; i <= 25; i++) touch(el, 'touchmove', 200, 300 + i * 12); touch(el, 'touchend', 200, 600); };
   const panel = () => w.JiwenSheet.isOpen() && $('catActList') ? $('uiSheetTitle').textContent : null;
   const openCat = c => [...$('catList').querySelectorAll('.cat-item')].find(r => r.dataset.cat === c).click();
-  const arc = () => w.loadStore(A.ID).archives['默认存档'];
+  const arc = () => w.JiwenStore.loadStore(A.ID).archives['默认存档'];
   const settle = async () => { await t.idle(); await wait(30); };
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   $('manageCatSetting').click(); await t.idle();

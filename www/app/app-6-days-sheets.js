@@ -1,45 +1,3 @@
-        // ============================================================
-        // ===== 日子（倒数日） =====
-        // ============================================================
-        // 【数据独立存储，不进 store】key = days_${user}
-        //   倒数日与「哪个存档」没有任何语义关联——切到「旅行」存档，「入职纪念日」
-        //   难道就不存在了？塞进 store.archives[x] 会污染数据模型，还会连带影响导出/导入
-        //   （用户导出的是账单存档，里面却夹着倒数日，导入到别人账号就串了）。
-        //   独立 key 还意味着倒数日的增删改完全不碰 saveStore，不会因账单数据配额满而丢失。
-        //   【导出/导入】存储归存储，传输归传输：导出存档时会把 days 一起写进文件（换手机
-        //   能带走），但导入只在「文件里的 user === 目标账号」时才收，否则跳过——见
-        //   importArchiveFromText。多存档时每份导出各带一份相同副本，这是可接受的冗余。
-        function daysKey(user){ return `days_${user!==undefined ? user : currentUser}`; }
-        // 【P3】损坏处理向 loadStore 看齐：原先直接 return []，下一次 saveDays 就把坏数据
-        //   永久覆盖了，连人工抢救的机会都没有。倒数日虽小，但同一份代码里两套存储对
-        //   「数据坏了」给出两种处理，本身就是将来会看走眼的坑。只留最近 1 份，不堆积。
-        function backupCorruptedDays(user, raw){
-            if(raw==null) return;
-            try{
-                const prefix=`${daysKey(user)}__corrupted_`;
-                const olds=[];
-                for(let i=0;i<localStorage.length;i++){
-                    const k=localStorage.key(i);
-                    if(k && k.indexOf(prefix)===0) olds.push(k);
-                }
-                olds.sort();
-                olds.slice(0, Math.max(0, olds.length-1)).forEach(k=>{
-                    try{ localStorage.removeItem(k); }catch(_){}
-                });
-                localStorage.setItem(`${prefix}${Date.now()}`, raw);
-            }catch(_){}
-        }
-        function loadDays(user){
-            let raw=null;
-            try{
-                raw=localStorage.getItem(daysKey(user));
-                const arr=raw ? JSON.parse(raw) : [];
-                if(!Array.isArray(arr)){ backupCorruptedDays(user, raw); return []; }
-                // 清洗：只保留结构合法的项，避免脏数据让整页崩掉
-                return arr.filter(d=> d && typeof d==='object'
-                    && typeof d.name==='string' && isValidDay(d.date));
-            }catch(_){ backupCorruptedDays(user, raw); return []; }
-        }
         function saveDays(list, user){
             try{
                 localStorage.setItem(daysKey(user), JSON.stringify(list));
@@ -50,19 +8,6 @@
                 customAlert('存储空间已满，这个日子没能保存。请删除部分记录后重试。', '保存失败');
                 return false;
             }
-        }
-
-        // 校验 'YYYY-MM-DD' 是否为真实存在的日期。
-        // 复用与账单时间同一套思路：逐项比对解析结果，杜绝 JS 对越界日期的静默滚动
-        // （'2026-02-30' 会被 new Date 滚到 3月2日而不报错——我们在账单侧已经栽过一次）。
-        function isValidDay(s){
-            if(typeof s!=='string') return false;
-            const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-            if(!m) return false;
-            const y=+m[1], mo=+m[2], d=+m[3];
-            if(mo<1||mo>12||d<1||d>31) return false;
-            const dt=new Date(y, mo-1, d);
-            return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d;
         }
 
         // 计算天数差。

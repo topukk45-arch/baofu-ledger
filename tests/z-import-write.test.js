@@ -73,7 +73,7 @@ async function boot(o) {
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   t.S = () => w.JiwenImportUI._state();
   t.st = () => w.JiwenImportStore;
-  t.recs = () => w.getUserData();
+  t.recs = () => w.JiwenStore.getUserData();
   // 导入一批文件：打开导入页 → 选文件 → （改方案）→ 点导入 → 等结果页 / 提示框
   t.importFiles = async (files, edit, opts) => {
     opts = opts || {};
@@ -206,9 +206,9 @@ const after1 = await t.dump();
   ok(bk.data.some(r => r.src && r.src.merged === true && Number.isInteger(r.cp) && r.batch) && bk.data.some(r => r.src && r.src.sum === 'petty') && bk.data.some(r => Number.isInteger(r.pm)),
     '8 记录带 src（含 merged、sum）、cp、pm、batch');
   const tn = await boot({ seed: seedOf([]) });
-  await tn.w.importArchiveFromText(JSON.stringify(bk), ID);
+  await tn.w.JiwenStore.importArchiveFromText(JSON.stringify(bk), ID);
   await tn.idle();
-  const st = tn.w.loadStore(ID), names = Object.keys(st.archives), a = st.archives[names[names.length - 1]];
+  const st = tn.w.JiwenStore.loadStore(ID), names = Object.keys(st.archives), a = st.archives[names[names.length - 1]];
   const n = a.records;
   ok(n.filter(r => r.src && r.src.merged === true).length === bk.data.filter(r => r.src && r.src.merged).length && n.filter(r => r.src && r.src.sum).length === bk.data.filter(r => r.src && r.src.sum).length
      && n.filter(r => r.batch).length === bk.data.filter(r => r.batch).length && same(a.cps, bk.cps) && same(a.pms, bk.pms), '8 导入备份以后 src / cp / pm / batch / 名单一个不丢');
@@ -318,7 +318,7 @@ function recModeOf(r) { return r.skip ? 'skip' : r.flow ? 'flow' : 'normal'; }
 {
   const many = Array.from({ length: 120000 }, (_, i) => ({ id: 'x' + i, time: `2025-${String(1 + (i % 12)).padStart(2, '0')}-${String(1 + (i % 28)).padStart(2, '0')}T12:00`, money: 1 + (i % 500), type: 'expense', cat: '吃饭', remark: '虚构' }));
   const tk = await boot({ seed: seedOf([]) });
-  { const st = tk.w.loadStore(ID); st.archives['默认存档'].records = many; tk.w.saveStore(st, ID); await tk.idle(); }
+  { const st = tk.w.JiwenStore.loadStore(ID); st.archives['默认存档'].records = many; tk.w.JiwenStore.saveStore(st, ID); await tk.idle(); }
   const one = wx({ time: T(9, 1, 9), cp: '虚构店', fen: 1234 });
   const r = await tk.importFiles([['one.csv', bill('wechat', [one])]]);
   ok(r.result && tk.recs().length === 120001, '11 12 万条账本上导入一笔');

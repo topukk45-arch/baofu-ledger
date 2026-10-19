@@ -182,7 +182,7 @@ const LEGACY={
   await t.prompt('阿甲');
   ok(t.idOf('阿甲')===J && (await t.db())['store_'+J]!==undefined, '7 改名后编号和数据都不变');
   ok(JSON.parse((await t.db())['store_'+J]).accountName==='阿甲', '7 新名字也抄进了库里的账本');
-  const p=t.w.odBuildPayload();
+  const p=t.w.JiwenStore.odBuildPayload();
   ok(p.accountId===J && p.user==='阿甲', '7 备份文件里带账号编号和新名字');
 }
 

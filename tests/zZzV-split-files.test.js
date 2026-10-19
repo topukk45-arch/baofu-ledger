@@ -43,15 +43,16 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   // 2. 全局重名
   const codes = files.map(f => fs.readFileSync(path.join(WWW, f), 'utf8'));
   const owner = new Map(), dups = [];
+  const D = require('./tools/deps');
   codes.forEach((c, i) => {
-    const decl = S.topDecls(S.parse(c));
+    const decl = S.topDecls(S.parse(D.unwrap(c)));   // 1019-Z4-M4 起：模块文件拆开包装算它里面的名字，旧代码引用表那一行不算定义
     decl.forEach((v, name) => {
       if (v.dup) dups.push(`${name}（${files[i]} 里定义了 ${v.dup.length + 1} 次）`);
       if (owner.has(name)) dups.push(`${name}（${owner.get(name)} 和 ${files[i]}）`); else owner.set(name, files[i]);
     });
   });
   ok(dups.length === 0, '2 没有全局重名：' + dups.join('、'));
-  ok(owner.size > 600, '2 顶层名字都数到了：' + owner.size);
+  ok(owner.size > 600, '2 名字都数到了（旧文件的顶层 + 模块里面的）：' + owner.size);
 
   // 3. 跨文件先用后定义
   let code = ''; const bounds = [];
@@ -83,7 +84,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   const t = await A.boot({ html: raw, www: WWW, seed: A.seedOf(recs) });
   const got = t.log.filter(p => /^app\//.test(p));
   ok(files.every(f => got.includes(f)) && got.includes('app/app.css'), '4 一个个读了 app/*.js 和 app.css：' + got.join(' '));
-  ok(typeof t.w.switchTab === 'function' && typeof t.w.loadStore === 'function' && t.w.JiwenSheet && t.w.JiwenPerf, '4 各个文件里的全局都在');
+  ok(typeof t.w.switchTab === 'function' && typeof t.w.JiwenStore.loadStore === 'function' && t.w.JiwenSheet && t.w.JiwenPerf, '4 各个文件里的全局都在');
   ok(t.$('mainBox').style.display === 'block' && t.$('loginBox').style.display === 'none', '4 自动进了账号（主界面出来、登录框收起）');
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
   ok(/虚构午饭/.test(t.$('billList').textContent), '4 账单页列出记录');

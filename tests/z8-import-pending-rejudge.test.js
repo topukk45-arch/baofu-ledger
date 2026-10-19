@@ -45,7 +45,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   }
 
   // ===== 3. 改了手记以后再导：金额相近那笔有了结论 =====
-  await (async () => { const s = t.w.loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.map(r => r.id === 'm1' ? Object.assign({}, r, { money: 29.5 }) : r); t.w.saveStore(s, A.ID); await t.idle(); })();
+  await (async () => { const s = t.w.JiwenStore.loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.map(r => r.id === 'm1' ? Object.assign({}, r, { money: 29.5 }) : r); t.w.JiwenStore.saveStore(s, A.ID); await t.idle(); })();
   const Dedit = await t.dump();
   let note = '';
   const r3 = await t.importFiles(F, () => { note = $('impPendResolved') ? $('impPendResolved').textContent : ''; });

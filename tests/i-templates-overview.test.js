@@ -15,7 +15,7 @@ function bootSync(arc, extraArchives){
     w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
   const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
   const d=dom.window.document,$=id=>d.getElementById(id);
-  const st=()=>JSON.parse(dom.window.ledgerGet(dom.window.storeKey()));
+  const st=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey()));
   const arcOf=()=>st().archives['默认存档'];
   const chipTxt=box=>[...$(box).querySelectorAll('.cc')].map(e=>e.textContent);
   const clickChip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>e.textContent===txt).click();
@@ -157,8 +157,8 @@ function bootSync(arc, extraArchives){
 {
   const tpls=[ {id:'a',type:'expense',cat:'订阅',remark:'视频会员',money:157,mode:'normal'} ];
   const t=await boot({ tpls, records:[R('r','2026-10-01T10:00',1,'expense','餐饮')] });
-  ok(JSON.stringify(t.w.eval('odBuildPayload()').tpls)===JSON.stringify(tpls), '云备份带模板');
-  t.w.importArchiveFromText(JSON.stringify({ archive:'导入', cats:['未分类','订阅','餐饮'], data:[R('x','2026-10-01T10:00',1,'expense','餐饮')],
+  ok(JSON.stringify(t.w.eval('JiwenStore.odBuildPayload()').tpls)===JSON.stringify(tpls), '云备份带模板');
+  t.w.JiwenStore.importArchiveFromText(JSON.stringify({ archive:'导入', cats:['未分类','订阅','餐饮'], data:[R('x','2026-10-01T10:00',1,'expense','餐饮')],
     tpls:[ {type:'expense',cat:'订阅',remark:'视频会员',money:157,mode:'normal'},
            {type:'expense',cat:'订阅',remark:'视频会员',money:157,mode:'normal'},   // 重复
            {type:'expense',cat:'不存在',remark:'x',money:null},                    // 分类不在表里
@@ -167,7 +167,7 @@ function bootSync(arc, extraArchives){
            {type:'expense',cat:'餐饮',remark:'<b>午饭</b>',money:'',mode:'flow'} ] }), t.w.localStorage.getItem('app_logged_in_user'));
   const im=t.st().archives['导入'].tpls;
   ok(im.length===2 && im[0].money===157 && im[1].money===null && im[1].mode==='flow' && im[0].id && im[0].id!==im[1].id, '导入清洗：'+JSON.stringify(im));
-  const t2=await boot(); t2.w.importArchiveFromText(JSON.stringify({ archive:'旧备份', cats:['未分类'], data:[R('x','2026-10-01T10:00',1,'expense','未分类')] }), t2.w.localStorage.getItem('app_logged_in_user'));
+  const t2=await boot(); t2.w.JiwenStore.importArchiveFromText(JSON.stringify({ archive:'旧备份', cats:['未分类'], data:[R('x','2026-10-01T10:00',1,'expense','未分类')] }), t2.w.localStorage.getItem('app_logged_in_user'));
   ok(Array.isArray(t2.st().archives['旧备份'].tpls) && t2.st().archives['旧备份'].tpls.length===0, '旧备份没有 tpls → 空数组');
   // XSS：模板名只当文字
   const t3=await boot({ tpls:[{id:'x',type:'expense',cat:'餐饮',remark:'<img src=x onerror="window.__pwn=1">',money:null,mode:'normal'}] });

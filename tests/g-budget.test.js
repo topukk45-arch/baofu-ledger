@@ -23,7 +23,7 @@ function bootSync(records, budgets){
     w.Date=class extends Date{constructor(...a){a.length?super(...a):super('2026-10-10T14:00:00');}static now(){return new Date('2026-10-10T14:00:00').getTime();}};}});
   const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
   const d=dom.window.document,$=id=>d.getElementById(id);
-  const arc=()=>JSON.parse(dom.window.ledgerGet(dom.window.storeKey())).archives['默认存档'];
+  const arc=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey())).archives['默认存档'];
   const chip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===txt);
   const stats=()=>d.querySelector('.tab-btn[data-tab="stats"]').click();
   const catRow=c=>[...$('catList').querySelectorAll('.cat-item')].find(r=>r.dataset.cat===c);
@@ -109,13 +109,13 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
 // ===== 5. 导出 / 导入 / AI =====
 {
   const t=await boot(null,{'游戏':200});
-  ok(t.w.odBuildPayload().budgets['游戏']===200, '云备份带上预算');
-  t.w.importArchiveFromText(JSON.stringify({user:'小明',archive:'导入',cats:['游戏','餐饮'],budgets:{'游戏':300,'不存在':100,'餐饮':-5},
+  ok(t.w.JiwenStore.odBuildPayload().budgets['游戏']===200, '云备份带上预算');
+  t.w.JiwenStore.importArchiveFromText(JSON.stringify({user:'小明',archive:'导入',cats:['游戏','餐饮'],budgets:{'游戏':300,'不存在':100,'餐饮':-5},
     data:[R('x','2026-10-01T10:00',10,'expense','游戏','')]}), t.w.localStorage.getItem('app_logged_in_user'));
-  const b=JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['导入'].budgets;
+  const b=JSON.parse(t.w.JiwenStore.ledgerGet(t.w.JiwenStore.storeKey())).archives['导入'].budgets;
   ok(JSON.stringify(b)==='{"游戏":300}', '导入只收合法预算：'+JSON.stringify(b));
-  t.w.importArchiveFromText(JSON.stringify({user:'小明',archive:'旧备份',cats:['游戏'],data:[R('y','2026-10-01T10:00',10,'expense','游戏','')]}), t.w.localStorage.getItem('app_logged_in_user'));
-  ok(JSON.stringify(JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['旧备份'].budgets)==='{}', '旧备份没有预算字段也能导入');
+  t.w.JiwenStore.importArchiveFromText(JSON.stringify({user:'小明',archive:'旧备份',cats:['游戏'],data:[R('y','2026-10-01T10:00',10,'expense','游戏','')]}), t.w.localStorage.getItem('app_logged_in_user'));
+  ok(JSON.stringify(JSON.parse(t.w.JiwenStore.ledgerGet(t.w.JiwenStore.storeKey())).archives['旧备份'].budgets)==='{}', '旧备份没有预算字段也能导入');
   // AI：按月导出带预算
   t.$('exportAiBtn').click(); t.chip('askChoices','按月').click(); t.$('askOk').click();
   t.chip('askChoices','2026年10月（7 笔）').click(); t.$('askOk').click();

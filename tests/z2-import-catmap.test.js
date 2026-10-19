@@ -142,7 +142,7 @@ async function boot(o) {
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   t.S = () => w.JiwenImportUI._state();
   t.st = () => w.JiwenImportStore;
-  t.arch = () => w.loadStore(ID).archives['默认存档'];
+  t.arch = () => w.JiwenStore.loadStore(ID).archives['默认存档'];
   t.importFiles = async (files, edit, opts) => {
     opts = opts || {};
     $('devImportBtn').click();
@@ -202,7 +202,7 @@ const recOf = (S, pred) => {
   ok(same(sortM(t.arch().importRules && t.arch().importRules.map), sortM(want1)), '1 存档里存了三条对照，没动的「文化休闲」不存：' + JSON.stringify(t.arch().importRules));
   const logs1 = await t.st().importsRead();
   ok(same(sortM(logs1[0].rulesAdded.map), sortM(want1)), '1 导入记录的 rulesAdded 带上这三条对照（给撤销用）');
-  ok(t.w.getUserData().filter(r => r.money === 23 || r.money === 50 || r.money === 15).every(r => r.cat === '杂项') && t.w.getUserData().find(r => r.money === 30).cat === '其他', '1 这一批照选的分类写进去');
+  ok(t.w.JiwenStore.getUserData().filter(r => r.money === 23 || r.money === 50 || r.money === 15).every(r => r.cat === '杂项') && t.w.JiwenStore.getUserData().find(r => r.money === 30).cat === '其他', '1 这一批照选的分类写进去');
   const after1 = await t.dump();
 
   // ===== 2. 第二次：同样的推荐分类直接落 X，新建分类里不再出现；没动过的照样问 =====
@@ -224,21 +224,21 @@ const recOf = (S, pred) => {
     const bk = JSON.parse(t.w.__files[t.w.__files.length - 1]);
     ok(same(sortM(bk.importRules.map), sortM(want1)) && same(sortM(bk.imports[0].rulesAdded.map), sortM(want1)), '3 导出的备份带对照（存档设置里、导入记录里都有）');
     const tn = await boot({ seed: seedOf(['未分类']) });
-    await tn.w.importArchiveFromText(JSON.stringify(bk), ID); await tn.idle();
-    const st = tn.w.loadStore(ID), names = Object.keys(st.archives), a = st.archives[names[names.length - 1]];
+    await tn.w.JiwenStore.importArchiveFromText(JSON.stringify(bk), ID); await tn.idle();
+    const st = tn.w.JiwenStore.loadStore(ID), names = Object.keys(st.archives), a = st.archives[names[names.length - 1]];
     ok(same(sortM(a.importRules.map), sortM(want1)), '3 导入备份以后对照还在');
-    await t.w.odSyncNow();
+    await t.w.JiwenStore.odSyncNow();
     const cloudText = t.w.__cloud[t.w.__cloud.length - 1] || 'null', cloud = JSON.parse(cloudText);
     ok(cloud && same(sortM(cloud.importRules.map), sortM(want1)), '3 云备份带对照');
     const tc = await boot({ seed: seedOf(['未分类']) });
-    await tc.w.importArchiveFromText(cloudText, ID); await tc.idle();
-    const sc = tc.w.loadStore(ID), nc = Object.keys(sc.archives), ac = sc.archives[nc[nc.length - 1]];
+    await tc.w.JiwenStore.importArchiveFromText(cloudText, ID); await tc.idle();
+    const sc = tc.w.JiwenStore.loadStore(ID), nc = Object.keys(sc.archives), ac = sc.archives[nc[nc.length - 1]];
     ok(same(sortM(ac.importRules.map), sortM(want1)), '3 从云备份恢复以后对照还在');
     // 坏数据：目标分类不在存档里的、没有 from 的、同一个 from 第二条，清洗时丢掉
     const bad = Object.assign({}, bk, { importRules: { cat: [], type: [], map: [{ from: '交通出行', cat: '杂项' }, { from: '交通出行', cat: '其他' }, { from: '', cat: '其他' }, { from: '酒店旅游', cat: '没有这个分类' }, 'x'] } });
     const tb = await boot({ seed: seedOf(['未分类']) });
-    await tb.w.importArchiveFromText(JSON.stringify(bad), ID); await tb.idle();
-    const sb = tb.w.loadStore(ID), nb = Object.keys(sb.archives), ab = sb.archives[nb[nb.length - 1]];
+    await tb.w.JiwenStore.importArchiveFromText(JSON.stringify(bad), ID); await tb.idle();
+    const sb = tb.w.JiwenStore.loadStore(ID), nb = Object.keys(sb.archives), ab = sb.archives[nb[nb.length - 1]];
     ok(same(ab.importRules.map, [{ from: '交通出行', cat: '杂项' }]), '3 备份里不合格的对照清洗掉：' + JSON.stringify(ab.importRules));
     ok(!t.errs.length && !tn.errs.length && !tc.errs.length && !tb.errs.length, '3 无报错 ' + t.errs.concat(tn.errs, tc.errs, tb.errs).join('|'));
   }
@@ -256,7 +256,7 @@ const recOf = (S, pred) => {
     const t5 = await boot({ seed: seedOf(CATS) });
     await t5.importFiles(files(batch1()), async () => { t5.pickInto('交通出行', '杂项'); });
     ok(same(t5.arch().importRules.map, [{ from: '交通出行', cat: '杂项' }]), '5 先存一条对照：交通出行 → 杂项');
-    const st = t5.w.loadStore(ID); st.archives['默认存档'].cats.push('交通出行'); t5.w.saveStore(st, ID); await t5.idle();
+    const st = t5.w.JiwenStore.loadStore(ID); st.archives['默认存档'].cats.push('交通出行'); t5.w.JiwenStore.saveStore(st, ID); await t5.idle();
     const r = await t5.importFiles(files(b2), null, { noGo: true });
     const dd5 = recOf(r.S, x => x.cp === '滴滴出行');
     ok(dd5.cat === '交通出行' && dd5.reason.indexOf('你的对照') < 0 && !r.plan.sections.newCats.some(n => n.name === '交通出行'), '5 同名分类优先，不查对照 ' + dd5.reason);
@@ -285,7 +285,7 @@ const recOf = (S, pred) => {
       const it = S.matched.items.find(x => x.src === 'row' && S.parsed.files[x.file].rows[x.row].cp === '滴滴出行');
       S.edits.rows[it.key] = { cat: '购物' }; t7.w.JiwenImportUI._replan();
     });
-    ok(r.result && !(t7.arch().importRules && t7.arch().importRules.map) && t7.w.getUserData().find(x => x.money === 23).cat === '购物', '7 只手动改了一行的分类：照改的写，不存对照');
+    ok(r.result && !(t7.arch().importRules && t7.arch().importRules.map) && t7.w.JiwenStore.getUserData().find(x => x.money === 23).cat === '购物', '7 只手动改了一行的分类：照改的写，不存对照');
     const r2b = await t7.importFiles(files(b2), null, { noGo: true });
     ok(r2b.plan.sections.newCats.length === 4, '7 第二次：没并过的照样出现在新建分类里');
   }

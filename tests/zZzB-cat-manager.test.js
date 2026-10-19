@@ -21,7 +21,7 @@ const CATS = ['未分类', '购物', '红包', '吃饭'];
   const { $, w, d } = t;
   const row = c => [...$('catList').querySelectorAll('.cat-item')].find(r => r.dataset.cat === c);
   const sheetOpen = () => w.JiwenSheet.isOpen();
-  const arc = () => w.loadStore(A.ID).archives['默认存档'];
+  const arc = () => w.JiwenStore.loadStore(A.ID).archives['默认存档'];
   $('manageCatSetting').click(); await t.idle();
 
   // 1. 行的结构：没有按钮；手柄、分类名、每月预算、›

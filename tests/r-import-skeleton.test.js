@@ -165,7 +165,7 @@ const importReqs = t => t.log.filter(p => p.startsWith('import/'));
   t.$('exportBtn').click(); await until(() => t.w.__files.length);
   const backup = t.w.__files[0] || '';
   ok(backup.length > 0 && !backup.includes('dev_import'), '4 导出的备份里没有开关');
-  ok(!JSON.stringify(t.w.odBuildPayload()).includes('dev_import'), '4 云备份内容里没有开关');
+  ok(!JSON.stringify((t.w.JiwenStore || t.w).odBuildPayload()).includes('dev_import'), '4 云备份内容里没有开关');
   const db = await (async () => { await t.idle(); return IDB.dumpDb(t.phone); })();
   ok(!Object.keys(db).some(k => k.includes('dev_import')) && !Object.values(db).some(v => String(v).includes('dev_import')), '4 账本库里没有开关');
   // 重开 App（同一台手机）：开关还在

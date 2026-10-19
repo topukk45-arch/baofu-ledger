@@ -81,8 +81,8 @@ const MAN = [{ id: 'm1', time: '2026-10-06T09:30', money: 36, type: 'expense', c
   await toReview(REPLY);
   tickAll();
   $('impAiGo').click(); await t.until(() => $('impAiConfirmOk')); $('impAiConfirmOk').click(); await t.until(() => $('impUndoNotice'));
-  { const st = t.w.loadStore(A.ID), rs = st.archives['默认存档'].records, i = rs.findIndex(r => r.id === rows.find(x => x.cp === '某虚构便利店').id);
-    rs[i] = Object.assign({}, rs[i], { cat: '吃饭' }); t.w.saveStore(st); await t.idle(); }
+  { const st = t.w.JiwenStore.loadStore(A.ID), rs = st.archives['默认存档'].records, i = rs.findIndex(r => r.id === rows.find(x => x.cp === '某虚构便利店').id);
+    rs[i] = Object.assign({}, rs[i], { cat: '吃饭' }); t.w.JiwenStore.saveStore(st); await t.idle(); }
   const l2 = (await t.st().importsRead()).pop();
   const p2 = await t.st().undoPlan(l2.b);
   ok(p2.totals.kept === 1 && /其中 1 处你后来又改过，保留你改的/.test(t.w.JiwenImportUndo.describe(p2)), '4 撤销前说明：你后来改过的那一处保留、列出来：' + t.w.JiwenImportUndo.describe(p2).split('\n').pop());

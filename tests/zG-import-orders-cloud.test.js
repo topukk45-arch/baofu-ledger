@@ -55,7 +55,7 @@ const pickBackup = async (t, text) => {
   {
     const rs = [{ id: 'a', time: '2026-10-01T08:00', money: 12.5, type: 'expense', cat: '吃饭', remark: '虚构', src: { app: 'wechat' }, cp: 2, batch: 'b1' },
                 { id: 'b', refundOf: 'a', money: 1, type: 'income', cat: '吃饭', time: '2026-10-02T09:00' }, { id: 'c' }];
-    ok(rs.every(r => t.w.impRecHash(r) === W.recHash(r)), '0 主页面的指纹和 write.js 的 recHash 一样');
+    ok(rs.every(r => (t.w.JiwenStore || t.w).impRecHash(r) === W.recHash(r)), '0 主页面的指纹和 write.js 的 recHash 一样');
   }
   const { $ } = t;
   // ===== 1. 连上主云备份和单号表文件 =====
@@ -106,20 +106,20 @@ const pickBackup = async (t, text) => {
     await pickBackup(t4, C.files[MAIN]);
     while (t4.ask()) await t4.askOk();
     await t4.idle();
-    const st = t4.w.loadStore(A.ID), arcs = Object.values(st.archives), got = arcs.find(a => a.records.length === 3);
+    const st = (t4.w.JiwenStore || t4.w).loadStore(A.ID), arcs = Object.values(st.archives), got = arcs.find(a => a.records.length === 3);
     ok(got && got.records.filter(r => r.src && r.src.app === 'wechat').length === 2 && got.records.some(r => r.id && r.money === 9), '4 1016-K 导入新版写的主云备份：3 条记录都在（合并的手记、导入的、后来记的）、导入的字段在');
     ok(!t4.errs.length, '4 1016-K 无报错 ' + t4.errs.join('|'));
   }
   {
     // 1016-K 那边也导一次账单，再让它写主云备份，新版来读
     await tOld.importFiles(F);
-    await tOld.w.odSyncNow(); await tOld.idle();
+    await (tOld.w.JiwenStore || tOld.w).odSyncNow(); await tOld.idle();
     const oldText = Object.values(C0.files)[0];
     const t5 = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
     await pickBackup(t5, oldText);
     while (t5.ask()) await t5.askOk();
     await t5.idle();
-    const st = t5.w.loadStore(A.ID), got = Object.values(st.archives).find(a => a.records.length === JSON.parse(oldText).data.length && a.records.length > 1);
+    const st = (t5.w.JiwenStore || t5.w).loadStore(A.ID), got = Object.values(st.archives).find(a => a.records.length === JSON.parse(oldText).data.length && a.records.length > 1);
     ok(got && got.records.some(r => r.src && r.src.app === 'wechat') && Array.isArray(got.cps), '5 新版导入 1016-K 写的主云备份：记录、来源、对方名单都在');
     ok(!t5.errs.length, '5 新版无报错 ' + t5.errs.join('|'));
   }
@@ -132,13 +132,13 @@ const pickBackup = async (t, text) => {
     await pickBackup(t6, C.files[MAIN]);
     while (t6.ask()) await t6.askOk();
     await t6.idle();
-    const st = t6.w.loadStore(A.ID), name = Object.keys(st.archives).find(k => st.archives[k].records.length === 3);
+    const st = (t6.w.JiwenStore || t6.w).loadStore(A.ID), name = Object.keys(st.archives).find(k => st.archives[k].records.length === 3);
     ok(name, '6 新手机：主云备份导进来了（' + name + '）');
     const before = await t6.st().ordersRead(name);
     ok(before.size === 0, '6 这时单号表是空的');
     let r = null;
-    try { r = await t6.w.impOrdersRestoreFromCloud(C2.files[ORD], name); } catch (e) { console.log('    ' + (e.code || e.message)); }
-    const T6 = await t6.st().ordersRead(name), a6 = t6.w.loadStore(A.ID).archives[name];
+    try { r = await (t6.w.JiwenStore || t6.w).impOrdersRestoreFromCloud(C2.files[ORD], name); } catch (e) { console.log('    ' + (e.code || e.message)); }
+    const T6 = await t6.st().ordersRead(name), a6 = (t6.w.JiwenStore || t6.w).loadStore(A.ID).archives[name];
     const e0 = T6.get('wechat', BILL[0].no);
     ok(r && r.kept === 4 && r.dropped === 0 && e0 && a6.records.some(x => x.id === e0.id && x.money === 30), '6 单号表恢复了：4 个单号，记录换成了新编号 ' + JSON.stringify(r));
     // 切到这个存档再导同一份账单
@@ -146,16 +146,16 @@ const pickBackup = async (t, text) => {
     const rr = await t6.importFiles(F, null, { noGo: true });
     ok(rr.plan.counts.add === 0 && rr.plan.counts.pending === 0 && rr.plan.counts.merge === 0, '6 再导同一份账单：一条不新增、没有待处理（不用按指纹猜）');
     let e2 = null;
-    try { await t6.w.impOrdersRestoreFromCloud(C2.files[ORD], name); } catch (e) { e2 = e.code; }
+    try { await (t6.w.JiwenStore || t6.w).impOrdersRestoreFromCloud(C2.files[ORD], name); } catch (e) { e2 = e.code; }
     ok(e2 === 'notempty', '7 已经有单号表：不覆盖');
     let e3 = null;
-    try { await t6.w.impOrdersRestoreFromCloud(C.files[MAIN], name); } catch (e) { e3 = e.code; }
+    try { await (t6.w.JiwenStore || t6.w).impOrdersRestoreFromCloud(C.files[MAIN], name); } catch (e) { e3 = e.code; }
     ok(e3 === 'badfile', '7 主云备份不是单号表文件：不认');
     ok(!t6.errs.length, '6 无报错 ' + t6.errs.join('|'));
   }
   // ===== 8. 开发开关关着：看不到单号表那一行 =====
   {
-    t.w.localStorage.removeItem('app_dev_import'); t.w.odRefreshStatusUI();
+    t.w.localStorage.removeItem('app_dev_import'); (t.w.JiwenStore || t.w).odRefreshStatusUI();
     ok($('odOrdersBar').style.display === 'none' && $('odOrdersStatus').style.display === 'none', '8 开发开关关着：没有单号表那一行');
   }
   ok(!t.errs.length && !tOld.errs.length, '无报错 ' + t.errs.concat(tOld.errs).join('|'));

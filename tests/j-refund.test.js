@@ -21,7 +21,7 @@ function bootSync(records, arcExtra){
     w.Date=class extends Date{constructor(...x){x.length?super(...x):super(NOW);}static now(){return new Date(NOW).getTime();}};}});
   const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
   const d=dom.window.document,$=id=>d.getElementById(id);
-  const recs=()=>JSON.parse(dom.window.ledgerGet(dom.window.storeKey())).archives['默认存档'].records;
+  const recs=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey())).archives['默认存档'].records;
   const refunds=()=>recs().filter(r=>r.refundOf);
   const kind=v=>$('refundKind').querySelector(`[data-v="${v}"]`).click();
   // 从修改弹窗走一次退款
@@ -233,7 +233,7 @@ function bootSync(records, arcExtra){
   ok(txt.includes('购物：70.00 元') && txt.includes('退款 购物 30.00 元（备注：差价）【退款】'), 'AI 分类净额与明细标注');
   ok(txt.includes('标注【退款】的记录'), 'AI 提示语说明退款');
   // 记账成功的预算提示也扣退款
-  ok(t.w.budgetSpentIn(t.recs(), '购物', 2026, 9)===70, 'budgetSpentIn 扣退款');
+  ok(t.w.JiwenStore.budgetSpentIn(t.recs(), '购物', 2026, 9)===70, 'budgetSpentIn 扣退款');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 
@@ -288,9 +288,9 @@ function bootSync(records, arcExtra){
 {
   const t=await boot();
   t.refund('buy', { part:30 }); t.$('askOk').click();
-  const payload=t.w.eval('odBuildPayload()');
+  const payload=t.w.eval('JiwenStore.odBuildPayload()');
   ok(payload.data.some(r=>r.refundOf==='buy'), '云备份带 refundOf');
-  t.w.importArchiveFromText(JSON.stringify({ archive:'导入', cats:['未分类','购物'], data:[
+  t.w.JiwenStore.importArchiveFromText(JSON.stringify({ archive:'导入', cats:['未分类','购物'], data:[
     R('o1','2026-10-01T10:00',100,'expense','购物','原'),
     R('r1','2026-10-02T10:00',60,'income','其他','退1',{refundOf:'o1'}),           // 分类被纠正为原账单的
     R('r2','2026-10-03T10:00',50,'income','购物','退2超额',{refundOf:'o1'}),       // 累计 110 > 100 → 普通收入
@@ -299,7 +299,7 @@ function bootSync(records, arcExtra){
     R('r4','2026-10-03T10:00',5,'income','购物','挂在收入上',{refundOf:'o2'}),      // → 普通收入
     R('r5','2026-10-03T10:00',5,'expense','购物','支出带标记',{refundOf:'o1'}),     // 支出不认
   ]}), t.w.localStorage.getItem('app_logged_in_user'));
-  const im=JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['导入'].records;
+  const im=JSON.parse(t.w.JiwenStore.ledgerGet(t.w.JiwenStore.storeKey())).archives['导入'].records;
   const by=rk=>im.find(r=>r.remark===rk);
   const o1=by('原');
   ok(by('退1').refundOf===o1.id && o1.id!=='o1' && by('退1').cat==='购物', '退款挂回新 id，分类跟原账单');

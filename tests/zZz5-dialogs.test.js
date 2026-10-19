@@ -45,11 +45,11 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   w.deleteCat('购物');
   ok(/^删除分类「购物」。\n\n有 1 条记录用着这个分类，删了以后这些记录会变成「未分类」，金额和备注都不动。$/.test($('askMsg').textContent) && $('askOk').textContent === '删除分类「购物」' && $('askOk').classList.contains('warn'), '3 删除分类：写几条会变未分类、按钮写分类名、警示色');
   $('askCancel').click(); await t.idle();
-  { const st = w.loadStore(A.ID); st.archives['另一个'] = { cats: ['未分类'], records: [] }; w.saveStore(st, A.ID); await t.idle(); }
+  { const st = w.JiwenStore.loadStore(A.ID); st.archives['另一个'] = { cats: ['未分类'], records: [] }; w.JiwenStore.saveStore(st, A.ID); await t.idle(); }
   $('delArchive').click();
   ok(/^删除存档「默认存档」：里面的 1 条记录、分类、预算、模板，还有导入记录、单号表、待处理、导入前的备份都会一起删掉，找不回来。/.test($('askMsg').textContent) && $('askOk').textContent === '删除这个存档' && $('askOk').classList.contains('warn'), '3 删除存档：写清会删掉什么、「删除这个存档」警示色');
   $('askCancel').click(); await t.idle();
-  ok(Object.keys(w.loadStore(A.ID).archives).length === 2 && t.recs().length === 1, '3 点取消：什么都没删');
+  ok(Object.keys(w.JiwenStore.loadStore(A.ID).archives).length === 2 && t.recs().length === 1, '3 点取消：什么都没删');
   // ===== 4. 导入相关（1017-V）：撤销、全部不要了、退出、AI 修改的确认按钮写清楚、警示色（各自的测试里点过：z5、z7、zV、zZw）=====
   const ui = fs.readFileSync(path.join(WWW, 'import', 'ui.js'), 'utf8');
   ok(/okText: okText, danger: true/.test(ui) && /'撤销这次导入'/.test(ui) && /'撤销这次 AI 修改'/.test(ui), '4 撤销：「撤销这次导入 / 撤销这次 AI 修改 / 连着撤销这 N 次」警示色');

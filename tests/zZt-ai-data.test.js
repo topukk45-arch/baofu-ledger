@@ -41,10 +41,10 @@ const lsDump = w => { const o = {}; for (let i = 0; i < w.localStorage.length; i
   const t = await A.boot({ html, www: WWW, seed: A.seedOf(RECS()) });
   const w = t.w;
   // ===== 1. 洗标记 =====
-  ok(same(w.impCleanAiFlag({ k: 'dup', why: '虚构', ref: 'a' }), { k: 'dup', why: '虚构', ref: 'a' }), '1 合格的标记照留');
-  ok(w.impCleanAiFlag({ k: 'x', why: '' }) === null && w.impCleanAiFlag(null) === null && w.impCleanAiFlag([1]) === null, '1 类型不对、空的、数组：不要');
-  ok(w.impCleanAiFlag({ k: 'miss', why: '长'.repeat(500) }).why.length === 200 && !('ref' in w.impCleanAiFlag({ k: 'miss', why: '', ref: 5 })), '1 理由截到 200 字，ref 不是字符串的去掉');
-  ok(same(w.impCleanAiFlag({ k: 'dup', why: '', ref: 'old' }, id => id === 'old' ? 'new' : null), { k: 'dup', why: '', ref: 'new' }) && !('ref' in w.impCleanAiFlag({ k: 'dup', why: '', ref: 'gone' }, () => null)), '1 换编号：换得了换，换不了去掉 ref、标记照留');
+  ok(same((w.JiwenStore || w).impCleanAiFlag({ k: 'dup', why: '虚构', ref: 'a' }), { k: 'dup', why: '虚构', ref: 'a' }), '1 合格的标记照留');
+  ok((w.JiwenStore || w).impCleanAiFlag({ k: 'x', why: '' }) === null && (w.JiwenStore || w).impCleanAiFlag(null) === null && (w.JiwenStore || w).impCleanAiFlag([1]) === null, '1 类型不对、空的、数组：不要');
+  ok((w.JiwenStore || w).impCleanAiFlag({ k: 'miss', why: '长'.repeat(500) }).why.length === 200 && !('ref' in (w.JiwenStore || w).impCleanAiFlag({ k: 'miss', why: '', ref: 5 })), '1 理由截到 200 字，ref 不是字符串的去掉');
+  ok(same((w.JiwenStore || w).impCleanAiFlag({ k: 'dup', why: '', ref: 'old' }, id => id === 'old' ? 'new' : null), { k: 'dup', why: '', ref: 'new' }) && !('ref' in (w.JiwenStore || w).impCleanAiFlag({ k: 'dup', why: '', ref: 'gone' }, () => null)), '1 换编号：换得了换，换不了去掉 ref、标记照留');
   ok(t.recs().find(r => r.id === 'r1').aiFlag.ref === 'r2', '1 存在账本里的标记原样读得出来');
   // ===== 2. 导入记录里 kind:'ai' 那一条 =====
   await t.st().importsWrite(undefined, LOGS.concat([{ kind: 'ai', of: 'BAD BATCH', b: 'b3', at: '', add: [], chg: [] }]));
@@ -57,7 +57,7 @@ const lsDump = w => { const o = {}; for (let i = 0; i < w.localStorage.length; i
   const bj = JSON.parse(bk);
   ok(bj.data.find(r => r.id === 'r1').aiFlag.ref === 'r2' && bj.imports[1].kind === 'ai', '3 导出的备份里有标记、有 AI 修改那条导入记录');
   await pickBackup(t, bk);
-  const st = w.loadStore(A.ID), nm = Object.keys(st.archives).find(k => k !== '默认存档'), arc = st.archives[nm];
+  const st = (w.JiwenStore || w).loadStore(A.ID), nm = Object.keys(st.archives).find(k => k !== '默认存档'), arc = st.archives[nm];
   const byRemark = (m) => arc.records.find(r => Math.round(r.money * 100) === m);
   const n1 = arc.records.find(r => r.aiFlag && r.aiFlag.k === 'dup' && r.aiFlag.why === FLAG.why), n2 = arc.records.find(r => r.src && r.money === 30);
   ok(nm && n1 && n2 && n1.id !== 'r1' && n1.aiFlag.ref === n2.id, '3 导入备份：标记照搬，ref 换成新编号（' + (n1 && n1.aiFlag.ref) + '）');
@@ -73,12 +73,12 @@ const lsDump = w => { const o = {}; for (let i = 0; i < w.localStorage.length; i
                      readText: async o => ({ text: C.files[o.uri] }), forget: async () => ({}), checkAccess: async () => ({ ok: true }) };
     const t4 = await A.boot({ html, www: WWW, seed: A.seedOf(RECS()), before: x => { x.Capacitor.Plugins.OneDriveLink = plugin; } });
     t4.$('odConnectBtn').click(); await t4.until(() => t4.ask()); await t4.askOk(); await t4.idle();
-    await t4.w.odSyncNow(); await t4.idle();
+    await (t4.w.JiwenStore || t4.w).odSyncNow(); await t4.idle();
     const main = Object.values(C.files)[0];
     ok(main && JSON.parse(main).data.find(r => r.id === 'r1').aiFlag.k === 'dup', '4 云备份里带着标记');
     const t5 = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
     await pickBackup(t5, main);
-    const a5 = Object.values(t5.w.loadStore(A.ID).archives).find(a => a.records.length === 5);
+    const a5 = Object.values((t5.w.JiwenStore || t5.w).loadStore(A.ID).archives).find(a => a.records.length === 5);
     ok(a5 && a5.records.filter(r => r.aiFlag).length === 3 && a5.records.find(r => r.aiFlag && r.aiFlag.ref).aiFlag.ref === a5.records.find(r => r.src && r.money === 30).id, '4 新手机从云备份恢复：标记都在，ref 换成新编号');
   }
   // ===== 5. 撤销：undo.js 认 aiFlag；撤原来那次导入要先撤 AI 修改 =====
@@ -95,15 +95,15 @@ const lsDump = w => { const o = {}; for (let i = 0; i < w.localStorage.length; i
   // ===== 6. AI 修改前备份：…_bk_<时间>_a，backups() 认得，能恢复 =====
   {
     const t6 = await A.boot({ html, www: WWW, seed: A.seedOf(RECS()) });
-    const tg = t6.w.impTarget();
-    const raw = await t6.w.impMakeBackup(tg, 'b2', 'ai');
+    const tg = (t6.w.JiwenStore || t6.w).impTarget();
+    const raw = await (t6.w.JiwenStore || t6.w).impMakeBackup(tg, 'b2', 'ai');
     ok(JSON.parse(raw).kind === 'AI 修改前备份' && JSON.parse(raw).data.find(r => r.id === 'r1').aiFlag.k === 'dup', '6 AI 修改前备份：kind「AI 修改前备份」，带着标记');
-    const key = t6.w.impBkPrefix(tg.e.id, tg.aid) + (1700000000000).toString(36) + '_a';
-    await t6.w.idbBatch([['put', key, raw]]); t6.w.__ledgerKeys && t6.w.__ledgerKeys.add && t6.w.__ledgerKeys.add(key);
+    const key = (t6.w.JiwenStore || t6.w).impBkPrefix(tg.e.id, tg.aid) + (1700000000000).toString(36) + '_a';
+    await (t6.w.JiwenStore || t6.w).idbBatch([['put', key, raw]]); (t6.w.JiwenStore || t6.w).__ledgerKeys && (t6.w.JiwenStore || t6.w).__ledgerKeys.add && (t6.w.JiwenStore || t6.w).__ledgerKeys.add(key);
     const bl = t6.st().backups();
     ok(bl.length === 1 && bl[0].kind === 'ai', '6 backups() 认得 AI 修改前备份');
     const recs0 = JSON.stringify(t6.recs());
-    { const s6 = t6.w.loadStore(A.ID), rs = s6.archives['默认存档'].records; rs[0] = Object.assign({}, rs[0], { cat: '其他' }); t6.w.saveStore(s6); await t6.idle(); }
+    { const s6 = (t6.w.JiwenStore || t6.w).loadStore(A.ID), rs = s6.archives['默认存档'].records; rs[0] = Object.assign({}, rs[0], { cat: '其他' }); (t6.w.JiwenStore || t6.w).saveStore(s6); await t6.idle(); }
     ok(t6.recs()[0].cat === '其他', '6 （先改一条）');
     const rr = await t6.st().restoreLast();
     ok(rr.records === 5 && JSON.stringify(t6.recs()) === recs0, '6 恢复到 AI 修改前：账本回到备份的样子');
@@ -127,17 +127,17 @@ const lsDump = w => { const o = {}; for (let i = 0; i < w.localStorage.length; i
   {
     const t8 = await A.boot({ html: OLD, www: WWW, seed: A.seedOf([]) });
     await pickBackup(t8, bk);
-    const a8 = Object.values(t8.w.loadStore(A.ID).archives).find(a => a.records.length === 5);
+    const a8 = Object.values((t8.w.JiwenStore || t8.w).loadStore(A.ID).archives).find(a => a.records.length === 5);
     ok(a8 && !t8.errs.length, '8 1016-K 导入新版带标记的备份：5 条记录都在、没报错（旧版不认标记，导进去时不带）');
     // 同一台手机：新版写进去的数据，旧版装回去读
     const tn = await A.boot({ html, www: WWW, seed: A.seedOf(RECS()) });
     await tn.idle();
     const to = await A.boot({ html: OLD, www: WWW, phone: tn.phone, seed: lsDump(tn.w) });
-    const ro = to.w.loadStore(A.ID).archives['默认存档'].records;
+    const ro = (to.w.JiwenStore || to.w).loadStore(A.ID).archives['默认存档'].records;
     ok(ro.length === 5 && ro.find(r => r.id === 'r1').aiFlag.ref === 'r2' && !to.errs.length, '8 1016-K 装回去：读得出来，标记原样留着，没报错');
     // 旧版里改一条带标记的记录（备注），再装回新版：标记还在
     to.$('mainBox') && to.d.querySelector('.tab-btn[data-tab="ledger"]').click();
-    { const st0 = to.w.loadStore(A.ID), rs = st0.archives['默认存档'].records, i = rs.findIndex(r => r.id === 'r1'); rs[i] = Object.assign({}, rs[i], { remark: '旧版里改的备注' }); to.w.saveStore(st0); await to.idle(); }
+    { const st0 = (to.w.JiwenStore || to.w).loadStore(A.ID), rs = st0.archives['默认存档'].records, i = rs.findIndex(r => r.id === 'r1'); rs[i] = Object.assign({}, rs[i], { remark: '旧版里改的备注' }); (to.w.JiwenStore || to.w).saveStore(st0); await to.idle(); }
     const tb = await A.boot({ html, www: WWW, phone: to.phone, seed: lsDump(to.w) });
     const rb = tb.recs().find(r => r.id === 'r1');
     ok(rb && rb.remark === '旧版里改的备注' && rb.aiFlag && rb.aiFlag.ref === 'r2' && !tb.errs.length, '8 旧版里改过别的字段再装回新版：标记还在');

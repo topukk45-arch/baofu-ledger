@@ -70,7 +70,7 @@ async function boot(o) {
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   t.S = () => w.JiwenImportUI._state();
   t.st = () => w.JiwenImportStore;
-  t.arch = () => w.loadStore(ID).archives['默认存档'];
+  t.arch = () => (w.JiwenStore || w).loadStore(ID).archives['默认存档'];
   t.recs = () => t.arch().records;
   // 导入一批：打开导入页 → 选文件 →（edit 改方案）→ 点导入
   t.importFiles = async (files, edit, opts) => {
@@ -100,7 +100,7 @@ async function boot(o) {
   t.undoPlan = async b => { await w.eval('loadImportUI')(); return t.st().undoPlan(b); };
   t.undo = async b => { const p = await t.undoPlan(b); const r = await t.st().undo(p); await t.idle(); return { p, r }; };
   t.dump = async () => { await t.idle(); const db = await IDB.dumpDb(t.phone); const o = {}; Object.keys(db).sort().forEach(k => { if (!/_bk_/.test(k)) o[k] = db[k]; }); return o; };
-  t.save = async fn => { const s = w.loadStore(ID); fn(s.archives['默认存档']); w.saveStore(s, ID); await t.idle(); };
+  t.save = async fn => { const s = (w.JiwenStore || w).loadStore(ID); fn(s.archives['默认存档']); (w.JiwenStore || w).saveStore(s, ID); await t.idle(); };
   return t;
 }
 // 确认页上的样子：各桶笔数、每行去向和分类、新建分类

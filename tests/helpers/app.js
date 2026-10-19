@@ -61,7 +61,7 @@ async function boot(o) {
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   t.S = () => w.JiwenImportUI && w.JiwenImportUI._state();
   t.st = () => w.JiwenImportStore;
-  t.arch = () => w.loadStore(ID).archives['默认存档'];
+  t.arch = () => (w.JiwenStore || w).loadStore(ID).archives['默认存档'];
   t.recs = () => t.arch().records;
   t.ask = () => $('askMask').style.display === 'flex' ? { title: $('askTitle') ? $('askTitle').textContent : '', msg: $('askMsg').textContent } : null;
   t.askOk = async () => { $('askOk').click(); await IDB.idle(w); };

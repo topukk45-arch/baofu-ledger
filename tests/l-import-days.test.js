@@ -88,7 +88,7 @@ function bootSync(loggedIn, existingDays){
   ok(t.days('小明').length===0, '3 不用了：日子没导');
   ok(t.open() && t.title()==='导入成功', '3 仍然弹出导入成功');
   ok(!t.msg().includes('日子'), '3 提示里不提日子');
-  const st=JSON.parse(t.w.ledgerGet(t.w.storeKey()));
+  const st=JSON.parse(t.w.JiwenStore.ledgerGet(t.w.JiwenStore.storeKey()));
   ok(st.archives['旧手机'] && st.archives['旧手机'].records.length===2, '3 账单照常导入');
 }
 

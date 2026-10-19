@@ -31,7 +31,7 @@ async function check(t, tag) {
   const logs = await t.st().importsRead(), pend = await t.st().pendingRead();
   const db = await t.dump(), bad = [];
   const st0 = new Map();
-  Object.keys(db).filter(k => /^imp_.+_o_/.test(k)).forEach(k => { const app = /_o_(alipay|wechat)_/.exec(k)[1]; (t.w.impBlkDecode(db[k]) || []).forEach(x => { if (x.st === 0) { st0.set(app + '|' + x.no, x.id); if (!ids.has(x.id)) bad.push('单号指向不存在的记录 ' + x.no); } }); });
+  Object.keys(db).filter(k => /^imp_.+_o_/.test(k)).forEach(k => { const app = /_o_(alipay|wechat)_/.exec(k)[1]; (t.w.JiwenStore.impBlkDecode(db[k]) || []).forEach(x => { if (x.st === 0) { st0.set(app + '|' + x.no, x.id); if (!ids.has(x.id)) bad.push('单号指向不存在的记录 ' + x.no); } }); });
   const bs = new Set(logs.map(l => l.b));
   logs.forEach(l => {
     if (l.kind === 'ai') { if (!logs.some(x => x.kind !== 'ai' && x.b === l.of)) bad.push('AI 修改指向不在的导入 ' + l.of); (l.chg || []).forEach(c => { if (!ids.has(c.id)) bad.push('AI 修改的记录不在 ' + c.id); }); return; }
@@ -121,7 +121,7 @@ const restoreKind = async (t, kind, nth) => { const L = await t.st().backupList(
     await check(t, '3 恢复后 AI 修改');
     await undoLast(t); await undoLast(t);
     const D0 = await t.dump();
-    ok(D0['imp_' + A.ID + '_' + t.w.impTarget().aid + '_i'] === undefined && t.recs().length === 1, '3 恢复后导入、AI 修改，倒着全撤：回到一条手记');
+    ok(D0['imp_' + A.ID + '_' + t.w.JiwenStore.impTarget().aid + '_i'] === undefined && t.recs().length === 1, '3 恢复后导入、AI 修改，倒着全撤：回到一条手记');
     // 恢复到「导入后」那份（撤销前）以后再导同一份：认成已导入
     await restoreKind(t, 'undo');
     const r3 = await t.importFiles(FA, null, { noGo: true });
@@ -156,7 +156,7 @@ const restoreKind = async (t, kind, nth) => { const L = await t.st().backupList(
   {
     const t = await boot();
     await t.importFiles(FA);
-    const save = async fn => { const s = t.w.loadStore(A.ID); fn(s.archives['默认存档']); t.w.saveStore(s); await t.idle(); };
+    const save = async fn => { const s = t.w.JiwenStore.loadStore(A.ID); fn(s.archives['默认存档']); t.w.JiwenStore.saveStore(s); await t.idle(); };
     await save(a => { a.records = a.records.concat([{ id: 'm9', time: '2026-10-19T08:00', money: 5, type: 'expense', cat: '吃饭', remark: '' }, { id: 'm8', time: '2026-10-19T09:00', money: 6, type: 'expense', cat: '吃饭', remark: '' }]); });
     const L = await t.st().backupList(), x = L.list.find(b => b.kind === 'import');
     const d = await t.st().backupDiff(x.key);

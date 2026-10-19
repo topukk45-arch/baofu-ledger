@@ -21,8 +21,8 @@ async function snap(file){
   // 账号编号是新建时随机生成的，两次跑本来就不一样，比之前换成同一个占位
   const noId=x=>x.replace(/"accountId": ?"u\d+"/g, '"accountId":"<编号>"');
   out.backup=noId(dom.window.__files[0]||'');
-  out.cloud=noId(JSON.stringify(dom.window.odBuildPayload()));
-  out.aiApp=dom.window.buildAiText(dom.window.getUserData().filter(r=>r.time.startsWith('2026-08')),'2026年8月','按月');
+  out.cloud=noId(JSON.stringify((dom.window.JiwenStore||dom.window).odBuildPayload()));
+  out.aiApp=dom.window.buildAiText((dom.window.JiwenStore||dom.window).getUserData().filter(r=>r.time.startsWith('2026-08')),'2026年8月','按月');
   out.overall=$('summaryOverall').innerHTML; out.cats=$('catStats').innerHTML;
   const pages=[]; for(let p=0;p<10;p++){ pages.push($('billList').innerHTML); const nx=[...$('pager').querySelectorAll('button')].pop(); if(!nx||nx.disabled)break; nx.click(); }
   out.pages=pages.join('|');

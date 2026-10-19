@@ -151,6 +151,8 @@ git show HEAD~1:www/index.html > /tmp/old.html
 node regress.js /tmp/old.html ../www/index.html
 # modules 分支（1019-Z4-M2 起）index.html 拆成了 www/app/*.js + app.css：run-all.js、regress.js 读的时候自动拼回单文件；
 # 单独跑一个测试要带上拼回钩子：node -r ./tools/inline-hook.js a-basics.test.js
+# 1019-Z4-M5 起存储那块搬进了 app/store.js：测试里直接调存储函数写成 w.JiwenStore.loadStore(…)；
+# 同一个文件里也起老版本（fixtures/index-1016-K.html.gz）的、helpers/ 下的写成 (w.JiwenStore || w).loadStore(…)；regress.js 也这样（要比老版本）
 ```
 
 用 `fixtures/sample-records.js` 生成的同一份假账单（约 130 条），对比两个版本的账单列表、分类汇总、筛选、统计页、当日明细和 AI 导出。新旧版本都能比（老版本同步启动，新版本等它准备好再取）。

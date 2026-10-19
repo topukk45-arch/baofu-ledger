@@ -31,10 +31,10 @@ const F = [['微信.csv', B.bill('wechat', TX, { range: RANGE }).bytes]];
   q('.imp-log-ai').click(); await t.until(() => $('impAiText'));
   const at = t.S().ai.at;
   $('impAiCopy').click(); await t.until(() => t.ask()); await t.askOk();
-  { const st = t.w.loadStore(A.ID), rs = st.archives['默认存档'].records;
+  { const st = t.w.JiwenStore.loadStore(A.ID), rs = st.archives['默认存档'].records;
     rs.splice(rs.findIndex(r => r.id === idOf('某虚构银行')), 1);
     const i = rs.findIndex(r => r.id === idOf('某虚构超市')); rs[i] = Object.assign({}, rs[i], { remark: '我自己改的' });
-    t.w.saveStore(st); await t.idle(); }
+    t.w.JiwenStore.saveStore(st); await t.idle(); }
   const n1 = nOf('某虚构便利店'), n2 = nOf('某虚构书店'), n3 = nOf('某虚构超市'), n4 = nOf('某虚构银行');
   const REPLY = ['看了一下，建议如下：', '```记问', '记问修改建议 v1 批次 ' + lg.b + ' 导出 ' + at,
     `#${n1} | 分类 | 零食 | 便利店买饮料`, `#${n2} | 分类 | 购物 | 买书`, `#${n3} | 备注 | 囤货 | 一次买了很多`, `#${n4} | 口径 | 不计入 | 信用卡还款`,

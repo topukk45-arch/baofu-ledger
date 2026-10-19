@@ -39,7 +39,7 @@ async function flush(t) { await wait(480); await t.idle(); await wait(30); await
   const seed = A.seedOf(MAN, CATS), seedNoStore = Object.assign({}, seed); delete seedNoStore['store_' + A.ID];
   // ===== 1. 确认页做几处选择 → 存下草稿 =====
   const t1 = await bootOn(null, seed);
-  const aid = t1.w.impTarget().aid;
+  const aid = t1.w.JiwenStore.impTarget().aid;
   await toConfirm(t1);
   await flush(t1);
   let db = await t1.dump();
@@ -58,12 +58,12 @@ async function flush(t) { await wait(480); await t.idle(); await wait(30); await
   ok(d1.n === 2 && /饭店 50\.00/.test(d1.labels[kFood]), '1 草稿记下几处选择、每处是哪一笔 ' + d1.n + JSON.stringify(d1.labels));
   // 草稿不进备份：导出的备份文件里没有它
   ok(!JSON.stringify(Object.keys(db).filter(k => !/^imp_/.test(k) || /_d$/.test(k))).includes('_bk_'), '1 草稿键不在备份里');
-  const ledgerBefore = JSON.stringify(t1.w.loadStore(A.ID).archives['默认存档'].records);
+  const ledgerBefore = JSON.stringify(t1.w.JiwenStore.loadStore(A.ID).archives['默认存档'].records);
 
   // ===== 2. 强杀 App，重开导入：问「接着来吗」=====
   t1.w.close();
   const t2 = await bootOn(t1.phone, seedNoStore);
-  ok(JSON.stringify(t2.w.loadStore(A.ID).archives['默认存档'].records) === ledgerBefore, '2 账本没有改动');
+  ok(JSON.stringify(t2.w.JiwenStore.loadStore(A.ID).archives['默认存档'].records) === ledgerBefore, '2 账本没有改动');
   t2.$('devImportBtn').click();
   await t2.until(() => t2.w.JiwenSheet.isOpen() && t2.$('uiSheetTitle').textContent === '上次导入没做完，接着来吗？', 5000);
   ok(t2.w.JiwenSheet.isOpen() && t2.$('uiSheetTitle').textContent === '上次导入没做完，接着来吗？', '2 打开导入：问「上次导入没做完，接着来吗？」');
@@ -98,7 +98,7 @@ async function flush(t) { await wait(480); await t.idle(); await wait(30); await
   t2.w.close();
   const t3 = await bootOn(t2.phone, seedNoStore);
   // 重开以后先把那条手记删掉：饭店那笔不再是「合并」，「分开记」就套不上了
-  t3.w.saveUserData(t3.w.getUserData().filter(r => r.id !== 'm1')); await t3.idle();
+  t3.w.JiwenStore.saveUserData(t3.w.JiwenStore.getUserData().filter(r => r.id !== 'm1')); await t3.idle();
   t3.$('devImportBtn').click();
   await t3.until(() => t3.w.JiwenSheet.isOpen() && t3.$('impResumeGo'), 5000);
   t3.$('impResumeGo').click();
@@ -132,8 +132,8 @@ async function flush(t) { await wait(480); await t.idle(); await wait(30); await
   await toConfirm(t4); await flush(t4);
   ok(!!(await t4.dump())[DKEY(aid)], '7 又存了一份草稿');
   t4.w.JiwenImportUI.close();
-  const st = t4.w.loadStore(A.ID); st.archives['另一个存档'] = { cats: CATS.slice(), records: [] }; st.last = '另一个存档'; t4.w.saveStore(st, A.ID); await t4.idle();
-  const st2 = t4.w.loadStore(A.ID); delete st2.archives['默认存档']; t4.w.saveStore(st2, A.ID); await t4.idle(); await wait(20); await t4.idle();
+  const st = t4.w.JiwenStore.loadStore(A.ID); st.archives['另一个存档'] = { cats: CATS.slice(), records: [] }; st.last = '另一个存档'; t4.w.JiwenStore.saveStore(st, A.ID); await t4.idle();
+  const st2 = t4.w.JiwenStore.loadStore(A.ID); delete st2.archives['默认存档']; t4.w.JiwenStore.saveStore(st2, A.ID); await t4.idle(); await wait(20); await t4.idle();
   ok(!(await t4.dump())[DKEY(aid)], '7 删存档：草稿跟着删了');
 
   [t1, t2, t3, t4].forEach((t, i) => ok(t.errs.length === 0, `没有报错（第 ${i + 1} 次启动）` + t.errs.join('；')));

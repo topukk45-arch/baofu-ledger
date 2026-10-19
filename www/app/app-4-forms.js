@@ -118,39 +118,9 @@
             renderTplChips();
             setDtInput(billTime, nowDtValue());
         }
-
-        // ===== 常用模板（1010-I）=====
-        // 存在存档里：archive.tpls = [{ id, type, cat, remark, money|null, mode, name? }]，跟着存档走（导出/云备份/导入）。1019-K 起可以有 name（没有就不带）。
-        // 顺序完全由用户决定（不按使用次数自动排），点一下只「填表」，不直接入账。
-        // money 为 null 表示「不带金额」：适合每次金额不同的，比如吃饭；固定价的（订阅、房贷）就带上。
-        const TPL_MAX=12, TPL_NAME_MAX=10;
         function getTpls(){
             const a=curArchive(loadStore());
             return (a && Array.isArray(a.tpls)) ? a.tpls : [];
-        }
-        function tplName(t){ return (t.name||'').trim() || (t.remark||'').trim().split('\n')[0] || t.cat; }   // 1019-K：模板可以有自己的名字（name，可有可无）
-        function tplSame(a, b){
-            return a.type===b.type && a.cat===b.cat && (a.remark||'')===(b.remark||'')
-                && (a.mode||'normal')===(b.mode||'normal') && (a.money==null ? null : round2(a.money))===(b.money==null ? null : round2(b.money));
-        }
-        function sanitizeTpls(raw, cats){
-            if(!Array.isArray(raw)) return [];
-            const out=[];
-            raw.forEach(t=>{
-                if(out.length>=TPL_MAX || !t || typeof t!=='object') return;
-                const type = t.type==='expense' ? 'expense' : (t.type==='income' ? 'income' : null);
-                if(!type) return;
-                const cat=charSlice(String(t.cat==null?'':t.cat).trim(), 8);
-                if(!cats.includes(cat)) return;
-                let money=null;
-                if(t.money!=null && t.money!==''){ const m=normMoney(t.money); if(!m.ok) return; money=m.val; }
-                const n={ id:genId(), type, cat, remark:String(t.remark==null?'':t.remark).trim().slice(0,5000), money,
-                          mode:(t.mode==='flow'||t.mode==='skip') ? t.mode : 'normal' };
-                const nm=charSlice(String(t.name==null?'':t.name).trim(), TPL_NAME_MAX);
-                if(nm) n.name=nm;   // 1019-K：有名字才带（没名字的模板和以前一模一样）
-                if(!out.some(o=>tplSame(o,n))) out.push(n);
-            });
-            return out;
         }
         function renderTplChips(){
             const field=$('billTplField'), box=$('billTplChips');

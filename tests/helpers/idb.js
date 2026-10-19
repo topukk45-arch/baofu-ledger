@@ -18,7 +18,8 @@ function install(w, factory){
 async function idle(w){
   // 让出几拍，让 setTimeout(0) 一类排在后面的回调也跑掉
   for (let i = 0; i < 3; i++) {
-    if (typeof w.ledgerIdle === 'function') await w.ledgerIdle();
+    const st = w.JiwenStore || w;   // modules 分支 1019-Z4-M5 起 ledgerIdle 在 JiwenStore 上；页面还没跑到 / 老版本单文件时照旧看 window
+    if (typeof st.ledgerIdle === 'function') await st.ledgerIdle();
     await new Promise(r => setTimeout(r, 0));
   }
 }

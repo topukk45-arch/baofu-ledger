@@ -82,7 +82,7 @@ async function boot(seed, opts) {
     open: () => $('askMask').style.display === 'flex',
     dump: () => { const o = {}; for (let i = 0; i < ls.length; i++) { const k = ls.key(i); o[k] = ls.getItem(k); } return o; },
     chip: n => [...$('recentUsers').querySelectorAll('.user-chip')].find(c => c.querySelector('span').textContent === n),
-    store: () => JSON.parse(w.ledgerGet(w.storeKey())),
+    store: () => JSON.parse((w.JiwenStore || w).ledgerGet((w.JiwenStore || w).storeKey())),
   };
   t.pick = async (inputId, text) => {
     const input = $(inputId);
@@ -201,17 +201,17 @@ const sampleLog = () => [
   ok(e && e.message === 'quota' && e2 && e2.message === 'quota', '2 存储满：登记、写待处理池都报 quota');
   ok(JSON.stringify(await t.db()) === before, '2 库里什么都没变');
   // 记一笔：不会把刚才失败的那批带进去
-  const data = t.w.getUserData(); data.push({ id: t.w.genId(), time: '2026-10-15T09:00', money: 3, cat: '餐饮', remark: '', type: 'expense' }); t.w.saveUserData(data);
+  const data = (t.w.JiwenStore || t.w).getUserData(); data.push({ id: (t.w.JiwenStore || t.w).genId(), time: '2026-10-15T09:00', money: 3, cat: '餐饮', remark: '', type: 'expense' }); (t.w.JiwenStore || t.w).saveUserData(data);
   const db = await t.db();
   ok((await S.ordersRead()).size === 2 && !Object.keys(db).some(k => k.endsWith('_p')), '2 之后记一笔，失败的那批没被顺带写进去');
   // 删存档时导入数据和月份块同一个事务：meta 写不进去，导入数据也还在
-  const s = t.w.loadStore(); s.archives['旅行'] = { cats: CATS.slice(), records: [{ id: 'rt1', time: '2026-10-01T10:00', money: 5, cat: '出行', remark: '', type: 'expense' }] };
-  await t.w.saveStoreDurable(s);
+  const s = (t.w.JiwenStore || t.w).loadStore(); s.archives['旅行'] = { cats: CATS.slice(), records: [{ id: 'rt1', time: '2026-10-01T10:00', money: 5, cat: '出行', remark: '', type: 'expense' }] };
+  await (t.w.JiwenStore || t.w).saveStoreDurable(s);
   await S.ordersRegister('旅行', [{ app: 'alipay', no: noA('1001', 1), time: '2026-10-01T10:00', id: 'rt1', batch: B1 }]);
   const before2 = await t.db();
-  const s2 = t.w.loadStore(); delete s2.archives['旅行'];
+  const s2 = (t.w.JiwenStore || t.w).loadStore(); delete s2.archives['旅行'];
   breakPut(k => k === 'led_' + ID_A + '_m');
-  let e3 = null; try { await t.w.saveStoreDurable(s2); } catch (x) { e3 = x; }
+  let e3 = null; try { await (t.w.JiwenStore || t.w).saveStoreDurable(s2); } catch (x) { e3 = x; }
   restorePut();
   const after2 = await t.db();
   ok(e3 && JSON.stringify(after2) === JSON.stringify(before2), '2 删存档写到一半失败：账本和导入数据都没动');
@@ -233,11 +233,11 @@ let backupText;
   ok(typeof bk.orders.alipay['2026-09'].n === 'string' && Array.isArray(bk.orders.alipay['2026-09'].ids), '3 备份里的单号表是紧凑写法');
   ok(bk.data[0].src.app === 'alipay' && bk.data[0].cp === 0 && bk.data[1].pm === 2 && bk.data[0].oc === '餐饮美食', '3 备份里的记录带新字段');
   // AI 导出：不带来源和单号
-  const ai = t.w.buildAiText(t.w.getUserData(), '2026年9月', '按月');
+  const ai = t.w.buildAiText((t.w.JiwenStore || t.w).getUserData(), '2026年9月', '按月');
   ok(!/alipay|wechat|imgw|22001/.test(ai), '3 AI 导出不带来源、批次、单号');
   // 云同步：带名单、规则、导入记录、待处理池，不带单号表
   t.ls.setItem('onedrive_link_' + ID_A + '__默认存档', JSON.stringify({ uri: 'content://虚构/备份.json' }));
-  await t.w.odSyncNow();
+  await (t.w.JiwenStore || t.w).odSyncNow();
   const cloud = JSON.parse(t.w.__cloud[t.w.__cloud.length - 1] || 'null');
   ok(cloud && cloud.cps && cloud.importRules && cloud.imports.length === 2 && cloud.pending.length === 2, '3 云同步带上名单、规则、导入记录、待处理池');
   ok(cloud && cloud.orders === undefined && !t.w.__cloud[t.w.__cloud.length - 1].includes(noA('0901', 1)), '3 云同步不带单号表');
@@ -336,15 +336,15 @@ let backupText;
   const t = await boot(SEED());
   const S = t.S();
   await S.ordersRegister(undefined, sampleOrders());
-  const s = t.w.loadStore(); s.archives['旅行'] = { cats: CATS.slice(), records: [{ id: 'rt1', time: '2026-10-01T10:00', money: 5, cat: '出行', remark: '', type: 'expense' }] };
-  await t.w.saveStoreDurable(s);
+  const s = (t.w.JiwenStore || t.w).loadStore(); s.archives['旅行'] = { cats: CATS.slice(), records: [{ id: 'rt1', time: '2026-10-01T10:00', money: 5, cat: '出行', remark: '', type: 'expense' }] };
+  await (t.w.JiwenStore || t.w).saveStoreDurable(s);
   await S.ordersRegister('旅行', [{ app: 'alipay', no: noA('1001', 1), time: '2026-10-01T10:00', id: 'rt1', batch: B1 }]);
   await S.pendingWrite('旅行', samplePending()); await S.importsWrite('旅行', sampleLog());
   let db = await t.db();
   const aidT = aidOf(db, ID_A, '旅行'), aidD = aidOf(db, ID_A, '默认存档');
   ok(impKeys(db).filter(k => k.includes('_' + aidT + '_')).length === 3, '6 「旅行」有单号表、待处理池、导入记录');
   // 改名：不用动
-  const s1 = t.w.loadStore(); s1.archives['出差'] = s1.archives['旅行']; delete s1.archives['旅行']; await t.w.saveStoreDurable(s1);
+  const s1 = (t.w.JiwenStore || t.w).loadStore(); s1.archives['出差'] = s1.archives['旅行']; delete s1.archives['旅行']; await (t.w.JiwenStore || t.w).saveStoreDurable(s1);
   t.w.refreshArchiveSelect();
   db = await t.db();
   ok(aidOf(db, ID_A, '出差') === aidT && impKeys(db).filter(k => k.includes('_' + aidT + '_')).length === 3 && (await S.ordersRead('出差')).size === 1, '6 存档改名：存档号不变，导入数据不用动');
@@ -355,7 +355,7 @@ let backupText;
   ok(!impKeys(db).some(k => k.includes('_' + aidT + '_')) && !Object.keys(db).some(k => k.includes('_' + aidT + '_')), '6 删存档：导入数据和月份块一起删了');
   ok(impKeys(db).filter(k => k.includes('_' + aidD + '_')).length === 4, '6 别的存档的单号表不受影响');
   // 移走账号的清理（新建账号没登记成功时用的那个）
-  await t.w.ledgerDropAccount(ID_A);
+  await (t.w.JiwenStore || t.w).ledgerDropAccount(ID_A);
   db = await t.db();
   ok(!Object.keys(db).some(k => k.startsWith('imp_' + ID_A + '_') || k.startsWith('led_' + ID_A + '_')), '6 账号整个删掉时导入数据一起删');
 
@@ -389,16 +389,16 @@ let backupText;
   const est = S.estimate({ records: 3000, orders: 3000, names });
   const size = db => Object.values(db).reduce((s, v) => s + String(v).length, 0) + Object.keys(db).reduce((s, k) => s + k.length, 0);
   const before = size(await t.db());
-  const s = t.w.loadStore(), a = t.w.curArchive(s);
+  const s = (t.w.JiwenStore || t.w).loadStore(), a = (t.w.JiwenStore || t.w).curArchive(s);
   a.cps = (a.cps || []).concat(names);
   const orders = [];
   for (let i = 0; i < 3000; i++) {
     const d = String(1 + i % 28).padStart(2, '0'), m = String(1 + i % 12).padStart(2, '0');
-    const id = t.w.genId();
+    const id = (t.w.JiwenStore || t.w).genId();
     a.records.push({ id, time: '2025-' + m + '-' + d + 'T' + String(i % 24).padStart(2, '0') + ':15', money: (i % 300) + 0.5, cat: CATS[1 + i % 4], remark: i % 4 ? '' : '虚构商品', type: 'expense', src: { app: i % 2 ? 'alipay' : 'wechat' }, batch: B1, cp: CPS.length + i % 500, pm: i % 3, oc: '餐饮美食' });
     orders.push({ app: i % 2 ? 'alipay' : 'wechat', no: i % 2 ? noA(m + d, i) : noW(m + d, i), time: '2025-' + m + '-' + d + 'T10:00', id, batch: B1 });
   }
-  await t.w.saveStoreDurable(s);
+  await (t.w.JiwenStore || t.w).saveStoreDurable(s);
   await S.ordersRegister(undefined, orders);
   const grew = size(await t.db()) - before;
   const ratio = est.chars / grew;
@@ -446,7 +446,7 @@ let backupText;
     const w = watchReads(); const t1 = ms();
     const x = await boot(from.dump(), { phone: from.phone, loose: true, html: html2 });
     const el = ms() - t1; w.stop();
-    return { chars: w.chars, imp: w.imp, ms: el, inMain: x.inMain(), n: x.w.getUserData().length };
+    return { chars: w.chars, imp: w.imp, ms: el, inMain: x.inMain(), n: (x.w.JiwenStore || x.w).getUserData().length };
   };
   // 两台「手机」都先迁移好（第一次打开时搬家），再测第二次打开
   const withOrd = await runEnter(t), noOrd = await runEnter(plain);
@@ -505,7 +505,7 @@ let backupText;
   // 云同步：不带单号表
   t.ls.setItem('onedrive_link_' + ID_A + '__默认存档', JSON.stringify({ uri: 'content://虚构/备份.json' }));
   t.$('archiveSelect').value = '默认存档'; t.$('archiveSelect').dispatchEvent(new t.w.Event('change')); await t.idle();
-  await t.w.odSyncNow();
+  await (t.w.JiwenStore || t.w).odSyncNow();
   const cloud = t.w.__cloud[t.w.__cloud.length - 1] || '';
   console.log('    云同步一次上传 ' + (Buffer.byteLength(cloud) / 1048576).toFixed(2) + 'MB（不带单号表）');
   ok(cloud.length > 0 && !cloud.includes(orders[0].no), '8 云同步不带单号表');
@@ -522,10 +522,10 @@ if (process.env.OLD_HTML) {
   const before = await t.db();
   // 装回旧版
   const o = await reboot(t, { html: oldHtml });
-  ok(o.inMain() && o.w.getUserData().length === 6, '9 旧版进得了账号，6 条记录都在');
-  const data = o.w.getUserData(); data.push({ id: o.w.genId(), time: '2026-10-15T09:30', money: 7, cat: '餐饮', remark: '旧版记的', type: 'expense' }); o.w.saveUserData(data);
+  ok(o.inMain() && (o.w.JiwenStore || o.w).getUserData().length === 6, '9 旧版进得了账号，6 条记录都在');
+  const data = (o.w.JiwenStore || o.w).getUserData(); data.push({ id: (o.w.JiwenStore || o.w).genId(), time: '2026-10-15T09:30', money: 7, cat: '餐饮', remark: '旧版记的', type: 'expense' }); (o.w.JiwenStore || o.w).saveUserData(data);
   // 旧版改一条导入来的记录
-  const d2 = o.w.getUserData(); d2[1] = Object.assign({}, d2[1], { remark: '旧版改过' }); o.w.saveUserData(d2);
+  const d2 = (o.w.JiwenStore || o.w).getUserData(); d2[1] = Object.assign({}, d2[1], { remark: '旧版改过' }); (o.w.JiwenStore || o.w).saveUserData(d2);
   await o.idle();
   o.d.querySelector('.tab-btn[data-tab="stats"]').click();
   const bk = await o.exportBackup();

@@ -97,7 +97,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   await t.until(() => d.querySelectorAll('.imp-log').length === 1);
   d.querySelector('.imp-log-undo').click();
   await t.until(() => t.ask());
-  { const s = w.loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.concat([man('m9', 12, 3, 9)]); w.saveStore(s, A.ID); await t.idle(); }
+  { const s = (w.JiwenStore || w).loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.concat([man('m9', 12, 3, 9)]); (w.JiwenStore || w).saveStore(s, A.ID); await t.idle(); }
   const before = await t.dump();
   await t.askOk();
   await t.until(() => t.ask() && /账本在这期间变了/.test(t.ask().msg));

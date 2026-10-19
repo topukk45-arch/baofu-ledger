@@ -147,7 +147,7 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   t.$('exportBtn').click(); await t.until(() => t.w.__files.length);
   const exp = String(t.w.__files[0] || '');
   ok(exp.length > 0 && !/app_snap_|boot-snap|bootSnap/.test(exp), '8 导出的备份里没有快照');
-  ok(!/app_snap_|boot-snap/.test(JSON.stringify(t.w.odBuildPayload())), '8 云备份内容里没有快照');
+  ok(!/app_snap_|boot-snap/.test(JSON.stringify(t.w.JiwenStore.odBuildPayload())), '8 云备份内容里没有快照');
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`\n${pass} 通过，${fail} 失败`);

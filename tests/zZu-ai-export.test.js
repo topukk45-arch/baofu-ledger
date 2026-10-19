@@ -105,7 +105,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   $('impAiBack').click(); await t.until(() => t.d.querySelector('.imp-log'));
   ok(t.S().phase === 'logs', '4 「返回」回到导入记录');
   // 删掉一笔：编号留空
-  { const st = t.w.loadStore(A.ID), rs = st.archives['默认存档'].records; const i = rs.findIndex(r => r.id === r1.rows[1].id); rs.splice(i, 1); t.w.saveStore(st); await t.idle(); }
+  { const st = t.w.JiwenStore.loadStore(A.ID), rs = st.archives['默认存档'].records; const i = rs.findIndex(r => r.id === r1.rows[1].id); rs.splice(i, 1); t.w.JiwenStore.saveStore(st); await t.idle(); }
   const r3 = await t.st().aiExportRows(lg.b);
   ok(r3.rows[1].gone && r3.rows[1].n === 2 && r3.rows[0].id === r1.rows[0].id, '4 删掉的那一笔：编号还占着（gone）');
   // 合并进去的账单比手记少：去向写「金额差一点：账单 x」

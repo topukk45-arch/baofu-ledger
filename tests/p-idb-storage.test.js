@@ -72,7 +72,7 @@ async function boot(seed, opts){
   };
   t.addBill=async(money, remark)=>{
     // 直接走数据层记一笔（界面上的记一笔流程别的测试已覆盖）
-    const data=w.getUserData(); data.push(R(w.genId(), '2026-10-10T12:00', money, 'expense', '餐饮', remark)); w.saveUserData(data);
+    const data=(w.JiwenStore || w).getUserData(); data.push(R((w.JiwenStore || w).genId(), '2026-10-10T12:00', money, 'expense', '餐饮', remark)); (w.JiwenStore || w).saveUserData(data);
   };
   await t.idle();
   return t;
@@ -100,15 +100,15 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
 // ===== 2. 缓存给副本 =====
 {
   const t=await boot(OLD);
-  const a=t.w.loadStore(), b=t.w.loadStore();
+  const a=(t.w.JiwenStore || t.w).loadStore(), b=(t.w.JiwenStore || t.w).loadStore();
   ok(a!==b && a.archives!==b.archives && a.archives['默认存档'].records!==b.archives['默认存档'].records, '2 两次 loadStore 拿到的是两个不同的对象');
   a.archives['默认存档'].records.push(R('x1','2026-10-09T12:00',1,'expense','餐饮','没保存的'));
   a.last='改了没存';
-  ok(t.w.loadStore().archives['默认存档'].records.length===1 && t.w.loadStore().last==='默认存档', '2 改了副本不保存：再读还是原样');
-  const recs=t.w.getUserData(); recs.length=0;
-  ok(t.w.getUserData().length===1, '2 getUserData 拿到的数组被清空，也不影响缓存');
-  t.w.getBudgets().x=1; t.w.getCats().push('乱加的');
-  ok(!('x' in t.w.getBudgets()) && !t.w.getCats().includes('乱加的'), '2 getBudgets / getCats 给的也是副本');
+  ok((t.w.JiwenStore || t.w).loadStore().archives['默认存档'].records.length===1 && (t.w.JiwenStore || t.w).loadStore().last==='默认存档', '2 改了副本不保存：再读还是原样');
+  const recs=(t.w.JiwenStore || t.w).getUserData(); recs.length=0;
+  ok((t.w.JiwenStore || t.w).getUserData().length===1, '2 getUserData 拿到的数组被清空，也不影响缓存');
+  (t.w.JiwenStore || t.w).getBudgets().x=1; (t.w.JiwenStore || t.w).getCats().push('乱加的');
+  ok(!('x' in (t.w.JiwenStore || t.w).getBudgets()) && !(t.w.JiwenStore || t.w).getCats().includes('乱加的'), '2 getBudgets / getCats 给的也是副本');
   ok(!(await t.db())['store_'+ID_A].includes('没保存的'), '2 没保存的东西也没写进库');
 }
 
@@ -116,7 +116,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
 {
   const t=await boot(OLD);
   await t.addBill(12.5, '奶茶');
-  ok(t.w.getUserData().some(r=>r.remark==='奶茶'), '3 存完立刻能读到（内存先改好了）');
+  ok((t.w.JiwenStore || t.w).getUserData().some(r=>r.remark==='奶茶'), '3 存完立刻能读到（内存先改好了）');
   ok(t.$('billList').textContent.includes('午饭'), '3 界面照常');
   const db=await t.db();
   ok(JSON.parse(db['store_'+ID_A]).archives['默认存档'].records.some(r=>r.remark==='奶茶'), '3 等一下就写进了 IndexedDB');
@@ -124,9 +124,9 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   for(let i=0;i<5;i++) await t.addBill(i+1, '连续'+i);
   const last=JSON.parse((await t.db())['store_'+ID_A]).archives['默认存档'].records;
   ok(last.filter(r=>r.remark.startsWith('连续')).length===5, '3 连续存 5 次，库里最后是完整的 5 条');
-  ok(JSON.stringify(last)===JSON.stringify(t.w.getUserData()), '3 库里和内存一致');
+  ok(JSON.stringify(last)===JSON.stringify((t.w.JiwenStore || t.w).getUserData()), '3 库里和内存一致');
   const t2=await reboot(t, t.dump());
-  ok(t2.w.getUserData().length===last.length, '3 重开 App 读回来的就是这份');
+  ok((t2.w.JiwenStore || t2.w).getUserData().length===last.length, '3 重开 App 读回来的就是这份');
 }
 
 // ===== 4. 切后台：强制写一次 =====
@@ -207,7 +207,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   await t.pick('importFile', backup);
   restore();
   ok(t.msg().includes('存储空间不足') && t.msg().includes('导入失败'), '7 导入写不进去：如实说导入失败');
-  ok(!t.w.loadStore().archives['备份'], '7 内存里也没有留下导入了一半的存档');
+  ok(!(t.w.JiwenStore || t.w).loadStore().archives['备份'], '7 内存里也没有留下导入了一半的存档');
   t.$('askOk').click();
   await t.pick('importFile', backup);
   ok(t.title()==='导入成功' && JSON.parse((await t.db())['store_'+id]).archives['备份'], '7 正常时导入成功并写进库');
@@ -291,7 +291,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   const bk=Object.keys(db).find(k=>k.startsWith('store_'+ID_A+'__corrupted_'));
   ok(bk && db[bk]==='{坏了', '11 原文另存进了库');
   t.ls.setItem(`onedrive_link_${ID_A}__默认存档`, JSON.stringify({ uri:'content://a', name:'a.json', lastCount:1 }));
-  await t.w.odSyncNow();
+  await (t.w.JiwenStore || t.w).odSyncNow();
   ok(JSON.parse(t.ls.getItem(`onedrive_link_${ID_A}__默认存档`)).blocked===true, '11 云同步照旧被拦住，不拿空账本覆盖云端');
 }
 
@@ -397,7 +397,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
     J.parse=op; J.stringify=os;
     const stats=t.d.querySelector('.tab-btn[data-tab="stats"]').classList.contains('active');
     t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
-    const data=t.w.getUserData();
+    const data=(t.w.JiwenStore || t.w).getUserData();
     const saved=data.length===N+1 && data[N].remark==='大账本里记一笔';
     const db=await t.db();
     return { t, db, entered, paged, stats, saved, tEnter, tSave, tSaveAll, tPage, tStats, cEnter, cSave, cPage, cStats };

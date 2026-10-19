@@ -103,7 +103,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   // 候选被删 → 提示建议作为新增 → 作为新增（选分类）
   {
     await t.back();
-    { const s = t.w.loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.filter(r => r.id !== 'm2'); t.w.saveStore(s, A.ID); await t.idle(); }
+    { const s = t.w.JiwenStore.loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.filter(r => r.id !== 'm2'); t.w.JiwenStore.saveStore(s, A.ID); await t.idle(); }
     t.w.JiwenImportUI.openPending();
     await t.until(() => d.querySelectorAll('.imp-pend').length === 3);
     const c = card(days.no);
@@ -179,7 +179,7 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
     t2.w.__impFailAt = null;
     // 候选在页面打开以后被别的账单合并了
     await t2.until(() => t2.d.querySelectorAll('.imp-pend').length === 1);
-    await (async () => { const s = t2.w.loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.map(r => r.id === 'k1' ? Object.assign({}, r, { src: { app: 'alipay', merged: true } }) : r); t2.w.saveStore(s, A.ID); await t2.idle(); })();
+    await (async () => { const s = t2.w.JiwenStore.loadStore(A.ID); s.archives['默认存档'].records = s.archives['默认存档'].records.map(r => r.id === 'k1' ? Object.assign({}, r, { src: { app: 'alipay', merged: true } }) : r); t2.w.JiwenStore.saveStore(s, A.ID); await t2.idle(); })();
     t2.d.querySelector('.imp-pend-pick').click();
     await t2.until(() => t2.ask());
     ok(/已经不在了/.test(t2.ask().msg), '10 候选在这期间被合并了：不改，提示重新看');

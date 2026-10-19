@@ -81,7 +81,7 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
         const t = await boot();
         $(t.d,'renameArchive').click(); prompt(t.d, '日常');
         ok(t.w.localStorage.getItem(odk(t,'日常')) === null, '无连接改名不产生连接');
-        ok(JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['日常'].records.length === 4, '改名后记录完整');
+        ok(JSON.parse(t.w.JiwenStore.ledgerGet(t.w.JiwenStore.storeKey())).archives['日常'].records.length === 4, '改名后记录完整');
     }
 
     // ---------- 2. 删除存档：清理连接 + 释放授权 ----------
@@ -113,7 +113,7 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
         const before = [];
         for(let i=0;i<ls.length;i++) before.push(ls.key(i));
         $(t.d,'editNameBtn').click(); prompt(t.d, '新名字');
-        ok(uid(t) === id && t.w.storeKey() === `store_${id}`, '改名后编号不变');
+        ok(uid(t) === id && t.w.JiwenStore.storeKey() === `store_${id}`, '改名后编号不变');
         ok(JSON.parse(ls.getItem('accounts')).find(a=>a.id===id).name === '新名字', '账号列表里的名字已改');
         ok(JSON.parse((await t.db())[`store_${id}`]).accountName === '新名字', '名字也抄进了账本（IndexedDB 里的）');
         const after = [];

@@ -80,7 +80,7 @@ const MASKS = ['addMask', 'editMask', 'detailMask', 'refundMask', 'tplMask', 'ca
   swipe($('editSheet'));
   ok(t.ask() && t.ask().title === '放弃这次填写？', '3 改了备注：往下拉先问');
   await t.askOk();
-  ok(!shown('editMask') && w.loadStore(A.ID).archives['默认存档'].records.find(r => r.id === 'r1').remark === '虚构午饭', '3 放弃：关掉、记录没改');
+  ok(!shown('editMask') && w.JiwenStore.loadStore(A.ID).archives['默认存档'].records.find(r => r.id === 'r1').remark === '虚构午饭', '3 放弃：关掉、记录没改');
 
   // 4. 日子：没填直接关；填了名字先问
   $('daysAdd').click(); await t.idle();

@@ -37,7 +37,7 @@ const r = (mo, d, money, cat, o) => Object.assign({ id: 'r' + (++k), time: `2026
   ok(/每月不到 50 元、或者收入比支出多的分类不给建议/.test($('bgSuggestCard').textContent), '2 说明里写了哪些不建议');
   // 写入勾上的：只动列出来的那几行
   $('bgSuggestApply').click(); await t.idle();
-  const b = t.w.loadStore(A.ID).archives['默认存档'].budgets;
+  const b = t.w.JiwenStore.loadStore(A.ID).archives['默认存档'].budgets;
   ok(b['购物'] === 600 && b['日用'] === 150 && b['餐饮'] === 1350 && !('水果' in b) && !('存款' in b), '3 写入：没设的购物写上 600，已设的日用不勾不动 ' + JSON.stringify(b));
   if (t.ask()) await t.askOk();
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));

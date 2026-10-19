@@ -70,14 +70,14 @@ const recs = [
   [...$('billTypeChips').children].find(c => c.textContent === '支出').click();
   [...$('billCatChips').children].find(c => c.textContent === '吃饭').click();
   $('addBill').click(); await t.idle();
-  const saved = w.loadStore(A.ID).archives['默认存档'].records.find(r => r.money === 26.5);
+  const saved = w.JiwenStore.loadStore(A.ID).archives['默认存档'].records.find(r => r.money === 26.5);
   ok(saved && saved.type === 'expense' && saved.cat === '吃饭' && !shown('addMask'), '4 照旧记进账本、记一笔关掉');
   // 收支没选：照旧拦住
   $('fabAdd').click(); await wait(420); w.kpClose();
   $('billMoney').value = '3';
   [...$('billCatChips').children].find(c => c.textContent === '吃饭').click();
   $('addBill').click(); await t.idle();
-  ok(shown('addMask') && w.loadStore(A.ID).archives['默认存档'].records.length === 3, '4 收支没选：照旧不让存');
+  ok(shown('addMask') && w.JiwenStore.loadStore(A.ID).archives['默认存档'].records.length === 3, '4 收支没选：照旧不让存');
   $('closeAdd').click(); await wait(400);
 
   // 5. 修改账单同一套；口径不是「计入」的一打开就展开

@@ -89,7 +89,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   ok(shown('askMask') && shown('kpMask') && $('askInput').classList.contains('kp-on') && $('kpOk').textContent === '保存', '5 设预算：自动弹数字键盘，大按钮「保存」');
   keys('300'); ok($('askInput').value === '300', '5 输入框实时变 300');
   $('kpOk').click(); await t.idle();
-  ok(!shown('kpMask') && !shown('askMask') && w.loadStore(A.ID).archives['默认存档'].budgets['吃饭'] === 300, '5 点「保存」：预算存好、提示框和键盘都收起');
+  ok(!shown('kpMask') && !shown('askMask') && w.JiwenStore.loadStore(A.ID).archives['默认存档'].budgets['吃饭'] === 300, '5 点「保存」：预算存好、提示框和键盘都收起');
   $('catActCancel').click();   // 1019-S 起存好回到这个分类的面板，先关掉面板
   $('closeCat').click();
 

@@ -162,7 +162,7 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   ok(r.querySelector('.bg-num').textContent==='306.87 / 500.00', '改完立即按新上限重算：'+r.querySelector('.bg-num').textContent);
   ok(r.classList.contains('open') && t.rowOf('订阅').classList.contains('open'), '改完两个展开的都还开着');
   ok(t.$('catMask').style.display!=='flex', '没有跳去分类管理');
-  ok(JSON.parse(t.w.ledgerGet(t.w.storeKey())).archives['默认存档'].budgets['游戏']===500, '新上限存进了账本');
+  ok(JSON.parse(t.w.JiwenStore.ledgerGet(t.w.JiwenStore.storeKey())).archives['默认存档'].budgets['游戏']===500, '新上限存进了账本');
   // 填 0 = 取消预算：游戏回到「未设预算」
   t.rowOf('游戏').nextElementSibling.querySelector('[data-act="bgSet"]').click();
   t.$('askInput').value='0'; t.$('askOk').click();

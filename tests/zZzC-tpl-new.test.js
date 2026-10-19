@@ -15,7 +15,7 @@ const recs = [{ id: 'r1', time: '2026-12-01T12:00', money: 18, type: 'expense', 
 (async () => {
   const t = await A.boot({ html, www: WWW, seed: A.seedOf(recs) });
   const { $, w, d } = t, shown = id => $(id).style.display === 'flex';
-  const arc = () => w.loadStore(A.ID).archives['默认存档'];
+  const arc = () => w.JiwenStore.loadStore(A.ID).archives['默认存档'];
   const chip = (box, txt) => [...$(box).children].find(c => c.textContent === txt);
   const ledger = () => JSON.stringify(arc().records);
   const ver = () => w.JiwenImportStore.archiveInfo().ver;
@@ -91,10 +91,10 @@ const recs = [{ id: 'r1', time: '2026-12-01T12:00', money: 18, type: 'expense', 
   await t.askCancel();
 
   // 6. 模板的名字跟着备份走；旧备份没名字照旧
-  const st = w.loadStore(A.ID); st.archives['默认存档'].tpls = [{ id: 'x', type: 'expense', cat: '吃饭', remark: '早饭', money: null, mode: 'normal', name: '虚构早点' }]; w.saveStore(st, A.ID); await t.idle();
-  const san = w.sanitizeTpls([{ type: 'expense', cat: '吃饭', remark: '早饭', name: '虚构早点' }, { type: 'income', cat: '吃饭', remark: '没名字' }], ['吃饭']);
+  const st = w.JiwenStore.loadStore(A.ID); st.archives['默认存档'].tpls = [{ id: 'x', type: 'expense', cat: '吃饭', remark: '早饭', money: null, mode: 'normal', name: '虚构早点' }]; w.JiwenStore.saveStore(st, A.ID); await t.idle();
+  const san = w.JiwenStore.sanitizeTpls([{ type: 'expense', cat: '吃饭', remark: '早饭', name: '虚构早点' }, { type: 'income', cat: '吃饭', remark: '没名字' }], ['吃饭']);
   ok(san[0].name === '虚构早点' && !('name' in san[1]), '6 导入备份时名字留着，没名字的不带 name');
-  ok(w.tplName({ cat: '吃饭', remark: '早饭' }) === '早饭' && w.tplName({ cat: '吃饭', remark: '早饭', name: '虚构早点' }) === '虚构早点', '6 有名字用名字，没有照旧用备注');
+  ok(w.JiwenStore.tplName({ cat: '吃饭', remark: '早饭' }) === '早饭' && w.JiwenStore.tplName({ cat: '吃饭', remark: '早饭', name: '虚构早点' }) === '虚构早点', '6 有名字用名字，没有照旧用备注');
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`\n${pass} 通过，${fail} 失败`);

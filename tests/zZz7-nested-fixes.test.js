@@ -83,7 +83,7 @@ const bill = tx => [['微信' + (++seq) + '.csv', B.bill('wechat', tx, { range: 
     const F = bill([wx({ time: T(6, 12), cp: '某虚构饭店', fen: 5000 }), wx({ time: T(7, 12), cp: '某虚构茶馆', fen: 900 })]);
     await t.importFiles(F);
     ok((await t.st().pendingRead()).length === 1, '4 第一次：饭店那笔进待处理');
-    { const s0 = t.w.loadStore(A.ID); s0.archives['默认存档'].records = s0.archives['默认存档'].records.filter(r => r.id !== 'm2'); t.w.saveStore(s0, A.ID); await t.idle(); }
+    { const s0 = t.w.JiwenStore.loadStore(A.ID); s0.archives['默认存档'].records = s0.archives['默认存档'].records.filter(r => r.id !== 'm2'); t.w.JiwenStore.saveStore(s0, A.ID); await t.idle(); }
     const D1 = await t.dump();
     await t.importFiles(F, null, { noGo: true, stay: true });
     t.$('impRecon').click();

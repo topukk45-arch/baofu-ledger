@@ -80,8 +80,8 @@ async function boot(seed, opts){
     prompt:v=>{ $('askInput').value=v; $('askOk').click(); },
   };
   // 改一条记录（走数据层：换成新对象再存）
-  t.edit=(id, patch)=>{ const d=w.getUserData(); const i=d.findIndex(r=>r.id===id); d[i]=Object.assign({}, d[i], patch); w.saveUserData(d); };
-  t.add=(rec)=>{ const d=w.getUserData(); d.push(rec); w.saveUserData(d); };
+  t.edit=(id, patch)=>{ const d=(w.JiwenStore || w).getUserData(); const i=d.findIndex(r=>r.id===id); d[i]=Object.assign({}, d[i], patch); (w.JiwenStore || w).saveUserData(d); };
+  t.add=(rec)=>{ const d=(w.JiwenStore || w).getUserData(); d.push(rec); (w.JiwenStore || w).saveUserData(d); };
   await t.idle();
   return t;
 }
@@ -110,7 +110,7 @@ const merged=(db,id)=>JSON.parse(db['store_'+id]);
   ok(db['store_'+ID_A]===OLD_LS['store_'+ID_A], '1 合起来和原来逐字节一样（记录顺序、预算、模板、名字都在）');
   const m=metaOf(db, ID_A);
   ok(m.accountName==='小明' && m.archives['默认存档'].budgets['餐饮']===500 && typeof m.archives['默认存档'].records==='string', '1 meta 里是存档级的东西，记录换成了存档号');
-  ok(JSON.stringify(t.w.getUserData().map(r=>r.id))===JSON.stringify(RECS_A.map(r=>r.id)), '1 读出来的记录顺序和原来一样');
+  ok(JSON.stringify((t.w.JiwenStore || t.w).getUserData().map(r=>r.id))===JSON.stringify(RECS_A.map(r=>r.id)), '1 读出来的记录顺序和原来一样');
   ok(t.inMain() && t.list().includes('没写时间的') && t.list().includes('八月地铁'), '1 界面照常');
   ok(!t.open() && !t.errs.length, '1 不弹提示、无报错 '+t.errs.join('|'));
   // 再开一次：什么都不变
@@ -140,7 +140,7 @@ const merged=(db,id)=>JSON.parse(db['store_'+id]);
   const bl2=blocksOf(await t.db(), ID_A)[aid];
   ok(bl2['2026-08'].includes('九月聚餐') && !bl2['2026-09'].includes('九月聚餐'), '2 切后台时两块一起补写进去了');
   const t2=await reboot(t);
-  ok(t2.w.getUserData().find(r=>r.id==='a3').time==='2026-08-30T18:30', '2 重开读回来是改过的');
+  ok((t2.w.JiwenStore || t2.w).getUserData().find(r=>r.id==='a3').time==='2026-08-30T18:30', '2 重开读回来是改过的');
 }
 
 // ===== 3. 批量改分类跨三个月、撤销：同一个事务 =====
@@ -241,7 +241,7 @@ const merged=(db,id)=>JSON.parse(db['store_'+id]);
   ok(bk && db[bk]==='{坏了', '7 坏块的原文另存了');
   ok(db[`led_${ID_A}_${aid}_2026-08`]===(await t0.db())[`led_${ID_A}_${aid}_2026-08`], '7 别的块没动');
   t.ls.setItem(`onedrive_link_${ID_A}__默认存档`, JSON.stringify({ uri:'content://a', name:'a.json', lastCount:1 }));
-  await t.w.odSyncNow();
+  await (t.w.JiwenStore || t.w).odSyncNow();
   ok(JSON.parse(t.ls.getItem(`onedrive_link_${ID_A}__默认存档`)).blocked===true, '7 云同步被拦住，不拿缺了一个月的账本覆盖云端');
   ok(!t.errs.length, '7 无报错 '+t.errs.join('|'));
   // 1013-H：改别的月份不碰坏块（留在库里，下次打开还认得出来）；真改到这个月才按内存里的样子重写（原文已另存）
@@ -261,16 +261,16 @@ const merged=(db,id)=>JSON.parse(db['store_'+id]);
   await seedIdb(t0.phone, { ['led_'+ID_A+'_m']:'{"archives":坏了' });
   const t=await reboot(t0);
   ok(t.inMain() && t.$('archiveSelect').textContent.includes('恢复的存档 1'), '8 存档重建出来了，叫「恢复的存档 1」');
-  ok(t.w.getUserData().length===RECS_A.length && t.list().includes('十月午饭'), '8 记录都在');
+  ok((t.w.JiwenStore || t.w).getUserData().length===RECS_A.length && t.list().includes('十月午饭'), '8 记录都在');
   const db=await t.db();
   const bk=realKeys(db).find(k=>k.startsWith('store_'+ID_A+'__corrupted_'));
   ok(bk && db[bk]==='{"archives":坏了', '8 坏的原文另存了');
   t.ls.setItem(`onedrive_link_${ID_A}__恢复的存档 1`, JSON.stringify({ uri:'content://a', name:'a.json', lastCount:1 }));
-  await t.w.odSyncNow();
+  await (t.w.JiwenStore || t.w).odSyncNow();
   ok(JSON.parse(t.ls.getItem(`onedrive_link_${ID_A}__恢复的存档 1`)).blocked===true, '8 云同步被拦住');
   t.add(R('a8','2026-10-09T10:00',1,'expense','餐饮','重建后记的'));
   const t2=await reboot(t);
-  ok(t2.inMain() && t2.list().includes('重建后记的') && t2.w.getUserData().length===RECS_A.length+1 && !t2.open(), '8 保存后 meta 写好了，重开不再报坏');
+  ok(t2.inMain() && t2.list().includes('重建后记的') && (t2.w.JiwenStore || t2.w).getUserData().length===RECS_A.length+1 && !t2.open(), '8 保存后 meta 写好了，重开不再报坏');
 }
 
 // ===== 9. 从 1013-F 搬：中途被杀续搬、读回对不上、旧的删不掉 =====
@@ -353,7 +353,7 @@ const F_SEED=Object.assign({}, BASE);
   ok(t.inMain() && t.list().includes('暂无记账记录'), '11 进去是空账本，不白屏');
   ok(realKeys(db).some(k=>k.startsWith('store_'+ID_A+'__corrupted_') && db[k]==='{坏了'), '11 原文另存了');
   t.ls.setItem(`onedrive_link_${ID_A}__默认存档`, JSON.stringify({ uri:'content://a', name:'a.json', lastCount:1 }));
-  await t.w.odSyncNow();
+  await (t.w.JiwenStore || t.w).odSyncNow();
   ok(JSON.parse(t.ls.getItem(`onedrive_link_${ID_A}__默认存档`)).blocked===true, '11 云同步被拦住');
   t.add(R('c1','2026-10-09T12:00',1,'expense','未分类','坏了以后记的'));
   db=await t.db();
@@ -387,14 +387,14 @@ const F_SEED=Object.assign({}, BASE);
   ok(t.title()==='导入成功' && merged(db, ID_B).archives['导入的'].records.length===2 && merged(db, ID_B).archives['默认存档'].records[0].remark==='小红的早饭', '12 再导一次成功，小红原来的账还在');
   t.$('askOk').click();   // 「立即进入」
   await t.idle();
-  ok(t.inMain() && JSON.stringify(t.w.eval('[...__ledger.keys()]'))===JSON.stringify(['store_'+ID_B]), '12 进了小红，内存里只留小红');
+  ok(t.inMain() && JSON.stringify(t.w.eval('[...JiwenStore.__ledger.keys()]'))===JSON.stringify(['store_'+ID_B]), '12 进了小红，内存里只留小红');
   // 别的账号有没写进去的修改：先留在内存里，写完再丢
   breakPut(led=>led.startsWith('led_'+ID_B), 'quota');
   t.add(R('b9','2026-10-09T12:00',3,'expense','餐饮','没写进去的')); await t.idle();
   t.$('askOk').click();
   restore();
   t.$('logoutBtn').click(); t.chip('小明').click(); await t.idle();
-  ok(JSON.stringify(t.w.eval('[...__ledger.keys()].sort()'))===JSON.stringify(['store_'+ID_A, 'store_'+ID_B].sort()), '12 小红有没写进去的修改：换账号时先留着');
+  ok(JSON.stringify(t.w.eval('[...JiwenStore.__ledger.keys()].sort()'))===JSON.stringify(['store_'+ID_A, 'store_'+ID_B].sort()), '12 小红有没写进去的修改：换账号时先留着');
   t.w.dispatchEvent(new t.w.Event('pagehide')); await t.idle();
   const arcsB=merged(await t.db(), ID_B).archives;
   ok(Object.keys(arcsB).some(n=>arcsB[n].records.some(r=>r.remark==='没写进去的')), '12 切后台时补写进去了');
@@ -404,17 +404,17 @@ const F_SEED=Object.assign({}, BASE);
 {
   const t=await boot(OLD_LS);
   let threw=false;
-  try{ t.w.getUserData()[0].cat='乱改'; }catch(_){ threw=true; }
-  ok(threw && t.w.getUserData()[0].cat==='餐饮', '13 直接改缓存里的记录会被拦下（测试里报错，App 里改不动）');
+  try{ (t.w.JiwenStore || t.w).getUserData()[0].cat='乱改'; }catch(_){ threw=true; }
+  ok(threw && (t.w.JiwenStore || t.w).getUserData()[0].cat==='餐饮', '13 直接改缓存里的记录会被拦下（测试里报错，App 里改不动）');
   threw=false;
-  try{ t.w.loadStore().archives['默认存档'].records[1].money=0; }catch(_){ threw=true; }
-  ok(threw && t.w.getUserData()[1].money===5, '13 从 loadStore 拿到的记录也一样');
-  const d=t.w.getUserData(); d.pop(); d.push(R('x','2026-10-09T00:00',1,'expense','餐饮','没存的'));
-  ok(t.w.getUserData().length===RECS_A.length && !t.w.getUserData().some(r=>r.remark==='没存的'), '13 数组随便改，不保存就不影响缓存');
+  try{ (t.w.JiwenStore || t.w).loadStore().archives['默认存档'].records[1].money=0; }catch(_){ threw=true; }
+  ok(threw && (t.w.JiwenStore || t.w).getUserData()[1].money===5, '13 从 loadStore 拿到的记录也一样');
+  const d=(t.w.JiwenStore || t.w).getUserData(); d.pop(); d.push(R('x','2026-10-09T00:00',1,'expense','餐饮','没存的'));
+  ok((t.w.JiwenStore || t.w).getUserData().length===RECS_A.length && !(t.w.JiwenStore || t.w).getUserData().some(r=>r.remark==='没存的'), '13 数组随便改，不保存就不影响缓存');
   // 插到中间：整个存档重新编号，顺序照调用方的
-  const e=t.w.getUserData(); e.splice(2, 0, R('mid','2026-07-07T07:07',2,'expense','餐饮','插在中间的')); t.w.saveUserData(e); await t.idle();
+  const e=(t.w.JiwenStore || t.w).getUserData(); e.splice(2, 0, R('mid','2026-07-07T07:07',2,'expense','餐饮','插在中间的')); (t.w.JiwenStore || t.w).saveUserData(e); await t.idle();
   const t2=await reboot(t);
-  ok(JSON.stringify(t2.w.getUserData().map(r=>r.id))===JSON.stringify(e.map(r=>r.id)), '13 插到中间：重开后顺序照旧');
+  ok(JSON.stringify((t2.w.JiwenStore || t2.w).getUserData().map(r=>r.id))===JSON.stringify(e.map(r=>r.id)), '13 插到中间：重开后顺序照旧');
 }
 
 // ===== 14. 账号列表坏了：从 meta 里找回账号和名字 =====
@@ -447,22 +447,22 @@ const F_SEED=Object.assign({}, BASE);
   const l1=JSON.parse(t1.ls.getItem(LK));
   ok(l1.blocked===true && l1.lastError.includes('读不出来'), '16 一认出来就把这个存档的云备份标成暂停（不等同步）');
   ok(JSON.parse(t1.ls.getItem(LK2)).blocked!==true, '16 别的存档的云备份不受影响');
-  await sleep(1700); await t1.idle(); await t1.w.odSyncNow();
+  await sleep(1700); await t1.idle(); await (t1.w.JiwenStore || t1.w).odSyncNow();
   let db=await t1.db();
   ok(c1.length===0 && db[k9]==='{坏了', '16 第一次打开：没往云端写，坏块还在库里（进账号那次保存不会顺手删掉它）');
   // 第二次打开：什么也不做
   const t2=await reboot(t1); const c2=spy(t2);
   ok(t2.inMain() && !t2.open(), '16 第二次打开：同一处坏了不再重复提示');
-  await sleep(1700); await t2.idle(); await t2.w.odSyncNow();
+  await sleep(1700); await t2.idle(); await (t2.w.JiwenStore || t2.w).odSyncNow();
   ok(c2.length===0 && JSON.parse(t2.ls.getItem(LK)).blocked===true, '16 第二次打开：照样没往云端写，仍是暂停');
   db=await t2.db();
   ok(realKeys(db).filter(k=>k.startsWith(k9+'__corrupted_')).length===1, '16 原文只另存了一份（没有每次打开都再存）');
   // 在别的月份记账：仍然不同步；改到九月以后也不同步（暂停只有用户能解除）
   t2.add(R('a7','2026-10-09T10:00',1,'expense','餐饮','坏了以后记的'));
   t2.add(R('a8','2026-09-20T10:00',2,'expense','餐饮','九月补记的'));
-  await sleep(1700); await t2.idle(); await t2.w.odSyncNow();
+  await sleep(1700); await t2.idle(); await (t2.w.JiwenStore || t2.w).odSyncNow();
   const t3=await reboot(t2); const c3=spy(t3);
-  await sleep(1700); await t3.idle(); await t3.w.odSyncNow();
+  await sleep(1700); await t3.idle(); await (t3.w.JiwenStore || t3.w).odSyncNow();
   ok(c2.length===0 && c3.length===0 && !t3.open(), '16 改到九月、重开以后：坏块已经重写、认不出来了，云同步照样停着');
   // 用户点「重新选择备份文件」：恢复同步
   t3.w.Capacitor.Plugins.OneDriveLink.pickFile=async()=>({ uri:'content://a2', name:'a2.json' });
@@ -498,7 +498,7 @@ const F_SEED=Object.assign({}, BASE);
   t.add(R('c1','2026-10-09T12:00',1,'expense','未分类','坏了以后记的'));
   const t2=await reboot(t);
   const calls=[]; t2.w.Capacitor.Plugins.OneDriveLink.writeText=async o=>{ calls.push(o); };
-  await t2.w.odSyncNow();
+  await (t2.w.JiwenStore || t2.w).odSyncNow();
   ok(!t2.open() && calls.length===0 && JSON.parse(t2.ls.getItem(LK)).blocked===true, '18 重开后账本是好的了，但云同步仍停着，不拿 1 条的账本覆盖云端的 6 条');
 }
 // ===== 19. 旧整段账本里有不是对象的记录 / 存档：丢掉它们、原文另存，账号照常进（检查记录 P1）=====
@@ -515,9 +515,9 @@ const F_SEED=Object.assign({}, BASE);
     const phone=IDB.newPhone(); await seedIdb(phone, { ['store_'+ID_A]:raw, ['store_'+ID_B]:F_B });
     const t=await boot(F_SEED, { phone });
     const db=await t.db();
-    ok(t.inMain() && !t.open() && t.w.getUserData().length===RECS_A.length && !realKeys(db).includes('store_'+ID_A), `19 ${nm}：搬完了，账号照常进，记录都在`);
+    ok(t.inMain() && !t.open() && (t.w.JiwenStore || t.w).getUserData().length===RECS_A.length && !realKeys(db).includes('store_'+ID_A), `19 ${nm}：搬完了，账号照常进，记录都在`);
     ok(db['migrate_skipped_store_'+ID_A]===raw, `19 ${nm}：旧的原文原样另存了`);
-    ok(JSON.stringify(t.w.getUserData().map(r=>r.id))===JSON.stringify(RECS_A.map(r=>r.id)), `19 ${nm}：顺序不变`);
+    ok(JSON.stringify((t.w.JiwenStore || t.w).getUserData().map(r=>r.id))===JSON.stringify(RECS_A.map(r=>r.id)), `19 ${nm}：顺序不变`);
   }
 }
 // ===== 20. 旧记录缺编号：补出来的编号固定，被杀后续搬对得上，不多出冲突备份（检查记录 P2）=====
@@ -563,7 +563,7 @@ const F_SEED=Object.assign({}, BASE);
     const mid=await o.db();
     ok(realKeys(before).filter(k=>k.startsWith('led_')).every(k=>mid[k]===before[k]), '15 1013-F 不碰分块的数据');
     // 在 1013-F 里记一笔，再装回新版：两边合并（1013-H 起），合并前的分块另存
-    const d=o.w.getUserData(); d.push(R('f9','2026-10-11T12:00',7,'expense','餐饮','旧版里记的')); o.w.saveUserData(d); await o.idle();
+    const d=(o.w.JiwenStore || o.w).getUserData(); d.push(R('f9','2026-10-11T12:00',7,'expense','餐饮','旧版里记的')); (o.w.JiwenStore || o.w).saveUserData(d); await o.idle();
     const t2=await boot(o.dump(), { phone:t.phone });
     const db=await t2.db();
     const ck=realKeys(db).find(k=>k.startsWith('migrate_conflict_store_'+ID_A+'_'));
