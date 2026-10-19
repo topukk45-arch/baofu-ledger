@@ -1,7 +1,9 @@
 package com.baofu.ledger;
 
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Process;
 import android.os.SystemClock;
 import android.view.View;
 import android.webkit.WebView;
@@ -24,18 +26,32 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         // 1019-U：启动画面等网页首屏画好再收（原来系统画出第一帧就收，那时网页还是一片底色），最多 1 秒。
         //   installSplashScreen 必须在 super.onCreate() 之前调；主题里 AppTheme.NoActionBarLaunch 本来就是 Theme.SplashScreen。
+        // 1019-X：记下原生那段的时间点（给网页的性能记录）；去掉安卓 12 起启动画面自带的退场动画（收的时候直接拿掉）；
+        //   开发开关「启动画面等首屏」关掉时（存在 SharedPreferences）整段不装，回到 1019-U 之前「系统画出第一帧就收」。
         LaunchPlugin.reset();
         final long t0 = SystemClock.uptimeMillis();
-        try {
-            SplashScreen splash = SplashScreen.installSplashScreen(this);
-            splash.setKeepOnScreenCondition(() -> !LaunchPlugin.isReady() && SystemClock.uptimeMillis() - t0 < SPLASH_MAX_MS);
-        } catch (Exception ignored) {}
+        LaunchPlugin.actCreate = t0;
+        if (Build.VERSION.SDK_INT >= 24) {
+            try { LaunchPlugin.procStart = Process.getStartUptimeMillis(); } catch (Exception ignored) {}
+        }
+        LaunchPlugin.waitOn = LaunchPlugin.readWait(this);
+        if (LaunchPlugin.waitOn) {
+            try {
+                SplashScreen splash = SplashScreen.installSplashScreen(this);
+                splash.setKeepOnScreenCondition(() -> !LaunchPlugin.isReady() && SystemClock.uptimeMillis() - t0 < SPLASH_MAX_MS);
+                splash.setOnExitAnimationListener(view -> {
+                    try { view.remove(); } catch (Exception ignored) {}
+                    LaunchPlugin.splashGone = SystemClock.uptimeMillis();
+                });
+            } catch (Exception ignored) {}
+        }
         registerPlugin(LaunchPlugin.class);
         // 必须在 super.onCreate() 之前注册：让「云备份」设置里的 OneDrive 直连功能可用
         registerPlugin(OneDriveLinkPlugin.class);
         // 1016-Z3：「用记问打开」账单文件（csv / xlsx）
         registerPlugin(OpenFilePlugin.class);
         super.onCreate(savedInstanceState);
+        LaunchPlugin.webReady = SystemClock.uptimeMillis();   // 1019-X：Capacitor 在 super.onCreate 里建好 WebView、开始加载网页
 
         // 1) 窗口根视图（decorView）背景：兜住一切层级最底下的露出
         try {

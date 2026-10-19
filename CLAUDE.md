@@ -65,6 +65,7 @@
   - 画：`index.html` 大脚本前面一小段（`<script>` 里 IIFE）先跑：记住的账号有快照，而且是同一版（登录页 `loginBuild` 那行）、同一天、「默认进入页面」和存的时候一样、屏幕宽度一样，就把它塞进 `body` 最后的 `#bootSnap`（`.boot-snap`，fixed 盖满、z-index 990）原样画出来；「上次停留」、离开不到 2 小时照原来滚到的位置（`top:-y`），别的情况第 1 页以后的不画。快照里的元素和真的同 id，但排在真的后面，`getElementById` 拿到的都是真的。真的首屏画好以后（`initApp` 的 finally 里 `snapUnveil()`）下一帧拿掉快照（这时真的那页已经排好，看不出变化）。性能记录的「启动」多一段「快照先出来」。
   - 删（`snapDrop()`，删这台手机上所有账号的快照）：账本一改（`saveStore`、`ledgerApply`、`ledgerKick` 要往库里写时——记一笔 / 改 / 删 / 批量改 / 导入 / 只对账 / 处理待处理 / 拆开 / AI 修改 / 撤销 / 恢复 / 导入备份……都走这几处）、换账号 / 存档（都会写一次存档）、换主题（`savePrefs`）、改默认进入页面（`setDefaultTab`）。打开 App 进账号时也会写一次存档，所以每次打开后旧快照就删了，下次切后台再存。
   - 启动画面：原生层 `MainActivity` 在 `super.onCreate` 之前 `SplashScreen.installSplashScreen()` + `setKeepOnScreenCondition`，等网页调 `Capacitor.Plugins.Launch.ready()`（`LaunchPlugin.java`）才收，最多 `SPLASH_MAX_MS` 1 秒；有快照时快照画出来那一帧调，没有时真的首屏 / 登录页画好调（`snapUnveil()`）。原来是系统画出第一帧就收，那时网页还是一片底色。
+  - 1019-X：性能记录的「启动」接上原生那段——`LaunchPlugin.timings()` 给原生的时间点（开机以来的毫秒 `SystemClock.uptimeMillis`：进程启动 `Process.getStartUptimeMillis()`（安卓 7 起有）、Activity 创建、WebView 建好（`super.onCreate` 之后）、收到「画好了」、启动画面真正收起）和一对「现在」（uptime + 系统时间），网页 `JiwenPerf.nativeInto()` 把 `performance.timeOrigin`（网页开始加载）换到同一把尺子上，都从点图标算，记进同一条（`e.nat`：`act / web / page / first / ready / gone / wait`），页面上写成一行「启动全程（从点图标算）：Activity 创建 · WebView 建好 · 网页开始 · 首屏画好 · 收到画好了 · 启动画面收起｜网页里：…」；启动画面还没收起就每 200 毫秒再问，最多 10 次。启动画面收得更快：快照一画上马上调 `ready()`（不再多等一帧），没有快照时真的首屏画好也马上调；`setOnExitAnimationListener` 里直接 `remove()`，去掉安卓 12 起自带的退场动画。开发开关里「启动画面等首屏（开发中）」（`#devSplashBtn`，默认开）：真正的开关存在原生层 SharedPreferences（`jiwen_launch` / `wait_first_screen`，`Launch.setWait / getWait`），关掉时 `MainActivity` 整段不装启动画面，回到 1019-U 之前「系统画出第一帧就收」，下次打开 App 生效；页面上的显示另记一份在 `localStorage` 的 `app_launch_wait`（不进备份）。1019-U 之后体感变慢的原因（从代码看）：网页那段 241ms 从网页开始加载算，不含进程启动、Activity、WebView 创建；而且 1019-U 让启动画面等网页说画好了才收、还带系统自带的退场动画，看到东西的时刻往后挪了。
   - 字体：底栏的霞鹜文楷（内嵌在 CSS 里）`font-display:swap`，不挡字。打开时第一次切页签不读滚动位置（`tabShownOnce`，少一次强制排版）。
   - 「先读这个月」没做：首屏的结余、分类汇总要所有月份才算得出来，只读这个月画不对；首屏由快照先出，读账本照旧一次读完（见开发记录还要确认）。量法：真 Chromium、CPU 调慢 4 / 6 倍、3000 / 17000 条虚构记录，重开 7 次取中位数；这台电脑默认字体没有中文（每段中文都要一路找替补字体，排版慢好几倍），量的时候用 fontconfig 把有中文的字体排第一，和手机一样。
 - 账单翻页（1017-M）：翻页只换列表那几行——`renderPager()` 的按钮调 `goPage(±1, 'top'|'bottom')` → `renderBill({ pageOnly:true })`，总览、分类汇总、日子卡、筛选小计、批量入口一概不动；列表行先拼进 fragment 再一次换上（不先清空，免得中间那一刻页面变短、滚动位置被夹到 0）。列表上面 `#pager`、下面 `#pagerBottom` 各一排，按钮只建一次、以后只改页码和能不能点；上面那排点了页面不动（新的一页变短时由 `#pagerPad` 垫上差的高度，整页重画时收掉），下面那排点了直接（`behavior:'instant'`）跳到新一页第一行。清筛选（✕）照旧整页重画、平滑滚回「账单」标题（`scrollListTop()`）。
@@ -136,7 +137,7 @@
 | 云端主备份（OneDrive 文件） | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |  |  |  | ✓ | ✓ |
 | 云端单号表文件（开发中） |  |  |  |  | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ | ✓ |  |  |  |  |  |
 | 首屏快照 `app_snap_<账号>`（1019-U，只在这台手机） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） | ✓（删） |
-| 这台手机上的本地设置（localStorage：开发开关、主题、月初提醒、滚动位置） |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
+| 这台手机上的本地设置（localStorage：开发开关、主题、月初提醒、滚动位置；1019-X 起原生 SharedPreferences 里的「启动画面等首屏」） |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |
 
 说明：
 - 每种备份都是一整套（账本、存档设置原样、单号表、待处理池、导入记录；AI 标记在记录上），所以「备份漏掉某样」这一类没有；本地设置有意不进备份。首屏快照（1019-U）也有意不进备份：它只是上次首屏的样子，账本一改就删，切后台再存。

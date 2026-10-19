@@ -1530,7 +1530,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-W</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-X</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1706,6 +1706,7 @@
                     <button class="set-item" id="devLogsBtn" style="display:none"><span>导入记录（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devRulesBtn" style="display:none"><span>管理导入规则（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devPerfBtn" style="display:none"><span>性能记录（开发中）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="devSplashBtn" style="display:none"><span>启动画面等首屏（开发中）</span><span class="set-arrow" id="devSplashVal">开</span></button>
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
                 </div>
@@ -2383,8 +2384,8 @@
                 if(y && el.firstElementChild) el.firstElementChild.style.top=(-y)+'px';
                 document.body.appendChild(el);
                 window.__bootSnap={ at:Math.round(performance.now()), user:u };
-                // 首屏已经出来了：原生启动画面可以收了（这一帧画完就是快照）
-                requestAnimationFrame(function(){ try{ var c=window.Capacitor, p=c&&c.Plugins&&c.Plugins.Launch; if(p&&p.ready) p.ready(); }catch(e){} });
+                // 快照画上了：马上告诉原生层收启动画面（1019-X 起不再多等一帧；消息过桥到原生那边时这一帧已经画出来了）
+                try{ var c=window.Capacitor, p=c&&c.Plugins&&c.Plugins.Launch; if(p&&p.ready) p.ready(); }catch(e){}
             }catch(e){ try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
@@ -2413,10 +2414,27 @@
                 const f=()=>{ boot.paint=Math.round(now()); const e={ kind:'启动', ms:boot.paint };
                     if(window.__bootSnap) boot.snap=window.__bootSnap.at;   // 1019-U：快照先画出来的时间
                     ['snap','script','db','read','render','paint'].forEach(k=>{ if(boot[k]!=null) e[k]=boot[k]; });
-                    e.n=window.__perfRecs; add(e); };
+                    e.n=window.__perfRecs;
+                    nativeInto(e, 0).then(()=>add(e), ()=>add(e)); };
                 if(window.requestAnimationFrame) requestAnimationFrame(()=>setTimeout(f, 0)); else setTimeout(f, 0);
             }
-            return { now, add, list, on, bootMark, bootDone, clear(){ try{ localStorage.removeItem(KEY); }catch(_){} }, T0 };
+            // 1019-X：原生那段（从点图标起）：问原生层要时间点，换到同一把尺子上（都从进程启动算），记进同一条「启动」。
+            //   网页的 performance 时间从网页开始加载算，换算：网页开始 = timeOrigin（系统时间）换成开机以来的毫秒。
+            //   启动画面还没收起（退场还没做完）就过 200 毫秒再问，最多问 10 次。不在手机上（没有 Launch.timings）就不加。
+            function nativeInto(e, tries){
+                const c=window.Capacitor, L=c && c.Plugins && c.Plugins.Launch;
+                if(!L || typeof L.timings!=='function') return Promise.resolve();
+                return Promise.resolve(L.timings()).then(t=>{
+                    if(!t || !t.actCreate) return;
+                    if(t.wait && !t.splashGone && tries<10) return new Promise(r=>setTimeout(r, 200)).then(()=>nativeInto(e, tries+1));
+                    const base=t.procStart || t.actCreate, off=t.nowUptime - t.nowEpoch;   // 系统时间 + off = 开机以来的毫秒
+                    const T0=(performance.timeOrigin || (Date.now()-performance.now())) + off;   // 网页开始加载那一刻
+                    const rel=x=>x ? Math.round(x-base) : null;
+                    const first=e.snap!=null ? e.snap : e.paint;
+                    e.nat={ proc:!!t.procStart, act:rel(t.actCreate), web:rel(t.webReady), page:rel(T0), first:rel(T0+first), ready:rel(t.readyAt), gone:rel(t.splashGone), wait:!!t.wait };
+                });
+            }
+            return { now, add, list, on, bootMark, bootDone, nativeInto, clear(){ try{ localStorage.removeItem(KEY); }catch(_){} }, T0 };
         })();
         // ===== 软键盘处理（极简、稳健版） =====
         // 关键教训：之前"先把弹窗设透明、等键盘信号再淡入"的做法，会在键盘弹起、WebView 重排的
@@ -6786,7 +6804,24 @@ ${detail}
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devPerfBtn').style.display = devImportOn() ? '' : 'none'; }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devPerfBtn').style.display = $('devSplashBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()) splashWaitPaint(); }
+        // 1019-X：开发开关里的「启动画面等首屏」（默认开）：真正的开关存在原生层（SharedPreferences，打开 App 时原生那边一开始就要知道），
+        //   这里只是读 / 写它；关掉 = 回到 1019-U 之前「系统画出第一帧就收启动画面」，下次打开 App 生效。不在手机上时记在 localStorage 里只为显示
+        function splashPlugin(){ const c=window.Capacitor; return c && c.Plugins && c.Plugins.Launch && typeof c.Plugins.Launch.setWait==='function' ? c.Plugins.Launch : null; }
+        function splashWaitLocal(){ try{ return localStorage.getItem('app_launch_wait')!=='0'; }catch(_){ return true; } }
+        function splashWaitPaint(){
+            const v=$('devSplashVal'); if(!v) return;
+            v.textContent=splashWaitLocal() ? '开' : '关';
+            const L=splashPlugin();
+            if(L && L.getWait) Promise.resolve(L.getWait()).then(r=>{ if(r && typeof r.on==='boolean'){ try{ localStorage.setItem('app_launch_wait', r.on ? '1' : '0'); }catch(_){} v.textContent=r.on ? '开' : '关'; } }).catch(()=>{});
+        }
+        $('devSplashBtn').addEventListener('click', ()=>{
+            const on=!splashWaitLocal();
+            try{ localStorage.setItem('app_launch_wait', on ? '1' : '0'); }catch(_){}
+            const L=splashPlugin(); if(L) Promise.resolve(L.setWait({ on })).catch(()=>{});
+            splashWaitPaint();
+            customAlert(on ? '已打开：启动画面等首屏画好再收（最多 1 秒）。下次打开 App 生效。' : '已关掉：启动画面像 1019-U 之前那样，系统画出第一帧就收。下次打开 App 生效。\n\n对比完告诉开发者用哪种当默认。', '启动画面等首屏');
+        });
         $('setBuild').textContent=$('loginBuild').textContent;
         renderDevImport();
         // 2 秒内连点 5 次版本号：开 / 关
@@ -10427,10 +10462,9 @@ ${detail}
         // 真的首屏画好了：下一帧拿掉快照（这一帧真的那页已经排好，拿掉看不出变化）；没有快照时告诉原生层可以收启动画面了
         function snapUnveil(){
             const el=document.getElementById('bootSnap');
-            const go=()=>{
-                const x=document.getElementById('bootSnap'); if(x) x.remove();
-                try{ const c=window.Capacitor, p=c&&c.Plugins&&c.Plugins.Launch; if(p&&p.ready) p.ready(); }catch(_){}
-            };
+            // 1019-X：告诉原生层收启动画面不再等一帧（有快照时早就说过了，这里再说一次没关系）
+            try{ const c=window.Capacitor, p=c&&c.Plugins&&c.Plugins.Launch; if(p&&p.ready) p.ready(); }catch(_){}
+            const go=()=>{ const x=document.getElementById('bootSnap'); if(x) x.remove(); };
             if(el && window.requestAnimationFrame) requestAnimationFrame(go); else go();
         }
         window.snapSave=snapSave; window.snapDrop=snapDrop;   // 给测试用
@@ -11931,6 +11965,8 @@ ${detail}
             new MutationObserver(ms=>ms.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.classList.contains('mask')) watchMask(n); }))).observe(document.body, { childList:true });
             // 「性能记录（开发中）」页：一行一条，能一键复制全部、清空
             function fmt(e){
+                if(e.kind==='启动' && e.nat){ const n=e.nat, v=x=>x!=null ? x : '-';
+                    return `${e.at} 启动全程（${n.proc ? '从点图标' : '从 Activity 创建'}算）：Activity 创建 ${v(n.act)} · WebView 建好 ${v(n.web)} · 网页开始 ${v(n.page)} · 首屏画好 ${v(n.first)} · 收到画好了 ${v(n.ready)} · 启动画面收起 ${n.wait ? v(n.gone) : '（没等首屏，系统第一帧就收）'}｜网页里：${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}`; }
                 if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}）`;
                 if(e.kind==='点输入框') return `${e.at} 点输入框到能输入 ${e.ms}ms（${e.what}）`;
                 if(e.kind==='键盘') return `${e.at} 键盘 面板位置变了 ${e.moves} 次${e.blank!=null ? `，露出空白 ${e.blank} 帧` : ''}，最慢一帧 ${e.maxFrame}ms、平均 ${e.avgFrame}ms，可视区 ${e.vv}（${e.what}）`;
