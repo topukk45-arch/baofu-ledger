@@ -6,6 +6,7 @@
         const { bindSheetDrag, sheetGhostsFinish } = window.JiwenPanel;   // 旧代码引用表：sheet 已搬进 app/sheet.js，旧文件都搬完时删掉
         const { askCancel, askMask, closeAsk, customAlert, customAlertHtml, customChoose, customConfirm, customPrompt } = window.JiwenAsk;   // 旧代码引用表：ask 已搬进 app/ask.js，旧文件都搬完时删掉
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, closeDtPicker, getDtInput, openDtPicker, openDtPickerDate, playSlide, setDtInput } = window.JiwenDate;   // 旧代码引用表：date 已搬进 app/date.js，旧文件都搬完时删掉
+        const { askImportOtherDays, importDaysSuffix, importFixSuffix, openAiExport } = window.JiwenAiExport;   // 旧代码引用表：ai 已搬进 app/ai-export.js，旧文件都搬完时删掉
 
         // ===== 1010-K5：点「备注」后，把保存按钮也露出来 =====
         // 键盘弹起时弹窗被压到半屏，WebView 只把备注框本身滚进视野，紧挨着的「添加记录 / 保存」

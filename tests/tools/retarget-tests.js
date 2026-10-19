@@ -25,7 +25,7 @@ files.forEach(f => {
   const src = fs.readFileSync(f, 'utf8');
   const lines = src.split('\n');
   let changed = false;
-  const compat = /index-1016|fixtures', 'index-/.test(src) || /[\\/]helpers[\\/]/.test(f);
+  const compat = /index-1016|fixtures', 'index-/.test(src) || /[\\/]helpers[\\/]/.test(f) || /regress\.js$/.test(f);
   const out = lines.map((l, i) => {
     let n = l.replace(reProp, (m, o, nm) => compat ? `(${o}.${entry} || ${o}).${nm}` : `${o}.${entry}.${nm}`);
     n = n.replace(reEval, (m, pre, q, body) => pre + q + body.replace(reWord, (mm, b, nm) => `${b}${entry}.${nm}`) + q);

@@ -158,7 +158,7 @@ function bootSync(records, extra){
     const recs=baseRecords(); recs[0].skip=true; recs[1].skip=true;
     const t=await boot(recs);
     const aug=recs.filter(r=>r.time.startsWith('2026-08'));
-    const txt=t.w.buildAiText(aug,'2026年8月','按月');
+    const txt=t.w.JiwenAiExport.buildAiText(aug,'2026年8月','按月');
     ok(txt.includes('支出 0.00 元') && txt.includes('共 2 笔（其中 2 笔不计入收支）'), 'AI 总览排除不计入');
     ok(txt.includes('已从总览和分类占比中排除') && (txt.match(/【不计入收支】/g)||[]).length===2+1, 'AI 提示语与明细标注');
     ok(txt.includes('（本期无支出）'), '全部不计入时分类占比为空');

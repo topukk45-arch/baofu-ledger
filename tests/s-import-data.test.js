@@ -233,7 +233,7 @@ let backupText;
   ok(typeof bk.orders.alipay['2026-09'].n === 'string' && Array.isArray(bk.orders.alipay['2026-09'].ids), '3 备份里的单号表是紧凑写法');
   ok(bk.data[0].src.app === 'alipay' && bk.data[0].cp === 0 && bk.data[1].pm === 2 && bk.data[0].oc === '餐饮美食', '3 备份里的记录带新字段');
   // AI 导出：不带来源和单号
-  const ai = t.w.buildAiText((t.w.JiwenStore || t.w).getUserData(), '2026年9月', '按月');
+  const ai = t.w.JiwenAiExport.buildAiText((t.w.JiwenStore || t.w).getUserData(), '2026年9月', '按月');
   ok(!/alipay|wechat|imgw|22001/.test(ai), '3 AI 导出不带来源、批次、单号');
   // 云同步：带名单、规则、导入记录、待处理池，不带单号表
   t.ls.setItem('onedrive_link_' + ID_A + '__默认存档', JSON.stringify({ uri: 'content://虚构/备份.json' }));

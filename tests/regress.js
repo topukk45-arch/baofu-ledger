@@ -22,7 +22,7 @@ async function snap(file){
   const noId=x=>x.replace(/"accountId": ?"u\d+"/g, '"accountId":"<编号>"');
   out.backup=noId(dom.window.__files[0]||'');
   out.cloud=noId(JSON.stringify((dom.window.JiwenStore||dom.window).odBuildPayload()));
-  out.aiApp=dom.window.buildAiText((dom.window.JiwenStore||dom.window).getUserData().filter(r=>r.time.startsWith('2026-08')),'2026年8月','按月');
+  out.aiApp=(dom.window.JiwenAiExport || dom.window).buildAiText((dom.window.JiwenStore||dom.window).getUserData().filter(r=>r.time.startsWith('2026-08')),'2026年8月','按月');
   out.overall=$('summaryOverall').innerHTML; out.cats=$('catStats').innerHTML;
   const pages=[]; for(let p=0;p<10;p++){ pages.push($('billList').innerHTML); const nx=[...$('pager').querySelectorAll('button')].pop(); if(!nx||nx.disabled)break; nx.click(); }
   out.pages=pages.join('|');
@@ -34,7 +34,7 @@ async function snap(file){
   out.stats=$('statCal').innerHTML+$('statMonthIn').textContent+$('statMonthOut').textContent+$('statMonthCatList').innerHTML;
   [...$('statCal').querySelectorAll('.day.has')][5].click(); out.day=$('statFlowList').innerHTML;
   // AI 导出（直接调构建函数）
-  out.ai=dom.window.buildAiText(records.filter(r=>r.time.startsWith('2026-09')),'2026年9月','按月');
+  out.ai=(dom.window.JiwenAiExport || dom.window).buildAiText(records.filter(r=>r.time.startsWith('2026-09')),'2026年9月','按月');
   return out;
 }
 (async()=>{

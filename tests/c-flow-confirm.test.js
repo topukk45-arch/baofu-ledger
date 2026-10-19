@@ -75,7 +75,7 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
 {
     let rs=oct(); rs=mark(rs,['cc1','cc2'],'skip'); rs=mark(rs,['lpo','lpi','par'],'flow');
     const t=await boot(rs);
-    const txt=t.w.buildAiText(rs.filter(r=>r.time.startsWith('2026-10')),'2026年10月','按月');
+    const txt=t.w.JiwenAiExport.buildAiText(rs.filter(r=>r.time.startsWith('2026-10')),'2026年10月','按月');
     ok(txt.includes('收入 100.00 元，支出 29.00 元'), 'AI 总览只含计入');
     ok(txt.includes('（其中 2 笔不计入收支、3 笔只算结余）'), 'AI 写明两类排除条数');
     ok((txt.match(/【只算结余】/g)||[]).length===4 && (txt.match(/【不计入收支】/g)||[]).length===3, 'AI 明细逐条标注（含提示语里各一次）');
