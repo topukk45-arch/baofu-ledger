@@ -39,7 +39,9 @@ const tab = (t, n) => t.d.querySelector('.tab-btn[data-tab="' + n + '"]').click(
 
 (async () => {
   // 1. 停在统计页 → 被杀 → 回来还是统计页（默认页是账单）
-  let t = await bootWith(A.seedOf(recs));
+  // 1019-L 起要在设置里选「上次停留的页面」才回到上次的页签 / 页码 / 位置（这里先选好；别的选项见 zZzI-default-tab）
+  let t = await bootWith(A.seedOf(recs, null, null), null);
+  t.w.localStorage.setItem('app_default_tab', 'last');
   tab(t, 'stats');
   t = await killAndReopen(t);
   ok(activeTab(t) === 'stats', '1 回来还在统计页');
@@ -55,10 +57,10 @@ const tab = (t, n) => t.d.querySelector('.tab-btn[data-tab="' + n + '"]').click(
   ok(/3/.test(pg(t).split('/')[0]), '2 还是第 3 页：' + pg(t));
   ok(t.w.__calls[0] === 1200, '2 滚动位置直接放回 1200，不先回顶上（后面的 0 是测试工具点了「设置」）' + JSON.stringify(t.w.__calls));
 
-  // 3. 离开超过 2 小时：照设置进默认页
+  // 3. 离开超过 2 小时：1019-L 起（选了「上次停留」）还是回到上次的页签，只是页码、位置从头开始
   tab(t, 'stats');
   t = await killAndReopen(t, ls => { const k = 'app_resume_' + A.ID; const r = JSON.parse(ls[k]); r.at = new Date(NOW).getTime() - 3 * 3600 * 1000; ls[k] = JSON.stringify(r); });
-  ok(activeTab(t) === 'ledger', '3 离开超过 2 小时：回到默认页');
+  ok(activeTab(t) === 'stats', '3 离开超过 2 小时：选了「上次停留」照样回到上次的页签（统计）');
 
   // 4. 记一笔填到一半 → 被杀 → 回来接着填，关的时候照样问「放弃这次填写？」
   tab(t, 'ledger');

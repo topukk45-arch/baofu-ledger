@@ -1443,7 +1443,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-K</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-L</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1656,6 +1656,7 @@
                             <button data-v="stats">统计</button>
                             <button data-v="ledger">记账</button>
                             <button data-v="settings">设置</button>
+                            <button data-v="last">上次停留</button>
                         </div>
                     </div>
                     <div class="set-item set-static">
@@ -5611,12 +5612,13 @@
             renderDaysCard();             // 「日子」入口卡（数据独立于存档，跟账号走）
             ledgerScrollY=0;              // 1017-F：换了账号，账单页从顶上开始
             // 1019-F：打开 App 自动登录、上次是被系统关掉的（离开不到 RESUME_MAX_MS）：回到上次的页签、账单页第几页、滚到哪
-            const rs=window.__autoLogin ? resumeTake(id) : null;
+            const auto=!!window.__autoLogin;
+            const rs=auto && getDefaultTabPref()==='last' ? resumeTake(id) : null;   // 1019-L：设置里选了「上次停留」才回去
             window.__autoLogin=false;
             if(rs && rs.tab==='ledger' && rs.page>1){ curPage=rs.page; renderBill(); }
             if(rs && rs.tab==='ledger'){ ledgerScrollY=rs.y||0; currentTab=''; }   // currentTab 先清掉：switchTab 开头记滚动位置那一步别把它冲成 0
             switchTab(rs ? rs.tab : getDefaultTab());   // 按用户设置进入默认页（默认记账）
-            if(rs) setTimeout(()=>formDraftRestore(id), 0);
+            if(auto) setTimeout(()=>formDraftRestore(id), 0);   // 填到一半的记一笔 / 修改，不管默认页选哪个都接着来
             // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
             // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
             trackBusy(runTimeRepairOnce(id));
@@ -9935,10 +9937,13 @@ ${detail}
         // ===== 底部标签切换 =====
         // ============================================================
         // 默认进入页面（存全局偏好，所有用户共用此设置）
-        function getDefaultTab(){
+        // 1019-L：多一个「上次停留的页面」（存 'last'）：选它才回到上次的页签、页码、滚动位置（resumeTake）；
+        //   别的选项永远照设置进（原来 1019-F 不管设置、2 小时内都回到上次的页面，把设置盖掉了）
+        function getDefaultTabPref(){
             const v=localStorage.getItem('app_default_tab');
-            return (v==='stats'||v==='ledger'||v==='settings') ? v : 'ledger';
+            return (v==='stats'||v==='ledger'||v==='settings'||v==='last') ? v : 'ledger';
         }
+        function getDefaultTab(){ const v=getDefaultTabPref(); return v==='last' ? 'ledger' : v; }
         function setDefaultTab(v){ localStorage.setItem('app_default_tab', v); }
 
         // 记一笔按钮位置偏好（全局，左撇子可设为「左」）。默认 right=记一笔在右、筛选在左。
@@ -10023,8 +10028,10 @@ ${detail}
         function resumeTake(id){
             let r=null;
             try{ r=JSON.parse(localStorage.getItem(resumeKey(id))||'null'); }catch(_){ r=null; }
-            if(!r || !(Date.now()-r.at < RESUME_MAX_MS) || r.archive!==currentArchive) return null;
+            if(!r || r.archive!==currentArchive) return null;
             if(['ledger','stats','settings'].indexOf(r.tab)<0) return null;
+            // 1019-L：选了「上次停留」就回到上次的页签（不限多久）；页码、滚动位置只在离开不到 2 小时时放回
+            if(!(Date.now()-r.at < RESUME_MAX_MS)) return { tab:r.tab, page:1, y:0 };
             const pages=Math.max(1, Math.ceil(getUserData().length/PAGE_SIZE));
             return { tab:r.tab, page:Math.min(Math.max(1, Math.floor(r.page)||1), pages), y:Math.max(0, +r.y||0) };
         }
@@ -10042,7 +10049,6 @@ ${detail}
             if(!f || !(Date.now()-f.at < RESUME_MAX_MS) || f.archive!==currentArchive || !f.v) return;
             const v=f.v, cats=getCats();
             if(f.kind==='add'){
-                if(currentTab!=='ledger') return;
                 openAddModal();
                 const blank=formState('addMask');
                 if(v.time) setDtInput(billTime, v.time);
@@ -10158,7 +10164,7 @@ ${detail}
         (function(){
             const seg=$('defaultTabSeg');
             function paint(){
-                const cur=getDefaultTab();
+                const cur=getDefaultTabPref();
                 seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===cur));
             }
             seg.querySelectorAll('button').forEach(b=>{
