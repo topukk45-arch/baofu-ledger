@@ -781,6 +781,36 @@
         .form-mask .sheet-head { margin-bottom:10px; }
         .form-mask .form-btns { margin-top:16px; }
         .form-mask .form-btns > * { margin:0; flex:none; }
+        /* 1019-Q：记一笔 / 修改排紧：金额一行在最上（大字 + 小的收支切换），时间一行小字，口径收进「更多」，保存贴在面板底边 */
+        .rec-sheet { padding-bottom:0; }
+        .rec-form .field { margin-bottom:10px; }
+        .rec-time { display:inline-flex; align-items:center; gap:4px; min-height:var(--ui-tap); margin:-4px 0 0 -6px; padding:0 6px;
+            background:none; border:none; color:var(--c-text-soft); font-size:14px; font-family:inherit; cursor:pointer; border-radius:8px; }
+        .rec-time:active { background:var(--c-chip); }
+        .rec-time-arrow { font-size:16px; }
+        .rec-time-raw { display:none !important; }
+        .rec-money-row { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
+        .rec-cur { font-size:26px; color:var(--c-text-soft); flex:none; }
+        .edit-dialog input.rec-money { flex:1 1 auto; min-width:0; width:auto; margin:0; padding:4px 2px; height:56px;
+            font-size:32px; line-height:48px; border:none; border-bottom:2px solid var(--c-primary); border-radius:0; background:transparent; }
+        .io-chips.io-mini { flex:none; gap:8px; margin:0; }
+        .io-chips.io-mini .cc { flex:none; min-width:56px; height:var(--ui-tap); padding:0 12px; line-height:46px; font-size:14px; margin:0; }
+        .rec-more { margin-bottom:6px; }
+        .rec-more-btn { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); padding:0 4px;
+            background:none; border:none; border-top:1px dashed var(--c-border); color:var(--c-text); font-size:14px; font-family:inherit; cursor:pointer; text-align:left; }
+        .rec-more-val { flex:1; color:var(--c-text-soft); font-size:13px; }
+        .rec-more-arrow { transition:transform .15s; }
+        .rec-more-btn[aria-expanded="true"] .rec-more-arrow { transform:rotate(90deg); }
+        .rec-more-body { padding-top:4px; }
+        .edit-dialog textarea.rec-remark { margin:4px 0 0; min-height:var(--ui-tap); height:var(--ui-tap); padding:12px 10px; line-height:22px;
+            white-space:nowrap; overflow:hidden; text-overflow:ellipsis; resize:none; }
+        .rec-form .tpl-save-btn { margin-top:8px; }
+        .rec-extra { display:flex; flex-direction:column; gap:var(--ui-gap); margin-top:8px; }
+        .rec-extra .tpl-save-btn, #editMask .rec-extra .tpl-save-btn { margin-top:0; }
+        .form-mask .rec-foot { position:sticky; bottom:0; z-index:2; margin:12px -18px 0; padding:10px 18px calc(12px + env(safe-area-inset-bottom));
+            background:linear-gradient(135deg,var(--c-card-1),var(--c-card-2)); border-top:1px solid var(--c-border); }
+        /* 数字键盘开着时（面板底下垫了键盘高的空白）保存那排不贴底，免得盖住键盘上面露出来的分类；键盘自己有「确定」 */
+        .form-mask .sheet.kp-lift .rec-foot { position:static; }
         /* 筛选浮层和上面这些在键盘弹起时：保持贴底，高度收进可视区，内部滚动 */
         body.kb-open .sheet-mask { align-items:flex-end; }
         body.kb-open .sheet { max-height:100%; }
@@ -1485,7 +1515,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Q</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-R</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1844,20 +1874,26 @@
     </div>
 
     <!-- 记账弹窗 -->
+    <!-- 1019-Q：记一笔 / 修改排紧：金额放最上面（大字）+ 旁边小的「支出 / 收入」；记账时间一行小字（点了弹日期时间选择）；
+         分类照旧是圆角块；统计口径收进「更多」（不是「计入」时自动展开）；备注一行（点了弹文字输入小面板）；「保存」固定在面板底部。
+         记的内容和规则不变（收支照旧必选、不默认选中）。 -->
     <div class="mask sheet-mask form-mask" id="addMask">
-        <div class="sheet edit-dialog" id="addSheet">
+        <div class="sheet edit-dialog rec-sheet" id="addSheet">
             <div class="sheet-grip" id="addGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>记一笔</h3></div></div>
-            <div class="form-box">
-                <div class="field">
-                    <label class="field-label">记账时间</label>
-                    <div id="billTime" class="dt-input" data-placeholder="选择记账时间"></div>
+            <div class="form-box rec-form">
+                <button type="button" class="rec-time" id="billTimeLine" aria-label="改记账时间"><span class="rec-time-txt" id="billTimeTxt"></span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
+                <div id="billTime" class="dt-input rec-time-raw" data-placeholder="选择记账时间"></div>
+                <div class="rec-money-row">
+                    <span class="rec-cur" aria-hidden="true">¥</span>
+                    <input type="text" inputmode="decimal" id="billMoney" class="money-input rec-money" placeholder="0.00" aria-label="金额">
+                    <!-- 收支：小的切换，必选、不默认选中 -->
+                    <div class="cat-chips io-chips io-mini" id="billTypeChips"></div>
+                    <select id="billType" style="display:none">
+                        <option value="expense">支出（花销）</option>
+                        <option value="income">收入（存入）</option>
+                    </select>
                 </div>
-                <div class="field">
-                    <label class="field-label">金额</label>
-                    <input type="text" inputmode="decimal" id="billMoney" class="money-input" placeholder="">
-                </div>
-                <!-- 常用模板（1010-I）：放在金额下面——打开弹窗时键盘已弹起，这个位置仍在可视区内。
-                     没有模板时整行隐藏 -->
+                <!-- 常用模板（1010-I）：没有模板时整行隐藏 -->
                 <div class="field" id="billTplField" style="display:none">
                     <label class="field-label">常用</label>
                     <div class="cat-chips tpl-chips" id="billTplChips"></div>
@@ -1866,79 +1902,71 @@
                     <label class="field-label">分类</label>
                     <!-- 固定顺序的横排标签：顺序由「管理分类」页拖动决定，一点即选 -->
                     <div class="cat-chips" id="billCatChips"></div>
-                    <!-- 分类已由上方标签(chips)驱动；此 select 仅隐藏作取值用，不再增强为可见下拉 -->
                     <select id="billCat" style="display:none"></select>
                 </div>
-                <div class="field">
-                    <label class="field-label">收支</label>
-                    <!-- 收支标签：与分类一致，必选、不默认选中。先选分类再选收支，从上到下一路点下来 -->
-                    <div class="cat-chips io-chips" id="billTypeChips"></div>
-                    <!-- 隐藏 select 仅作取值用，不增强为可见下拉 -->
-                    <select id="billType" style="display:none">
-                        <option value="expense">支出（花销）</option>
-                        <option value="income">收入（存入）</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label class="field-label">统计口径</label>
-                    <div class="cat-chips mode-chips" id="billMode"></div>
-                    <div class="skip-hint" id="billModeHint"></div>
+                <div class="field rec-more">
+                    <button type="button" class="rec-more-btn" id="billMoreBtn" aria-expanded="false"><span>更多</span><span class="rec-more-val" id="billMoreVal">统计口径：计入</span><span class="rec-more-arrow" aria-hidden="true">›</span></button>
+                    <div class="rec-more-body" id="billMoreBody" hidden>
+                        <label class="field-label">统计口径</label>
+                        <div class="cat-chips mode-chips" id="billMode"></div>
+                        <div class="skip-hint" id="billModeHint"></div>
+                    </div>
                 </div>
                 <div class="field">
                     <label class="field-label">备注</label>
-                    <textarea id="billRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
+                    <textarea id="billRemark" class="remark-area rec-remark" placeholder="点这里写备注" maxlength="5000" rows="1"></textarea>
                 </div>
-                <button class="add-btn" id="addBill">添加记录</button>
                 <button class="tpl-save-btn" id="billSaveTpl">存为常用</button>
             </div>
-            <div class="dialog-btn ui-stack form-btns">
+            <div class="dialog-btn ui-stack form-btns rec-foot">
+                <button class="ui-btn primary block" id="addBill">保存</button>
                 <button class="ui-btn block" id="closeAdd">关闭</button>
             </div>
         </div>
     </div>
 
     <div class="mask sheet-mask form-mask" id="editMask">
-        <div class="sheet edit-dialog" id="editSheet">
+        <div class="sheet edit-dialog rec-sheet" id="editSheet">
             <div class="sheet-grip" id="editGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>修改账单</h3></div></div>
-            <div class="form-box">
+            <div class="form-box rec-form">
                 <!-- 1010-J：退款记录 / 有退款的原账单，在这里说明关联关系 -->
                 <div class="refund-note" id="editRefundNote" style="display:none"></div>
-                <div class="field">
-                    <label class="field-label">记账时间</label>
-                    <div id="editTime" class="dt-input" data-placeholder="选择记账时间"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">金额</label>
-                    <input type="text" inputmode="decimal" id="editMoney" class="money-input" placeholder="">
-                </div>
-                <div class="field lock-on-refund">
-                    <label class="field-label">分类</label>
-                    <div class="cat-chips" id="editCatChips"></div>
-                    <select id="editCat" style="display:none"></select>
-                </div>
-                <div class="field lock-on-refund">
-                    <label class="field-label">收支</label>
-                    <div class="cat-chips io-chips" id="editTypeChips"></div>
+                <button type="button" class="rec-time" id="editTimeLine" aria-label="改记账时间"><span class="rec-time-txt" id="editTimeTxt"></span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
+                <div id="editTime" class="dt-input rec-time-raw" data-placeholder="选择记账时间"></div>
+                <div class="rec-money-row">
+                    <span class="rec-cur" aria-hidden="true">¥</span>
+                    <input type="text" inputmode="decimal" id="editMoney" class="money-input rec-money" placeholder="0.00" aria-label="金额">
+                    <div class="cat-chips io-chips io-mini lock-on-refund" id="editTypeChips"></div>
                     <select id="editType" style="display:none">
                         <option value="expense">支出（花销）</option>
                         <option value="income">收入（存入）</option>
                     </select>
                 </div>
                 <div class="field lock-on-refund">
-                    <label class="field-label">统计口径</label>
-                    <div class="cat-chips mode-chips" id="editMode"></div>
-                    <div class="skip-hint" id="editModeHint"></div>
+                    <label class="field-label">分类</label>
+                    <div class="cat-chips" id="editCatChips"></div>
+                    <select id="editCat" style="display:none"></select>
+                </div>
+                <div class="field rec-more lock-on-refund">
+                    <button type="button" class="rec-more-btn" id="editMoreBtn" aria-expanded="false"><span>更多</span><span class="rec-more-val" id="editMoreVal">统计口径：计入</span><span class="rec-more-arrow" aria-hidden="true">›</span></button>
+                    <div class="rec-more-body" id="editMoreBody" hidden>
+                        <label class="field-label">统计口径</label>
+                        <div class="cat-chips mode-chips" id="editMode"></div>
+                        <div class="skip-hint" id="editModeHint"></div>
+                    </div>
                 </div>
                 <div class="field">
                     <label class="field-label">备注</label>
-                    <textarea id="editRemark" class="remark-area" placeholder="" maxlength="5000" rows="2"></textarea>
+                    <textarea id="editRemark" class="remark-area rec-remark" placeholder="点这里写备注" maxlength="5000" rows="1"></textarea>
+                </div>
+                <div class="rec-extra">
+                    <button class="tpl-save-btn refund-btn" id="editRefundBtn">退款</button>
+                    <button class="tpl-save-btn" id="editSaveTpl">存为常用</button>
+                    <button class="ui-btn danger block" id="deleteInEdit">删除这条记录</button>
                 </div>
             </div>
-            <div class="dialog-btn ui-stack form-btns">
+            <div class="dialog-btn ui-stack form-btns rec-foot">
                 <button class="ui-btn primary block" id="saveEdit">保存</button>
-                <button class="tpl-save-btn refund-btn" id="editRefundBtn">退款</button>
-                <button class="tpl-save-btn" id="editSaveTpl">存为常用</button>
-                <button class="ui-btn danger block" id="deleteInEdit">删除这条记录</button>
                 <button class="ui-btn block" id="cancelEdit">取消</button>
             </div>
         </div>
@@ -7615,9 +7643,27 @@ ${detail}
         // 给时间输入框赋值：dataset.value 存规范格式(带T，逻辑用)，显示框去掉T更美观
         // 传空则同时清空
         function setDtInput(input, val){
-            if(!val){ input.value=''; input.dataset.value=''; return; }
+            if(!val){ input.value=''; input.dataset.value=''; paintRecTime(input); return; }
             input.dataset.value=val;
             input.value=val.replace('T',' ');
+            paintRecTime(input);
+        }
+        // 1019-Q：记一笔 / 修改的记账时间写成一行小字：「今天 11:21 ›」「昨天 …」「10月3日 …」，不是今年的带年份
+        function recTimeText(v, now){
+            const m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}:\d{2})/.exec(v||'');
+            if(!m) return '选择记账时间';
+            const n=now||new Date(), d=new Date(+m[1], m[2]-1, +m[3]);
+            const t0=new Date(n.getFullYear(), n.getMonth(), n.getDate());
+            const diff=Math.round((t0-d)/86400000);
+            let day;
+            if(diff===0) day='今天'; else if(diff===1) day='昨天'; else if(diff===2) day='前天';
+            else if(+m[1]===n.getFullYear()) day=`${+m[2]}月${+m[3]}日`;
+            else day=`${m[1]}年${+m[2]}月${+m[3]}日`;
+            return day+' '+m[4];
+        }
+        function paintRecTime(input){
+            const txt=input && document.getElementById(input.id+'Txt');
+            if(txt) txt.textContent=recTimeText(input.dataset.value || String(input.value||'').replace(' ','T'));
         }
         // 读取时间输入框的规范值（带T），供保存逻辑使用
         function getDtInput(input){ return input.dataset.value || input.value.replace(' ','T'); }
@@ -7630,6 +7676,11 @@ ${detail}
         // 绑定两个时间输入框
         billTime.addEventListener('click', ()=>openDtPicker(billTime));
         editTime.addEventListener('click', ()=>openDtPicker(editTime));
+        // 1019-Q：那一行小字点了照样弹日期时间选择（原来的框藏起来，值还在它身上）
+        $('billTimeLine').addEventListener('click', ()=>openDtPicker(billTime));
+        $('editTimeLine').addEventListener('click', ()=>openDtPicker(editTime));
+        // 别处直接改了 dataset.value（没走 setDtInput）也跟着改那一行
+        [billTime, editTime].forEach(el=>{ try{ new MutationObserver(()=>paintRecTime(el)).observe(el, { attributes:true, attributeFilter:['data-value'] }); }catch(e){} });
 
         // ===== 筛选浮层（bottom sheet）控件绑定 =====
         // 草稿模式：sheet 内所有改动只写进控件（草稿），不动列表。
@@ -8981,13 +9032,32 @@ ${detail}
             const cur=box.dataset.mode||'normal';
             box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===cur));
             const hint=$(box.id+'Hint'); if(hint) hint.textContent=MODE_HINT[cur];
+            recMorePaint(box, cur!=='normal' ? true : null);
         }
         function setModeChips(box, mode){
             if(!box) return;
             box.dataset.mode = (mode==='flow'||mode==='skip') ? mode : 'normal';
             delete box.dataset.auto;
             paintModeChips(box);
+            recMorePaint(box, box.dataset.mode!=='normal');   // 打开 / 换一条时：是「计入」就收着，不是就展开
         }
+        // 1019-Q：记一笔 / 修改的统计口径收进「更多」：那一行写现在的口径；不是「计入」时自动展开（自己点开的不自动收）
+        function recMorePaint(box, open){
+            const pre = box && box.id==='billMode' ? 'bill' : box && box.id==='editMode' ? 'edit' : '';
+            if(!pre) return;
+            const btn=$(pre+'MoreBtn'), body=$(pre+'MoreBody'), val=$(pre+'MoreVal');
+            if(!btn) return;
+            const o=MODE_OPTS.find(x=>x.v===(box.dataset.mode||'normal'));
+            val.textContent='统计口径：'+(o?o.t:'计入');
+            if(open!=null){ body.hidden=!open; btn.setAttribute('aria-expanded', open?'true':'false'); }
+        }
+        ['bill','edit'].forEach(pre=>{
+            const btn=$(pre+'MoreBtn'); if(!btn) return;
+            btn.addEventListener('click', ()=>{
+                const open=$(pre+'MoreBody').hidden;
+                $(pre+'MoreBody').hidden=!open; btn.setAttribute('aria-expanded', open?'true':'false');
+            });
+        });
         function getModeChips(box){ return (box && box.dataset.mode) || 'normal'; }
         function autoModeOnCat(box, prev, next){
             if(!box || prev===next) return;

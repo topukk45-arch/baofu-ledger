@@ -85,7 +85,9 @@ function bootSync(arc, extraArchives){
   const time0=t.$('billTime').dataset.value || t.$('billTime').textContent;
   // 【1010-I2】常用在金额下面
   const fields=[...t.$('addMask').querySelectorAll('.form-box > .field')].map(f=>f.querySelector('.field-label').textContent);
-  ok(fields.slice(0,3).join()==='记账时间,金额,常用', '常用排在金额下面：'+fields.join());
+  // 1019-Q 起记账时间、金额不再是带标题的 .field（时间一行小字、金额一行大字在最上面），按页面里的先后比
+  const after=(a,b)=>!!(t.$(a).compareDocumentPosition(t.$(b)) & 4);
+  ok(after('billTimeLine','billMoney') && after('billMoney','billTplField') && fields[0]==='常用', '常用排在金额下面：'+fields.join());
   t.$('billMoney').focus();
   t.clickChip('billTplChips','视频会员157');
   ok(t.$('billMoney').value==='157' && t.$('billRemark').value==='视频会员', '金额与备注已填');
