@@ -1530,7 +1530,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z3</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z4</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -2398,12 +2398,14 @@
             function list(){ try{ const a=JSON.parse(localStorage.getItem(KEY)||'[]'); return Array.isArray(a) ? a : []; }catch(_){ return []; } }
             function add(e){
                 if(!on()) return;
-                const a=list(); a.push(Object.assign({ at:new Date().toISOString().slice(5, 19).replace('T', ' ') }, e));
+                const ts=Date.now(); const a=list(); a.push(Object.assign({ at:perfLocalAt(ts), ts }, e));   // 1019-Z4：按手机当地时间写（原来 toISOString 是 UTC，北京时间差 8 小时）
                 while(a.length>PERF_MAX) a.shift();
                 try{ localStorage.setItem(KEY, JSON.stringify(a)); }catch(_){}
             }
             // 启动：各段到「网页开始加载」多少毫秒
             function bootMark(k){ if(!(k in boot)) boot[k]=Math.round(now()); }
+            // 1019-Z4：「月-日 时:分:秒」按手机当地时间（页面上和复制出来的都用它）
+            function perfLocalAt(ts){ const d=new Date(ts), p=n=>String(n).padStart(2, '0'); return `${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; }
             function bootDone(){
                 if(boot.done) return; boot.done=1;
                 const f=()=>{ boot.paint=Math.round(now()); const e={ kind:'启动', ms:boot.paint };
@@ -2429,7 +2431,7 @@
                     e.nat={ proc:!!t.procStart, act:rel(t.actCreate), web:rel(t.webReady), page:rel(T0), first:rel(T0+first), ready:rel(t.readyAt), gone:rel(t.splashGone), wait:!!t.wait };
                 });
             }
-            return { now, add, list, on, bootMark, bootDone, nativeInto, clear(){ try{ localStorage.removeItem(KEY); }catch(_){} }, T0 };
+            return { now, add, list, on, bootMark, bootDone, nativeInto, localAt:perfLocalAt, clear(){ try{ localStorage.removeItem(KEY); }catch(_){} }, T0 };
         })();
         // ===== 软键盘处理（极简、稳健版） =====
         // 关键教训：之前"先把弹窗设透明、等键盘信号再淡入"的做法，会在键盘弹起、WebView 重排的
@@ -11977,6 +11979,7 @@ ${detail}
             new MutationObserver(ms=>ms.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.classList.contains('mask')) watchMask(n); }))).observe(document.body, { childList:true });
             // 「性能记录（开发中）」页：一行一条，能一键复制全部、清空
             function fmt(e){
+                if(typeof e.ts==='number') e=Object.assign({}, e, { at:P.localAt(e.ts) });   // 1019-Z4：有时间戳的按当地时间重新写（老记录没有，照原样）
                 if(e.kind==='启动' && e.nat){ const n=e.nat, v=x=>x!=null ? x : '-';
                     return `${e.at} 启动全程（${n.proc ? '从点图标' : '从 Activity 创建'}算）：Activity 创建 ${v(n.act)} · WebView 建好 ${v(n.web)} · 网页开始 ${v(n.page)} · 首屏画好 ${v(n.first)} · 收到画好了 ${v(n.ready)} · 启动画面收起 ${n.wait ? v(n.gone) : '（没等首屏，系统第一帧就收）'}｜网页里：${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}`; }
                 if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}）`;
