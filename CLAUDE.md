@@ -170,6 +170,7 @@
   - 1019-Z4-M19 设置页 `app/settings.js`（`JiwenSettings`，12 条、对外 refreshArchiveSelect / renderStorageUse）。
   - 1019-Z4-M20 四个共用状态收进基础：`currentUser` / `currentArchive` / `currentTab` / `curPage` 的四行 `let` 原样挪进 `app/base.js`，`JiwenBase` 上给读写口，别处 150 处改成 `JiwenBase.currentUser` 这种（工具 `tests/tools/move-state.js`，按语法树找）。外壳要在加载时读 `currentTab`，必须先做这一步（第一次试搬外壳时报「currentTab 还没初始化」，退回）。
   - 1019-Z4-M21 外壳 `app/tabs.js`（`JiwenTabs`，47 条、对外 backFromDaysPage / enterAccount / refreshAllViews / refreshCatSelectors / snapDrop / snapUnveil / switchTab）。
+  - 1019-Z4-M22 登录页 `app/login.js`（`JiwenLogin`，17 条、对外 login / renderRecentUsers）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。
