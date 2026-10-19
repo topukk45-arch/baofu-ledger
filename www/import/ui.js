@@ -192,6 +192,7 @@
     '.imp-near-act{display:flex;gap:8px;margin-top:8px;}.imp-near-act .ui-btn{flex:1 1 0;min-height:48px;white-space:nowrap;padding:0 8px;font-size:15px;}',
     '.imp-near-bulk{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;padding:8px 10px;border-radius:10px;background:var(--c-bg);}',
     '.imp-near-bulk .imp-soft{flex:1 1 100%;margin:0;}.imp-near-bulk .ui-btn{flex:1 1 0;min-height:48px;}',
+    '.imp-sel-all{display:block;margin:0 0 8px;min-height:48px;}.imp-near-bulk .imp-sel-all{flex:1 1 100%;margin:0;}',   /* 1019-G：全选 / 全不选 */
     '.pc-pick{display:block;width:100%;min-height:48px;border-radius:10px;border:1.5px solid var(--st-main);background:transparent;color:var(--st-main);font-size:15px;font-weight:bold;font-family:inherit;cursor:pointer;}',
     '.pc.on .pc-pick{background:var(--st-ok);border-color:var(--st-ok);color:#fff;}.pc-pick:disabled{opacity:.45;}',
     '.pc-none{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;min-height:48px;margin-top:8px;border-radius:10px;border:1.5px solid var(--st-skip);background:transparent;color:var(--st-skip);font-size:15px;font-family:inherit;cursor:pointer;}',
@@ -1286,6 +1287,15 @@
     c.appendChild(el('div', 'imp-line', '这段时间漏记了 ' + m.n + ' 笔，共 ' + yuan(m.out) + ' 元' + (m.inc ? '（另有收入 ' + yuan(m.inc) + ' 元）' : '') + '。'));
     c.appendChild(el('div', 'imp-soft', '勾上要补进账本的几笔，只写这几笔；其余什么都不改（不合并手记、不登记、不进待处理），下次再导同一份文件结果不变。'));
     b.appendChild(c);
+    // 1019-G：勾选框超过 3 个，顶上放「全选」，全勾上了变「全不选」（和日子管理同一个写法）
+    if (m.items.length > 3) {
+      var allOn = m.items.every(function (x) { return S.view.reconPick[x.id]; });
+      var ra = btn(allOn ? '全不选' : '全选', 'ui-btn small imp-sel-all', function () {
+        if (allOn) S.view.reconPick = {}; else m.items.forEach(function (x) { S.view.reconPick[x.id] = true; });
+        render();
+      }); ra.id = 'impReconAll';
+      b.appendChild(ra);
+    }
     var list = el('div'); list.id = 'impReconList';
     var picked = 0, pickedFen = 0;
     m.items.forEach(function (x) {
@@ -1476,6 +1486,11 @@
       if (nm.keys.length > 1) {
         var bk = el('div', 'imp-near-bulk'); bk.id = 'impNearBulk';
         bk.appendChild(el('div', 'imp-soft', selKeys.length ? '已勾 ' + selKeys.length + ' 对' : '勾上几对，可以一起处理'));
+        if (nm.keys.length > 3) {      // 1019-G：超过 3 对，多一个「全选 / 全不选」（收起的那几对也算）
+          var nAll = selKeys.length === nm.keys.length;
+          var ba0 = btn(nAll ? '全不选' : '全选', 'ui-btn imp-sel-all', function (e) { e.stopPropagation(); if (nAll) Object.keys(nSel).forEach(function (k) { delete nSel[k]; }); else nm.keys.forEach(function (k) { nSel[k] = true; }); render(); });
+          ba0.id = 'impNearAll'; bk.appendChild(ba0);
+        }
         var bs0 = btn('勾上的分开记', 'ui-btn', function (e) { e.stopPropagation(); selKeys.forEach(function (k) { setRow(k, function (x) { x.split = true; delete x.pay; }); delete nSel[k]; }); replan(); });
         var bp0 = btn('勾上的改成实付', 'ui-btn primary', function (e) { e.stopPropagation(); selKeys.forEach(function (k) { setRow(k, function (x) { x.pay = true; }); delete nSel[k]; }); replan(); });
         bs0.id = 'impNearBulkSplit'; bp0.id = 'impNearBulkPay'; bs0.disabled = bp0.disabled = !selKeys.length;

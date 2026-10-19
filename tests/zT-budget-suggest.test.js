@@ -29,7 +29,7 @@ const r = (mo, d, money, cat, o) => Object.assign({ id: 'r' + (++k), time: `2026
   $('bgSuggestBtn').click();
   const rows = [...d.querySelectorAll('.bg-suggest-row')];
   const txt = rows.map(x => x.textContent);
-  ok(rows.length === 2 && /吃饭：建议 450 元（中位数 450\.00），还没设/.test(txt[0]) && /出行：建议 100 元（中位数 95\.50），现在 50\.00/.test(txt[1]), '1 吃饭 300/500/400/600/450 → 450；出行 100 退 4.5 → 95.5 往上取整 100；购物大多数月份没花、中位数 0 不建议 ' + JSON.stringify(txt));
+  ok(rows.length === 2 && /吃饭：建议 450 元（中位数 450\.00），现在没有预算/.test(txt[0]) && /出行：建议 100 元（中位数 95\.50），现在 50\.00/.test(txt[1]), '1 吃饭 300/500/400/600/450 → 450；出行 100 退 4.5 → 95.5 往上取整 100；购物大多数月份没花、中位数 0 不建议 ' + JSON.stringify(txt));
   ok(rows[0].querySelector('input').checked && !rows[1].querySelector('input').checked, '1 没设预算的勾上，已经设了的不勾');
   ok(/过去 5 个月/.test($('bgSuggestCard').textContent), '1 写明按过去 5 个月');
   $('bgSuggestApply').click(); await t.idle();

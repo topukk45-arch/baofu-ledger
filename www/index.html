@@ -1424,13 +1424,14 @@
         .bg-suggest-foot { position:sticky; bottom:calc(64px + env(safe-area-inset-bottom)); z-index:5; display:flex; gap:var(--ui-gap);
             margin:10px -14px -14px; padding:10px 14px; background:var(--c-surface); border-top:1px solid var(--c-border); border-radius:0 0 14px 14px; }
         .bg-suggest-foot > * { flex:1 1 0; }
+        .bg-sel-all { min-height:var(--ui-tap); margin:8px 0 2px; padding:0 18px; }   /* 1019-G：预算建议的全选 / 全不选 */
     </style>
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-F</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-G</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -8333,14 +8334,23 @@ ${detail}
             } else {
                 note.textContent=`按过去 ${S.months} 个月每月花的中位数，往上取整到 10 元。没设预算的默认勾上；已经设了的不勾，勾上就换成建议的。`;
                 const box=document.createElement('div'); box.id='bgSuggestList';
+                // 1019-G：勾选框超过 3 个，顶上放「全选」，全勾上了变「全不选」
+                let allBtn=null;
+                const syncAll=()=>{ if(!allBtn) return; const cbs=[...box.querySelectorAll('input[type=checkbox]')]; allBtn.textContent=(cbs.length && cbs.every(c=>c.checked)) ? '全不选' : '全选'; };
                 S.list.filter(x=>cats.includes(x.cat)).forEach(x=>{
                     const row=document.createElement('label'); row.className='bg-suggest-row'; row.dataset.cat=x.cat;
                     row.style.display='flex'; row.style.gap='8px'; row.style.alignItems='center'; row.style.padding='6px 0'; row.style.fontSize='13px';
                     const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=!(budgets[x.cat]>0);
                     const tx=document.createElement('span'); tx.style.flex='1';
-                    tx.textContent=`${x.cat}：建议 ${x.suggest.toFixed(0)} 元（中位数 ${x.median.toFixed(2)}）` + (budgets[x.cat]>0 ? `，现在 ${safeNum(budgets[x.cat]).toFixed(2)}` : '，还没设');
+                    tx.textContent=`${x.cat}：建议 ${x.suggest.toFixed(0)} 元（中位数 ${x.median.toFixed(2)}）` + (budgets[x.cat]>0 ? `，现在 ${safeNum(budgets[x.cat]).toFixed(2)}` : '，现在没有预算');
+                    cb.addEventListener('change', syncAll);
                     row.appendChild(cb); row.appendChild(tx); box.appendChild(row);
                 });
+                if(box.children.length>3){
+                    allBtn=document.createElement('button'); allBtn.type='button'; allBtn.className='mini-btn bg-sel-all'; allBtn.id='bgSuggestAll';
+                    allBtn.addEventListener('click', ()=>{ const cbs=[...box.querySelectorAll('input[type=checkbox]')]; const on=!cbs.every(c=>c.checked); cbs.forEach(c=>{ c.checked=on; }); syncAll(); });
+                    card.appendChild(allBtn); syncAll();
+                }
                 card.appendChild(box);
                 const go=document.createElement('button'); go.type='button'; go.className='mini-btn gold'; go.id='bgSuggestApply'; go.textContent='写入勾上的';
                 go.addEventListener('click', ()=>{
