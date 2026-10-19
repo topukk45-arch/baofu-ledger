@@ -156,6 +156,7 @@
   - 1019-Z4-M5 存储 `app/store.js`（`JiwenStore`，229 条语句、99 个名字对外）：账本存储（IndexedDB 分块、写入队列、切后台写盘）、loadStore / saveStore、账号、老数据迁移、两次搬家、退款和预算的计算、分类 / 模板 / 日子的数据、导入数据和写入、`JiwenImportStore`（入口不变）、云备份、单号表上云、备份导出 / 导入。留在旧文件的：新建账号按钮（登录页）、云备份那几个按钮（设置页）。回调口多数出两处：`JiwenImportStore` 写完 / 撤销后调 `refreshAllViews`、`refreshCatSelectors`（同一种「数据改了刷新页面」）。测试改写法：`w.loadStore(…)` → `w.JiwenStore.loadStore(…)`，也起老版本 1016-K 的测试文件和 `helpers/` 写成 `(w.JiwenStore || w).loadStore(…)`（老版本照旧走 window），工具 `tests/tools/retarget-tests.js`。
   - 1019-Z4-M6 金色下拉 `app/select.js`（`JiwenSelect`，10 条、对外 `closeAllCs`）。同时：搬家工具能把同一行上的几条语句一起搬；入口可以带只读口（会变的变量写成 `get 名字(){ return 名字; }`，别处读的地方改成 `入口.名字`，搬数字键盘时用）；搬之前自查用到排在后面的模块（不是回调口就不搬）。
   - 1019-Z4-M7 数字键盘 `app/keypad.js`（`JiwenKeypad`，24 条、对外 `kpOpen` / `kpClose` / `kpOn` 和只读口 `kpTarget`）。提示框关掉时看「数字键盘是不是在给提示框的输入框打字」那一句改成读 `JiwenKeypad.kpTarget`（唯一改了写法的一行）；提示框的输入框弹数字键盘那两个绑定登记归提示框。
+  - 1019-Z4-M8 文字小面板 `app/text.js`（`JiwenText`，14 条、对外 `closeText`，老入口 `window.openTextPanel` 照旧）。同时设计表：分类管理排到统计页前面（统计页的预算要调「设预算」「管理分类」），回调口加 `cats → stats: renderStats`、`settings → tabs: snapDrop`（同两种老回调）；登记了几处跟着页面走的绑定（管理分类按钮归设置页、进 / 出日子管理页和「接下来可以」归外壳）；搬家工具支持读写口（别处会改的变量，入口上 get / set，读写的地方改成「入口.名字」，统计页搬的时候用）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

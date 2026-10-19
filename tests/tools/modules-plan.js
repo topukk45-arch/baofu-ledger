@@ -22,9 +22,9 @@ const MODULES = [
   { key: 'impentry', layer: 3, entry: 'JiwenImportEntry', file: 'app/import-entry.js', what: '导入入口（开发开关、loadImportUI、用记问打开、空账本入口、月初提醒、待处理横幅、AI 标记列表的入口）', secs: ['1015-A：账单导入（开发中）'], names: [] },
   { key: 'forms', layer: 4, entry: 'JiwenForms', file: 'app/forms.js', what: '记一笔、修改账单、退款弹窗、口径选择、常用模板和模板面板', secs: ['悬浮按钮：打开/关闭记账弹窗', '统计口径选择：计入 / 只算结余 / 不计入', '常用模板（1010-I）', '退款弹窗（1010-J）', '1019-K：模板面板（新建 / 编辑都用它）', '修改弹窗的分类/收支标签（与记账弹窗同款，但打开时预选记录原有值）'], names: ['refundLineHtml', 'formState', 'formSnaps'] },
   { key: 'ledger', layer: 4, entry: 'JiwenLedger', file: 'app/ledger.js', what: '账单页：列表、翻页、搜索和筛选（含筛选浮层的控件）、分类汇总和滑动提示、批量操作', secs: ['筛选浮层（bottom sheet）控件绑定', '搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加', '批量操作（基于当前筛选结果）', '分类汇总卡片', '1019-H：分类汇总能滑但看不出来：右下角的小圆钮'], names: ['renderPager', 'scrollListTop', 'pagerPad', 'renderFilterChips', 'goPage'] },
+  { key: 'cats', layer: 4, entry: 'JiwenCats', file: 'app/cats.js', what: '分类管理（列表、拖动排序、改名、删除、设预算）', secs: ['分类长按拖动排序（pointer/touch 手写，避免 WebView 原生 draggable 不稳）'], names: ['openCatManager', 'openCatActions', 'attachCatDrag', 'showCatErr'] },
   { key: 'stats', layer: 4, entry: 'JiwenStats', file: 'app/stats.js', what: '统计页、预算页、预算建议、年月选择、账单详情', secs: ['统计页：预算', '单独一版（1016-Z9）：按过去 3–6 个月的中位数给每月预算建议，一键写入', '统计模块（纯手写 SVG，跟随外观主题变量）', '年月选择器（统计页）'], names: [] },
   { key: 'days', layer: 4, entry: 'JiwenDays', file: 'app/days.js', what: '日子（入口卡、管理页、选择删除、编辑弹窗）', secs: ['日子（倒数日）', '入口卡显示条数（可配置）', '记账页的入口卡', '管理页', '日子管理弹窗', '选择模式（批量删除）', '编辑/添加弹窗'], names: [] },
-  { key: 'cats', layer: 4, entry: 'JiwenCats', file: 'app/cats.js', what: '分类管理（列表、拖动排序、改名、删除、设预算）', secs: ['分类长按拖动排序（pointer/touch 手写，避免 WebView 原生 draggable 不稳）'], names: ['openCatManager', 'openCatActions', 'attachCatDrag', 'showCatErr'] },
   { key: 'settings', layer: 5, entry: 'JiwenSettings', file: 'app/settings.js', what: '设置页、外观、存储用量', secs: ['外观：主题色（全局，所有账号共用，存 localStorage）'], names: ['renderStorageUse', '__storageSeq', 'STORAGE_WARN', 'refreshArchiveSelect'] },
   { key: 'tabs', layer: 5, entry: 'JiwenTabs', file: 'app/tabs.js', what: '外壳：页签切换、进账号（enterAccount）、历史脏数据自检、进日子管理页 / 回来、刷新所有页面、被杀回来、首屏快照（老入口 window.snapSave / snapDrop 留着）', secs: ['底部标签切换', '1019-F：切到后台被系统杀掉，回来看不出来', '1019-U：首屏快照'], names: ['gotoDaysPage', 'backFromDaysPage', 'refreshAllViews', 'refreshCatSelectors', 'enterAccount', 'runTimeRepairOnce', 'scanAndRepairStore'] },
   { key: 'login', layer: 5, entry: 'JiwenLogin', file: 'app/login.js', what: '登录页：账号列表、新建账号、从文件导入存档、登录（login）', secs: ['登录页：从文件导入存档（先选文件，再指定要导入到哪个账号）', '登录页：账号列表'], names: ['promptNewAccount', 'login'] },
@@ -45,6 +45,10 @@ const BIND = [
   ["askInput.addEventListener('focus', ()=>{ if(askInput.dataset.kp", 'ask'],
   ["$('askList').addEventListener('click', e=>{", 'stats'],                       // AI 标记列表点一行开详情
   ["(function(){\n            const kw=$('searchKeyword')", 'ledger'],           // 筛选浮层里的控件
+  ["$('manageCatSetting').addEventListener('click', openCatManager);", 'settings'],   // 设置页「管理账单分类」
+  ["$('daysManageBtn').addEventListener('click', gotoDaysPage);", 'tabs'],         // 进日子管理页 / 回来（外壳管页面切换）
+  ["$('daysBack').addEventListener('click', backFromDaysPage);", 'tabs'],
+  ["window.JiwenImportNext={", 'tabs'],                                             // 导入结果页「接下来可以」：去统计 / 设预算 / 期初余额，跨几个页面
 ];
 
 // 主程序以外直接用的老入口（import/、测试、原生层以外的页面代码按名字找），搬完也要留在 window 上
@@ -57,6 +61,8 @@ const CALLBACKS = {
   'store → tabs': ['snapDrop', 'refreshAllViews', 'refreshCatSelectors'],   // 后两个：JiwenImportStore 写完导入 / 撤销后刷新页面（1019-Z4-M5 搬存储时数出来的）
   'store → ask': ['customAlert'],
   'cats → tabs': ['refreshCatSelectors', 'refreshAllViews'],
+  'cats → stats': ['renderStats'],   // 设好预算后刷新统计页（1019-Z4-M8 调先后时数出来的）
+  'settings → tabs': ['snapDrop'],   // 换主题、改默认进入页面后删首屏快照（同上）
   'ledger → tabs': ['refreshAllViews'],
   'forms → tabs': ['refreshAllViews'],
   'stats → tabs': ['refreshAllViews'],

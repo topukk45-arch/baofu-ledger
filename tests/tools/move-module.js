@@ -95,7 +95,8 @@ function run(key, opt) {
   others.forEach(b => { const r = D.freeRefs(S.parse(b.text)); [...r.reads, ...r.writes].forEach(n => { if (defs.has(n)) outside.add(n); }); });
   const writesOut = [];
   body.forEach(st => { if (pickStart.has(st.start)) return; const r = D.freeRefs(st); [...r.writes].forEach(n => { if (defs.has(n)) writesOut.push(n); }); });
-  if (writesOut.length) throw new Error('别处给这块的变量赋值，不能只取一份：' + [...new Set(writesOut)].join('、'));
+  // 别处给这块的变量赋值的：入口上给读写口（get / set），别处读写的地方都改成「入口.名字」
+  const setters = [...new Set(writesOut)];
   const testUse = testNames(path.join(ROOT, 'tests'), defs);
   const exportsList = [...defs].filter(n => outside.has(n) || testUse.has(n)).sort();
   // 对外的名字里，有 let / var 而且这块自己后来又给它赋值的：别处取的那一份会过时，不能这样搬
@@ -104,7 +105,9 @@ function run(key, opt) {
   pick.forEach(st => { const r = D.freeRefs(st.type === 'VariableDeclaration' ? { type: 'Program', body: st.declarations.map(d => d.init).filter(Boolean).map(e => ({ type: 'ExpressionStatement', expression: e })) } : st); [...r.writes].forEach(n => { if (mutable.has(n)) reassigned.add(n); }); });
   const stale = exportsList.filter(n => mutable.has(n) && reassigned.has(n));
   // 会变的变量：入口上给一个只读口（get 名字(){ return 名字; }），别处读的地方改成「入口.名字」（只读不写，上面查过没人在外面写）
-  const getters = stale;
+  setters.forEach(n => { if (!exportsList.includes(n)) exportsList.push(n); });
+  exportsList.sort();
+  const getters = [...new Set(stale.concat(setters))];
   // 这块用到前面模块的名字（模块文件里取一行）
   const imports = {};
   pick.forEach(st => { const r = D.freeRefs(st); [...r.reads, ...r.writes].forEach(n => { if (defs.has(n)) return; if (STATE.has(n)) return; const o = P.nameMod.get(n); if (o && o !== key && order[o] < order[key] && fs.existsSync(path.join(WWW, PL.MODULES[order[o]].file))) (imports[o] = imports[o] || new Set()).add(n); }); });
@@ -113,7 +116,7 @@ function run(key, opt) {
   let out = '(function(){\n';
   Object.keys(imports).sort((x, y) => order[x] - order[y]).forEach(o => { out += `${IND}const { ${[...imports[o]].sort().join(', ')} } = window.${PL.MODULES[order[o]].entry};   // 用到前面模块的\n`; });
   chunks.forEach(c => { out += RAW.slice(c.a, c.z); });
-  out += `${IND}window.${mod.entry} = { ${exportsList.map(n => getters.includes(n) ? `get ${n}(){ return ${n}; }` : n).join(', ')} };   // ${mod.key} 模块对外只有这一个入口${getters.length ? '（get 的是会变的，读的时候才取）' : ''}\n})();\n`;
+  out += `${IND}window.${mod.entry} = { ${exportsList.map(n => setters.includes(n) ? `get ${n}(){ return ${n}; }, set ${n}(v){ ${n}=v; }` : getters.includes(n) ? `get ${n}(){ return ${n}; }` : n).join(', ')} };   // ${mod.key} 模块对外只有这一个入口${getters.length ? '（get / set 的是会变的变量，读写的时候才去取）' : ''}\n})();\n`;
   // 旧文件剪掉这几块
   const newLegacy = legacy.map(b => {
     let t = '', at = b.start;
@@ -135,6 +138,7 @@ function run(key, opt) {
     });
     const declared = newLegacy.some(b => new RegExp(`(let|const|var|function)\\s+(${getters.join('|')})\\b|\\((${getters.join('|')})[,)]`).test(b.text));
     if (declared) throw new Error('旧文件里有同名的局部变量，不能直接按名字改：' + getters.join('、'));
+    if (/\+\+|--/.test(getterSites.join('\n'))) throw new Error('读写口的地方有 ++ / --，要手动看：' + getterSites.join(' | '));
   }
   const refLine2 = legacyUses.size ? `${IND}const { ${[...legacyUses].sort().join(', ')} } = window.${mod.entry};   // 旧代码引用表：${mod.key} 已搬进 ${mod.file}，旧文件都搬完时删掉\n` : '';
   { let at = 0, mm; while ((mm = ALIAS_LINE.exec(first.text.slice(at, at + 4000)))) at += mm[0].length; first.text = first.text.slice(0, at) + refLine2 + first.text.slice(at); }
@@ -146,7 +150,7 @@ function run(key, opt) {
   const m = firstTag.exec(html);
   if (!m) throw new Error('index.html 里找不到 ' + first.file);
   html = html.replace(firstTag, `${m[1]}<script src="${mod.file}?v=${ver}"></script>\n${m[0]}`);
-  const report = { getters, getterSites, key, entry: mod.entry, file: mod.file, stmts: pick.length, lines: out.split('\n').length, exports: exportsList, legacyRefs: [...legacyUses].sort(), imports: Object.fromEntries(Object.entries(imports).map(([k, v]) => [k, [...v]])), testUse: [...testUse].sort() };
+  const report = { getters, setters, getterSites, key, entry: mod.entry, file: mod.file, stmts: pick.length, lines: out.split('\n').length, exports: exportsList, legacyRefs: [...legacyUses].sort(), imports: Object.fromEntries(Object.entries(imports).map(([k, v]) => [k, [...v]])), testUse: [...testUse].sort() };
   if (opt.dry) return report;
   fs.writeFileSync(path.join(WWW, mod.file), out);
   newLegacy.forEach(b => fs.writeFileSync(path.join(WWW, b.file), b.text));

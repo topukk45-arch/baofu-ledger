@@ -53,14 +53,15 @@ const namesOf = p => !p ? [] : p.type === 'Identifier' ? [p.name] : p.type === '
         const o = s.expression.right;
         // { 名字, … }；会变的变量写成 get 名字(){ return 名字; }（只读口）
         const isGetter = p => p.kind === 'get' && !p.computed && p.value.body.body.length === 1 && p.value.body.body[0].type === 'ReturnStatement' && p.value.body.body[0].argument && p.value.body.body[0].argument.type === 'Identifier' && p.value.body.body[0].argument.name === p.key.name;
-        if (o.type === 'ObjectExpression' && o.properties.every(p => p.shorthand || isGetter(p))) entryKeys = o.properties.map(p => p.key.name);
+        const isSetter = p => p.kind === 'set' && !p.computed && p.value.params.length === 1 && p.value.body.body.length === 1 && p.value.body.body[0].type === 'ExpressionStatement' && p.value.body.body[0].expression.type === 'AssignmentExpression' && p.value.body.body[0].expression.left.name === p.key.name && p.value.body.body[0].expression.right.name === p.value.params[0].name;
+        if (o.type === 'ObjectExpression' && o.properties.every(p => p.shorthand || isGetter(p) || isSetter(p))) entryKeys = [...new Set(o.properties.map(p => p.key.name))];
       }
     });
     // 2
     const r = D.freeRefs(st);
     const winBad = [...r.winSet].filter(n => n !== m.entry && !PL.LEGACY.includes(n));
     ok(winBad.length === 0, `2 ${m.file}：挂到 window 上的只有入口 ${m.entry} 和老入口：多了 ${winBad.join('、')}`);
-    ok(entryCount === 1 && entryKeys && entryKeys.every(k => own.has(k)), `2 ${m.file}：入口只挂一次、写成 { 名字, … }（会变的写成 get 名字(){ return 名字; }）、都是自己定义的`);
+    ok(entryCount === 1 && entryKeys && entryKeys.every(k => own.has(k)), `2 ${m.file}：入口只挂一次、写成 { 名字, … }（会变的写成 get 名字(){ return 名字; }，别处会改的再加 set 名字(v){ 名字=v; }）、都是自己定义的`);
     // 3
     const entryOf = Object.fromEntries(PL.MODULES.map(x => [x.entry, x.key]));
     const badImp = Object.keys(imports).filter(e => !(order[entryOf[e]] < order[m.key]));
