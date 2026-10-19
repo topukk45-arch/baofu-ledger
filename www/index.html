@@ -799,13 +799,10 @@
             font-size:32px; line-height:48px; border:none; border-bottom:2px solid var(--c-primary); border-radius:0; background:transparent; }
         .io-chips.io-mini { flex:none; gap:8px; margin:0; }
         .io-chips.io-mini .cc { flex:none; min-width:56px; height:var(--ui-tap); padding:0 12px; line-height:46px; font-size:14px; margin:0; }
-        .rec-more { margin-bottom:6px; }
-        .rec-more-btn { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); padding:0 4px;
-            background:none; border:none; border-top:1px dashed var(--c-border); color:var(--c-text); font-size:14px; font-family:inherit; cursor:pointer; text-align:left; }
-        .rec-more-val { flex:1; color:var(--c-text-soft); font-size:13px; }
-        .rec-more-arrow { transition:transform .15s; }
-        .rec-more-btn[aria-expanded="true"] .rec-more-arrow { transform:rotate(90deg); }
-        .rec-more-body { padding-top:4px; }
+        /* 1019-Z：统计口径一行三个小按钮（计入 / 只算结余 / 不计入），说明只在不是「计入」时显示 */
+        .mode-chips.mode-mini { display:flex; gap:8px; flex-wrap:nowrap; margin:0; }
+        .mode-chips.mode-mini .cc { flex:1 1 0; min-width:0; margin:0; padding:0 6px; height:var(--ui-tap); line-height:46px; font-size:14px; text-align:center; white-space:nowrap; }
+        .rec-mode .skip-hint { margin-top:6px; }
         .edit-dialog textarea.rec-remark { margin:4px 0 0; min-height:var(--ui-tap); height:var(--ui-tap); padding:12px 10px; line-height:22px;
             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; resize:none; }
         .rec-form .tpl-save-btn { margin-top:8px; }
@@ -1530,7 +1527,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Y</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-Z</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -1920,13 +1917,11 @@
                     <div class="cat-chips" id="billCatChips"></div>
                     <select id="billCat" style="display:none"></select>
                 </div>
-                <div class="field rec-more">
-                    <button type="button" class="rec-more-btn" id="billMoreBtn" aria-expanded="false"><span>更多</span><span class="rec-more-val" id="billMoreVal">统计口径：计入</span><span class="rec-more-arrow" aria-hidden="true">›</span></button>
-                    <div class="rec-more-body" id="billMoreBody" hidden>
-                        <label class="field-label">统计口径</label>
-                        <div class="cat-chips mode-chips" id="billMode"></div>
-                        <div class="skip-hint" id="billModeHint"></div>
-                    </div>
+                <!-- 1019-Z：统计口径不再收进「更多」：一行三个小按钮，说明只在不是「计入」时显示 -->
+                <div class="field rec-mode">
+                    <label class="field-label">统计口径</label>
+                    <div class="cat-chips mode-chips mode-mini" id="billMode"></div>
+                    <div class="skip-hint" id="billModeHint"></div>
                 </div>
                 <div class="field">
                     <label class="field-label">备注</label>
@@ -1963,13 +1958,10 @@
                     <div class="cat-chips" id="editCatChips"></div>
                     <select id="editCat" style="display:none"></select>
                 </div>
-                <div class="field rec-more lock-on-refund">
-                    <button type="button" class="rec-more-btn" id="editMoreBtn" aria-expanded="false"><span>更多</span><span class="rec-more-val" id="editMoreVal">统计口径：计入</span><span class="rec-more-arrow" aria-hidden="true">›</span></button>
-                    <div class="rec-more-body" id="editMoreBody" hidden>
-                        <label class="field-label">统计口径</label>
-                        <div class="cat-chips mode-chips" id="editMode"></div>
-                        <div class="skip-hint" id="editModeHint"></div>
-                    </div>
+                <div class="field rec-mode lock-on-refund">
+                    <label class="field-label">统计口径</label>
+                    <div class="cat-chips mode-chips mode-mini" id="editMode"></div>
+                    <div class="skip-hint" id="editModeHint"></div>
                 </div>
                 <div class="field">
                     <label class="field-label">备注</label>
@@ -9186,33 +9178,14 @@ ${detail}
         function paintModeChips(box){
             const cur=box.dataset.mode||'normal';
             box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===cur));
-            const hint=$(box.id+'Hint'); if(hint) hint.textContent=MODE_HINT[cur];
-            recMorePaint(box, cur!=='normal' ? true : null);
+            const hint=$(box.id+'Hint'); if(hint){ hint.textContent=MODE_HINT[cur]; if(box.classList.contains('mode-mini')) hint.style.display = cur==='normal' ? 'none' : ''; }   // 1019-Z：一行小按钮的，计入时不写说明
         }
         function setModeChips(box, mode){
             if(!box) return;
             box.dataset.mode = (mode==='flow'||mode==='skip') ? mode : 'normal';
             delete box.dataset.auto;
             paintModeChips(box);
-            recMorePaint(box, box.dataset.mode!=='normal');   // 打开 / 换一条时：是「计入」就收着，不是就展开
         }
-        // 1019-Q：记一笔 / 修改的统计口径收进「更多」：那一行写现在的口径；不是「计入」时自动展开（自己点开的不自动收）
-        function recMorePaint(box, open){
-            const pre = box && box.id==='billMode' ? 'bill' : box && box.id==='editMode' ? 'edit' : '';
-            if(!pre) return;
-            const btn=$(pre+'MoreBtn'), body=$(pre+'MoreBody'), val=$(pre+'MoreVal');
-            if(!btn) return;
-            const o=MODE_OPTS.find(x=>x.v===(box.dataset.mode||'normal'));
-            val.textContent='统计口径：'+(o?o.t:'计入');
-            if(open!=null){ body.hidden=!open; btn.setAttribute('aria-expanded', open?'true':'false'); }
-        }
-        ['bill','edit'].forEach(pre=>{
-            const btn=$(pre+'MoreBtn'); if(!btn) return;
-            btn.addEventListener('click', ()=>{
-                const open=$(pre+'MoreBody').hidden;
-                $(pre+'MoreBody').hidden=!open; btn.setAttribute('aria-expanded', open?'true':'false');
-            });
-        });
         function getModeChips(box){ return (box && box.dataset.mode) || 'normal'; }
         function autoModeOnCat(box, prev, next){
             if(!box || prev===next) return;

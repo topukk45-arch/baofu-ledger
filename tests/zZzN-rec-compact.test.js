@@ -1,6 +1,6 @@
 // 1019-R 记一笔 / 修改账单排紧（jsdom，记录全是虚构的）。node zZzN-rec-compact.test.js [index.html]
 // 金额一行在最上面（大字 + 旁边小的「支出 / 收入」），记账时间一行小字（「今天 11:21 ›」，点了弹日期时间选择），
-// 分类照旧是圆角块，统计口径收进「更多」（不是「计入」时自动展开），备注一行（点了弹文字输入小面板），保存贴在面板底边。
+// 分类照旧是圆角块，统计口径一行三个小按钮（1019-Z 起不再收进「更多」，说明只在不是「计入」时显示），备注一行（点了弹文字输入小面板），保存贴在面板底边。
 // 只改排法：记的内容、收支必选、口径规则都不变。412×970 一屏放得下在 tests 外用真 Chromium 截图量（见提交说明）。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
@@ -23,9 +23,9 @@ const recs = [
   const after = (a, b) => !!($(a).compareDocumentPosition($(b)) & 4);
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
 
-  // 1. 排法：时间一行小字 → 金额一行（¥ + 大字 + 小的收支）→ 分类 → 更多 → 备注；保存在底部那排、主按钮在上
+  // 1. 排法：时间一行小字 → 金额一行（¥ + 大字 + 小的收支）→ 分类 → 统计口径 → 备注；保存在底部那排、主按钮在上
   $('fabAdd').click(); await wait(320); w.kpClose();
-  ok(after('billTimeLine', 'billMoney') && after('billMoney', 'billCatChips') && after('billCatChips', 'billMoreBtn') && after('billMoreBtn', 'billRemark'), '1 时间 → 金额 → 分类 → 更多 → 备注');
+  ok(after('billTimeLine', 'billMoney') && after('billMoney', 'billCatChips') && after('billCatChips', 'billMode') && after('billMode', 'billRemark') && !$('billMoreBtn'), '1 时间 → 金额 → 分类 → 统计口径 → 备注（没有「更多」）');
   const row = $('billMoney').closest('.rec-money-row');
   ok(row && row.contains($('billTypeChips')) && $('billTypeChips').classList.contains('io-mini'), '1 收支是金额旁边一个小切换（同一行）');
   ok([...$('billTypeChips').children].map(c => c.textContent).join() === '支出,收入' && !$('billTypeChips').querySelector('.sel-out,.sel-in'), '1 收支照旧不默认选中');
@@ -51,20 +51,19 @@ const recs = [
   ok(shown('dtMask'), '2 点时间那一行：弹日期时间选择');
   w.closeDtPicker && w.closeDtPicker(); if (shown('dtMask')) $('dtMask').style.display = 'none';
 
-  // 3. 统计口径收在「更多」里：默认收着、写现在的口径；点开能改；选了不是「计入」的分类自动变「不计入」并展开
-  ok($('billMoreBody').hidden && $('billMoreVal').textContent === '统计口径：计入', '3 默认收着，写「统计口径：计入」');
-  $('billMoreBtn').click();
-  ok(!$('billMoreBody').hidden && $('billMoreBtn').getAttribute('aria-expanded') === 'true', '3 点「更多」展开');
+  // 3. 1019-Z：统计口径一行三个小按钮，直接看得见；说明只在不是「计入」时显示；选了信用卡还款这类分类照旧自动变「不计入」
+  const modes = () => [...$('billMode').children].map(c => c.textContent).join();
+  const hintShown = id => $(id + 'Hint').style.display !== 'none';
+  ok(modes() === '计入,只算结余,不计入' && $('billMode').classList.contains('mode-mini') && $('billMode').querySelector('.cc.sel').dataset.v === 'normal', '3 一行三个：计入 / 只算结余 / 不计入，默认计入');
+  ok(!hintShown('billMode'), '3 计入时不写说明');
   [...$('billMode').children].find(c => c.dataset.v === 'flow').click();
-  ok($('billMoreVal').textContent === '统计口径：只算结余', '3 改了口径，那一行跟着写');
-  $('billMoreBtn').click();
-  ok($('billMoreBody').hidden, '3 再点收起（口径还是只算结余）');
+  ok(hintShown('billMode') && /资金往来/.test($('billModeHint').textContent), '3 点「只算结余」：说明出来');
   w.resetBillForm();
-  ok($('billMoreBody').hidden && $('billMoreVal').textContent === '统计口径：计入', '3 重新开一笔：回到计入、收着');
+  ok($('billMode').querySelector('.cc.sel').dataset.v === 'normal' && !hintShown('billMode'), '3 重新开一笔：回到计入、说明收起');
   w.setModeChips($('billMode'), 'skip');
-  ok(!$('billMoreBody').hidden && $('billMoreVal').textContent === '统计口径：不计入', '3 不是「计入」（模板、草稿带来的）：自动展开');
+  ok(hintShown('billMode') && /重复记录/.test($('billModeHint').textContent), '3 不是「计入」（模板、草稿带来的）：说明照样写');
   w.setModeChips($('billMode'), 'normal');
-  ok($('billMoreBody').hidden, '3 换回计入：收起');
+  ok(!hintShown('billMode'), '3 换回计入：说明收起');
 
   // 4. 照旧记得进去：选收支、分类、填金额，点保存
   $('billMoney').value = '26.5';
@@ -85,13 +84,13 @@ const recs = [
   w.openEdit('r2'); await t.idle();
   ok(after('editTimeLine', 'editMoney') && $('editMoney').closest('.rec-money-row').contains($('editTypeChips')), '5 修改：时间一行、金额旁边收支');
   ok($('editTimeTxt').textContent === '2025年3月5日 08:07' || $('editTimeTxt').textContent.endsWith('3月5日 08:07'), '5 修改：时间小字 ' + $('editTimeTxt').textContent);
-  ok(!$('editMoreBody').hidden && $('editMoreVal').textContent === '统计口径：只算结余', '5 只算结余的记录：「更多」自动展开');
+  ok($('editMode').querySelector('.cc.sel').dataset.v === 'flow' && hintShown('editMode'), '5 只算结余的记录：选中「只算结余」、写说明');
   const ef = $('saveEdit').parentElement;
   ok(ef.classList.contains('rec-foot') && ef.firstElementChild === $('saveEdit') && ef.lastElementChild === $('cancelEdit'), '5 底部「保存」在上、「取消」在最下');
   ok(!ef.contains($('deleteInEdit')) && !ef.contains($('editRefundBtn')) && !ef.contains($('editSaveTpl')), '5 退款 / 存为常用 / 删除挪进内容里');
   $('cancelEdit').click(); await wait(300);
   w.openEdit('r1'); await t.idle();
-  ok($('editMoreBody').hidden && $('editMoreVal').textContent === '统计口径：计入', '5 计入的记录：收着');
+  ok($('editMode').querySelector('.cc.sel').dataset.v === 'normal' && !hintShown('editMode'), '5 计入的记录：选中「计入」、不写说明');
   $('cancelEdit').click();
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
