@@ -1430,7 +1430,7 @@
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-E</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1019-F</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -5549,7 +5549,13 @@
             renderBill();
             renderDaysCard();             // 「日子」入口卡（数据独立于存档，跟账号走）
             ledgerScrollY=0;              // 1017-F：换了账号，账单页从顶上开始
-            switchTab(getDefaultTab());   // 按用户设置进入默认页（默认记账）
+            // 1019-F：打开 App 自动登录、上次是被系统关掉的（离开不到 RESUME_MAX_MS）：回到上次的页签、账单页第几页、滚到哪
+            const rs=window.__autoLogin ? resumeTake(id) : null;
+            window.__autoLogin=false;
+            if(rs && rs.tab==='ledger' && rs.page>1){ curPage=rs.page; renderBill(); }
+            if(rs && rs.tab==='ledger'){ ledgerScrollY=rs.y||0; currentTab=''; }   // currentTab 先清掉：switchTab 开头记滚动位置那一步别把它冲成 0
+            switchTab(rs ? rs.tab : getDefaultTab());   // 按用户设置进入默认页（默认记账）
+            if(rs) setTimeout(()=>formDraftRestore(id), 0);
             // 历史脏数据自检（每个账号只跑一次）。放在最后：此时界面已就绪，
             // 修复函数内部可以直接刷新视图并弹出如实告知的提示。
             trackBusy(runTimeRepairOnce(id));
@@ -9805,6 +9811,75 @@ ${detail}
                 }
             }).catch(()=>{ if(my===__storageSeq){ const b=$('storageUse'); if(b) b.remove(); } });
         }
+        // ===== 1019-F：切到后台被系统杀掉，回来看不出来 =====
+        //   切到后台（visibilitychange hidden / pagehide / 原生 pause）时，把停在哪个页签、账单页第几页、滚到哪，
+        //   和记一笔 / 修改账单填到一半的（和打开时比变了才算）存在这台手机的 localStorage（不进备份）；
+        //   下次打开 App 自动登录、离开不到 RESUME_MAX_MS（2 小时）就直接回去，填到一半的重新打开接着填。
+        //   正常回到前台（没被杀）什么都不用做。表单关掉（保存、取消、放弃）就把它的草稿删掉。
+        const RESUME_MAX_MS=2*3600*1000;
+        const resumeKey=id=>'app_resume_'+id, formDraftKey=id=>'app_formdraft_'+id;
+        function resumeSave(){
+            if(!currentUser || $('mainBox').style.display!=='block') return;
+            saveLedgerScroll();
+            try{ localStorage.setItem(resumeKey(currentUser), JSON.stringify({ tab:currentTab, page:curPage, y:ledgerScrollY, archive:currentArchive, at:Date.now() })); }catch(_){}
+            try{
+                const f=formDraftNow();
+                if(f) localStorage.setItem(formDraftKey(currentUser), JSON.stringify(Object.assign(f, { archive:currentArchive, at:Date.now() })));
+                else localStorage.removeItem(formDraftKey(currentUser));
+            }catch(_){}
+        }
+        function resumeTake(id){
+            let r=null;
+            try{ r=JSON.parse(localStorage.getItem(resumeKey(id))||'null'); }catch(_){ r=null; }
+            if(!r || !(Date.now()-r.at < RESUME_MAX_MS) || r.archive!==currentArchive) return null;
+            if(['ledger','stats','settings'].indexOf(r.tab)<0) return null;
+            const pages=Math.max(1, Math.ceil(getUserData().length/PAGE_SIZE));
+            return { tab:r.tab, page:Math.min(Math.max(1, Math.floor(r.page)||1), pages), y:Math.max(0, +r.y||0) };
+        }
+        // 记一笔 / 修改账单开着、填过东西：记下填了什么
+        function formDraftNow(){
+            if($('addMask').style.display==='flex' && window.__formDirty && window.__formDirty('addMask'))
+                return { kind:'add', v:{ time:getDtInput(billTime), money:billMoney.value, cat:billCatSel, type:billTypeSel, mode:getModeChips($('billMode')), remark:billRemark.value } };
+            if(editMask.style.display==='flex' && editId!=null && window.__formDirty && window.__formDirty('editMask'))
+                return { kind:'edit', id:editId, v:{ time:getDtInput(editTime), money:editMoney.value, cat:editCatSel, type:editTypeSel, mode:getModeChips($('editMode')), remark:editRemark.value } };
+            return null;
+        }
+        function formDraftRestore(id){
+            let f=null;
+            try{ f=JSON.parse(localStorage.getItem(formDraftKey(id))||'null'); }catch(_){ f=null; }
+            if(!f || !(Date.now()-f.at < RESUME_MAX_MS) || f.archive!==currentArchive || !f.v) return;
+            const v=f.v, cats=getCats();
+            if(f.kind==='add'){
+                if(currentTab!=='ledger') return;
+                openAddModal();
+                const blank=formState('addMask');
+                if(v.time) setDtInput(billTime, v.time);
+                billMoney.value=v.money||'';
+                const cc=[...$('billCatChips').children].find(c=>c.textContent===v.cat && cats.includes(v.cat)); if(cc) cc.click();
+                const tc=[...$('billTypeChips').children].find(c=>c.textContent===(v.type==='expense'?'支出':v.type==='income'?'收入':'')); if(tc) tc.click();
+                if(v.mode) setModeChips($('billMode'), v.mode);
+                billRemark.value=v.remark||'';
+                Promise.resolve().then(()=>{ formSnaps.addMask=blank; });   // 恢复出来的算「填过」，关的时候照样问
+            } else if(f.kind==='edit'){
+                const rec=getUserData().find(r=>r.id===f.id);
+                if(!rec) return;
+                window.openEdit(f.id);
+                if(editMask.style.display!=='flex') return;
+                const blank=formState('editMask');
+                if(v.time) setDtInput(editTime, v.time);
+                editMoney.value=v.money||'';
+                if(!rec.refundOf){   // 退款记录的分类 / 收支 / 口径跟着原账单，不动
+                    renderEditCatChips(cats.includes(v.cat) ? v.cat : '');
+                    renderEditTypeChips(v.type);
+                    if(v.mode) setModeChips($('editMode'), v.mode);
+                }
+                editRemark.value=v.remark||'';
+                Promise.resolve().then(()=>{ formSnaps.editMask=blank; });
+            }
+        }
+        document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') resumeSave(); });
+        window.addEventListener('pagehide', ()=>resumeSave());
+        try{ const cap=window.Capacitor; if(cap && cap.Plugins && cap.Plugins.App && cap.Plugins.App.addListener) cap.Plugins.App.addListener('pause', ()=>resumeSave()); }catch(_){}
         // 1017-F：离开账单页时记下滚到哪了，回来放回原处（以前切回来先回到顶上，安卓上还会再自己往下滑一段，看着跳一下）
         let ledgerScrollY=0;
         function saveLedgerScroll(){
@@ -10963,7 +11038,7 @@ ${detail}
                 new MutationObserver(()=>{
                     const now=m.style.display;
                     if(now==='flex' && was!=='flex') formSnaps[id]=formState(id);
-                    if(now!=='flex') delete formSnaps[id];
+                    if(now!=='flex'){ delete formSnaps[id]; if(was==='flex' && currentUser) try{ localStorage.removeItem('app_formdraft_'+currentUser); }catch(_){} }   // 1019-F：关掉了，填到一半的草稿不要了
                     was=now;
                 }).observe(m, { attributes:true, attributeFilter:['style'] });
             }
@@ -11379,6 +11454,7 @@ ${detail}
                 const rememberedAcc=remembered ? accountById(remembered) : null;
                 // 记住的账号自己已经整理好了，就照常自动进入（别的账号没整理完不影响它）
                 if(rememberedAcc && typeof rememberedAcc.legacy!=='string' && !__ledgerPending.has(remembered) && ledgerExists(remembered)){
+                    window.__autoLogin=true;   // 1019-F：只有打开 App 时的自动登录才接着上次被关掉前的样子
                     await login(remembered);   // 自动登录，按设置进入默认页
                 } else {
                     // 没整理完时先留着，下次整理完还能自动进入
