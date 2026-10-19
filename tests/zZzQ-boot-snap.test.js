@@ -127,9 +127,9 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   }
 
   // 7. 屏幕上的不是打开时会看到的：不存
-  t.w.goPage(1, 'top'); await hide(t);
+  t.w.JiwenLedger.goPage(1, 'top'); await hide(t);
   ok(!snap(t), '7 翻到第 2 页（打开时是第 1 页）：不存');
-  t.w.goPage(-1, 'top');
+  t.w.JiwenLedger.goPage(-1, 'top');
   t.$('filterFab').click(); t.$('searchKeyword').value = '虚构1'; t.$('sheetApply').click(); await t.idle();
   ok(t.w.__filterActive(), '7 筛选生效了');
   await hide(t);
@@ -138,7 +138,7 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   ok(!t.w.__filterActive(), '7 清掉筛选');
   // 「上次停留」：照原来的页码和位置存
   t.w.localStorage.setItem('app_default_tab', 'last');
-  t.w.goPage(1, 'top'); await hide(t);
+  t.w.JiwenLedger.goPage(1, 'top'); await hide(t);
   ok(snap(t) && snap(t).pref === 'last' && snap(t).page === 2, '7 选了「上次停留」：第 2 页也存（打开时回到这一页）');
 
   // 8. 快照不进导出的备份

@@ -48,7 +48,7 @@ const tab = (t, n) => t.d.querySelector('.tab-btn[data-tab="' + n + '"]').click(
 
   // 2. 账单页第 3 页、滚到 1200 → 被杀 → 回来第 3 页、放回 1200
   tab(t, 'ledger');
-  t.w.goPage(1, 'top'); t.w.goPage(1, 'top');
+  t.w.JiwenLedger.goPage(1, 'top'); t.w.JiwenLedger.goPage(1, 'top');
   const pg = t => t.$('pager').querySelector('.page-info').textContent;
   ok(/^第 ?3 ?页|^3 ?\//.test(pg(t)) || /3/.test(pg(t).split('/')[0]), '2 翻到第 3 页：' + pg(t));
   t.w.__y = 1200;

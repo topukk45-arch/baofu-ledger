@@ -12,7 +12,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
 let seq = 0;
 const file = (to) => [['微信.csv', B.bill('wechat', [B.txn({ time: { y: 2026, mo: 10, d: 3, h: 12, mi: 0, s: 0 }, kind: '商户消费', cp: '某虚构店', desc: '书', io: 'expense', fen: 1000 + (++seq), pm: '零钱', status: '支付成功', mno: '', no: '4200000000' + String(seq).padStart(19, '0') })], { range: { from: '2026-10-01 00:00:00', to } }).bytes]];
 const settle = async t => { await t.idle(); await new Promise(r => setTimeout(r, 20)); await t.idle(); };
-const ledger = async t => { t.d.querySelector('.tab-btn[data-tab="ledger"]').click(); t.w.eval('renderBill')(); await settle(t); };
+const ledger = async t => { t.d.querySelector('.tab-btn[data-tab="ledger"]').click(); t.w.eval('JiwenLedger.renderBill')(); await settle(t); };
 
 (async () => {
   {

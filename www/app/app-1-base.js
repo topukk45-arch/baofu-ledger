@@ -9,19 +9,11 @@
         const { askImportOtherDays, importDaysSuffix, importFixSuffix, openAiExport } = window.JiwenAiExport;   // 旧代码引用表：ai 已搬进 app/ai-export.js，旧文件都搬完时删掉
         const { DEV_IMPORT_KEY, devImportOn, impOpenFile, loadImportUI, renderDevImport, scrollChipIntoView } = window.JiwenImportEntry;   // 旧代码引用表：impentry 已搬进 app/import-entry.js，旧文件都搬完时删掉
         const { closeEditModal, closeRefund, closeTplEditor, formSnaps, formState, getModeChips, openAddModal, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, setModeChips } = window.JiwenForms;   // 旧代码引用表：forms 已搬进 app/forms.js，旧文件都搬完时删掉
+        const { clearAllFilters, renderBill, renderFilterChips, resetSearch } = window.JiwenLedger;   // 旧代码引用表：ledger 已搬进 app/ledger.js，旧文件都搬完时删掉
 
 
         let currentUser = '';
         let currentArchive = '';
         let currentTab = 'ledger';
         let curPage = 1;
-        // 账单表事件委托：备注查看 / 修改。用 data-act + data-id 取代内联 onclick，
-        // 既杜绝把记录 id 拼进 HTML 属性的注入隐患，也避免每行绑定监听。
-        billList.addEventListener('click', e => {
-            const el = e.target.closest('[data-act]');
-            if(!el || !billList.contains(el)) return;
-            const id = el.dataset.id;
-            if(el.dataset.act==='remark'){ window.viewRemark && window.viewRemark(id); }
-            else if(el.dataset.act==='edit'){ window.openEdit && window.openEdit(id); }
-        });
 

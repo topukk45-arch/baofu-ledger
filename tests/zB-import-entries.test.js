@@ -44,9 +44,9 @@ async function newAccount(t, name) {
     ok(!t2.ask(), '1 重开 App 不再问');
     // 记到 5 条：入口消失
     const id = t.w.eval('currentUser');
-    await (async () => { const s = t.w.JiwenStore.loadStore(id); const a = Object.values(s.archives)[0]; a.records = [1, 2, 3, 4].map(i => man('r' + i, i)); t.w.JiwenStore.saveStore(s, id); t.w.eval('renderBill')(); await t.idle(); })();
+    await (async () => { const s = t.w.JiwenStore.loadStore(id); const a = Object.values(s.archives)[0]; a.records = [1, 2, 3, 4].map(i => man('r' + i, i)); t.w.JiwenStore.saveStore(s, id); t.w.eval('JiwenLedger.renderBill')(); await t.idle(); })();
     ok(!!t.$('impEmptyEntry'), '2 4 条：入口还在');
-    await (async () => { const s = t.w.JiwenStore.loadStore(id); const a = Object.values(s.archives)[0]; a.records = [1, 2, 3, 4, 5].map(i => man('r' + i, i)); t.w.JiwenStore.saveStore(s, id); t.w.eval('renderBill')(); await t.idle(); })();
+    await (async () => { const s = t.w.JiwenStore.loadStore(id); const a = Object.values(s.archives)[0]; a.records = [1, 2, 3, 4, 5].map(i => man('r' + i, i)); t.w.JiwenStore.saveStore(s, id); t.w.eval('JiwenLedger.renderBill')(); await t.idle(); })();
     ok(!t.$('impEmptyEntry'), '2 记到 5 条：入口消失');
     // 从零开始记：不打开导入页
     await newAccount(t, '小刚');

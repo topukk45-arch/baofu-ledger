@@ -524,38 +524,6 @@
             renderFilterChips();
             if(window.syncFilterFab) window.syncFilterFab();
         }
-
-        // 渲染筛选分类标签：「全部」固定第一个，其后按存档 cats 顺序。
-        // 草稿模式：点击只更新草稿分类 draftCat + 切换高亮，不提交、不刷新列表；
-        //   要点 sheet 的「完成」才会把 draftCat 提交进 filterCat 并筛选。
-        function renderFilterChips(){
-            const box=$('filterChips'); if(!box) return;
-            // 草稿当前值：sheet 打开时用 draftCat；若 sheet 未开（如分类管理触发的重渲染），
-            // 以已提交的 filterCat 为准并同步给 draftCat，避免下次打开时草稿是旧值
-            const sheetOpen = $('filterSheetMask') && $('filterSheetMask').classList.contains('open');
-            let cur;
-            if(sheetOpen && window.getDraftCat){
-                cur = window.getDraftCat();
-            } else {
-                cur = filterCat.value || '__all';
-                if(window.setDraftCat) window.setDraftCat(cur);
-            }
-            const prevScroll=box.scrollLeft;
-            box.innerHTML='';
-            const items=[{v:'__all', t:'全部'}].concat(getCats().map(c=>({v:c, t:c})));
-            items.forEach(it=>{
-                const b=document.createElement('div');
-                b.className='cc'+(it.v===cur?' sel':'');
-                b.textContent=it.t;
-                b.onclick=()=>{
-                    if(window.setDraftCat) window.setDraftCat(it.v);   // 只改草稿
-                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
-                    scrollChipIntoView(box, b);
-                };
-                box.appendChild(b);
-            });
-            box.scrollLeft=prevScroll;
-        }
         // 「管理分类」入口已从筛选浮层移到设置页（分类属于存档配置，与筛选语义分离）
         $('manageCatSetting').addEventListener('click', openCatManager);
         function showCatErr(msg){
@@ -850,28 +818,4 @@
             // 「日子」入口卡也一并刷新：它虽与账单无关，但改名等路径会换 currentUser，
             // 收在这里就不必在每个调用点各加一行（漏一个就是显示旧账号的日子）。
             if(typeof renderDaysCard==='function') renderDaysCard();
-        }
-
-        // ===== 筛选浮层（bottom sheet）控件绑定 =====
-        // 草稿模式：sheet 内所有改动只写进控件（草稿），不动列表。
-        //   完成 → 提交草稿到 searchState/filterCat 并刷新列表；
-        //   下滑 / 点遮罩 → 丢弃草稿，列表不变；
-        //   清除全部 → 只清草稿，要点完成才生效。
-        // draftCat 暂存分类选择，避免直接改 filterCat（filterCat 是已提交状态，renderBill 读它）。
-        let draftCat='__all';
-        // 统计口径筛选的草稿值：'' 全部 / 'normal' / 'flow' / 'skip'。与 draftCat 同一套草稿规则：
-        // 面板里点只改草稿，点「完成」才提交进 searchState.mode。
-        let draftMode='';
-        const FILTER_MODE_OPTS=[ {v:'', t:'全部'}, {v:'normal', t:'计入'}, {v:'flow', t:'只算结余'}, {v:'skip', t:'不计入'} ];
-        function renderFilterModeChips(){
-            const box=$('filterModeChips'); if(!box) return;
-            if(!box.children.length){
-                FILTER_MODE_OPTS.forEach(o=>{
-                    const b=document.createElement('div');
-                    b.className='cc'; b.textContent=o.t; b.dataset.v=o.v;
-                    b.onclick=()=>{ draftMode=o.v; renderFilterModeChips(); };
-                    box.appendChild(b);
-                });
-            }
-            box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===draftMode));
         }

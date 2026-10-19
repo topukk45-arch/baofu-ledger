@@ -163,6 +163,7 @@
   - 1019-Z4-M12 AI 导出 `app/ai-export.js`（`JiwenAiExport`，17 条、对外 askImportOtherDays / buildAiText / importDaysSuffix / importFixSuffix / openAiExport）。
   - 1019-Z4-M13 导入入口 `app/import-entry.js`（`JiwenImportEntry`，34 条、对外 DEV_IMPORT_KEY / __buildTaps / devImportOn / impOpenFile / loadImportUI / renderDevImport / scrollChipIntoView）。
   - 1019-Z4-M14 记一笔 `app/forms.js`（`JiwenForms`，68 条、对外 billCatSel / billTypeSel / closeEditModal / closeRefund / closeTplEditor / editCatSel / editId / editTypeSel / formSnaps / formState / getModeChips / openAddModal / refreshBillCatChipsIfOpen / refreshEditCatChipsIfOpen / refundLineHtml / renderEditCatChips / renderEditTypeChips / resetBillForm / setModeChips）。
+  - 1019-Z4-M15 账单页 `app/ledger.js`（`JiwenLedger`，50 条、对外 applyBatch / clearAllFilters / goPage / openBatchMenu / renderBill / renderFilterChips / resetSearch / undoBatch）。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。

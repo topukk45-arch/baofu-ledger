@@ -104,7 +104,7 @@ const recs = [
   // 6. 批量操作：确认框取消回上一层
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
   const choose = label => [...$('askChoices').querySelectorAll('.cc')].find(b => (b.querySelector('.cc-label') || b).textContent === label).click();
-  w.openBatchMenu(); await settle();
+  w.JiwenLedger.openBatchMenu(); await settle();
   choose('改分类'); $('askOk').click(); await settle();
   ok(t.ask() && t.ask().title === '选择分类', '6 改分类：选分类');
   choose('购物'); $('askOk').click(); await settle();
