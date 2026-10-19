@@ -60,20 +60,32 @@ function run(key, opt) {
     if (prev && fileOf(prev.start) === f && R.code.lastIndexOf('\n', st.start - 1) + 1 < R.code.indexOf('\n', prev.end) + 1) throw new Error('两条语句在同一行：L' + st.loc.start.line);
     const gap = RAW.slice(a, R.code.lastIndexOf('\n', st.start - 1) + 1);
     if (gap.split('\n').some(l => l.trim() && !/^\s*\/\//.test(l))) throw new Error('语句前面夹着别的东西：L' + st.loc.start.line + ' ' + JSON.stringify(gap.slice(0, 80)));
-    let z = R.code.indexOf('\n', st.end); if (z < 0 || z > f.end) z = f.end - 1;
-    const tail = RAW.slice(st.end, z);
-    if (tail.trim() && !/^\s*(\/\/.*)?$/.test(tail)) throw new Error('语句后面同一行还有别的：L' + st.loc.end.line + ' ' + JSON.stringify(tail));
-    const next = body[i + 1];
-    if (next && next.start < z) throw new Error('下一条语句在同一行：L' + st.loc.end.line);
-    return { a, z: z + 1, f };
+    // 同一行后面还有语句的：都要一起搬（并成一块），不然报错
+    let last = st, j = i;
+    let z = R.code.indexOf('\n', last.end); if (z < 0 || z > f.end) z = f.end - 1;
+    while (body[j + 1] && body[j + 1].start < z) {
+      j++;
+      if (!pickSet.has(body[j])) throw new Error('同一行里有不搬的语句：L' + body[j].loc.start.line);
+      last = body[j]; z = R.code.indexOf('\n', last.end); if (z < 0 || z > f.end) z = f.end - 1;
+    }
+    const tail = RAW.slice(last.end, z);
+    if (tail.trim() && !/^\s*(\/\/.*)?$/.test(tail)) throw new Error('语句后面同一行还有别的：L' + last.loc.end.line + ' ' + JSON.stringify(tail));
+    return { a, z: z + 1, f, upto: j };
   };
-  const chunks = pick.map(st => Object.assign(chunkOf(st), { st }));
+  const pickSet = new Set(pick);
+  const chunks = []; let coveredTo = -1;
+  pick.forEach(st => { const bi = body.indexOf(st); if (bi <= coveredTo) return; const c = Object.assign(chunkOf(st), { st }); coveredTo = c.upto; chunks.push(c); });
   // 「当场」要用的名字都要在这个模块或前面的模块里（全 App 共用的状态这时还在旧文件里，搬到前面就拿不到）
   const order = Object.fromEntries(PL.MODULES.map((m, i) => [m.key, i]));
   const A = S.analyze(R.code), pickStart = new Set(pick.map(s => s.start));
   const nowBad = [];
   A.stmts.forEach(s => { if (!pickStart.has(s.start)) return; [...s.now].forEach(n => { const o = P.nameMod.get(n); if (STATE.has(n) || order[o] > order[key]) nowBad.push('L' + s.line + ' ' + n); }); });
   if (nowBad.length) throw new Error('搬到前面以后当场要用的名字还没有：' + nowBad.join('、'));
+  // 用到排在后面的模块的名字（不管当场还是以后）：只能是回调口表里的
+  const allowCb = Object.entries(PL.CALLBACKS).filter(([k]) => k.startsWith(key + ' → ')).flatMap(([, v]) => v);
+  const upBad = [];
+  pick.forEach(st => { const r = D.freeRefs(st); new Set([...r.reads, ...r.writes]).forEach(n => { const o = P.nameMod.get(n); if (o && order[o] > order[key] && !allowCb.includes(n) && !STATE.has(n) && !defsOf(st).includes(n)) upBad.push('L' + st.loc.start.line + ' ' + n + '（' + o + '）'); }); });
+  if (upBad.length && !opt.allowUp) throw new Error('用到排在后面的模块（不是回调口）：' + upBad.join('、'));
   // 这块定义的名字；别处用到的才进入口
   const defs = new Set(pick.flatMap(ownNames));
   const outside = new Set();
@@ -91,7 +103,8 @@ function run(key, opt) {
   const reassigned = new Set();
   pick.forEach(st => { const r = D.freeRefs(st.type === 'VariableDeclaration' ? { type: 'Program', body: st.declarations.map(d => d.init).filter(Boolean).map(e => ({ type: 'ExpressionStatement', expression: e })) } : st); [...r.writes].forEach(n => { if (mutable.has(n)) reassigned.add(n); }); });
   const stale = exportsList.filter(n => mutable.has(n) && reassigned.has(n));
-  if (stale.length && !opt.allowStale) throw new Error('对外的变量这块自己会改，别处取一份会过时：' + stale.join('、'));
+  // 会变的变量：入口上给一个只读口（get 名字(){ return 名字; }），别处读的地方改成「入口.名字」（只读不写，上面查过没人在外面写）
+  const getters = stale;
   // 这块用到前面模块的名字（模块文件里取一行）
   const imports = {};
   pick.forEach(st => { const r = D.freeRefs(st); [...r.reads, ...r.writes].forEach(n => { if (defs.has(n)) return; if (STATE.has(n)) return; const o = P.nameMod.get(n); if (o && o !== key && order[o] < order[key] && fs.existsSync(path.join(WWW, PL.MODULES[order[o]].file))) (imports[o] = imports[o] || new Set()).add(n); }); });
@@ -100,7 +113,7 @@ function run(key, opt) {
   let out = '(function(){\n';
   Object.keys(imports).sort((x, y) => order[x] - order[y]).forEach(o => { out += `${IND}const { ${[...imports[o]].sort().join(', ')} } = window.${PL.MODULES[order[o]].entry};   // 用到前面模块的\n`; });
   chunks.forEach(c => { out += RAW.slice(c.a, c.z); });
-  out += `${IND}window.${mod.entry} = { ${exportsList.join(', ')} };   // ${mod.key} 模块对外只有这一个入口\n})();\n`;
+  out += `${IND}window.${mod.entry} = { ${exportsList.map(n => getters.includes(n) ? `get ${n}(){ return ${n}; }` : n).join(', ')} };   // ${mod.key} 模块对外只有这一个入口${getters.length ? '（get 的是会变的，读的时候才取）' : ''}\n})();\n`;
   // 旧文件剪掉这几块
   const newLegacy = legacy.map(b => {
     let t = '', at = b.start;
@@ -112,6 +125,17 @@ function run(key, opt) {
   const first = newLegacy[0];
   const legacyUses = new Set();
   body.forEach(st => { if (pickStart.has(st.start)) return; const r = D.freeRefs(st); [...r.reads].forEach(n => { if (defs.has(n)) legacyUses.add(n); }); });
+  getters.forEach(n => legacyUses.delete(n));
+  const getterSites = [];
+  if (getters.length) {
+    const re = new RegExp(`(^|[^\\w$.])(${getters.join('|')})(?![\\w$])`, 'g');
+    newLegacy.forEach(b => {
+      const lines = b.text.split('\n');
+      b.text = lines.map((l, i) => { if (/^\s*\/\//.test(l)) return l; const nl = l.replace(re, (m, pre, nm) => `${pre}${mod.entry}.${nm}`); if (nl !== l) getterSites.push(`${b.file}:${i + 1}  ${l.trim()}  →  ${nl.trim()}`); return nl; }).join('\n');
+    });
+    const declared = newLegacy.some(b => new RegExp(`(let|const|var|function)\\s+(${getters.join('|')})\\b|\\((${getters.join('|')})[,)]`).test(b.text));
+    if (declared) throw new Error('旧文件里有同名的局部变量，不能直接按名字改：' + getters.join('、'));
+  }
   const refLine2 = legacyUses.size ? `${IND}const { ${[...legacyUses].sort().join(', ')} } = window.${mod.entry};   // 旧代码引用表：${mod.key} 已搬进 ${mod.file}，旧文件都搬完时删掉\n` : '';
   { let at = 0, mm; while ((mm = ALIAS_LINE.exec(first.text.slice(at, at + 4000)))) at += mm[0].length; first.text = first.text.slice(0, at) + refLine2 + first.text.slice(at); }
   // index.html：在第一个旧文件那行前面加上模块文件
@@ -122,13 +146,14 @@ function run(key, opt) {
   const m = firstTag.exec(html);
   if (!m) throw new Error('index.html 里找不到 ' + first.file);
   html = html.replace(firstTag, `${m[1]}<script src="${mod.file}?v=${ver}"></script>\n${m[0]}`);
-  const report = { key, entry: mod.entry, file: mod.file, stmts: pick.length, lines: out.split('\n').length, exports: exportsList, legacyRefs: [...legacyUses].sort(), imports: Object.fromEntries(Object.entries(imports).map(([k, v]) => [k, [...v]])), testUse: [...testUse].sort() };
+  const report = { getters, getterSites, key, entry: mod.entry, file: mod.file, stmts: pick.length, lines: out.split('\n').length, exports: exportsList, legacyRefs: [...legacyUses].sort(), imports: Object.fromEntries(Object.entries(imports).map(([k, v]) => [k, [...v]])), testUse: [...testUse].sort() };
   if (opt.dry) return report;
   fs.writeFileSync(path.join(WWW, mod.file), out);
   newLegacy.forEach(b => fs.writeFileSync(path.join(WWW, b.file), b.text));
   fs.writeFileSync(htmlPath, html);
   return report;
 }
+function defsOf(st) { return st.type === 'FunctionDeclaration' || st.type === 'ClassDeclaration' ? [st.id.name] : st.type === 'VariableDeclaration' ? st.declarations.flatMap(d => namesOf(d.id)) : []; }
 function namesOf(p) {
   if (!p) return [];
   if (p.type === 'Identifier') return [p.name];

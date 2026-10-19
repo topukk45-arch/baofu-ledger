@@ -44,6 +44,7 @@ const BIND = [
   ["askInput.addEventListener('click', ()=>{ if(askInput.dataset.kp", 'ask'],     // 提示框的输入框弹数字键盘
   ["askInput.addEventListener('focus', ()=>{ if(askInput.dataset.kp", 'ask'],
   ["$('askList').addEventListener('click', e=>{", 'stats'],                       // AI 标记列表点一行开详情
+  ["(function(){\n            const kw=$('searchKeyword')", 'ledger'],           // 筛选浮层里的控件
 ];
 
 // 主程序以外直接用的老入口（import/、测试、原生层以外的页面代码按名字找），搬完也要留在 window 上
