@@ -179,12 +179,12 @@
         // ===== 搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加 =====
         // 金额存数字（null 表示不限）；日期存 'YYYY-MM-DD'（null 表示不限）；关键词存小写串。
         // mode：统计筛选，null 表示不限，否则为 'normal' / 'flow' / 'skip'
-        const searchState={ keyword:'', min:null, max:null, from:null, to:null, mode:null };
+        const searchState={ keyword:'', min:null, max:null, from:null, to:null, mode:null, rv:false };   // rv：1021-T13 只看待确认分类
         const MODE_NAME={ normal:'计入', skip:'不计', flow:'往来' };
 
         // 是否有任意搜索条件生效（用于显示「清除」入口、高亮筛选按钮、空结果提示文案）
         function hasActiveSearch(){
-            return !!(hasTextSearch() || searchState.mode);
+            return !!(hasTextSearch() || searchState.mode || searchState.rv);
         }
         // 只看关键词 / 金额 / 日期（不含口径），用来决定徽标里写不写「搜索」
         function hasTextSearch(){
@@ -195,7 +195,7 @@
         // 重置搜索状态与界面控件（切换存档/登录时调用，避免筛选条件跨存档残留）
         function resetSearch(){
             searchState.keyword=''; searchState.min=null; searchState.max=null;
-            searchState.from=null; searchState.to=null; searchState.mode=null;
+            searchState.from=null; searchState.to=null; searchState.mode=null; searchState.rv=false;
             draftMode=''; renderFilterModeChips();
             const kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax'),
                   from=$('searchFrom'), to=$('searchTo');
@@ -241,6 +241,7 @@
             }
             // 统计
             if(searchState.mode && recMode(r)!==searchState.mode) return false;
+            if(searchState.rv && r.rv!==1) return false;
             return true;
         }
 
@@ -288,6 +289,21 @@
                 b.appendChild(tx); b.appendChild(go); b.appendChild(no);
             }).catch(()=>{ if(my===__remindSeq){ const x=$('impRemind'); if(x) x.remove(); } });
         }
+        // 1021-T13（实测 10-20）：账单页顶上「待确认分类 N」小胶囊（开发开关开着、有 rv 标记的记录时才有）：点了等于一个筛选，
+        //   再用现成的多选、批量改分类慢慢改（改了分类就去掉标记）；开着时写「只看待确认分类 · N ✕」，再点回到全部
+        function renderRvChip(raw){
+            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const n=on ? raw.filter(r=>r.rv===1).length : 0;
+            let b=$('rvChip');
+            if(!on || (!n && !searchState.rv)){ if(b) b.remove(); if(!on) searchState.rv=false; return; }
+            if(!b){
+                b=document.createElement('button'); b.type='button'; b.id='rvChip'; b.className='rv-chip';
+                b.addEventListener('click', ()=>{ searchState.rv=!searchState.rv; JiwenBase.curPage=1; if(window.syncFilterFab) window.syncFilterFab(); renderBill(); if(searchState.rv) scrollListTop(); });
+                const head=$('billHead'); head.parentNode.insertBefore(b, head);
+            }
+            b.classList.toggle('on', !!searchState.rv);
+            b.textContent = searchState.rv ? `只看待确认分类 · ${n} 条  ✕` : `待确认分类 ${n} 条 ›`;
+        }
         function renderImpEmptyEntry(n){
             let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
             let b=$('impEmptyEntry');
@@ -309,7 +325,7 @@
             // 时间精度仅到分钟，同分钟多笔用「记录在存储数组里的原始顺序」作次级键——
             // 它天然稳定且唯一，不依赖 id 的字符串大小（旧 id 不定长，字符串比较会乱序）。
             const raw=getUserData();
-            if(!pageOnly){ renderImpEmptyEntry(raw.length); renderImpRemind(); pagerPad(0); }
+            if(!pageOnly){ renderImpEmptyEntry(raw.length); renderImpRemind(); renderRvChip(raw); pagerPad(0); }
             // 【为什么先算时间戳再排序】比较器里每调一次 parseRecTime 就是一次
             //   正则 + new Date()。而排序要做 O(n log n) 次比较，每次比较调两遍
             //   —— 12000 条记录约 16 万次比较、32 万次解析，实测占掉 renderBill
@@ -541,7 +557,7 @@
                 if(!idSet.has(r.id) || isRefund(r)) return;
                 prev.push({ id:r.id, cat:r.cat, mode:recMode(r) });
                 const n=Object.assign({}, r);
-                if(change.cat!==undefined) n.cat=change.cat;
+                if(change.cat!==undefined){ n.cat=change.cat; if(n.rv){ prev[prev.length-1].rv=1; delete n.rv; } }   // 1021-T13：改了分类就去掉「待确认分类」，撤销时放回
                 if(change.mode!==undefined) setRecMode(n, change.mode);
                 data[i]=n;
                 byId.set(n.id, n);
@@ -578,6 +594,7 @@
                 const p=map.get(r.id); if(!p) return;
                 const n=Object.assign({}, r);
                 n.cat=p.cat;
+                if(p.rv) n.rv=1;
                 setRecMode(n, p.mode);
                 data[i]=n;
             });

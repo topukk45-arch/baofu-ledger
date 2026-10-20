@@ -1,0 +1,3443 @@
+[
+ {
+  "H": 780,
+  "W": 360,
+  "n": 2,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#newAccountBtn",
+    "name": "#newAccountBtn 新建账号",
+    "top": 393,
+    "bottom": 441,
+    "fromBottom": 339,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 128
+   }
+  ],
+  "contentBottom": 554,
+  "blank": 226,
+  "hscroll": false,
+  "over": [],
+  "name": "login",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 3,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#askOk",
+    "name": "#askOk 确定",
+    "top": 668,
+    "bottom": 716,
+    "fromBottom": 64,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 772,
+  "blank": 8,
+  "hscroll": false,
+  "over": [],
+  "name": "new-account-name",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 2,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#askOk",
+    "name": "#askOk 导入微信、支付宝账单",
+    "top": 662,
+    "bottom": 710,
+    "fromBottom": 70,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   },
+   {
+    "sel": "#askCancel",
+    "name": "#askCancel 从零开始记",
+    "top": 718,
+    "bottom": 766,
+    "fromBottom": 14,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 766,
+  "blank": 14,
+  "hscroll": false,
+  "over": [],
+  "name": "how-to-start",
+  "cfg": "narrow",
+  "note": "新账号「怎么开始」",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 8,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impEmptyEntry",
+    "name": "#impEmptyEntry 有微信、支付宝账单？可以一次导进来 ›",
+    "top": 208,
+    "bottom": 256,
+    "fromBottom": 524,
+    "upper": true,
+    "offscreen": false,
+    "h": 48,
+    "w": 310
+   },
+   {
+    "sel": ".act-add",
+    "name": "#fabAdd 记一笔",
+    "top": 670,
+    "bottom": 720,
+    "fromBottom": 60,
+    "upper": false,
+    "offscreen": false,
+    "h": 50,
+    "w": 162
+   }
+  ],
+  "contentBottom": 597,
+  "blank": 183,
+  "hscroll": false,
+  "over": [],
+  "name": "ledger-empty",
+  "cfg": "narrow",
+  "note": "空账本小入口",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 15,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#addBill",
+    "name": "#addBill 保存",
+    "top": 664,
+    "bottom": 712,
+    "fromBottom": 68,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 768,
+  "blank": 12,
+  "hscroll": false,
+  "over": [],
+  "name": "add-record",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [
+    "#addBill 被 .kp-key「7」、#kpOk、.kp-key「0」、#kpGrid 盖住"
+   ],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 5,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impPick",
+    "name": "#impPick 选账单文件",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 332
+   }
+  ],
+  "contentBottom": 598,
+  "blank": 182,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-pick",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 3,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impGuideBack",
+    "name": "#impGuideBack ‹ 回去选文件",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impGuidePick",
+    "name": "#impGuidePick 选账单文件",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 810,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-guide-wechat",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 3,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impGuideBack",
+    "name": "#impGuideBack ‹ 回去选文件",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 715,
+  "blank": 65,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-guide-alipay",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 3,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#askOk",
+    "name": "#askOk 确定",
+    "top": 682,
+    "bottom": 730,
+    "fromBottom": 50,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 786,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-zip-password",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 1,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impProgCancel",
+    "name": "#impProgCancel 取消",
+    "top": 690,
+    "bottom": 738,
+    "fromBottom": 42,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 296
+   }
+  ],
+  "contentBottom": 738,
+  "blank": 42,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-progress",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 43,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": ".act-add",
+    "name": "#fabAdd 记一笔",
+    "top": 670,
+    "bottom": 720,
+    "fromBottom": 60,
+    "upper": false,
+    "offscreen": false,
+    "h": 50,
+    "w": 162
+   }
+  ],
+  "contentBottom": 6150,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "ledger-list",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 38,
+  "small": [
+   {
+    "name": "1-248",
+    "w": 37,
+    "h": 62,
+    "top": 207
+   },
+   {
+    "name": "2-84",
+    "w": 37,
+    "h": 62,
+    "top": 207
+   },
+   {
+    "name": "3-138",
+    "w": 37,
+    "h": 62,
+    "top": 207
+   },
+   {
+    "name": "4-46",
+    "w": 37,
+    "h": 62,
+    "top": 207
+   },
+   {
+    "name": "5-108",
+    "w": 37,
+    "h": 62,
+    "top": 273
+   },
+   {
+    "name": "6-86",
+    "w": 37,
+    "h": 62,
+    "top": 273
+   },
+   {
+    "name": "7-141",
+    "w": 37,
+    "h": 62,
+    "top": 273
+   },
+   {
+    "name": "8-46",
+    "w": 37,
+    "h": 62,
+    "top": 273
+   },
+   {
+    "name": "9+4954",
+    "w": 37,
+    "h": 62,
+    "top": 273
+   },
+   {
+    "name": "10+7934",
+    "w": 37,
+    "h": 62,
+    "top": 273
+   },
+   {
+    "name": "11-313",
+    "w": 37,
+    "h": 62,
+    "top": 273
+   },
+   {
+    "name": "12-134",
+    "w": 37,
+    "h": 62,
+    "top": 339
+   },
+   {
+    "name": "13-145",
+    "w": 37,
+    "h": 62,
+    "top": 339
+   },
+   {
+    "name": "14-318",
+    "w": 37,
+    "h": 62,
+    "top": 339
+   },
+   {
+    "name": "15-237",
+    "w": 37,
+    "h": 62,
+    "top": 339
+   },
+   {
+    "name": "16-140",
+    "w": 37,
+    "h": 62,
+    "top": 339
+   },
+   {
+    "name": "17-46",
+    "w": 37,
+    "h": 62,
+    "top": 339
+   },
+   {
+    "name": "18-167",
+    "w": 37,
+    "h": 62,
+    "top": 339
+   },
+   {
+    "name": "19-136",
+    "w": 37,
+    "h": 62,
+    "top": 405
+   },
+   {
+    "name": "20-51",
+    "w": 37,
+    "h": 62,
+    "top": 405
+   },
+   {
+    "name": "21-168",
+    "w": 37,
+    "h": 62,
+    "top": 405
+   },
+   {
+    "name": "22-79545",
+    "w": 37,
+    "h": 62,
+    "top": 405
+   },
+   {
+    "name": "23-180",
+    "w": 37,
+    "h": 62,
+    "top": 405
+   },
+   {
+    "name": "24-46",
+    "w": 37,
+    "h": 62,
+    "top": 405
+   },
+   {
+    "name": "25-140",
+    "w": 37,
+    "h": 62,
+    "top": 405
+   },
+   {
+    "name": "26-51",
+    "w": 37,
+    "h": 62,
+    "top": 471
+   },
+   {
+    "name": "27-46",
+    "w": 37,
+    "h": 62,
+    "top": 471
+   },
+   {
+    "name": "28-46",
+    "w": 37,
+    "h": 62,
+    "top": 471
+   }
+  ],
+  "tight": [
+   {
+    "a": "1-248",
+    "b": "2-84",
+    "gap": 4
+   },
+   {
+    "a": "1-248",
+    "b": "8-46",
+    "gap": 4
+   },
+   {
+    "a": "2-84",
+    "b": "3-138",
+    "gap": 4
+   },
+   {
+    "a": "2-84",
+    "b": "9+4954",
+    "gap": 4
+   },
+   {
+    "a": "3-138",
+    "b": "4-46",
+    "gap": 4
+   },
+   {
+    "a": "3-138",
+    "b": "10+7934",
+    "gap": 4
+   },
+   {
+    "a": "4-46",
+    "b": "11-313",
+    "gap": 4
+   },
+   {
+    "a": "5-108",
+    "b": "6-86",
+    "gap": 4
+   },
+   {
+    "a": "5-108",
+    "b": "12-134",
+    "gap": 4
+   },
+   {
+    "a": "6-86",
+    "b": "7-141",
+    "gap": 4
+   },
+   {
+    "a": "6-86",
+    "b": "13-145",
+    "gap": 4
+   },
+   {
+    "a": "7-141",
+    "b": "8-46",
+    "gap": 4
+   },
+   {
+    "a": "7-141",
+    "b": "14-318",
+    "gap": 4
+   },
+   {
+    "a": "8-46",
+    "b": "9+4954",
+    "gap": 4
+   },
+   {
+    "a": "8-46",
+    "b": "15-237",
+    "gap": 4
+   },
+   {
+    "a": "9+4954",
+    "b": "10+7934",
+    "gap": 4
+   },
+   {
+    "a": "9+4954",
+    "b": "16-140",
+    "gap": 4
+   },
+   {
+    "a": "10+7934",
+    "b": "11-313",
+    "gap": 4
+   },
+   {
+    "a": "10+7934",
+    "b": "17-46",
+    "gap": 4
+   },
+   {
+    "a": "11-313",
+    "b": "18-167",
+    "gap": 4
+   },
+   {
+    "a": "12-134",
+    "b": "13-145",
+    "gap": 4
+   },
+   {
+    "a": "12-134",
+    "b": "19-136",
+    "gap": 4
+   },
+   {
+    "a": "13-145",
+    "b": "14-318",
+    "gap": 4
+   },
+   {
+    "a": "13-145",
+    "b": "20-51",
+    "gap": 4
+   },
+   {
+    "a": "14-318",
+    "b": "15-237",
+    "gap": 4
+   },
+   {
+    "a": "14-318",
+    "b": "21-168",
+    "gap": 4
+   },
+   {
+    "a": "15-237",
+    "b": "16-140",
+    "gap": 4
+   },
+   {
+    "a": "15-237",
+    "b": "22-79545",
+    "gap": 4
+   },
+   {
+    "a": "16-140",
+    "b": "17-46",
+    "gap": 4
+   },
+   {
+    "a": "16-140",
+    "b": "23-180",
+    "gap": 4
+   },
+   {
+    "a": "17-46",
+    "b": "18-167",
+    "gap": 4
+   },
+   {
+    "a": "17-46",
+    "b": "24-46",
+    "gap": 4
+   },
+   {
+    "a": "18-167",
+    "b": "25-140",
+    "gap": 4
+   },
+   {
+    "a": "19-136",
+    "b": "20-51",
+    "gap": 4
+   },
+   {
+    "a": "19-136",
+    "b": "26-51",
+    "gap": 4
+   },
+   {
+    "a": "20-51",
+    "b": "21-168",
+    "gap": 4
+   },
+   {
+    "a": "20-51",
+    "b": "27-46",
+    "gap": 4
+   },
+   {
+    "a": "21-168",
+    "b": "22-79545",
+    "gap": 4
+   },
+   {
+    "a": "21-168",
+    "b": "28-46",
+    "gap": 4
+   },
+   {
+    "a": "22-79545",
+    "b": "23-180",
+    "gap": 4
+   },
+   {
+    "a": "23-180",
+    "b": "24-46",
+    "gap": 4
+   },
+   {
+    "a": "24-46",
+    "b": "25-140",
+    "gap": 4
+   },
+   {
+    "a": "26-51",
+    "b": "27-46",
+    "gap": 4
+   },
+   {
+    "a": "27-46",
+    "b": "28-46",
+    "gap": 4
+   }
+  ],
+  "prim": [],
+  "contentBottom": 1203,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "stats",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 11,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#bgSuggestBtn",
+    "name": "#bgSuggestBtn 按过去几个月给预算建议（开发中）",
+    "top": 462,
+    "bottom": 510,
+    "fromBottom": 270,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 236
+   }
+  ],
+  "contentBottom": 688,
+  "blank": 92,
+  "hscroll": false,
+  "over": [],
+  "name": "budget",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 30,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#bgSuggestApply",
+    "name": "#bgSuggestApply 写入勾上的 16 个",
+    "top": 658,
+    "bottom": 706,
+    "fromBottom": 74,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 136
+   }
+  ],
+  "contentBottom": 1343,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "budget-suggest",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 34,
+  "small": [],
+  "tight": [],
+  "prim": [],
+  "contentBottom": 1928,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "settings",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 34,
+  "small": [],
+  "tight": [],
+  "prim": [],
+  "contentBottom": 770,
+  "blank": 10,
+  "hscroll": false,
+  "over": [],
+  "name": "settings-storage",
+  "cfg": "narrow",
+  "note": "存储用量那一块",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 4,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impNext",
+    "name": "#impNext 下一步 ›",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impCancel",
+    "name": "#impCancel 取消",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 662,
+  "blank": 118,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-step-check",
+  "cfg": "narrow",
+  "note": "第 1 步 / 共 6 步",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 35,
+  "small": [],
+  "tight": [
+   {
+    "a": "imp-near-ck",
+    "b": "没看你记的10月6日 12:30 · 吃饭30.00备注：午饭账单里的10月6日",
+    "gap": 0
+   }
+  ],
+  "prim": [
+   {
+    "sel": "#impNext",
+    "name": "#impNext 下一步 ›",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impPrev",
+    "name": "#impPrev ‹ 上一步",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 4583,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-step-match",
+  "cfg": "narrow",
+  "note": "第 2 步 / 共 6 步",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 8,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impNext",
+    "name": "#impNext 下一步 ›",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impPrev",
+    "name": "#impPrev ‹ 上一步",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 647,
+  "blank": 133,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-step-refund",
+  "cfg": "narrow",
+  "note": "第 3 步 / 共 6 步",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 7,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impNext",
+    "name": "#impNext 下一步 ›",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impPrev",
+    "name": "#impPrev ‹ 上一步",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 626,
+  "blank": 154,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-step-cat",
+  "cfg": "narrow",
+  "note": "第 4 步 / 共 6 步",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 7,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impNext",
+    "name": "#impNext 下一步 ›",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impPrev",
+    "name": "#impPrev ‹ 上一步",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 676,
+  "blank": 104,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-step-amount",
+  "cfg": "narrow",
+  "note": "第 5 步 / 共 6 步",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 14,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impGo",
+    "name": "#impGo 新建 15 条记录，合并 3 笔",
+    "top": 666,
+    "bottom": 714,
+    "fromBottom": 66,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 332
+   },
+   {
+    "sel": "#impPrev",
+    "name": "#impPrev ‹ 上一步",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impRecon",
+    "name": "#impRecon 只对账",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 1147,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-step-overview",
+  "cfg": "narrow",
+  "note": "第 6 步 / 共 6 步",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 6,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#uiSheetCancel",
+    "name": "#uiSheetCancel 取消",
+    "top": 718,
+    "bottom": 766,
+    "fromBottom": 14,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 766,
+  "blank": 14,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-picker",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 46,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#uiSheetCancel",
+    "name": "#uiSheetCancel 取消",
+    "top": 718,
+    "bottom": 766,
+    "fromBottom": 14,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 1067,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-picker-cat",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": [
+    ".cc「学习」 被贴底按钮排切成半截",
+    ".cc「娱乐」 被贴底按钮排切成半截",
+    ".cc「运动」 被贴底按钮排切成半截",
+    ".cc「宠物」 被贴底按钮排切成半截",
+    ".cc「人情往来」 被滚动区下沿切成半截",
+    ".cc「孩子」 被滚动区下沿切成半截",
+    ".cc「父母」 被滚动区下沿切成半截",
+    ".cc「旅行」 被滚动区下沿切成半截"
+   ]
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 10,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impNext",
+    "name": "#impNext 下一步 ›",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impPrev",
+    "name": "#impPrev ‹ 上一步",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 691,
+  "blank": 89,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-step-cat-done",
+  "cfg": "narrow",
+  "note": "改过以后，展开「已处理」",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 15,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impGo",
+    "name": "#impGo 新建 15 条记录，合并 3 笔",
+    "top": 666,
+    "bottom": 714,
+    "fromBottom": 66,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 332
+   }
+  ],
+  "contentBottom": 619,
+  "blank": 161,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-overview-changes",
+  "cfg": "narrow",
+  "note": "这次所有的改动",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 2,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impExitStay",
+    "name": "#impExitStay 继续导入",
+    "top": 662,
+    "bottom": 710,
+    "fromBottom": 70,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   },
+   {
+    "sel": "#impExitOk",
+    "name": "#impExitOk 退出，不导入了",
+    "top": 718,
+    "bottom": 766,
+    "fromBottom": 14,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 766,
+  "blank": 14,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-exit-sheet",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 2,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impConfirmOk",
+    "name": "#impConfirmOk 确认导入",
+    "top": 662,
+    "bottom": 710,
+    "fromBottom": 70,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   },
+   {
+    "sel": "#impConfirmBack",
+    "name": "#impConfirmBack 再看看",
+    "top": 718,
+    "bottom": 766,
+    "fromBottom": 14,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 766,
+  "blank": 14,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-confirm-sheet",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 54,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impGo",
+    "name": "#impGo 新建 15 条记录，合并 3 笔",
+    "top": 666,
+    "bottom": 714,
+    "fromBottom": 66,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 332
+   }
+  ],
+  "contentBottom": 3201,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-confirm-details",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 10,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impSheetOk",
+    "name": "#impSheetOk 确定",
+    "top": 662,
+    "bottom": 710,
+    "fromBottom": 70,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   },
+   {
+    "sel": "#impSheetClose",
+    "name": "#impSheetClose 取消",
+    "top": 718,
+    "bottom": 766,
+    "fromBottom": 14,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 1018,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-row-sheet",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 16,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impGo",
+    "name": "#impGo 补进 1 笔",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impRecon",
+    "name": "#impRecon ‹ 返回",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 983,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-recon",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 2,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impConfirmOk",
+    "name": "#impConfirmOk 确认补进 1 笔",
+    "top": 662,
+    "bottom": 710,
+    "fromBottom": 70,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   },
+   {
+    "sel": "#impConfirmBack",
+    "name": "#impConfirmBack 再看看",
+    "top": 718,
+    "bottom": 766,
+    "fromBottom": 14,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 766,
+  "blank": 14,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-recon-sheet",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 9,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impBackToLedger",
+    "name": "#impBackToLedger 回到账本",
+    "top": 666,
+    "bottom": 714,
+    "fromBottom": 66,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 332
+   },
+   {
+    "sel": "#impUndoThis",
+    "name": "#impUndoThis 撤销这次导入",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 332
+   }
+  ],
+  "contentBottom": 1157,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-result",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 230,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impPendDropAll",
+    "name": "#impPendDropAll 全部不要了",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   },
+   {
+    "sel": "#impBarClose",
+    "name": "#impBarClose 返回",
+    "top": 722,
+    "bottom": 770,
+    "fromBottom": 10,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 162
+   }
+  ],
+  "contentBottom": 12654,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-pending",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 2,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#askOk",
+    "name": "#askOk 这 33 笔都不要了",
+    "top": 675,
+    "bottom": 723,
+    "fromBottom": 57,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 779,
+  "blank": 1,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-pending-dropall-confirm",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 7,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": ".imp-log-undo",
+    "name": "撤销",
+    "top": 405,
+    "bottom": 453,
+    "fromBottom": 327,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 64
+   }
+  ],
+  "contentBottom": 586,
+  "blank": 194,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-logs",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 2,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#askOk",
+    "name": "#askOk 撤销这次导入",
+    "top": 682,
+    "bottom": 730,
+    "fromBottom": 50,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 786,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-undo-confirm",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 12,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impRuleAddBtn",
+    "name": "#impRuleAddBtn 添加",
+    "top": 689,
+    "bottom": 737,
+    "fromBottom": 43,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 58
+   }
+  ],
+  "contentBottom": 758,
+  "blank": 22,
+  "hscroll": false,
+  "over": [],
+  "name": "imp-rules",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [
+    "#impRuleAddBtn 被 #impBarClose、#impBar 盖住"
+   ],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 39,
+  "small": [
+   {
+    "name": "1-248",
+    "w": 37,
+    "h": 62,
+    "top": 311
+   },
+   {
+    "name": "2-84",
+    "w": 37,
+    "h": 62,
+    "top": 311
+   },
+   {
+    "name": "3-153",
+    "w": 37,
+    "h": 62,
+    "top": 311
+   },
+   {
+    "name": "4-46",
+    "w": 37,
+    "h": 62,
+    "top": 311
+   },
+   {
+    "name": "5-108",
+    "w": 37,
+    "h": 62,
+    "top": 377
+   },
+   {
+    "name": "6-86",
+    "w": 37,
+    "h": 62,
+    "top": 377
+   },
+   {
+    "name": "7-141不计",
+    "w": 37,
+    "h": 62,
+    "top": 377
+   },
+   {
+    "name": "8-146",
+    "w": 37,
+    "h": 62,
+    "top": 377
+   },
+   {
+    "name": "9+5054",
+    "w": 37,
+    "h": 62,
+    "top": 377
+   },
+   {
+    "name": "10+7884",
+    "w": 37,
+    "h": 62,
+    "top": 377
+   },
+   {
+    "name": "11-303退款",
+    "w": 37,
+    "h": 62,
+    "top": 377
+   },
+   {
+    "name": "12-134",
+    "w": 37,
+    "h": 62,
+    "top": 443
+   },
+   {
+    "name": "13-145",
+    "w": 37,
+    "h": 62,
+    "top": 443
+   },
+   {
+    "name": "14-363",
+    "w": 37,
+    "h": 62,
+    "top": 443
+   },
+   {
+    "name": "15-237",
+    "w": 37,
+    "h": 62,
+    "top": 443
+   },
+   {
+    "name": "16-140不计",
+    "w": 37,
+    "h": 62,
+    "top": 443
+   },
+   {
+    "name": "17-46",
+    "w": 37,
+    "h": 62,
+    "top": 443
+   },
+   {
+    "name": "18-187",
+    "w": 37,
+    "h": 62,
+    "top": 443
+   },
+   {
+    "name": "19-89024",
+    "w": 37,
+    "h": 62,
+    "top": 509
+   },
+   {
+    "name": "20-51",
+    "w": 37,
+    "h": 62,
+    "top": 509
+   },
+   {
+    "name": "21-168",
+    "w": 37,
+    "h": 62,
+    "top": 509
+   },
+   {
+    "name": "22-81845",
+    "w": 37,
+    "h": 62,
+    "top": 509
+   },
+   {
+    "name": "23-1479",
+    "w": 37,
+    "h": 62,
+    "top": 509
+   },
+   {
+    "name": "24-60",
+    "w": 37,
+    "h": 62,
+    "top": 509
+   },
+   {
+    "name": "25-155",
+    "w": 37,
+    "h": 62,
+    "top": 509
+   },
+   {
+    "name": "26-51",
+    "w": 37,
+    "h": 62,
+    "top": 575
+   },
+   {
+    "name": "27-46",
+    "w": 37,
+    "h": 62,
+    "top": 575
+   },
+   {
+    "name": "28-46",
+    "w": 37,
+    "h": 62,
+    "top": 575
+   }
+  ],
+  "tight": [
+   {
+    "a": "1-248",
+    "b": "2-84",
+    "gap": 4
+   },
+   {
+    "a": "1-248",
+    "b": "8-146",
+    "gap": 4
+   },
+   {
+    "a": "2-84",
+    "b": "3-153",
+    "gap": 4
+   },
+   {
+    "a": "2-84",
+    "b": "9+5054",
+    "gap": 4
+   },
+   {
+    "a": "3-153",
+    "b": "4-46",
+    "gap": 4
+   },
+   {
+    "a": "3-153",
+    "b": "10+7884",
+    "gap": 4
+   },
+   {
+    "a": "4-46",
+    "b": "11-303退款",
+    "gap": 4
+   },
+   {
+    "a": "5-108",
+    "b": "6-86",
+    "gap": 4
+   },
+   {
+    "a": "5-108",
+    "b": "12-134",
+    "gap": 4
+   },
+   {
+    "a": "6-86",
+    "b": "7-141不计",
+    "gap": 4
+   },
+   {
+    "a": "6-86",
+    "b": "13-145",
+    "gap": 4
+   },
+   {
+    "a": "7-141不计",
+    "b": "8-146",
+    "gap": 4
+   },
+   {
+    "a": "7-141不计",
+    "b": "14-363",
+    "gap": 4
+   },
+   {
+    "a": "8-146",
+    "b": "9+5054",
+    "gap": 4
+   },
+   {
+    "a": "8-146",
+    "b": "15-237",
+    "gap": 4
+   },
+   {
+    "a": "9+5054",
+    "b": "10+7884",
+    "gap": 4
+   },
+   {
+    "a": "9+5054",
+    "b": "16-140不计",
+    "gap": 4
+   },
+   {
+    "a": "10+7884",
+    "b": "11-303退款",
+    "gap": 4
+   },
+   {
+    "a": "10+7884",
+    "b": "17-46",
+    "gap": 4
+   },
+   {
+    "a": "11-303退款",
+    "b": "18-187",
+    "gap": 4
+   },
+   {
+    "a": "12-134",
+    "b": "13-145",
+    "gap": 4
+   },
+   {
+    "a": "12-134",
+    "b": "19-89024",
+    "gap": 4
+   },
+   {
+    "a": "13-145",
+    "b": "14-363",
+    "gap": 4
+   },
+   {
+    "a": "13-145",
+    "b": "20-51",
+    "gap": 4
+   },
+   {
+    "a": "14-363",
+    "b": "15-237",
+    "gap": 4
+   },
+   {
+    "a": "14-363",
+    "b": "21-168",
+    "gap": 4
+   },
+   {
+    "a": "15-237",
+    "b": "16-140不计",
+    "gap": 4
+   },
+   {
+    "a": "15-237",
+    "b": "22-81845",
+    "gap": 4
+   },
+   {
+    "a": "16-140不计",
+    "b": "17-46",
+    "gap": 4
+   },
+   {
+    "a": "16-140不计",
+    "b": "23-1479",
+    "gap": 4
+   },
+   {
+    "a": "17-46",
+    "b": "18-187",
+    "gap": 4
+   },
+   {
+    "a": "17-46",
+    "b": "24-60",
+    "gap": 4
+   },
+   {
+    "a": "18-187",
+    "b": "25-155",
+    "gap": 4
+   },
+   {
+    "a": "19-89024",
+    "b": "20-51",
+    "gap": 4
+   },
+   {
+    "a": "19-89024",
+    "b": "26-51",
+    "gap": 4
+   },
+   {
+    "a": "20-51",
+    "b": "21-168",
+    "gap": 4
+   },
+   {
+    "a": "20-51",
+    "b": "27-46",
+    "gap": 4
+   },
+   {
+    "a": "21-168",
+    "b": "22-81845",
+    "gap": 4
+   },
+   {
+    "a": "21-168",
+    "b": "28-46",
+    "gap": 4
+   },
+   {
+    "a": "22-81845",
+    "b": "23-1479",
+    "gap": 4
+   },
+   {
+    "a": "23-1479",
+    "b": "24-60",
+    "gap": 4
+   },
+   {
+    "a": "24-60",
+    "b": "25-155",
+    "gap": 4
+   },
+   {
+    "a": "26-51",
+    "b": "27-46",
+    "gap": 4
+   },
+   {
+    "a": "27-46",
+    "b": "28-46",
+    "gap": 4
+   }
+  ],
+  "prim": [
+   {
+    "sel": "#statPendGo",
+    "name": "#statPendGo 去处理",
+    "top": 167,
+    "bottom": 215,
+    "fromBottom": 565,
+    "upper": true,
+    "offscreen": false,
+    "h": 48,
+    "w": 288
+   }
+  ],
+  "contentBottom": 1307,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "stats-pend-banner",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 3,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#detailSplit",
+    "name": "#detailSplit 拆开",
+    "top": 575,
+    "bottom": 623,
+    "fromBottom": 157,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 54
+   }
+  ],
+  "contentBottom": 760,
+  "blank": 20,
+  "hscroll": false,
+  "over": [],
+  "name": "detail-source",
+  "cfg": "narrow",
+  "note": "合并过的手记，有「拆开」",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 3,
+  "small": [],
+  "tight": [],
+  "prim": [],
+  "contentBottom": 0,
+  "blank": 780,
+  "hscroll": false,
+  "over": [],
+  "name": "tabbar",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 46,
+  "small": [
+   {
+    "name": "#catStatsHint 往下翻",
+    "w": 36,
+    "h": 36,
+    "top": 483
+   }
+  ],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#impRemindGo",
+    "name": "#impRemindGo 去导入",
+    "top": 711,
+    "bottom": 759,
+    "fromBottom": 21,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 140
+   },
+   {
+    "sel": "#impRemindOff",
+    "name": "#impRemindOff 这个月不提醒",
+    "top": 711,
+    "bottom": 759,
+    "fromBottom": 21,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 140
+   }
+  ],
+  "contentBottom": 6274,
+  "blank": 0,
+  "hscroll": false,
+  "over": [],
+  "name": "ledger-remind",
+  "cfg": "narrow",
+  "note": "月初导入提醒",
+  "geo": {
+   "cover": [
+    "#impRemindGo 被 #filterFab、.tab-btn「统计」、.tab-txt「记账」 盖住",
+    "#impRemindOff 被 #actionBar、#fabAdd、.tab-txt「记账」、.tab-btn「设置」 盖住"
+   ],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 1,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#askOk",
+    "name": "#askOk 确定",
+    "top": 718,
+    "bottom": 766,
+    "fromBottom": 14,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 766,
+  "blank": 14,
+  "hscroll": false,
+  "over": [],
+  "name": "open-with-devoff",
+  "cfg": "narrow",
+  "note": "「用记问打开」开关关着",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "name": "devoff-leaks",
+  "cfg": "narrow",
+  "leaks": [],
+  "importRequests": [],
+  "errs": []
+ },
+ {
+  "name": "kb-add-record",
+  "cfg": "narrow",
+  "kb": true,
+  "kbOpen": true,
+  "gap": 0,
+  "top": 195,
+  "gripTop": 196,
+  "H": 460,
+  "lowerMoved": 0
+ },
+ {
+  "name": "kb-edit-record",
+  "cfg": "narrow",
+  "kb": true,
+  "kbOpen": true,
+  "gap": 0,
+  "top": 195,
+  "gripTop": 196,
+  "H": 460,
+  "lowerMoved": 0
+ },
+ {
+  "name": "kb-day",
+  "cfg": "narrow",
+  "kb": true,
+  "kbOpen": true,
+  "gap": 0,
+  "top": 238,
+  "gripTop": 239,
+  "H": 460,
+  "lowerMoved": 0
+ },
+ {
+  "name": "cat-manager-x1.3",
+  "cfg": "narrow",
+  "cat": true,
+  "rows": [
+   {
+    "cat": "未分类",
+    "cut": false,
+    "gap": 181,
+    "h": 62
+   },
+   {
+    "cat": "购物",
+    "cut": false,
+    "gap": 73,
+    "h": 62
+   },
+   {
+    "cat": "红包",
+    "cut": false,
+    "gap": 73,
+    "h": 62
+   },
+   {
+    "cat": "水电燃气费",
+    "cut": false,
+    "gap": 8,
+    "h": 62
+   },
+   {
+    "cat": "人情往来",
+    "cut": false,
+    "gap": 42,
+    "h": 62
+   },
+   {
+    "cat": "咖啡奶茶",
+    "cut": false,
+    "gap": 160,
+    "h": 62
+   },
+   {
+    "cat": "地铁公交",
+    "cut": false,
+    "gap": 160,
+    "h": 62
+   },
+   {
+    "cat": "房租物业",
+    "cut": false,
+    "gap": 160,
+    "h": 62
+   }
+  ]
+ },
+ {
+  "name": "swipe-ai-export",
+  "cfg": "narrow",
+  "swipe": true,
+  "what": "aiExpText",
+  "max": 5407,
+  "bottom": true,
+  "openAfterUp": true,
+  "top": true,
+  "openAfterDown": true,
+  "closed": true,
+  "ok": true
+ },
+ {
+  "name": "swipe-cat-manager",
+  "cfg": "narrow",
+  "swipe": true,
+  "what": "catList",
+  "max": 2334,
+  "bottom": true,
+  "openAfterUp": true,
+  "top": true,
+  "openAfterDown": true,
+  "closed": true,
+  "ok": true
+ },
+ {
+  "name": "swipe-templates",
+  "cfg": "narrow",
+  "swipe": true,
+  "what": "tplList",
+  "max": 1098,
+  "bottom": true,
+  "openAfterUp": true,
+  "top": true,
+  "openAfterDown": true,
+  "closed": true,
+  "ok": true
+ },
+ {
+  "name": "swipe-perf-log",
+  "cfg": "narrow",
+  "swipe": true,
+  "what": "uiSheet",
+  "max": 851,
+  "bottom": true,
+  "openAfterUp": true,
+  "top": true,
+  "openAfterDown": true,
+  "closed": true,
+  "ok": true
+ },
+ {
+  "name": "swipe-sheet-long-list",
+  "cfg": "narrow",
+  "swipe": true,
+  "what": "uiSheet",
+  "max": 2934,
+  "bottom": true,
+  "openAfterUp": true,
+  "top": true,
+  "openAfterDown": true,
+  "closed": true,
+  "ok": true
+ },
+ {
+  "name": "swipe-sheet-cat-pick",
+  "cfg": "narrow",
+  "swipe": true,
+  "what": "uiSheet",
+  "max": 2883,
+  "bottom": true,
+  "openAfterUp": true,
+  "top": true,
+  "openAfterDown": true,
+  "closed": true,
+  "ok": true
+ },
+ {
+  "name": "swipe-sheet-body-text",
+  "cfg": "narrow",
+  "swipe": true,
+  "what": "TEXTAREA",
+  "max": 3902,
+  "bottom": true,
+  "openAfterUp": true,
+  "top": true,
+  "openAfterDown": true,
+  "closed": true,
+  "ok": true
+ },
+ {
+  "name": "swipe-days-page",
+  "cfg": "narrow",
+  "swipe": true,
+  "what": "pageDays",
+  "max": 1200,
+  "bottom": true,
+  "openAfterUp": true,
+  "top": true,
+  "openAfterDown": true,
+  "closed": true,
+  "ok": true
+ },
+ {
+  "name": "center-ledger",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "从大到小",
+    "d": -0.1,
+    "h": 16,
+    "covered": false,
+    "cls": ".on",
+    "dc": -0.4,
+    "px": -0.1
+   },
+   {
+    "text": "从小到大",
+    "d": -0.1,
+    "h": 16,
+    "covered": false,
+    "cls": "button",
+    "dc": 0.1,
+    "px": -0.1
+   },
+   {
+    "text": "‹ 上一页",
+    "d": 0.3,
+    "h": 48,
+    "covered": true,
+    "cls": "button",
+    "dc": 0.3,
+    "px": null
+   },
+   {
+    "text": "下一页 ›",
+    "d": 0.8,
+    "h": 48,
+    "covered": true,
+    "cls": "button",
+    "dc": 0.8,
+    "px": null
+   },
+   {
+    "text": "统计",
+    "d": -0.2,
+    "h": 58,
+    "covered": false,
+    "cls": ".tab-btn",
+    "dc": -1,
+    "px": -0.2
+   },
+   {
+    "text": "记账",
+    "d": 0.3,
+    "h": 58,
+    "covered": false,
+    "cls": ".tab-btn.active",
+    "dc": -1,
+    "px": 0.3
+   },
+   {
+    "text": "设置",
+    "d": 0,
+    "h": 58,
+    "covered": false,
+    "cls": ".tab-btn",
+    "dc": -1,
+    "px": 0
+   },
+   {
+    "text": "筛选",
+    "d": -0.5,
+    "h": 50,
+    "covered": false,
+    "cls": "#filterFab.act-btn.act-filter",
+    "dc": -1,
+    "px": -0.5
+   },
+   {
+    "text": "记一笔",
+    "d": -0.5,
+    "h": 50,
+    "covered": false,
+    "cls": "#fabAdd.act-btn.act-add",
+    "dc": -1,
+    "px": -0.5
+   }
+  ]
+ },
+ {
+  "name": "center-add-record",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "今天 10:00",
+    "d": 0.8,
+    "h": 48,
+    "covered": false,
+    "cls": "#billTimeLine.rec-time",
+    "dc": 0,
+    "px": 0.8
+   },
+   {
+    "text": "支出",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.5,
+    "px": 0.3
+   },
+   {
+    "text": "收入",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0.5
+   },
+   {
+    "text": "工资",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.2,
+    "px": -0.2
+   },
+   {
+    "text": "水电燃气",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "话费网费",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "日用",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.2,
+    "px": 0
+   },
+   {
+    "text": "分类",
+    "d": 0.3,
+    "h": 52,
+    "covered": false,
+    "cls": "#billCatMore.rec-row",
+    "dc": 0,
+    "px": 0.3
+   },
+   {
+    "text": "统计计入",
+    "d": 0,
+    "h": 52,
+    "covered": false,
+    "cls": "#billMode.rec-row",
+    "dc": 0.1,
+    "px": 0
+   },
+   {
+    "text": "常用",
+    "d": 0.3,
+    "h": 52,
+    "covered": false,
+    "cls": "#billTplRow.rec-row",
+    "dc": 0,
+    "px": 0.3
+   },
+   {
+    "text": "备注",
+    "d": 0,
+    "h": 52,
+    "covered": false,
+    "cls": "#billRemarkRow.rec-row",
+    "dc": 0,
+    "px": 0
+   },
+   {
+    "text": "保存",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#addBill.ui-btn.primary",
+    "dc": 0,
+    "px": 0.5
+   },
+   {
+    "text": "关闭",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#closeAdd.ui-btn",
+    "dc": 0,
+    "px": 0.5
+   },
+   {
+    "text": "存为常用",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#billSaveTpl.ui-btn",
+    "dc": 0,
+    "px": 0.5
+   }
+  ]
+ },
+ {
+  "name": "center-cat-drawer",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "工资",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.2,
+    "px": -0.2
+   },
+   {
+    "text": "水电燃气",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "话费网费",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "日用",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.2,
+    "px": 0
+   },
+   {
+    "text": "未分类",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "吃饭",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": 0
+   },
+   {
+    "text": "购物",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.7,
+    "px": 0
+   },
+   {
+    "text": "出行",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "工资",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.2,
+    "px": -0.2
+   },
+   {
+    "text": "红包",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": 0
+   },
+   {
+    "text": "其他",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.2,
+    "px": 0
+   },
+   {
+    "text": "日用",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.2,
+    "px": 0
+   },
+   {
+    "text": "水电燃气",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "话费网费",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "取消",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": "#uiSheetCancel.ui-btn",
+    "dc": -0.5,
+    "px": 0.3
+   },
+   {
+    "text": "管理分类",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#catDrawerManage.ui-btn",
+    "dc": 0,
+    "px": 0.5
+   }
+  ]
+ },
+ {
+  "name": "center-mode-sheet",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "取消",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": "#uiSheetCancel.ui-btn.block",
+    "dc": -0.5,
+    "px": 0.3
+   }
+  ]
+ },
+ {
+  "name": "center-edit-record",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "10月28日 16:38",
+    "d": 0.1,
+    "h": 48,
+    "covered": false,
+    "cls": "#editTimeLine.rec-time",
+    "dc": 0,
+    "px": 0.1
+   },
+   {
+    "text": "支出",
+    "d": -0.4,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.5,
+    "px": -0.4
+   },
+   {
+    "text": "收入",
+    "d": -0.1,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc.sel-in",
+    "dc": 0,
+    "px": -0.1
+   },
+   {
+    "text": "工资",
+    "d": 0.4,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc.sel",
+    "dc": 0.2,
+    "px": 0.4
+   },
+   {
+    "text": "未分类",
+    "d": 0.1,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": 0.1
+   },
+   {
+    "text": "吃饭",
+    "d": 0.4,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": 0.4
+   },
+   {
+    "text": "购物",
+    "d": 0.4,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.7,
+    "px": 0.4
+   },
+   {
+    "text": "分类",
+    "d": -0.4,
+    "h": 52,
+    "covered": false,
+    "cls": "#editCatMore.rec-row.lock-on-refund",
+    "dc": 0,
+    "px": -0.4
+   },
+   {
+    "text": "删除这条记录",
+    "d": -0.4,
+    "h": 48,
+    "covered": false,
+    "cls": "#deleteInEdit.ui-btn.warn",
+    "dc": 0,
+    "px": -0.4
+   },
+   {
+    "text": "保存",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#saveEdit.ui-btn.primary",
+    "dc": 0,
+    "px": 0.5
+   },
+   {
+    "text": "取消",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": "#cancelEdit.ui-btn",
+    "dc": -0.5,
+    "px": 0.3
+   },
+   {
+    "text": "存为常用",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#editSaveTpl.ui-btn",
+    "dc": 0,
+    "px": 0.5
+   }
+  ]
+ },
+ {
+  "name": "center-stats",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "收支",
+    "d": 0,
+    "h": 28,
+    "covered": false,
+    "cls": ".on",
+    "dc": 0,
+    "px": 0
+   },
+   {
+    "text": "预算",
+    "d": 0,
+    "h": 28,
+    "covered": false,
+    "cls": "button",
+    "dc": 0.5,
+    "px": 0
+   },
+   {
+    "text": "‹",
+    "d": 0.3,
+    "h": 32,
+    "covered": false,
+    "cls": "#statPrevM.dt-nav",
+    "dc": -0.2,
+    "px": 0.3
+   },
+   {
+    "text": "›",
+    "d": 0.3,
+    "h": 32,
+    "covered": false,
+    "cls": "#statNextM.dt-nav",
+    "dc": -0.2,
+    "px": 0.3
+   },
+   {
+    "text": "支出",
+    "d": 0.1,
+    "h": 19,
+    "covered": false,
+    "cls": ".on",
+    "dc": 0,
+    "px": 0.1
+   },
+   {
+    "text": "收入",
+    "d": 0.1,
+    "h": 19,
+    "covered": false,
+    "cls": "button",
+    "dc": 0,
+    "px": 0.1
+   }
+  ]
+ },
+ {
+  "name": "center-settings",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "新建存档",
+    "d": -0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#newArchive.mini-btn.gold",
+    "dc": -0.5,
+    "px": -0.5
+   },
+   {
+    "text": "重命名",
+    "d": -0.7,
+    "h": 48,
+    "covered": false,
+    "cls": "#renameArchive.mini-btn",
+    "dc": -0.5,
+    "px": -0.7
+   },
+   {
+    "text": "删除存档",
+    "d": -0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#delArchive.mini-btn",
+    "dc": -0.5,
+    "px": -0.5
+   }
+  ]
+ },
+ {
+  "name": "center-days",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "添加日子",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#daysAdd.ui-btn.primary",
+    "dc": 0,
+    "px": 0.5
+   },
+   {
+    "text": "管理",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#daysManage.ui-btn.days-manage-btn",
+    "dc": 0,
+    "px": 0.5
+   }
+  ]
+ },
+ {
+  "name": "center-ask",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "确定",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": "#askOk.ui-btn.block",
+    "dc": 0,
+    "px": 0.5
+   },
+   {
+    "text": "取消",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": "#askCancel.ui-btn.block",
+    "dc": -0.5,
+    "px": 0.3
+   }
+  ]
+ },
+ {
+  "name": "center-sheet-cat-pick",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "水电燃气",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "未分类",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "吃饭",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc.sel",
+    "dc": 0.2,
+    "px": -0.2
+   },
+   {
+    "text": "购物",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.7,
+    "px": 0
+   },
+   {
+    "text": "出行",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "水电燃气",
+    "d": -0.2,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.3,
+    "px": -0.2
+   },
+   {
+    "text": "取消",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": "#uiSheetCancel.ui-btn",
+    "dc": -0.5,
+    "px": 0.3
+   }
+  ]
+ },
+ {
+  "name": "center-filter",
+  "cfg": "narrow",
+  "center": true,
+  "rows": [
+   {
+    "text": "关键词",
+    "d": 0,
+    "h": 52,
+    "covered": false,
+    "cls": ".rec-row.rec-row-in",
+    "dc": -0.2,
+    "px": 0
+   },
+   {
+    "text": "全部",
+    "d": -0.7,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc.sel",
+    "dc": -1,
+    "px": -0.7
+   },
+   {
+    "text": "计入",
+    "d": -0.7,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -0.5,
+    "px": -0.7
+   },
+   {
+    "text": "不计",
+    "d": -0.7,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -1,
+    "px": -0.7
+   },
+   {
+    "text": "往来",
+    "d": -0.5,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": -1,
+    "px": -0.5
+   },
+   {
+    "text": "全部",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc.sel",
+    "dc": 0,
+    "px": 0
+   },
+   {
+    "text": "未分类",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0.3
+   },
+   {
+    "text": "吃饭",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0
+   },
+   {
+    "text": "购物",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0.3
+   },
+   {
+    "text": "出行",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0.3
+   },
+   {
+    "text": "工资",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0.3
+   },
+   {
+    "text": "红包",
+    "d": 0,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0
+   },
+   {
+    "text": "其他",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.5,
+    "px": 0.5
+   },
+   {
+    "text": "日用",
+    "d": 0.5,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0.5,
+    "px": 0.5
+   },
+   {
+    "text": "水电燃气",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0.3
+   },
+   {
+    "text": "话费网费",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": ".cc",
+    "dc": 0,
+    "px": 0.3
+   },
+   {
+    "text": "清除全部",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": "#sheetClear.cancel",
+    "dc": -0.4,
+    "px": 0.3
+   },
+   {
+    "text": "完成",
+    "d": 0.3,
+    "h": 48,
+    "covered": false,
+    "cls": "#sheetApply.save",
+    "dc": -0.4,
+    "px": 0.3
+   }
+  ]
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 11,
+  "small": [],
+  "tight": [],
+  "prim": [],
+  "contentBottom": 760,
+  "blank": 20,
+  "hscroll": false,
+  "over": [],
+  "name": "theme",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": []
+  }
+ },
+ {
+  "H": 780,
+  "W": 360,
+  "n": 18,
+  "small": [],
+  "tight": [],
+  "prim": [
+   {
+    "sel": "#cpApply",
+    "name": "#cpApply 应用",
+    "top": 662,
+    "bottom": 710,
+    "fromBottom": 70,
+    "upper": false,
+    "offscreen": false,
+    "h": 48,
+    "w": 322
+   }
+  ],
+  "contentBottom": 766,
+  "blank": 14,
+  "hscroll": false,
+  "over": [],
+  "name": "color-picker",
+  "cfg": "narrow",
+  "note": "",
+  "geo": {
+   "cover": [],
+   "half": [
+    "#cpHex 被贴底按钮排切成半截"
+   ]
+  }
+ }
+]

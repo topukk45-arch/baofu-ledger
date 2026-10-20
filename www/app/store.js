@@ -1284,6 +1284,7 @@
                 if(Number.isInteger(x.cp)) r.cp=x.cp;
                 if(Number.isInteger(x.pm)) r.pm=x.pm;
                 if(typeof x.oc==='string' && x.oc) r.oc=x.oc.slice(0, 32);
+                if(x.rv===1) r.rv=1;   // 1021-T13：待确认分类
                 if(x.refundOf) r.refundOf=res(x.refundOf);
                 made.push(r); madeBy[r.id]=r;
                 if(i%200===199){ prog && prog('build', i+1, ws.records.length); await impYield(); }
@@ -1718,7 +1719,7 @@
                     Object.keys(c.set).forEach(k=>{
                         if(!FIELDS.includes(k)) return;
                         let v=c.set[k];
-                        if(k==='cat'){ if(typeof v!=='string' || !a.cats.includes(v)) return; }
+                        if(k==='cat'){ if(typeof v!=='string' || !a.cats.includes(v)) return; delete n.rv; }   // 1021-T13：改了分类就不用再确认
                         if(k==='remark'){ if(typeof v!=='string') return; v=v.slice(0, 5000); }
                         if(k==='skip' || k==='flow'){ v=v===true ? true : null; }
                         if(k==='aiFlag' && v!==null){ const f=impCleanAiFlag(v, id=>at.has(id) ? id : null); if(!f) return; v=f; }
@@ -2811,7 +2812,7 @@
                 if(Array.isArray(v)) return '['+v.map(canon).join(',')+']';
                 return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}';
             };
-            const o={}; Object.keys(r||{}).forEach(k=>{ if(k!=='id' && k!=='refundOf' && r[k]!==undefined) o[k]=r[k]; });
+            const o={}; Object.keys(r||{}).forEach(k=>{ if(k!=='id' && k!=='refundOf' && k!=='rv' && r[k]!==undefined) o[k]=r[k]; });   // 1021-T13：rv 不算（和 write.js 的 recHash 一样）
             const str=canon(o); let h1=0xdeadbeef, h2=0x41c6ce57;
             for(let i=0;i<str.length;i++){ const ch=str.charCodeAt(i); h1=Math.imul(h1^ch, 2654435761); h2=Math.imul(h2^ch, 1597334677); }
             h1=Math.imul(h1^(h1>>>16), 2246822507) ^ Math.imul(h2^(h2>>>13), 3266489909);
@@ -3044,6 +3045,7 @@
                 if(typeof r.oc==='string' && r.oc.trim()) rec.oc=r.oc.trim().slice(0, 32);
                 // 1017-G：AI 标记照搬（ref 等全部记录编好号再换，见下面）
                 const af=impCleanAiFlag(r.aiFlag, null); if(af) rec.aiFlag=af;
+                if(r.rv===1) rec.rv=1;   // 1021-T13：待确认分类标记照搬
                 if(r.id!=null) idMap.set(String(r.id), rec);
                 if(type==='income' && r.refundOf!=null && r.refundOf!=='') pend.push([rec, String(r.refundOf)]);
                 out.push(rec);

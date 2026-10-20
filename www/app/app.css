@@ -481,6 +481,9 @@
         .imp-empty-entry { display:block; width:100%; margin:0 0 10px; padding:8px 10px; font-size:13px; text-align:left; border:1px dashed var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-primary-deep); cursor:pointer; }
                 .stat-pend-banner { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 10px; margin-bottom:10px; border:1px solid var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-text); }
         .stat-pend-banner span { flex:1; }
+        /* 1021-T13：账单页「待确认分类 N」胶囊（48px 高，开着时主色实心） */
+        .rv-chip { display:inline-flex; align-items:center; min-height:48px; padding:0 16px; margin:0 0 10px; border:1px solid var(--c-border-mid); border-radius:24px; background:var(--c-surface); color:var(--c-text); font-size:14px; cursor:pointer; }
+        .rv-chip.on { background:var(--c-primary); border-color:var(--c-primary); color:#fff; }
         .stat-pend-banner button { border:none; background:none; color:var(--c-primary-deep); text-decoration:underline; font-size:12.5px; padding:0; cursor:pointer; }
         /* 年月选择器 */
         .ym-year-row { display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:14px; }

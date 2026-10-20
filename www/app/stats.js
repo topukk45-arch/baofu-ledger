@@ -818,6 +818,7 @@
             paintDetailRefund(rec, all);
             paintDetailSource(rec);
             paintDetailAiFlag(rec, all);
+            paintDetailRv(rec);
             const rk=(rec.remark||'').trim();
             $('detailRemark').textContent = rk || '（无备注）';
             // 1019-S：从别的列表点进来的，关掉回那个列表；详情里刷新同一条（去掉 AI 标记、拆开）时照旧留着
@@ -884,6 +885,26 @@
                 const data=getUserData(), i=data.findIndex(r=>r.id===rec.id);
                 if(i<0){ customAlert('这条记录不存在了'); return; }
                 const next=Object.assign({}, data[i]); delete next.aiFlag;
+                data[i]=next;
+                if(!saveUserData(data)) return;
+                try{ window.JiwenTabs.refreshAllViews(); }catch(_){}
+                openDetail(rec.id);
+            });
+            f.appendChild(b);
+        }
+        // 1021-T13：待确认分类（导入时推荐把握低 / 未分类、确认页没定过的，记录上 rv:1）：详情里一行「分类没问题」只去掉标记
+        function paintDetailRv(rec){
+            let f=$('detailRvField');
+            if(rec.rv!==1){ if(f) f.remove(); return; }
+            if(!f){ f=document.createElement('div'); f.className='rec-row detail-row detail-block'; f.id='detailRvField'; $('detailList').appendChild(f); }
+            f.textContent='';
+            const lab=document.createElement('span'); lab.className='rec-row-k'; lab.textContent='待确认'; f.appendChild(lab);
+            const v=document.createElement('div'); v.textContent='分类是导入时推荐的，还没确认。改了分类就不再提示。'; v.style.color='var(--c-text-soft)'; f.appendChild(v);
+            const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='detailRvOk'; b.textContent='分类没问题'; b.style.marginTop='6px';
+            b.addEventListener('click', ()=>{
+                const data=getUserData(), i=data.findIndex(r=>r.id===rec.id);
+                if(i<0){ customAlert('这条记录不存在了'); return; }
+                const next=Object.assign({}, data[i]); delete next.rv;
                 data[i]=next;
                 if(!saveUserData(data)) return;
                 try{ window.JiwenTabs.refreshAllViews(); }catch(_){}

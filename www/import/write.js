@@ -122,6 +122,9 @@
       if ((d.group !== 'add' && d.group !== 'neutral') || sumDone[d.key]) return;
       var o = base(d);
       setMode(o, d.mode);
+      // 1021-T13（实测 10-20）：待确认分类：推荐把握低或未分类、你没在确认页定过（还是推荐的）、不是不计的 → rv:1，
+      //   到账单页「待确认分类」里慢慢改（改了分类就去掉）。指纹 recHash 不含它
+      if (d.group === 'add' && d.mode !== 'skip' && d.catFrom === 'rec' && (o.cat === '未分类' || (d.rec && d.rec.conf === 'low'))) o.rv = 1;
       var t = newRec(o);
       tmpOfKey[d.key] = t;
       order(d.key, d.time, 0, { tmp: t });
@@ -331,7 +334,7 @@
     return '{' + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(v[k]); }).join(',') + '}';
   }
   function recHash(r) {
-    var o = {}; Object.keys(r || {}).forEach(function (k) { if (k !== 'id' && k !== 'refundOf' && r[k] !== undefined) o[k] = r[k]; });
+    var o = {}; Object.keys(r || {}).forEach(function (k) { if (k !== 'id' && k !== 'refundOf' && k !== 'rv' && r[k] !== undefined) o[k] = r[k]; });   // 1021-T13：待确认分类标记 rv 不算（去掉标记不算「导入后你改过」）
     var str = canon(o), h1 = 0xdeadbeef, h2 = 0x41c6ce57;
     for (var i = 0; i < str.length; i++) { var ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
     h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);

@@ -806,6 +806,7 @@
                 }
                 // 在原记录上合并，而不是整条重建：重建会把表单里没有的字段（skip，以及以后的新字段）悄悄丢掉
                 next=Object.assign({}, old, { id:editId, time, money:m.val, cat, remark, type });
+                if(next.rv && cat!==(old.cat||'未分类')) delete next.rv;   // 1021-T13：改了分类就不用再确认
                 setRecMode(next, getModeChips($('editMode')));
                 data[idx]=next;
                 syncRefunds(data, next);           // 分类 / 口径变了，退款跟着改
