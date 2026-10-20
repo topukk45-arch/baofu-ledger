@@ -159,6 +159,7 @@
             if(!list.length){
                 box.innerHTML='';
                 empty.style.display='block';
+                const ln=$('daysLines'); if(ln) ln.innerHTML='';
                 if(daysSelecting) exitSelectMode();   // 全删光了就自动退出选择模式
                 return;
             }
@@ -171,13 +172,24 @@
                 return `<div class="day-item${d.pin?' pinned':''}${on?' sel':''}" data-day-id="${escapeHtml(d.id)}">`
                     + `<div class="di-check">${on?'✓':''}</div>`
                     + `<div class="di-l">`
-                    +   `<div class="di-name">${d.pin?'<span class="pin">★置顶</span>':''}${escapeHtml(d.name)}</div>`
+                    +   `<div class="di-name">${d.pin?'<svg class="di-star" viewBox="0 0 24 24" role="img" aria-label="置顶"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>':''}<span class="di-nm">${escapeHtml(d.name)}</span></div>`
                     +   `<div class="di-date">${escapeHtml(fmtDayDate(d.date))}</div>`
                     + `</div>`
                     + `<div class="di-r">${dayNumHtml(c,'di')}</div>`
                     + `</div>`;
             }).join('');
+            paintDaysLines();
         }
+        // 1020-H：日子下面接着画几条更淡的虚线，一直画到底部操作栏上面（像草稿纸那样排）
+        function paintDaysLines(){
+            const box=$('daysLines'); if(!box) return;
+            const list=$('daysList'), bar=$('daysBar');
+            const top=list.getBoundingClientRect().bottom + window.scrollY;
+            const barTop=bar && bar.getBoundingClientRect().height ? bar.getBoundingClientRect().top + window.scrollY : window.innerHeight;
+            const n=Math.max(0, Math.min(30, Math.floor((barTop - top)/72)));
+            if(box.childElementCount!==n) box.innerHTML='<div></div>'.repeat(n);
+        }
+        window.addEventListener('resize', ()=>{ if($('pageDays').style.display==='block') paintDaysLines(); });
         // 管理页列表：事件委托（与账单表格/明细行同一套模式，不写内联 onclick）
         // 选择模式下改为「点行 = 勾选/取消」，不再进编辑——同一个 DOM，两种语义。
         $('daysList').addEventListener('click', e=>{

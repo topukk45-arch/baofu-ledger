@@ -1,5 +1,5 @@
 (function(){
-        const { $, pad } = window.JiwenBase;   // 用到前面模块的
+        const { $, pad, setTxtNudge, txtNudge } = window.JiwenBase;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
 
         // ===== 1015-A：账单导入（开发中）=====
@@ -7,7 +7,7 @@
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devPerfBtn').style.display = $('devSplashBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()) splashWaitPaint(); }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devPerfBtn').style.display = $('devSplashBtn').style.display = $('devNudgeBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()){ splashWaitPaint(); nudgePaint(); } }
         // 1019-X：开发开关里的「启动画面等首屏」（默认开）：真正的开关存在原生层（SharedPreferences，打开 App 时原生那边一开始就要知道），
         //   这里只是读 / 写它；关掉 = 回到 1019-U 之前「系统画出第一帧就收启动画面」，下次打开 App 生效。不在手机上时记在 localStorage 里只为显示
         function splashPlugin(){ const c=window.Capacitor; return c && c.Plugins && c.Plugins.Launch && typeof c.Plugins.Launch.setWait==='function' ? c.Plugins.Launch : null; }
@@ -24,6 +24,17 @@
             const L=splashPlugin(); if(L) Promise.resolve(L.setWait({ on })).catch(()=>{});
             splashWaitPaint();
             customAlert(on ? '已打开：启动画面等首屏画好再收（最多 1 秒）。下次打开 App 生效。' : '已关掉：启动画面像 1019-U 之前那样，系统画出第一帧就收。下次打开 App 生效。\n\n对比完告诉开发者用哪种当默认。', '启动画面等首屏');
+        });
+        // 1020-H：开发开关里的「字往下挪几像素（开发中）」：0～3px（每档 0.5），只存这台手机（localStorage 的 app_txt_nudge，不进备份），
+        //   写进 html 上的 --txt-nudge-dev（按钮、分类块、收支、列表卡的行里的字一起往下挪），手机上看着调，定了再写死、去掉这个调节。
+        //   「自动」= 不写（支持 text-box 的按字形裁、不挪；不支持的旧 WebView 往下挪 1px）
+        function nudgePaint(){ const v=$('devNudgeVal'); if(!v) return; const n=txtNudge(); v.textContent = n===null ? '自动' : n+' px'; }
+        $('devNudgeBtn').addEventListener('click', ()=>{
+            const cur=txtNudge();
+            window.JiwenSheet.pick({ title:'字往下挪几像素', sub:'按钮、分类块、收支、列表卡的行里的字一起往下挪，选了马上生效，只存这台手机。',
+                value: cur===null ? 'auto' : String(cur),
+                options:[{ value:'auto', label:'自动（不支持按字形裁的旧手机挪 1px）' }].concat([0, 0.5, 1, 1.5, 2, 2.5, 3].map(n=>({ value:String(n), label:n+' px' }))),
+                onPick:v=>{ setTxtNudge(v==='auto' ? null : +v); nudgePaint(); } });
         });
         $('setBuild').textContent=$('loginBuild').textContent;
         renderDevImport();

@@ -590,7 +590,7 @@ async function run(cfg, port, browser) {
   if (want(9)) {
     const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(40), cats: BASE_CATS.slice(0, 10), extra: id => ({ ['days_' + id]: JSON.stringify([{ id: 'd1', name: '虚构纪念日', date: '2026-11-01' }, { id: 'd2', name: '虚构生日', date: '2027-03-08' }]) }) }) });
     const centerIn = scopeSel => page.evaluate(scopeSel => {
-      const SEL = 'button, .seg > *, .cc, .chip, .tab-btn, .ui-btn, .io-chips > *, .mode-chips > *, .cat-chip, [role="button"], .days-manage, .days-back';
+      const SEL = 'button, .seg > *, .cc, .chip, .tab-btn, .ui-btn, .io-chips > *, .mode-chips > *, .cat-chip, [role="button"], .days-manage, .days-back, .cs-row, .set-item, .rec-row';   // 1020-H：加上列表行（分类汇总、设置、列表卡）
       const cv = document.createElement('canvas').getContext('2d');
       const vis = el => { const r = el.getBoundingClientRect(); if (!r.width || !r.height) return false; const cs = getComputedStyle(el); return cs.visibility !== 'hidden' && cs.display !== 'none' && r.bottom > 0 && r.top < innerHeight; };
       const out = [];
@@ -618,15 +618,54 @@ async function run(cfg, port, browser) {
         // 框的上下中心：去掉上下边框（看着的框是边框以内）
         const bt = b.top + parseFloat(bs.borderTopWidth), bb = b.bottom - parseFloat(bs.borderBottomWidth);
         const d = Math.round(((top + bot) / 2 - (bt + bb) / 2) * 10) / 10;
-        out.push({ text: txt.slice(0, 12), d, h: Math.round(b.height), cls: (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : el.tagName.toLowerCase()) });
+        // 1020-H：再按截图上的像素量一次（字真画出来的上下边），这里先记下字的左右范围和框的上下
+        let tl = Infinity, tr = -Infinity;
+        { const tw2 = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.nodeValue.trim() && vis(n.parentElement) ? 1 : 2 }); let m2;
+          while ((m2 = tw2.nextNode())) { const r = document.createRange(); r.selectNodeContents(m2); [...r.getClientRects()].forEach(x => { if (x.width > 0) { tl = Math.min(tl, x.left); tr = Math.max(tr, x.right); } }); } }
+        // 被别的东西盖住的（比如滚到贴底的按钮排下面）按像素量不准，不量像素（照旧按 canvas 算）
+        const ex = (b.left + b.right) / 2, inEl = y => { const h = document.elementFromPoint(ex, y); return h && (el === h || el.contains(h)); };
+        const covered = !inEl((bt + bb) / 2) || !inEl(bt + 2) || !inEl(bb - 2);   // 中间、上沿、下沿都得是它自己
+        out.push({ text: txt.slice(0, 12), d, h: Math.round(b.height), covered, cls: (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : el.tagName.toLowerCase()),
+          box: { t: bt, b: bb, l: tl, r: tr } });
       }));
       return out;
     }, scopeSel || null);
-    const C = async (name, scopeSel) => { const rows = await centerIn(scopeSel); results.push({ name: 'center-' + name, cfg: cfg.name, center: true, rows }); if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-center-${name}.png`) }); };
+    // 1020-H：按像素量：截一张图交回页面里解开（浏览器自己解 PNG），每个框只看字左右那一段：每一列拿框顶上（上内边距里）和框底下的颜色当底色，
+    //   和底色差得多的算字，找出最上、最下一行，字的上下中心和框（边框以内）的上下中心比。canvas 的量法（d）留着对照，表里按像素的（px）算。
+    const inkIn = async rows => {
+      const shot = (await page.screenshot()).toString('base64');
+      return page.evaluate(async ({ shot, rows }) => {
+        const img = new Image(); img.src = 'data:image/png;base64,' + shot; await img.decode();
+        const k = img.naturalWidth / innerWidth, c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+        const g = c.getContext('2d'); g.drawImage(img, 0, 0); const D = g.getImageData(0, 0, c.width, c.height).data, W = c.width;
+        const px = (x, y) => { const i = (y * W + x) * 4; return [D[i], D[i + 1], D[i + 2]]; };
+        const diff = (a, b) => Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]);
+        return rows.map(r => {
+          const B = r.box; if (!B || !(B.r > B.l) || r.covered) return null;
+          const y0 = Math.ceil((B.t + 2) * k), y1 = Math.floor((B.b - 2) * k), x0 = Math.ceil(B.l * k), x1 = Math.floor(B.r * k);
+          if (y1 - y0 < 6 || y0 < 0 || y1 >= c.height) return null;
+          let top = -1, bot = -1;
+          for (let y = y0 + 1; y < y1 - 1; y++) {
+            for (let x = x0; x < x1; x++) { const p = px(x, y), m = Math.min(diff(p, px(x, y0)), diff(p, px(x, y1))); if (m > 90) { if (top < 0) top = y; bot = y; break; } }
+          }
+          if (top < 0) return null;
+          return Math.round((((top + bot + 1) / 2) / k - (B.t + B.b) / 2) * 10) / 10;
+        });
+      }, { shot, rows });
+    };
+    const C = async (name, scopeSel) => { const rows = await centerIn(scopeSel); const ink = await inkIn(rows); rows.forEach((r, i) => { r.dc = r.d; r.px = ink[i]; if (ink[i] !== null && ink[i] !== undefined) r.d = ink[i]; delete r.box; });
+      results.push({ name: 'center-' + name, cfg: cfg.name, center: true, rows }); if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-center-${name}.png`) }); };
     await tab(page, 'ledger');
     await C('ledger', '#pageLedger, #tabBar, #actionBar');
     await click(page, '.act-add'); await page.waitForTimeout(500); await page.evaluate(() => window.kpClose && window.kpClose()); await page.waitForTimeout(400);
     await C('add-record', '#addMask');
+    // 1020-H：分类抽屉、统计面板
+    await page.click('#billCatMore'); await page.waitForTimeout(500);
+    await C('cat-drawer', '#uiSheetMask');
+    await page.evaluate(() => window.JiwenSheet.back()); await page.waitForTimeout(400);
+    await page.click('#billMode'); await page.waitForTimeout(500);
+    await C('mode-sheet', '#uiSheetMask');
+    await page.evaluate(() => window.JiwenSheet.back()); await page.waitForTimeout(400);
     await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400);
     await page.evaluate(() => { const r = document.querySelector('#billList [data-act="edit"]'); if (r) window.openEdit(r.dataset.id); }); await page.waitForTimeout(600);
     await page.evaluate(() => window.kpClose && window.kpClose()); await page.waitForTimeout(300);

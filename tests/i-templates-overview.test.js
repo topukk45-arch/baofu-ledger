@@ -257,7 +257,9 @@ function bootSync(arc, extraArchives){
   const rule=sel=>css.filter(r=>r.selectorText.split(',').map(x=>x.trim()).includes(sel));
   const selRules=[...rule('.cat-chips .cc.sel'), ...rule('.filter-chips .cc.sel')];
   ok(selRules.length>=2 && selRules.every(r=>!r.style.fontWeight), '分类 / 常用 / 口径 / 筛选标签选中时不改字重');
-  ok(rule('.cat-chips .cc').some(r=>r.style.lineHeight==='20px') && rule('.filter-chips .cc').some(r=>r.style.lineHeight==='20px'), '标签行高固定，不随字体变化');
+  // 1020-H：行高 max(20px, 1.43em)：只跟字号走（系统字体调大时跟着放大），照样不随字体、字重变化
+  const LH=v=>v==='20px' || /^max\(20px,\s*1\.43em\)$/.test(v);
+  ok(rule('.cat-chips .cc').some(r=>LH(r.style.lineHeight)) && rule('.filter-chips .cc').some(r=>LH(r.style.lineHeight)), '标签行高固定，不随字体变化');
 }
 
 console.log(`\n1010-I 专项：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);

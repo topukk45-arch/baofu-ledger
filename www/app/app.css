@@ -266,7 +266,7 @@
         .cat-chips .cc.sel {
             background:var(--c-sel-bg);
             border-color:var(--c-sel-border); -webkit-text-stroke:0.45px currentColor; }
-        .cat-chips .cc, .filter-chips .cc { line-height:20px; }
+        .cat-chips .cc, .filter-chips .cc { line-height:20px; line-height:max(20px, 1.43em); }   /* 1020-H：字号放大（系统字体调大）时行高跟着放大，原来定死 20px，字偏上 1.2px */
         .cat-chips .cc.pressed { transform:scale(0.95); filter:brightness(0.95); }
 
         /* 收支标签：复用 cat-chips 布局，但选中态用语义色（支出红 / 收入绿）便于一眼区分 */
@@ -328,9 +328,20 @@
            （16px 粗体约 1.4px，按钮越大越明显）；text-box 把字体上下的留白裁掉、按大写字母顶到基线居中（<button> 自己会把内容上下居中），
            不管手机字体留白多大都一样。不支持的旧 WebView 就是原来的样子。只用在 <button> 上：div 做的分类块、口径不会自己居中，裁了反而偏上。 */
         @supports (text-box: trim-both cap alphabetic) {
-            button.ui-btn, button.days-back, button.days-manage, .pager button, button.ds-btn, .seg > button { text-box: trim-both cap alphabetic; }
+            button.ui-btn, button.days-back, button.days-manage, .pager button, button.ds-btn, .seg > button, .dialog-btn > button.save, .dialog-btn > button.cancel { text-box: trim-both cap alphabetic; }   /* 1020-H：加上筛选浮层、共用面板里老样式的「完成 / 清除全部 / 取消」（按像素量偏下 1.3px） */
             /* 只有一个箭头的（翻月 ‹ ›、分类汇总的 ↓ ↑）：箭头落在小写字母高度的中间，按小写字母顶到基线裁 */
-            button.dt-nav, button.cs-hint { text-box: trim-both ex alphabetic; }
+            button.dt-nav { text-box: trim-both ex alphabetic; }
+        }
+        /* 1020-H：字上下居中再补一刀（照安卓自带的 Noto Sans CJK SC 按截图像素量，tests/ui/audit.js 第 9 段）：
+           <div> / flex 做的块（分类块、收支、分类抽屉、列表卡的行、记账时间）原来没裁，字偏上 0.5～1px、列表卡的行偏下 0.8px。
+           text-box 只对「块里的字」起作用，flex 容器本身裁不到，所以字包一层 span（.cc-t），裁 span。
+           不支持 text-box 的旧 WebView：统一往下挪 --txt-nudge-auto（1px）。开发开关里「字往下挪几像素（开发中）」写 --txt-nudge-dev（0～3px，
+           只存这台手机），有它就用它，手机上看着调，定了再写死。 */
+        :root { --txt-nudge-auto:0px; --txt-nudge:var(--txt-nudge-dev, var(--txt-nudge-auto)); }
+        @supports not (text-box: trim-both cap alphabetic) { :root { --txt-nudge-auto:1px; } }
+        @supports (text-box: trim-both cap alphabetic) {
+            .cc-t, .rec-time-txt, .rec-row-k, .rec-row-v, .mode-pick-txt b { text-box: trim-both cap alphabetic; }
+            .rec-row-v { overflow:clip; overflow-clip-margin:8px; }   /* 裁掉上下留白以后框只有大写字母高，字的上下会探出去一点：别把它剪掉 */
         }
         .ui-btn.small { font-size:14px; padding:max(8px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) 14px; }
         .ui-btn.block { display:block; width:100%; }
@@ -406,7 +417,7 @@
             padding-bottom:env(safe-area-inset-bottom);
             box-shadow:0 -2px 12px rgba(var(--c-shadow-rgb),0.18); }
         .tab-btn { flex:1; border:none; background:transparent; cursor:pointer;
-            padding:9px 0 8px; display:flex; flex-direction:column; align-items:center; gap:2px;
+            padding:8px 0 9px; display:flex; flex-direction:column; align-items:center; gap:2px;   /* 1020-H：原来上 9 下 8，图标 + 字整体偏下 1.3px */
             color:var(--c-text-soft); transition:0.15s; }
         /* 1010-K3：底栏文字用霞鹜文楷（LXGW WenKai，SIL OFL 1.1，可商用），
            只裁出「统计记账设置」6 个字内嵌，不随系统字体变；其他字照常用系统字体。 */
@@ -693,6 +704,15 @@
             background:rgba(0,0,0,0.3); display:none;
             align-items:center; justify-content:center; z-index:1000;
             padding:16px; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        /* 1020-H：遮罩出来时和面板同一个时长慢慢变深（消失由影子的 ghostBgOut 慢慢变浅）；
+           第二层不加深：上面再叠的一层（.stack-over，sheet.js 的 stackPaint 加）遮罩透明，只靠面板自己的阴影分开层次 */
+        .mask { animation:maskIn var(--sheet-ms) var(--sheet-ease); }
+        @keyframes maskIn { from { background-color:rgba(0,0,0,0); } to { background-color:rgba(0,0,0,0.3); } }
+        .mask.stack-over { background:transparent; animation:none; }
+        .mask.stack-over > .sheet, .mask.stack-over > .edit-dialog, .mask.stack-over > .dt-dialog { box-shadow:0 -6px 24px rgba(var(--c-shadow-rgb),0.45); }
+        .sheet-ghost.stack-over, .sheet-ghost.stack-over.ghost-down { background:transparent; animation:none; }
+        #kpMask { animation:none; }
+        @media (prefers-reduced-motion: reduce) { .mask { animation:none; } }
         #askMask            { z-index:1040; }   /* 提示/确认：永远最顶 */
         #askMask.as-page    { z-index:1010; }   /* 当内容页用（批量确认清单）：降档，好让详情盖上来 */
         #detailMask         { z-index:1020; }   /* 账单详情：从清单/当日明细点进来的下一层 */
@@ -1122,26 +1142,40 @@
             color:var(--c-text-soft); cursor:pointer; }
 
         /* 管理页 */
-        /* 1020-D：顶上一行照 App 别的页面：左「‹ 返回」、中间标题、右「管理」，返回和管理都是文字按钮（没有框、48px 高、字上下居中）；
-           「添加日子」是主按钮，放进底部操作栏 .days-bar */
-        .days-head { display:flex; align-items:center; gap:8px; margin:-8px 0 12px; padding-bottom:4px; border-bottom:1px solid var(--c-border); }
-        .days-back, .days-manage { display:inline-block; text-align:center; min-height:var(--ui-tap); min-width:var(--ui-tap);
-            padding:0 12px; border:none; background:none; border-radius:10px; font-size:16px; line-height:1; font-family:inherit;
-            color:var(--c-primary-dark); cursor:pointer; }
-        .days-back { margin-left:-12px; }
-        .days-manage { margin-right:-12px; }
-        .days-back:active, .days-manage:active { background:var(--c-chip); }
-        .days-title { font-size:18px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; flex:1; line-height:var(--ui-tap); }
+        /* 1020-H：照草图「日子 · 满屏横线」：去掉外面那圈卡片框、整页铺满；顶上一行「‹（图标按钮 48px）日子」，下面一条实线 */
+        .days-head { display:flex; align-items:center; gap:4px; height:56px; margin:0; padding:0 4px; border-bottom:2px solid var(--c-primary-dark); }
+        .days-back { display:flex; align-items:center; justify-content:center; width:var(--ui-tap); height:var(--ui-tap); padding:0; margin:0;
+            border:none; background:none; border-radius:10px; color:var(--c-text); cursor:pointer; }
+        .days-back-ico { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        .days-back:active { background:var(--c-chip); }
+        .days-title { font-size:19px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; flex:1; line-height:24px; }
+        /* 「管理」是次要按钮：底色、边框、主色字 */
+        .ui-btn.days-manage-btn { color:var(--c-primary-dark); }
+        body.days-page:not(.login-mode) .container { background:transparent; border:none; border-radius:0; box-shadow:none; padding:0; }
+        body.days-page:not(.login-mode) { padding:0; }
+        /* 每个日子一行 72px，下面一条虚线（和首页分类汇总同一个样子）；置顶的前面一个小星；「还有 / 已经 N 天」靠右 */
+        #pageDays .day-item { height:72px; margin:0; padding:0 20px; border:none; border-bottom:1px dashed var(--c-border); border-radius:0; background:transparent; box-shadow:none; }
+        #pageDays .day-item.pinned { background:transparent; border-color:var(--c-border); }
+        #pageDays .day-item:active { background:var(--c-chip); box-shadow:none; }
+        #pageDays .day-item .di-name { display:flex; align-items:center; gap:6px; font-size:16px; font-weight:500; line-height:22px; margin-bottom:4px; }
+        #pageDays .day-item .di-name .di-star { width:14px; height:14px; flex:none; fill:var(--c-primary-dark); }
+        #pageDays .day-item .di-nm { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        #pageDays .day-item .di-date { font-size:13px; line-height:18px; }
+        #pageDays .day-item .di-r { display:flex; align-items:baseline; gap:3px; white-space:nowrap; }
+        #pageDays .day-item .di-num { font-size:28px; line-height:32px; }
+        body.days-selecting #pageDays .day-item.sel { background:var(--c-chip); }
+        .days-lines > div { height:72px; border-bottom:1px dashed var(--c-border); opacity:.5; }
+        .days-empty { padding:24px 20px; }
         /* 底部操作栏：在底栏（60px）上面，和账单页「筛选 / 记一笔」那排同一个高度；平时只有「添加日子」，选择模式只有「删除」 */
         .ui-bar.days-bar { bottom:calc(60px + env(safe-area-inset-bottom)); z-index:900; padding:10px 12px;
             background:linear-gradient(to top, var(--c-bg) 75%, transparent); border-top:none; box-shadow:none; }
         @media (min-width:761px){ .ui-bar.days-bar { padding-left:calc(50% - 366px); padding-right:calc(50% - 366px); } }
         .days-bar .days-del-btn { display:none; }
-        body.days-selecting .days-bar .days-add { display:none; }
+        body.days-selecting .days-bar .days-add, body.days-selecting .days-bar .days-manage-btn { display:none; }
         body.days-selecting .days-bar .days-del-btn { display:block; }
         body.kb-open .days-bar { display:none; }
         /* 日子管理页开着时：卡片跟着内容高度走（不再把底栏留白算进卡片里），卡片外面让出底部操作栏 + 底栏 */
-        body.days-page:not(.login-mode) .container { padding-bottom:18px; margin-bottom:calc(138px + env(safe-area-inset-bottom)); }
+        body.days-page:not(.login-mode) .container { margin-bottom:calc(196px + env(safe-area-inset-bottom)); }   /* 1020-H：操作栏两个按钮（添加日子、管理）+ 底栏 */
 
         /* ===== 选择模式（批量删除）=====
            不新开弹窗，而是把同一个列表就地切成可勾选状态：
@@ -1285,6 +1319,13 @@
             border:1px solid var(--c-border-mid); background:var(--c-surface); color:var(--c-primary-dark); font-size:18px; line-height:1;
             box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),0.3); cursor:pointer; opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
         .cs-hint.show { opacity:1; pointer-events:auto; }
+        /* 1020-H：↓ / ↑ 不再用字画（按截图像素量，字形偏下 2.5px，各家字体的箭头高低还不一样），画成 Lucide arrow-down 图标、在圆里正中；
+           字还在按钮里（读屏、测试照旧认 ↓ / ↑），只是看不见 */
+        .cs-hint { font-size:0; display:flex; align-items:center; justify-content:center; }
+        .cs-hint::before { content:''; width:18px; height:18px; background:currentColor;
+            -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14'/%3E%3Cpath d='m19 12-7 7-7-7'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14'/%3E%3Cpath d='m19 12-7 7-7-7'/%3E%3C/svg%3E") center / contain no-repeat; }
+        .cs-hint[data-end="1"]::before { transform:rotate(180deg); }
         .cs-hint:active { transform:scale(0.92); }
 
         /* 列表式选项：一行一个、左对齐，多了框内滑动（批量菜单、选分类） */
@@ -1545,7 +1586,6 @@
         .edit-dialog .dt-input, .form-box .dt-input { padding-top:14px; padding-bottom:13px; }
         .cs-display { padding-top:14px; padding-bottom:14px; }
         .cs-opt { padding-top:14px; padding-bottom:14px; }
-        .cat-chips .cc { padding-top:13px; padding-bottom:13px; }
         .mode-chips .cc { padding:13px 0; }
         .filter-chips .cc { padding-top:13px; padding-bottom:13px; }
         .to-top, .clear-filter-fab { width:var(--ui-tap); height:var(--ui-tap); }
@@ -1586,3 +1626,9 @@
         .perf-list { margin:0; white-space:pre-wrap; word-break:break-all; font-size:12px; line-height:1.6; color:var(--c-text);
             font-family:ui-monospace, Menlo, Consolas, monospace; background:var(--c-surface); border:1px solid var(--c-border); border-radius:8px; padding:8px 10px; }
         .bg-sel-all { min-height:var(--ui-tap); margin:8px 0 2px; padding:0 18px; }   /* 1019-G：预算建议的全选 / 全不选 */
+        /* 1020-H：字往下挪（--txt-nudge，见上面「字上下居中再补一刀」）：固定高度、字靠 flex 居中的，上面多垫 2 倍（中心往下 1 倍）；靠上下内边距撑的，上多下少 */
+        .cat-chips.rec-cats .cc, .cat-chips.cat-grid4 .cc, .io-chips.io-pair .cc, .rec-row, .rec-time { padding-top:calc(2 * var(--txt-nudge)); }
+        .cat-chips .cc { padding-top:calc(13px + var(--txt-nudge)); padding-bottom:calc(13px - var(--txt-nudge)); }
+        .cat-chips.rec-cats .cc, .cat-chips.cat-grid4 .cc, .io-chips.io-pair .cc { padding-bottom:0; }
+        .ui-btn { padding-top:calc(max(11px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) + var(--txt-nudge)); padding-bottom:calc(max(11px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) - var(--txt-nudge)); }
+        .ui-btn.small { padding-top:calc(max(8px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) + var(--txt-nudge)); padding-bottom:calc(max(8px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) - var(--txt-nudge)); }

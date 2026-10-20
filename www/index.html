@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1020-G">
+    <link rel="stylesheet" href="app/app.css?v=1020-H">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-G</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-H</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -200,6 +200,7 @@
                     <button class="set-item" id="devLogsBtn" style="display:none"><span>导入记录（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devRulesBtn" style="display:none"><span>管理导入规则（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devPerfBtn" style="display:none"><span>性能记录（开发中）</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="devNudgeBtn" style="display:none"><span>字往下挪几像素（开发中）</span><span class="set-arrow" id="devNudgeVal">自动</span></button>
                     <button class="set-item" id="devSplashBtn" style="display:none"><span>启动画面等首屏（开发中）</span><span class="set-arrow" id="devSplashVal">开</span></button>
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
@@ -286,11 +287,10 @@
                  理由：倒数日与账单无数据关联，频次也远低于记账；提到 tab 级会挤掉
                  「记账」的居中位置（拇指最易触达处），为辅助功能牺牲核心功能不划算。 -->
             <div class="tab-page" id="pageDays" style="display:none">
-                <!-- 1020-D：顶上一行「‹ 返回」+ 标题 +「管理」（文字按钮，48px 高）；「添加日子」是主按钮，在底部操作栏 -->
+                <!-- 1020-H：照草图「日子 · 满屏横线」：顶上一行「‹（图标按钮，48px）日子」，下面一条实线；「管理」挪到底部操作栏 -->
                 <div class="days-head" id="daysHeadNormal">
-                    <button class="days-back" id="daysBack">‹ 返回</button>
+                    <button class="days-back" id="daysBack" aria-label="返回"><svg class="days-back-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
                     <span class="days-title">日子</span>
-                    <button class="days-manage" id="daysManage">管理</button>
                 </div>
                 <!-- 选择模式下顶替上面那条：取消 / 已选N项 / 全选 -->
                 <div class="days-sel-head" id="daysHeadSelect" style="display:none">
@@ -299,13 +299,16 @@
                     <button class="ds-btn" id="daysSelAll">全选</button>
                 </div>
                 <div id="daysList"></div>
+                <!-- 1020-H：没东西的地方接着画几条更淡的虚线到底（像草稿纸，没有纸的纹理） -->
+                <div class="days-lines" id="daysLines" aria-hidden="true"></div>
                 <div class="days-empty" id="daysEmpty" style="display:none">
                     还没有记录任何日子<br>点下面的「添加日子」记下第一个吧
                 </div>
-                <!-- 底部操作栏（.ui-bar，在底栏上面）：平时是「＋ 添加日子」，选择模式下换成「删除选中的 N 项」 -->
+                <!-- 底部操作栏（.ui-bar，在底栏上面）：「添加日子」（主按钮）在上、「管理」（次要按钮）在下；选择模式下换成「删除选中的 N 项」 -->
                 <div class="ui-bar days-bar" id="daysBar">
-                    <button class="ui-btn primary days-add" id="daysAdd">＋ 添加日子</button>
-                    <button class="ui-btn warn days-del-btn" id="daysDelBtn" disabled>删除选中的 0 项</button>
+                    <button class="ui-btn primary days-add ui-full" id="daysAdd">添加日子</button>
+                    <button class="ui-btn days-manage-btn ui-full" id="daysManage">管理</button>
+                    <button class="ui-btn warn days-del-btn ui-full" id="daysDelBtn" disabled>删除选中的 0 项</button>
                 </div>
             </div>
         </div>
@@ -882,26 +885,26 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1020-G"></script>
-    <script src="app/store.js?v=1020-G"></script>
-    <script src="app/select.js?v=1020-G"></script>
-    <script src="app/keypad.js?v=1020-G"></script>
-    <script src="app/text.js?v=1020-G"></script>
-    <script src="app/sheet.js?v=1020-G"></script>
-    <script src="app/ask.js?v=1020-G"></script>
-    <script src="app/date.js?v=1020-G"></script>
-    <script src="app/ai-export.js?v=1020-G"></script>
-    <script src="app/import-entry.js?v=1020-G"></script>
-    <script src="app/forms.js?v=1020-G"></script>
-    <script src="app/ledger.js?v=1020-G"></script>
-    <script src="app/cats.js?v=1020-G"></script>
-    <script src="app/stats.js?v=1020-G"></script>
-    <script src="app/days.js?v=1020-G"></script>
-    <script src="app/settings.js?v=1020-G"></script>
-    <script src="app/tabs.js?v=1020-G"></script>
-    <script src="app/login.js?v=1020-G"></script>
-    <script src="app/back.js?v=1020-G"></script>
-    <script src="app/boot.js?v=1020-G"></script>
+    <script src="app/base.js?v=1020-H"></script>
+    <script src="app/store.js?v=1020-H"></script>
+    <script src="app/select.js?v=1020-H"></script>
+    <script src="app/keypad.js?v=1020-H"></script>
+    <script src="app/text.js?v=1020-H"></script>
+    <script src="app/sheet.js?v=1020-H"></script>
+    <script src="app/ask.js?v=1020-H"></script>
+    <script src="app/date.js?v=1020-H"></script>
+    <script src="app/ai-export.js?v=1020-H"></script>
+    <script src="app/import-entry.js?v=1020-H"></script>
+    <script src="app/forms.js?v=1020-H"></script>
+    <script src="app/ledger.js?v=1020-H"></script>
+    <script src="app/cats.js?v=1020-H"></script>
+    <script src="app/stats.js?v=1020-H"></script>
+    <script src="app/days.js?v=1020-H"></script>
+    <script src="app/settings.js?v=1020-H"></script>
+    <script src="app/tabs.js?v=1020-H"></script>
+    <script src="app/login.js?v=1020-H"></script>
+    <script src="app/back.js?v=1020-H"></script>
+    <script src="app/boot.js?v=1020-H"></script>
 
 </body>
 </html>

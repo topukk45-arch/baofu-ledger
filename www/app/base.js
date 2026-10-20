@@ -284,6 +284,15 @@
                 }
             });
         }
+        // 1020-H：「字往下挪几像素（开发中）」：localStorage 的 app_txt_nudge（0～3，只存这台手机），写进 html 上的 --txt-nudge-dev；没有就是自动
+        const TXT_NUDGE_KEY='app_txt_nudge';
+        function txtNudge(){ try{ const v=localStorage.getItem(TXT_NUDGE_KEY); if(v===null || v==='') return null; const n=+v; return isFinite(n) && n>=0 && n<=3 ? n : null; }catch(_){ return null; } }
+        function setTxtNudge(n){
+            try{ if(n===null) localStorage.removeItem(TXT_NUDGE_KEY); else localStorage.setItem(TXT_NUDGE_KEY, String(n)); }catch(_){}
+            applyTxtNudge();
+        }
+        function applyTxtNudge(){ const n=txtNudge(), st=document.documentElement.style; if(n===null) st.removeProperty('--txt-nudge-dev'); else st.setProperty('--txt-nudge-dev', n+'px'); }
+        applyTxtNudge();
         const MODE_HINT={
             normal:'算进收入、支出和结余（平时都是这个）',
             skip:'哪里都不算：信用卡还款、重复记录',
@@ -353,5 +362,5 @@
         let currentArchive = '';
         let currentTab = 'ledger';
         let curPage = 1;
-        window.JiwenBase = { get currentUser(){ return currentUser; }, set currentUser(v){ currentUser=v; }, get currentArchive(){ return currentArchive; }, set currentArchive(v){ currentArchive=v; }, get currentTab(){ return currentTab; }, set currentTab(v){ currentTab=v; }, get curPage(){ return curPage; }, set curPage(v){ curPage=v; }, $, DEFAULT_CATS, MODE_HINT, PAGE_SIZE, SHEET_MS, addBill, afterOpenAnim, archiveSelect, billCat, billList, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, escapeHtml, fabHold, fabWake, fillSelect, filterCat, fitNums, isDirtyTime, isFlow, isSkip, loginBox, logoutBtn, mainBox, normMoney, nowDtValue, nowUser, pad, parseRecTime, recMode, repairTime, round2, safeNum, sanitizeMoney, saveEdit, setRecMode };   // base 模块对外只有这一个入口
+        window.JiwenBase = { txtNudge, setTxtNudge, applyTxtNudge, get currentUser(){ return currentUser; }, set currentUser(v){ currentUser=v; }, get currentArchive(){ return currentArchive; }, set currentArchive(v){ currentArchive=v; }, get currentTab(){ return currentTab; }, set currentTab(v){ currentTab=v; }, get curPage(){ return curPage; }, set curPage(v){ curPage=v; }, $, DEFAULT_CATS, MODE_HINT, PAGE_SIZE, SHEET_MS, addBill, afterOpenAnim, archiveSelect, billCat, billList, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, escapeHtml, fabHold, fabWake, fillSelect, filterCat, fitNums, isDirtyTime, isFlow, isSkip, loginBox, logoutBtn, mainBox, normMoney, nowDtValue, nowUser, pad, parseRecTime, recMode, repairTime, round2, safeNum, sanitizeMoney, saveEdit, setRecMode };   // base 模块对外只有这一个入口
 })();

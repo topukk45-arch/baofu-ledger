@@ -50,7 +50,7 @@
             recentOf[p].forEach(c=>{
                 const b=document.createElement('div');
                 b.className='cc';
-                b.textContent=c;
+                { const sp=document.createElement('span'); sp.className='cc-t'; sp.textContent=c; b.appendChild(sp); }   // 1020-H：字包一层，好按字形裁掉上下留白居中
                 b.setAttribute('role','button');
                 b.onclick=()=>onPick(c);
                 box.appendChild(b);
@@ -124,7 +124,7 @@
             opts.forEach(o=>{
                 const b=document.createElement('div');
                 b.className='cc';
-                b.textContent=o.t;
+                { const sp=document.createElement('span'); sp.className='cc-t'; sp.textContent=o.t; b.appendChild(sp); }   // 1020-H：字包一层，好按字形裁掉上下留白居中
                 b.setAttribute('role','radio');
                 b.onclick=()=>{
                     const changed=billTypeSel!==o.v;
@@ -636,7 +636,7 @@
             opts.forEach(o=>{
                 const b=document.createElement('div');
                 b.className='cc'+(o.v===editTypeSel?' '+o.cls:'');
-                b.textContent=o.t;
+                { const sp=document.createElement('span'); sp.className='cc-t'; sp.textContent=o.t; b.appendChild(sp); }   // 1020-H：字包一层，好按字形裁掉上下留白居中
                 b.setAttribute('role','radio');
                 b.onclick=()=>{
                     const changed=editTypeSel!==o.v;

@@ -24,7 +24,8 @@ const days = [{ id: 'd1', name: '虚构纪念日', date: '2026-12-25' }, { id: '
   $('daysManageBtn').click(); await wait(50);
   const head = $('daysHeadNormal');
   ok($('pageDays').style.display === 'block' && d.body.classList.contains('days-page'), '一 进了日子管理页，body 有 days-page');
-  ok(head.contains($('daysBack')) && head.contains($('daysManage')) && head.querySelector('.days-title') && !head.contains($('daysAdd')), '一 顶上一行：返回、标题、管理（添加不在顶上）');
+  // 1020-H 起照草图「满屏横线」：顶上只有返回（图标按钮）+ 标题，「管理」挪到底部操作栏「添加日子」下面
+  ok(head.contains($('daysBack')) && head.querySelector('.days-title') && !head.contains($('daysManage')) && !head.contains($('daysAdd')) && $('daysBack').getAttribute('aria-label') === '返回' && $('daysBack').querySelector('svg'), '一 顶上一行：返回（图标按钮）、标题（添加、管理不在顶上）');
   const bar = $('daysBar');
   ok(bar && bar.classList.contains('ui-bar') && bar.contains($('daysAdd')) && $('daysAdd').classList.contains('primary') && /添加日子/.test($('daysAdd').textContent), '一 「＋ 添加日子」是主按钮，在底部操作栏 .ui-bar');
   ok(bar.contains($('daysDelBtn')) && !$('daysDelBar'), '一 删除按钮也在底部操作栏（原来页面底部那一条去掉了）');
@@ -40,8 +41,8 @@ const days = [{ id: 'd1', name: '虚构纪念日', date: '2026-12-25' }, { id: '
   $('daysBack').click(); await wait(50);
   ok(!d.body.classList.contains('days-page') && $('pageLedger').style.display === 'block', '一 返回账单页：days-page 去掉');
   const css = [...d.querySelectorAll('style')].map(s => s.textContent).join('\n');
-  ok(/body\.days-selecting \.days-bar \.days-add\s*\{\s*display:none/.test(css) && /body\.days-selecting \.days-bar \.days-del-btn\s*\{\s*display:block/.test(css), '一 选择模式下：添加藏起来、删除露出来');
-  ok(/body\.days-page:not\(\.login-mode\) \.container\s*\{[^}]*padding-bottom:18px/.test(css), '一 日子页卡片不再把底栏留白算进去（下面不空一大块）');
+  ok(/body\.days-selecting \.days-bar \.days-add, body\.days-selecting \.days-bar \.days-manage-btn\s*\{\s*display:none/.test(css) && /body\.days-selecting \.days-bar \.days-del-btn\s*\{\s*display:block/.test(css), '一 选择模式下：添加、管理藏起来，删除露出来');
+  ok(/body\.days-page:not\(\.login-mode\) \.container\s*\{[^}]*background:transparent;[^}]*border:none[^}]*padding:0/.test(css), '一 1020-H：日子页去掉外面那圈卡片框、整页铺满（下面不空一大块）');
 
   // 二、记一笔 / 修改
   for (const k of ['bill', 'edit']) {
@@ -67,7 +68,7 @@ const days = [{ id: 'd1', name: '虚构纪念日', date: '2026-12-25' }, { id: '
   if (!w.Range.prototype.getClientRects || !w.document.createRange().getClientRects().length) w.Range.prototype.getClientRects = () => [{ top: 10, height: 19, width: 30 }];
   w.openPerfPage(); await wait(50);
   const first = ($('perfList') ? $('perfList').textContent : '').split('\n')[0];
-  ok(/^按钮里的字上下差多少（这台手机当场量/.test(first) && /分类块 .* 统计 .* 收支 .* 主按钮 /.test(first), '三 性能记录页第一行：这台手机当场量的按钮里的字差多少 ' + first.slice(0, 40));
+  ok(/^按钮里的字上下差多少（这台手机当场量/.test(first) && /分类块 .* 收支 .* 列表卡的行 .* 主按钮 .*按字形裁/.test(first), '三 性能记录页第一行：这台手机当场量的按钮里的字差多少 ' + first.slice(0, 40));
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`\n${pass} 通过，${fail} 失败`);

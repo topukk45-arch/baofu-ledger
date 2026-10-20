@@ -232,7 +232,7 @@
                 const tn=o.type==='expense' ? '支出 · ' : o.type==='income' ? '收入 · ' : '';
                 open({ title:o.title||'选分类', sub:`${tn}共 ${all.length} 个`, onDismiss:o.onCancel,
                     body(box, done){
-                        const mk=(c)=>{ const b=document.createElement('button'); b.type='button'; b.className='cc'+(c===o.value?' sel':''); b.textContent=c; b.dataset.value=c;
+                        const mk=(c)=>{ const b=document.createElement('button'); b.type='button'; b.className='cc'+(c===o.value?' sel':''); const sp=document.createElement('span'); sp.className='cc-t'; sp.textContent=c; b.appendChild(sp); b.dataset.value=c;
                             b.addEventListener('click', ()=>{ done(); if(o.onPick) o.onPick(c); }); return b; };
                         const sec=(h, list, id)=>{ const d=document.createElement('div'); d.className='cat-drawer-sec'; d.id=id;
                             const t=document.createElement('div'); t.className='cat-drawer-h'; t.textContent=h; d.appendChild(t);
@@ -410,7 +410,24 @@
             if(gs) gs.addEventListener('animationend', ()=>g.__fin(), { once:true });
             setTimeout(()=>g.__fin(), (reduceMotion() ? SHEET_FADE_MS : SHEET_OUT_MS)+60);   // 动画事件没来（被打断、没有布局）的兜底
         }
+        // ===== 1020-H：第二层不加深 =====
+        //   只有最下面那层面板盖住页面时加遮罩（变灰）；上面再叠的（日期选择、分类抽屉、统计面板、文字小面板、提示框……）遮罩透明，
+        //   只靠面板自己的阴影分开层次（.mask.stack-over）。原来每层都加一层 0.3 的灰，叠两层下面那层一下子变深、还闪一下。
+        //   遮罩出来、消失都和面板同一个时长（--sheet-ms）慢慢变（出来：.mask 的 maskIn；消失：影子的 ghostBgOut）。
+        //   哪层在下面按 z-index 比，一样高的按在页面里的先后；数字键盘那层本来就透明，不算。
+        function maskShown(m){ return m.isConnected && m.id!=='kpMask' && (m.style.display==='flex' || m.style.display==='block' || m.classList.contains('open')) && getComputedStyle(m).display!=='none'; }
+        let stackQueued=false;
+        function stackPaint(){
+            stackQueued=false;
+            if(typeof document==='undefined' || !document || !document.querySelectorAll) return;   // 页面已经关了（测试收尾）
+            const all=[...document.querySelectorAll('.mask')];
+            const on=all.filter(maskShown).map(m=>({ m, z:parseInt(getComputedStyle(m).zIndex, 10)||0, i:all.indexOf(m) }));
+            on.sort((a, b)=>(a.z-b.z) || (a.i-b.i));
+            all.forEach(m=>{ const over = on.length>1 && on[0].m!==m && on.some(x=>x.m===m); if(m.classList.contains('stack-over')!==over) m.classList.toggle('stack-over', over); });
+        }
+        function stackKick(){ if(stackQueued) return; stackQueued=true; Promise.resolve().then(stackPaint); }
         function sheetGhostWatch(m){
+            if(!m.__stackWatch){ m.__stackWatch=1; new MutationObserver(stackKick).observe(m, { attributes:true, attributeFilter:['style', 'class'] }); }
             if(m.__ghostWatch || SHEET_GHOST_SKIP[m.id]) return; m.__ghostWatch=1;
             const sh=()=>m.querySelector('.sheet') || m.firstElementChild;
             // 面板里滚到哪了（关掉以后读不到了，影子要照着摆）
@@ -507,16 +524,18 @@
                 try{
                     const box=document.createElement('div');
                     box.style.cssText='position:fixed;left:0;top:0;width:360px;visibility:hidden;pointer-events:none;z-index:-1';
-                    box.innerHTML='<div class="edit-dialog"><div class="cat-chips"><div class="cc">吃饭</div></div>'
-                        +'<div class="mode-chips mode-mini"><div class="cc">往来</div></div>'
-                        +'<div class="cat-chips io-chips io-mini"><div class="cc">支出</div></div>'
-                        +'<button class="ui-btn primary block">保存</button></div>';
+                    // 1020-H：照现在记一笔里的样子摆：分类块（4 个最近常用那种，字包在 span 里）、收支两个按钮、列表卡的一行、主按钮、筛选里的分类块
+                    box.innerHTML='<div class="edit-dialog"><div class="cat-chips rec-cats"><div class="cc"><span class="cc-t">吃饭</span></div></div>'
+                        +'<div class="cat-chips io-chips io-pair"><div class="cc"><span class="cc-t">支出</span></div></div>'
+                        +'<div class="rec-list"><button class="rec-row"><span class="rec-row-k">统计</span><span class="rec-row-v">往来</span></button></div>'
+                        +'<button class="ui-btn primary block">保存</button><div class="cat-chips"><div class="cc">吃饭</div></div></div>';
                     document.body.appendChild(box);
                     const cv=document.createElement('canvas').getContext('2d');
                     let em='';
                     const one=el=>{
-                        const n=el.firstChild, rg=document.createRange(); rg.selectNodeContents(n);
-                        const rc=rg.getClientRects()[0], cs=getComputedStyle(el);
+                        const tx=el.querySelector('.cc-t, .rec-row-k') || el;
+                        const n=tx.firstChild, rg=document.createRange(); rg.selectNodeContents(n);
+                        const rc=rg.getClientRects()[0], cs=getComputedStyle(tx);
                         cv.font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
                         const m=cv.measureText(n.nodeValue), fs=parseFloat(cs.fontSize)||16;
                         const base=rc.top+(rc.height-(m.fontBoundingBoxAscent+m.fontBoundingBoxDescent))/2+m.fontBoundingBoxAscent;
@@ -526,7 +545,9 @@
                         const d=Math.round((ink-(t+bt)/2)*10)/10; return (d>0?'+':'')+d;
                     };
                     const q=sel=>box.querySelector(sel);
-                    const out=`按钮里的字上下差多少（这台手机当场量，正数偏下、负数偏上，单位 px）：分类块 ${one(q('.cat-chips:not(.io-chips) .cc'))} · 统计 ${one(q('.mode-mini .cc'))} · 收支 ${one(q('.io-mini .cc'))} · 主按钮 ${one(q('.ui-btn'))}｜${em}｜${getComputedStyle(q('.cc')).fontFamily}`;
+                    const tb=!!(window.CSS && CSS.supports && CSS.supports('text-box', 'trim-both cap alphabetic'));
+                    const nudge=getComputedStyle(document.documentElement).getPropertyValue('--txt-nudge-dev').trim() || ('自动 ' + (tb ? '0px' : '1px'));
+                    const out=`按钮里的字上下差多少（这台手机当场量，正数偏下、负数偏上，单位 px）：分类块 ${one(q('.rec-cats .cc'))} · 收支 ${one(q('.io-pair .cc'))} · 列表卡的行 ${one(q('.rec-row'))} · 主按钮 ${one(q('.ui-btn'))} · 筛选里的分类块 ${one(q('.cat-chips:not(.rec-cats):not(.io-chips) .cc'))}｜按字形裁（text-box）${tb ? '支持' : '不支持'} · 字往下挪 ${nudge}｜${em}｜${getComputedStyle(q('.cc')).fontFamily}`;
                     box.remove();
                     return out;
                 }catch(_){ return ''; }
