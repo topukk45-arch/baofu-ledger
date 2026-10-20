@@ -139,7 +139,8 @@ const before = await t.snapshot();
   if (t.$('askMask').style.display === 'flex') t.$('askOk').click();
   ok(t.$('impTypes') && t.$('impTypes').textContent.includes('群收款'), '1 没见过的交易类型：问一次');
   ok(t.$('impNewCats') && t.$('impNewCats').textContent.includes('交通出行') && !t.$('impNewCats').querySelector('input').checked, '1 新建分类：老用户默认不勾');
-  ok(t.$('impCpGroups') && [...t.$('impCpGroups').querySelectorAll('.imp-row-opt')].some(r => r.dataset.cp === '某某'), '1 未分类按对方归组');
+  // 1021-T14：只有 1 笔的对方不列组，写一句「其余 N 笔照推荐入账、标「待确认分类」」
+  ok(t.$('impCpRest') && /照推荐入账、标「待确认分类」/.test(t.$('impCpRest').textContent), '1 未分类按对方归组：一笔的不列组，写去处');
   ok(t.$('impNotes') && t.$('impNotes').textContent.includes('撞上了'), '1 提个醒：不计的提现和同金额的普通手记撞上了');
   ok(t.$('impStorage').textContent.includes('MB'), '1 存储预检：' + t.$('impStorage').textContent);
 }

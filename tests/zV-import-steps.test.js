@@ -107,7 +107,7 @@ const MANY = () => [
   {
     const t = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
     const raw = id => t.d.getElementById(id);
-    await pick(t, bill([wx({ time: T(12, 9), cp: '某虚构平台乙', fen: 1999 })]));
+    await pick(t, bill([wx({ time: T(12, 9), cp: '某虚构平台乙', fen: 1999 }), wx({ time: T(13, 9), cp: '某虚构平台乙', fen: 2999 })]));   // 1021-T14：2 笔才成组
     ok(t.S().view.steps.join() === 'check,overview' && t.S().view.inline === 'cat', '3 只有 1 步、1 件要定：总共 2 步（核对、总览）');
     ok(/放在最后一步一起看/.test(raw('impBody').textContent), '3 第 1 步写明要定的放在最后一步');
     raw('impNext').click();

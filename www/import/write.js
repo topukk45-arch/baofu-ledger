@@ -223,7 +223,7 @@
     // 确认页「按对方选分类」选了的：记成你的规则（1016-Y：这个关键词已经有规则、分类不一样的，改那条规则，不再加一条一样的关键词）
     Object.keys(ctx.cpCats || {}).forEach(function (kw) {
       var cat = ctx.cpCats[kw];
-      if (!kw || !cat || cat === '未分类' || have[kw] === cat || kw.indexOf('（') === 0) return;
+      if (!kw || !cat || cat === '未分类' || have[kw] === cat || kw.indexOf('（') === 0 || kw.indexOf('品：') === 0) return;   // 1021-T14：按商品说明归的组不存规则（规则只认对方）
       if (have[kw] !== undefined) rulesChange.push({ kw: kw, from: have[kw], to: cat });
       else { rulesAdd.push({ kw: kw, cat: cat }); have[kw] = cat; }
     });

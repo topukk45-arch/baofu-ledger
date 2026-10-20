@@ -71,7 +71,8 @@ const p = r.plan();
   ok(p.canImport === true && p.blocking.length === 0, '1 有认不出的文件也能导入其它的（那一份不导入）');
   ok(p.sections.unknownTypes.length === 1 && p.sections.unknownTypes[0].type === '群收款', '1 没见过的交易类型：群收款');
   ok(p.sections.newCats.some(c => c.name === '交通出行' && c.count === 4 && c.on === false), '1 老用户：交通出行 4 笔，新建默认不勾');
-  ok(p.sections.cpGroups.some(g => g.cp === '某某' && g.n === 1), '1 未分类按对方归组：某某');
+  // 1021-T14：只有 1 笔的对方不成组（不列出来），算进「其余 N 笔照推荐入账、标待确认」（cpSingles / cpRest）
+  ok(!p.sections.cpGroups.some(g => g.cp === '某某') && p.sections.cpSingles.some(g => g.cp === '某某' && g.n === 1) && p.sections.cpRest.n >= 1, '1 未分类按对方归组：某某只有 1 笔，不列组、算进其余');
   ok(p.sections.notes.neutralVsNormal.length === 1 && p.groups.neutral.some(d => d.tags.includes('neutralVsNormal')), '1 提现 200 和同一天 200 元的普通手记撞上了：提示一句，不合并');
   ok(p.groups.skip.some(d => d.why === 'status' && d.reason.includes('交易关闭')), '1 跳过的写明原因');
   const dev = PL.devText(p);
@@ -92,7 +93,7 @@ const p = r.plan();
   const p4 = r.plan({ rows: { [kOdd]: { cat: '购物' } } });
   ok(!p4.sections.cpGroups.some(g => g.cp === '某某') && p4.groups.add.find(d => d.key === kOdd).cat === '购物', '2 一行改了分类：不再出现在「按对方选分类」里');
   const p5 = r.plan({ cpCats: { '某某': '转账' } });
-  ok(p5.groups.add.find(d => d.key === kOdd).cat === '转账' && p5.sections.cpGroups.find(g => g.cp === '某某').cat === '转账', '2 按对方一组选了分类：这组的行都跟着变');
+  ok(p5.groups.add.find(d => d.key === kOdd).cat === '转账' && p5.sections.cpSingles.some(g => g.cp === '某某'), '2 按对方一组选了分类：这组的行都跟着变（1021-T14：只有 1 笔的组在 cpSingles 里，选了照样生效）');
   const p6 = r.plan({ rows: { [kWd]: { mode: 'normal' } } });
   const ne6 = p6.files[0].diff.neutral, ne0 = p.files[0].diff.neutral;
   ok(ne6.parts.find(x => x.key === 'newNormal').fen === 20000 && ne6.parts.find(x => x.key === 'neutral').fen === ne0.parts.find(x => x.key === 'neutral').fen - 20000 && diffOk(p6), '2 改口径（不计入 → 计入）：差额里从「不计入」挪到「新增（计入）」');

@@ -36,11 +36,11 @@ const pa = P.parseFiles([{ name: 'b.csv', data: B.ab(B.bill('wechat', tx2, { ran
 const ra = R.route(pa, { known: {} });
 const ma = M.match(ra, pa, { manual: [], cats: CATS, merchants: W });
 // 投票会把同一个对方统一成一类；去掉投票的影响：把两笔的推荐改成未分类，模拟「部分有分类」
-ma.items.forEach(it => { if (it.rec && pa.files[0].rows[it.row].desc === '不知道是什么') it.rec = { cat: '未分类', want: '未分类', layer: 'none', conf: null, reason: '没找到依据' }; else if (it.rec) it.rec = { cat: '购物', want: '日用百货', layer: 'builtin', conf: 'low', reason: '内置' }; });
+ma.items.forEach(it => { if (it.rec && pa.files[0].rows[it.row].desc === '不知道是什么') it.rec = { cat: '未分类', want: '未分类', layer: 'none', conf: null, reason: '没找到依据' }; else if (it.rec) it.rec = { cat: '购物', want: '日用百货', layer: 'builtin', conf: 'mid', reason: '内置' }; });
 const pb = PL.plan({ parsed: pa, matched: ma, info: { cats: CATS }, manualById: {}, overlaps: [] }, {});
 const g = pb.sections.cpGroups.find(x => x.cp === '某虚构杂货');
 ok(g && g.n === 2 && g.others && g.others['购物'] === 2, '2 组里写同一个对方组外 2 笔已归到「购物」：' + JSON.stringify(g && g.others));
-ok(pb.rows.filter(d => d.src === 'row').every(d => d.inCpGroup === '某虚构杂货'), '2 组外那 2 笔（把握低）也标上 inCpGroup，不再单列进「推荐要你看一眼」');
+ok(pb.rows.filter(d => d.src === 'row').every(d => d.inCpGroup === '某虚构杂货'), '2 组外那 2 笔（已有分类）也标上 inCpGroup');
 
 console.log(`\n${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

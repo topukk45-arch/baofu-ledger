@@ -689,7 +689,8 @@
   var STEP_NAME = { check: '核对', match: '和手记对不上的', refund: '退款和转账', cat: '分类', amount: '金额要你看一眼', overview: '总览' };
   var STEP_ORDER = ['check', 'match', 'refund', 'cat', 'amount', 'overview'];
   var MID = ['match', 'refund', 'cat', 'amount'];
-  var MORE_N = 5;          // 待你确认、推荐看一眼这种多的，先列 5 个，其余收起
+  var MORE_N = 5;
+  var CP_SHOW_N = 20;      // 1021-T14：按组选分类先显示 20 组，「再显示 20 组」          // 待你确认、推荐看一眼这种多的，先列 5 个，其余收起
   var INLINE_MAX = 3;      // 只有 1 步要定、不超过 3 件：放进总览
   // ---------- 1017-UI8：配对卡 ----------
   //   上面「你记的」（时间、分类、金额、备注），下面「账单里的」一笔一行（时间、对方、金额，第二行小字写商品说明、支付方式、来源），
@@ -865,7 +866,7 @@
     s.petty.forEach(function (x) { add('refund', 'petty:' + x.key, x.key in E.petty, '零碎扣款：' + x.cp + ' · ' + x.month, []); });
     s.newCats.forEach(function (x) { add('cat', 'nc:' + x.name, x.name in E.newCats, '新建分类「' + x.name + '」', newCatKeys(p, x.name)); });
     s.cpGroups.forEach(function (g) { add('cat', 'cp:' + g.cp, g.cp in E.cpCats || !!V['cp:' + g.cp], cpShow(g.cp) + ' · ' + g.n + ' 笔 · ' + yuan(g.fen), g.keys); });
-    lowConfRows(p).forEach(function (d) { add('cat', 'lc:' + d.key, !!(E.rows[d.key] && E.rows[d.key].cat) || !!V['lc:' + d.key], rowLabel(d), [d.key]); });
+    // 1021-T14：「推荐要你看一眼」的单笔不再一件一件列（并进按组选；零散的照推荐入账、标待确认分类）
     var tk = typeKeys(s);
     tk.t.forEach(function (k) { add('cat', 'ty:' + k, !!S.types[k], '没见过的交易类型「' + k.split('|')[1] + '」', []); });
     tk.s.forEach(function (k) { add('cat', 'st:' + k, !!S.statuses[k], '没见过的状态「' + k.split('|')[1] + '」', []); });
@@ -1167,7 +1168,7 @@
     var push = function (c) { if (c) out.push(c); };
     if (step === 'match') { push(cards.sums); push(cards.near); push(cards.pendGroups); push(pendCard(p, false)); }
     else if (step === 'refund') { push(cards.transfers); push(pendCard(p, true)); push(cards.refundHints); push(cards.receipt); push(cards.petty); push(incomeHint(p)); }
-    else if (step === 'cat') { push(cards.newCats); push(cards.cpGroups); push(lowConfCard(p)); push(cards.types); }
+    else if (step === 'cat') { push(cards.newCats); push(cards.cpGroups); push(cpRestNote(p)); push(cards.types); }
     else if (step === 'amount') { push(cards.amounts); }
     return out;
   }
@@ -1213,6 +1214,14 @@
     return c;
   }
   // 推荐要你看一眼（把握低）：点一行直接选分类
+  // 1021-T14：组外零散的（只有一笔的对方 / 商品说明）：不列，写一句去处
+  function cpRestNote(p) {
+    var r = p.sections.cpRest;
+    if (!r || !r.n) return null;
+    var c = el('div', 'imp-card imp-soft'); c.id = 'impCpRest';
+    c.textContent = '其余 ' + r.n + ' 笔（共 ' + yuan(r.fen) + ' 元）一个对方只有一笔，照推荐入账、标「待确认分类」，以后在账单页顶上「待确认分类」里改。';
+    return c;
+  }
   function lowConfCard(p) {
     var rows = lowConfRows(p);
     if (!rows.length) return null;
@@ -1593,32 +1602,63 @@
       });
       out.newCats = nc;
     }
-    if (s.cpGroups.length) {
+    // 1021-T14：组都定完 / 挪走了也留着这张卡（「已处理」要挂在它下面）
+    var cpEver = Object.keys(((S.view.ever || {}).cat) || {}).some(function (id) { return id.indexOf('cp:') === 0; });
+    if (s.cpGroups.length || cpEver) {
       var gc = el('div', 'imp-card'); gc.id = 'impCpGroups';
-      gc.appendChild(el('h4', null, '还没有分类的，按对方一组选一次（' + s.cpGroups.length + ' 组）'));
-      s.cpGroups.forEach(function (g) {
+      gc.appendChild(el('h4', null, '拿不准分类的，按对方一组选一次（' + s.cpGroups.length + ' 组）'));
+      // 1021-T14：一组一行写全（笔数、合计、每笔多少、规律、商品说明、推荐和理由，有疑点才多一句）；「看这 N 笔」展开逐笔，点一笔单独改；先显示 20 组
+      var showN = S.view.cpShowN || CP_SHOW_N, byKey = {};
+      p.rows.forEach(function (d) { if (d.key) byKey[d.key] = d; });
+      s.cpGroups.forEach(function (g, gi) {
+        if (gi >= showN) return;
         var r = el('div', 'imp-row-opt imp-tap imp-cp-row'); r.dataset.cp = g.cp; r.dataset.item = 'cp:' + g.cp;
         // 1016-Z1：规律说明「工作日中午 12 点左右」放在前面，帮你认出是谁（只是提示，不自动分类）
         var desc = cpShow(g.cp) + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元' + (g.hint ? ' · ' + g.hint : '') + (g.n > 1 ? ' · 每笔 ' + (g.min === g.max ? yuan(g.min) : yuan(g.min) + '–' + yuan(g.max)) + ' 元' : '') + ' → 选个分类';
         var gw = el('span', 'grow'); gw.appendChild(document.createTextNode(desc));
+        if (g.by === 'cp' && g.descs && g.descs.length) gw.appendChild(el('div', 'imp-soft imp-cp-desc', '商品：' + g.descs.map(function (x) { return cut(x, 14); }).join('、')));
+        if (g.rec) gw.appendChild(el('div', 'imp-soft imp-cp-rec', '推荐：' + g.rec.cat + '（' + cut(g.rec.reason, 30) + '）'));
         // 1021-T10：同一对方别的几笔已经归了哪类、组里有几笔退款，写在下面一行（同一对方不再裂成「已处理」和「待选」两半）
         var oth = g.others ? Object.keys(g.others).map(function (c) { return g.others[c] + ' 笔已归到「' + c + '」'; }) : [];
         if (g.refundN) oth.push('其中 ' + g.refundN + ' 笔是退款 +' + yuan(g.refundFen));
         if (oth.length) gw.appendChild(el('div', 'imp-soft imp-cp-others', '同一个对方：' + oth.join(' · ')));
+        if (g.doubts && g.doubts.length) gw.appendChild(el('div', 'imp-soft imp-cp-doubt', '留意：' + g.doubts.join('；')));
         r.appendChild(gw);
         // 1017-UI2：整行都能点，点了弹选分类面板（选了同一个也算定过）；下拉框留在行里（藏着），照旧也能用它改
         var setCp = function (v) { S.view.seen['cp:' + g.cp] = true; if (v === '未分类') delete S.edits.cpCats[g.cp]; else S.edits.cpCats[g.cp] = v; replan(); };
         var sub0 = cpShow(g.cp) + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元';
         var sw = select(catOpts().map(function (c) { return [c, c]; }), g.cat || '未分类', setCp, 'imp-cp-sel', sub0);
         sw.style.display = 'none'; r.appendChild(sw);
-        r.appendChild(el('span', 'imp-val', (g.cat || '未分类') + ' ›'));
+        r.appendChild(el('span', 'imp-val', (g.cat || (g.rec && g.rec.cat) || '未分类') + ' ›'));
         r.appendChild(mk(g.cp in S.edits.cpCats || !!S.view.seen['cp:' + g.cp]));
         r.addEventListener('click', function () {
           if (window.JiwenSheet) window.JiwenSheet.pick({ title: SEL_TITLE['imp-cp-sel'], sub: sub0, options: catOpts().map(function (c) { return { value: c, label: c }; }), value: g.cat || '未分类', chips: true, onPick: setCp });
         });
         gc.appendChild(r);
+        // 展开看逐笔（时间、金额、商品说明），点一笔打开它的详情单独改（单独改了就不跟着这一组）
+        var open = !!(S.view.cpOpen && S.view.cpOpen[g.cp]);
+        var tg = btn((open ? '收起这 ' : '看这 ') + g.keys.length + ' 笔' + (open ? ' ▾' : ' ▸'), 'imp-link imp-cp-toggle', function (ev) {
+          ev.stopPropagation(); S.view.cpOpen = S.view.cpOpen || {}; S.view.cpOpen[g.cp] = !open; render();
+        });
+        gc.appendChild(tg);
+        if (open) {
+          var box = el('div', 'imp-cp-items');
+          g.keys.forEach(function (k) {
+            var d = byKey[k]; if (!d) return;
+            var it = el('div', 'imp-row-opt imp-tap imp-cp-item'); it.dataset.key = k;
+            it.appendChild(el('span', 'grow', fmtTime(d.time) + ' · ' + yuan(d.fen) + ' 元 · ' + cut(d.title || d.cp || '—', 16)));
+            it.appendChild(el('span', 'imp-val', (d.cat || '未分类') + ' ›'));
+            it.addEventListener('click', function () { openSheet(k); });
+            box.appendChild(it);
+          });
+          gc.appendChild(box);
+        }
       });
-      gc.appendChild(el('div', 'imp-soft', '选了的导入时记成你的规则，以后同一个对方直接归过去（规则只管以后的导入，不改已经入账的）。'));
+      if (s.cpGroups.length > showN) {
+        var mb = btn('再显示 ' + Math.min(CP_SHOW_N, s.cpGroups.length - showN) + ' 组（还有 ' + (s.cpGroups.length - showN) + ' 组）', 'ui-btn block imp-cp-more', function () { S.view.cpShowN = showN + CP_SHOW_N; render(); });
+        gc.appendChild(mb);
+      }
+      gc.appendChild(el('div', 'imp-soft', '不选的照推荐入账、标「待确认分类」。选了的导入时记成你的规则（按商品说明归的组不存规则），以后同一个对方直接归过去（规则只管以后的导入，不改已经入账的）。'));
       out.cpGroups = gc;
     }
     // 多笔合一（1017-UI8：配对卡）。组里各种选法的手记一样时，「你记的」只在组顶上写一次；几笔加起来的、一笔账单的分开叫

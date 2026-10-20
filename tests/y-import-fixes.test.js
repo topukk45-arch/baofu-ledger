@@ -482,9 +482,10 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     ok(four.every(x => rowOf(p0, r.key(x)).group === 'pending') && !p0.sections.cpGroups.some(g => /某虚构.摊/.test(g.cp)), '16-H 待你确认的行不进按对方选分类');
     const none = {}; four.forEach(x => { none[r.key(x)] = { pick: 'new' }; });
     const p1 = r.plan({ rows: none });
-    ok(p1.sections.cpGroups.filter(g => /某虚构.摊/.test(g.cp)).length === 2, '16-H 点了「都不是」变成新增：进按对方选分类');
+    const cpAll = p => p.sections.cpGroups.concat(p.sections.cpSingles || []);   // 1021-T14：只有 1 笔的不列组，在 cpSingles 里
+    ok(cpAll(p1).filter(g => /某虚构.摊/.test(g.cp)).length === 2, '16-H 点了「都不是」变成新增：进按对方选分类');
     const p2 = r.plan({ rows: { [r.key(four[0])]: { pick: { record: 'm16' } } } });
-    ok(p2.sections.cpGroups.some(g => g.cp === '某虚构乙摊') && !p2.sections.cpGroups.some(g => g.cp === '某虚构甲摊'), '16-H 同组另一笔合并了、这笔被自动作为新增：进分组');
+    ok(cpAll(p2).some(g => g.cp === '某虚构乙摊') && !cpAll(p2).some(g => g.cp === '某虚构甲摊'), '16-H 同组另一笔合并了、这笔被自动作为新增：进分组');
   }
   // 4. 部分付款：账单不到手记的三分之一不当候选
   {
@@ -514,7 +515,8 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
                 wx({ time: T(10, 3, 9), kind: '微信红包（单发）', cp: '某亲戚乙', fen: 5000 }), wx({ time: T(10, 25, 9), kind: '转账', cp: '某同事', fen: 3000 })];
     const r = run([{ app: 'wechat', txns: tx }], []);
     const p0 = r.plan();
-    ok(!p0.sections.cpGroups.some(g => ['某亲戚甲', '某亲戚乙'].includes(g.cp)) && p0.sections.cpGroups.some(g => g.cp === '某同事'), '16-1 转账往来段里的行不进按对方选分类，段外的单笔照旧');
+    const cpAll0 = p0.sections.cpGroups.concat(p0.sections.cpSingles || []);   // 1021-T14：只有 1 笔的在 cpSingles 里
+    ok(!cpAll0.some(g => ['某亲戚甲', '某亲戚乙'].includes(g.cp)) && cpAll0.some(g => g.cp === '某同事'), '16-1 转账往来段里的行不进按对方选分类，段外的单笔照旧');
     const ed = { rows: {} }; p0.sections.transfers[0].keys.forEach(k => { ed.rows[k] = { mode: 'skip' }; });
     const p1 = r.plan(ed);
     const total = r.parsed.files[0].stats.parsed.total;

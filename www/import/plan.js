@@ -258,14 +258,31 @@
       });
     })();
     // 未分类按对方归组，一组选一次
+    //   1021-T14（实测 10-20）：第 4 步只列组：未分类和推荐把握低的都进组；按清洗后的对方归，对方是平台（淘宝、美团、抖音、闪购……）
+    //   或个人（带 *）时按清洗后的商品说明归（去数字、单号、日期、括号，只认一模一样），组名写成「品：商品说明」；
+    //   只有 2 笔以上的组列出来（sections.cpGroups），其余的照推荐入账、写进账本时标「待确认分类」（write.js 的 rv），数在 cpRest 里
     var cpg = {};
+    var GROUP_PLAT_RE = /淘宝|天猫|京东|拼多多|抖音|唯品会|美团|饿了么|盒马|闪购|交易猫|闲鱼|快手/;
+    var descKey = function (desc) {
+      var t = cleanDesc(desc).replace(/^\s*退款[\s\-－—_:：]*/, ''), prev;
+      do { prev = t; t = t.replace(/[（(【\[][^（()）【】\[\]]*[)）】\]]/g, ''); } while (t !== prev);
+      return t.replace(/[0-9０-９]+/g, '').replace(/[\s\-_·:：#*.,，、\/|]+/g, ' ').trim();
+    };
+    var groupKeyOf = function (d) {
+      var cp = String(d.cp || '');
+      if (cp.indexOf('*') >= 0 || GROUP_PLAT_RE.test(cp)) { var dk = descKey(d.desc || ''); if (dk.length >= 2) return '品：' + dk; }
+      return clean(d.cp) || '（没有交易对方）';
+    };
     rows.forEach(function (d) {
-      if (d.src !== 'row' || d.catFrom !== 'rec' || d.cat !== '未分类') return;
+      if (d.src !== 'row' || d.catFrom !== 'rec') return;
+      if (d.cat !== '未分类' && !(d.rec && d.rec.conf === 'low')) return;
       // 1016-H：待你确认的不进，等选成新增（「都不是」或被自动作为新增）再进；不计的、转账往来里的也不用选
       if (['add', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;
-      var k = clean(d.cp) || '（没有交易对方）';
-      var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [], wd: 0, we: 0 });
-      g.n += d.units; g.fen += d.fen; g.min = Math.min(g.min, d.fen); g.max = Math.max(g.max, d.fen); g.keys.push(d.key);
+      var k = groupKeyOf(d);
+      var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [], wd: 0, we: 0, descs: {}, recs: {}, fens: [] });
+      g.n += d.units; g.fen += d.fen; g.min = Math.min(g.min, d.fen); g.max = Math.max(g.max, d.fen); g.keys.push(d.key); g.fens.push(d.fen);
+      var dk0 = descKey(d.desc || ''); if (dk0) g.descs[dk0] = (g.descs[dk0] || 0) + 1;
+      var rc0 = d.cat || '未分类'; (g.recs[rc0] = g.recs[rc0] || { n: 0, reason: d.rec ? d.rec.reason : '' }).n++;
       var h = +d.time.slice(11, 13); g.hours[h] = (g.hours[h] || 0) + 1;
       var wk = new Date(Date.UTC(+d.time.slice(0, 4), +d.time.slice(5, 7) - 1, +d.time.slice(8, 10))).getUTCDay();
       if (wk === 0 || wk === 6) g.we++; else g.wd++;
@@ -280,7 +297,7 @@
     //   组里的退款也数出来；这些行标上 inCpGroup，不再同时出现在「推荐要你看一眼」的单笔里
     rows.forEach(function (d) {
       if (d.src !== 'row' || ['add', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;
-      var k = clean(d.cp) || '（没有交易对方）', g = cpg[k];
+      var k = groupKeyOf(d), g = cpg[k];
       if (!g) return;
       d.inCpGroup = k;
       if (g.keys.indexOf(d.key) >= 0) { if (d.group === 'refund') { g.refundN = (g.refundN || 0) + d.units; g.refundFen = (g.refundFen || 0) + d.fen; } return; }
@@ -389,12 +406,24 @@
                                    pays: nmPays, payN: nm.filter(payOf).length, payFen: nm.filter(payOf).reduce(function (s0, d) { return s0 + (manualById[d.into].fen - d.fen); }, 0),
                                    keys: nm.map(function (d) { return d.key; }) } : null;
     sec.newCats = newCatsIn.map(function (c) { var p = ncPlan[c.name]; return { name: c.name, count: c.count, on: p.on, into: p.into, picked: p.picked, defaultOn: !!c.defaultOn }; });
-    sec.cpGroups = Object.keys(cpg).map(function (k) {
+    sec.cpRest = { n: 0, fen: 0 }; sec.cpSingles = [];
+    sec.cpGroups = Object.keys(cpg).filter(function (k) {
+      if (cpg[k].keys.length >= 2) return true;
+      sec.cpRest.n += cpg[k].n; sec.cpRest.fen += cpg[k].fen; sec.cpSingles.push({ cp: k, n: cpg[k].n, fen: cpg[k].fen, keys: cpg[k].keys }); return false;
+    }).map(function (k) {
       var g = cpg[k], hb = null, hn = 0;
       Object.keys(g.hours).forEach(function (h) { if (g.hours[h] > hn) { hn = g.hours[h]; hb = +h; } });
       var hour = hn * 2 > g.keys.length ? hb : null;
+      // 1021-T14：组里写全：商品说明（最多 2 种）、推荐（多数那一类和理由）、有疑点才提（金额不合群、商品说明不止一种）
+      var descs = Object.keys(g.descs).sort(function (a, b) { return g.descs[b] - g.descs[a]; });
+      var recCat = Object.keys(g.recs).sort(function (a, b) { return g.recs[b].n - g.recs[a].n; })[0];
+      var fs = g.fens.slice().sort(function (a, b) { return a - b; }), med = fs[Math.floor(fs.length / 2)];
+      var doubts = [];
+      if (fs.length >= 3 && med > 0 && fs[fs.length - 1] > med * 5) doubts.push('有一笔金额比别的大很多（' + yuan(fs[fs.length - 1]) + ' 元）');
+      if (descs.length > 1) doubts.push('商品说明不止一种');
       return { cp: g.cp, n: g.n, fen: g.fen, min: g.min, max: g.max, hour: hour, cat: cpCats[k] || null, keys: g.keys,
-               hint: patternHint(g.keys.length, g.wd, g.we, g.hours), others: g.others || null, refundN: g.refundN || 0, refundFen: g.refundFen || 0 };
+               hint: patternHint(g.keys.length, g.wd, g.we, g.hours), others: g.others || null, refundN: g.refundN || 0, refundFen: g.refundFen || 0,
+               by: g.cp.indexOf('品：') === 0 ? 'desc' : 'cp', descs: descs.slice(0, 2), rec: recCat && recCat !== '未分类' ? { cat: recCat, reason: g.recs[recCat].reason } : null, doubts: doubts };
     }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; });
     var notes = { neutralVsNormal: [], joined: [], noNote: [], overlap: [] };
     rows.forEach(function (d) { d.tags.forEach(function (t) { if (notes[t] && d.key) notes[t].push(d.key); }); });

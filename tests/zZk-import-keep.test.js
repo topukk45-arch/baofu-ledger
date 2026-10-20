@@ -30,7 +30,8 @@ const TX = () => [
   wx({ time: T(4, 11, 58), cp: '某虚构食堂', desc: '套餐', fen: 3000 }), wx({ time: T(4, 11, 59), cp: '某虚构食堂', desc: '饮料', fen: 500 }),
   wx({ time: T(8, 18), kind: '转账', cp: '*小玲', fen: 10000 }), wx({ time: T(9, 19), kind: '转账', io: 'income', cp: '*小玲', fen: 10000 }),
   wx({ time: T(12, 9), cp: '某省联通', desc: '手机充值', fen: 5000 }), wx({ time: T(13, 9), cp: '某省联通', desc: '手机充值', fen: 3000 }),
-  wx({ time: T(14, 9), cp: '某虚构平台甲', fen: 1999 }), wx({ time: T(15, 9), cp: '某虚构平台乙', fen: 2999 }),
+  wx({ time: T(14, 9), cp: '某虚构平台甲', fen: 1999 }), wx({ time: T(16, 9), cp: '某虚构平台甲', fen: 999 }),   // 1021-T14：2 笔才成组
+  wx({ time: T(15, 9), cp: '某虚构平台乙', fen: 2999 }),
 ];
 const MID = ['match', 'refund', 'cat', 'amount'];
 
@@ -67,7 +68,7 @@ const MID = ['match', 'refund', 'cat', 'amount'];
   const cb = ncRow().querySelector('input[type=checkbox]'); cb.checked = true; cb.dispatchEvent(new t.w.Event('change'));
   ok(!S().plan.sections.cpGroups.some(g => g.cp === '某省联通'), '1 勾上新建「充值缴费」：方案里某省联通不在按对方选分类了');
   const fold = q('#impCpGroups .imp-fold'), fb = q('#impCpGroups .imp-fold-box');
-  ok(fold && /✓ 已处理 1 件/.test(fold.textContent) && fb && fb.style.display === 'none', '1 底部「✓ 已处理 1 件 ▸」，默认收起');
+  ok(fold && /✓ 已处理 1 件/.test(fold.textContent) && fb && fb.style.display === 'none', '1 底部「✓ 已处理 1 件 ▸」，默认收起：' + (fold && fold.textContent) + ' ' + (fb && fb.style.display));
   const mv = fb && fb.querySelector('.imp-moved[data-item="cp:某省联通"]');
   ok(mv && /某省联通 · 2 笔 · 80\.00/.test(mv.textContent) && /→ 已归到新建的『充值缴费』/.test(mv.textContent) && mv.querySelector('.imp-done-edit'), '1 那一组留一行：「→ 已归到新建的『充值缴费』」，带「改」');
   ok(/归进去的：某省联通（2 笔）/.test(ncRow() ? ncRow().textContent : (q('#impNewCats') || {}).textContent), '1 新建分类那项写归进去的是哪几组');

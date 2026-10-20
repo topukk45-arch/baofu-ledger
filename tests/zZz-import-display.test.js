@@ -26,6 +26,7 @@ async function pick(t, files) {
 const ODD = '某虚构店　　(　　　　)';
 const TX = () => [
   wx({ time: T(6, 12), cp: ODD, desc: '/', fen: 1999 }),
+  wx({ time: T(8, 12), cp: ODD, desc: '/', fen: 2999 }),   // 1021-T14：只有 2 笔以上的对方才列组
   wx({ time: T(7, 10), kind: '零钱提现', cp: '某虚构银行(尾号0000)', desc: '/', io: 'neutral', fen: 300000, status: '提现已到账' }),
 ];
 
@@ -43,7 +44,7 @@ const TX = () => [
   ok(S().plan.rows.some(d => d.cp === ODD), '2 方案里这一行存的还是原文（带全角空格和空括号）');
   UI._goStep('cat');
   const cr = Array.from(t.d.querySelectorAll('.imp-cp-row')).find(r => /某虚构店/.test(r.dataset.cp));
-  ok(cr && /^某虚构店 · 1 笔/.test(cr.querySelector('.grow').textContent) && !/[(（]/.test(cr.querySelector('.grow').textContent) && !/　/.test(cr.textContent), '2 按对方选分类：显示「某虚构店 · 1 笔…」：' + (cr ? cr.querySelector('.grow').textContent : ''));
+  ok(cr && /^某虚构店 · 2 笔/.test(cr.querySelector('.grow').textContent) && !/[(（]/.test(cr.querySelector('.grow').textContent) && !/　/.test(cr.textContent), '2 按对方选分类：显示「某虚构店 · 1 笔…」：' + (cr ? cr.querySelector('.grow').textContent : ''));
   const S0 = S(); S0.view.details = true; Object.keys(S0.plan.groups).forEach(g => { S0.view.open[g] = true; }); UI._goStep('overview');
   const k = S().plan.rows.find(d => d.cp === ODD).key;
   const dr = Array.from(t.d.querySelectorAll('#impBody .al-row')).find(r => r.dataset.key === k);
