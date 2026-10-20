@@ -519,7 +519,7 @@
                             ()=>applyBatch(targets.map(r=>r.id), { cat }), '批量改分类',
                             { okText:`改这 ${targets.length} 条`, list:targets, danger:true, onCancel:pickCat });   // 1019-S：取消回到选分类
                     };
-                    const pickCat=()=>customChoose('改成哪个分类？', getCats().map(c=>({ value:c, label:c })), onCat, '选择分类', openBatchMenu, { layout:'list' });
+                    const pickCat=()=>window.JiwenSheet.cats({ title:'改成哪个分类', value:'', onPick:onCat, onCancel:openBatchMenu });   // 1020-I：用分类抽屉；取消回到批量操作
                     pickCat();
                 } else {
                     const NAME={ normal:'计入', skip:'不计', flow:'往来' };

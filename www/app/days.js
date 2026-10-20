@@ -71,7 +71,7 @@
             // 没有日子时，「批量删除」无意义，禁用掉而不是让人点进去看空列表
             const has=loadDays().length>0;
             $('dmBatch').disabled=!has;
-            $('dmBatch').textContent = has ? '批量删除日子' : '批量删除日子（暂无日子）';
+            $('dmBatch').querySelector('.rec-row-k').textContent = has ? '批量删除日子' : '批量删除日子（暂无日子）';   // 1020-I：列表行，只改名字那一格
             // 走既有的键盘安全打开口：不留透明帧、不抢在绘制前聚焦。
             // 但这里不自动 focus —— 一进来就弹键盘会盖住下面的「批量删除」按钮，
             // 用户多半只是想点它。要改条数的人自己点输入框即可。
@@ -220,6 +220,7 @@
         function setDayDate(s){
             dayDate.dataset.day=s||'';
             dayDate.value = s ? fmtDayDate(s) : '';
+            $('dayDateTxt').textContent = s ? fmtDayDate(s) : '选择目标日期';   // 1020-I：目标日期那一行
             updateDayPreview();
         }
         // 复用现有的纯日期选择器（openDtPickerDate），不另造一个
@@ -227,6 +228,9 @@
             openDtPickerDate(dayDate.dataset.day || todayStr(), (day)=>setDayDate(day));
         });
         dayPin.addEventListener('click', ()=>dayPin.classList.toggle('on'));
+        // 1020-I：目标日期、置顶是列表行：点整行都行
+        $('dayDateLine').addEventListener('click', ()=>dayDate.click());
+        $('dayPinRow').addEventListener('click', e=>{ if(e.target!==dayPin) dayPin.classList.toggle('on'); });
 
         function openDayDialog(id){
             dayEditId = id || null;

@@ -822,7 +822,7 @@
         .io-chips.io-pair .cc { flex:1 1 0; min-width:0; height:var(--ui-tap); margin:0; padding:0 8px; border-radius:12px;
             display:flex; align-items:center; justify-content:center; font-size:16px; line-height:1.2; text-align:center;
             border:1px solid var(--c-border-mid); background:var(--c-surface); color:var(--c-text); }
-        .io-chips.io-pair .cc.sel-out, .io-chips.io-pair .cc.sel-in { background:var(--c-primary-dark); border-color:var(--c-primary-dark); color:var(--c-on-primary); font-weight:bold; -webkit-text-stroke:0; }
+        .io-chips.io-pair .cc.sel-out, .io-chips.io-pair .cc.sel-in, .io-chips.io-pair .cc.sel { background:var(--c-primary-dark); border-color:var(--c-primary-dark); color:var(--c-on-primary); font-weight:bold; -webkit-text-stroke:0; }
         /* 分类：一行 4 个，块里的字上下左右居中，48px 高 */
         .cat-chips.rec-cats, .cat-grid4 { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:var(--ui-gap); }
         .cat-chips.rec-cats .cc, .cat-grid4 .cc { min-width:0; height:var(--ui-tap); padding:0 4px; border-radius:12px;
@@ -836,10 +836,19 @@
         .rec-row + .rec-row::before { content:''; position:absolute; left:14px; right:0; top:0; height:1px; background:var(--c-border); }
         #editMask.is-refund .rec-row::before { display:none; }
         .rec-row:active { background:var(--c-chip); }
-        .rec-row-k { flex:none; width:40px; font-size:14px; color:var(--c-text-soft); }
+        .rec-row-k { flex:none; min-width:40px; white-space:nowrap; font-size:14px; color:var(--c-text-soft); }
         .rec-row-v { flex:1 1 auto; min-width:0; text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .rec-row-v.on { font-weight:bold; }
         .rec-form textarea.rec-remark { display:none; }
+        /* 1020-I：列表卡里能直接填的一行（模板的名字、固定金额，筛选的关键词）：右边是没有框的输入框，字靠右 */
+        .rec-row.rec-row-in { cursor:text; }
+        .rec-row .rec-row-input, .edit-dialog .rec-row .rec-row-input, .sheet .rec-row .rec-row-input { flex:1 1 auto; min-width:0; width:auto; height:48px; min-height:0; margin:0; padding:0;
+            border:0; border-radius:0; background:transparent; box-shadow:none; outline:none; text-align:right; font-size:15px; font-family:inherit; color:var(--c-text); }
+        .rec-row .rec-row-input::placeholder { color:var(--c-text-soft); opacity:.7; }
+        /* 一行里两个有框的小格（筛选的金额区间、日期范围） */
+        .rec-row .rec-pair { flex:1 1 auto; min-width:0; display:flex; align-items:center; justify-content:flex-end; gap:6px; }
+        .rec-row .rec-pair > .search-input { flex:1 1 0; min-width:0; max-width:130px; min-height:var(--ui-tap); height:var(--ui-tap); padding:0 8px; font-size:14px; text-align:center; }
+        .rec-row .rec-pair > .dt-input.search-input { padding-top:0; padding-bottom:0; display:flex; align-items:center; justify-content:center; }
         .rec-extra { display:flex; flex-direction:column; gap:var(--ui-gap); }
         /* 底部「关闭 | 存为常用」：左右并排（左退右进），一样大 */
         .ui-pair { display:flex; gap:var(--ui-gap); }
@@ -1239,6 +1248,16 @@
         .day-preview { font-size:12.5px; color:var(--c-text-soft); background:var(--c-chip);
             border-radius:8px; padding:9px 11px; line-height:1.6; }
         .day-pin-row { display:flex; align-items:center; justify-content:space-between; }
+        /* 1020-I：日子弹窗 / 日子管理弹窗照列表卡排 */
+        .rec-row.day-pin-row { justify-content:flex-start; cursor:pointer; }
+        .day-pin-row .day-pin-hint { color:var(--c-text-soft); font-size:13px; }
+        .day-pin-row .day-switch { flex:none; position:relative; }
+        .dm-list { margin:4px 0 6px; }
+        .rec-row .dm-k { width:auto; flex:none; }
+        .rec-row .rec-row-input.dm-num { width:auto; font-size:20px; font-weight:bold; color:var(--c-primary-deep); font-variant-numeric:tabular-nums; }
+        .dm-unit { flex:none; color:var(--c-text-soft); font-size:14px; }
+        #dmBatch:disabled { color:var(--c-text-soft); opacity:.55; cursor:default; }
+        .dm-hint { font-size:12px; }
         .day-switch { width:46px; height:26px; border-radius:13px; background:var(--c-border);
             position:relative; cursor:pointer; transition:.2s; flex-shrink:0; }
         .day-switch.on { background:var(--c-primary); }
@@ -1255,6 +1274,15 @@
             align-items:flex-start; white-space:pre-wrap; word-break:break-word;
             line-height:1.5; max-height:160px; overflow-y:auto; }
 
+        /* 1020-I：账单详情照记一笔的列表卡：一行一项（左边两个字的名字、右边值）；备注、原账单 / 退款记录、来源、AI 标记这种长的，名字在上、内容在下 */
+        .detail-row { cursor:default; }
+        .detail-row:active { background:transparent; }
+        .detail-row .rec-row-v { white-space:normal; }
+        .detail-row.detail-block { flex-direction:column; align-items:stretch; gap:4px; padding-top:12px; padding-bottom:12px; }
+        .detail-block .rec-row-k { width:auto; }
+        .detail-block .detail-remark { white-space:pre-wrap; word-break:break-word; line-height:1.5; max-height:160px; overflow-y:auto; color:var(--c-text); font-size:15px; }
+        .detail-block .detail-src { color:var(--c-text-soft); font-size:13px; }
+        .detail-block .mini-btn { align-self:flex-start; min-height:var(--ui-tap); }
         /* 「记账成功」弹窗里的可选补充入口（添加备注）：单独占一行、居中、轻量描边，
            不挤占「再记一笔 / 关闭」那一行，也不与主操作抢视觉。 */
         .ask-extra-btn {
@@ -1520,7 +1548,7 @@
             color:var(--c-text-soft); flex-wrap:wrap; }
         .refund-sum .rs-nums b { color:var(--c-text); font-variant-numeric:tabular-nums; }
         .refund-sum .rs-nums b.pos { color:#3a7a2e; }
-        #refundMoney.ro { background:var(--c-chip); color:var(--c-text-soft); }
+        #refundMoney.ro { background:transparent; color:var(--c-text-soft); }
 
         .detail-refund { display:block; }
         .detail-refund .dr-line { display:flex; align-items:baseline; gap:10px; padding:2px 0; width:100%; }
@@ -1632,3 +1660,12 @@
         .cat-chips.rec-cats .cc, .cat-chips.cat-grid4 .cc, .io-chips.io-pair .cc { padding-bottom:0; }
         .ui-btn { padding-top:calc(max(11px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) + var(--txt-nudge)); padding-bottom:calc(max(11px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) - var(--txt-nudge)); }
         .ui-btn.small { padding-top:calc(max(8px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) + var(--txt-nudge)); padding-bottom:calc(max(8px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) - var(--txt-nudge)); }
+        /* 1020-I：筛选浮层的关键词、金额、日期是一张列表卡 */
+        .filter-list { margin-bottom:14px; }
+        .filter-list .rec-row { cursor:default; }
+        .filter-list .rec-row:active { background:transparent; }
+        /* 1020-I：详情里的值是标签（支出 / 分类）时不裁、不剪（标签有框和内边距） */
+        .detail-row .rec-row-v { text-box:none; overflow:visible; }
+        /* 1020-I：退款金额的提示字（「最多 19.63」）用小字，不和大字金额一样大 */
+        #refundMoney::placeholder { font-size:20px; font-weight:normal; }
+        #refundMask .refund-sum { margin-bottom:12px; }

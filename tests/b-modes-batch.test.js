@@ -38,7 +38,7 @@ function bootSync(records, extra){
     const recs=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey())).archives['默认存档'].records;
     const byId=id=>recs().find(r=>r.id===id);
     const chip=(boxId,text)=>RC.chip(d, boxId, text);   // 1020-G：分类不在最近常用 4 个里的从分类抽屉选
-    const choose=text=>{ chip('askChoices',text).click(); $('askOk').click(); };
+    const choose=text=>RC.choose(d, text);   // 1020-I：批量改分类在分类抽屉里选
     const filterKw=kw=>{ $('filterFab').click(); $('searchKeyword').value=kw; $('sheetApply').click(); };
     return { w:dom.window, d, $, recs, byId, chip, choose, filterKw, errs };
 }
@@ -209,7 +209,7 @@ function bootSync(records, extra){
 {
     const t=await boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_小明.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
     t.w.JiwenStats.openDetail('a5');
-    ok(t.$('detailType').textContent.includes('不计') && t.$('detailMoney').querySelector('.amt-skip'), '详情显示不计');
+    ok(t.$('detailMode').textContent==='不计' && t.$('detailMoney').querySelector('.amt-skip'), '详情显示不计（1020-I 起统计单独一行）');
     ok(t.$('odStatus').textContent.includes('（云盘文件名不随存档改名）'), '文件名对不上时有说明');
     const t2=await boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_默认存档.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
     ok(!t2.$('odStatus').textContent.includes('不随存档改名'), '文件名一致时不显示说明');

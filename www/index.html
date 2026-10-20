@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1020-H">
+    <link rel="stylesheet" href="app/app.css?v=1020-I">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-H</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-I</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -350,24 +350,22 @@
                 </div>
             </div>
             <div class="sheet-body">
-                <div class="search-field">
-                    <span class="search-label">备注关键词</span>
-                    <input type="text" id="searchKeyword" class="search-input" placeholder="搜索备注关键词…">
-                </div>
-                <div class="search-field">
-                    <span class="search-label">金额区间</span>
-                    <div class="search-range">
-                        <input type="text" inputmode="decimal" id="searchMin" class="search-input money-input" placeholder="最低">
-                        <span class="search-sep">—</span>
-                        <input type="text" inputmode="decimal" id="searchMax" class="search-input money-input" placeholder="最高">
+                <!-- 1020-I：关键词、金额区间、日期范围做成列表行（左边名字，右边填的东西；金额、日期照留框） -->
+                <div class="rec-list filter-list">
+                    <label class="rec-row rec-row-in"><span class="rec-row-k">关键词</span><input type="text" id="searchKeyword" class="search-input rec-row-input" placeholder="备注里的字（不限）"></label>
+                    <div class="rec-row rec-row-in"><span class="rec-row-k">金额</span>
+                        <div class="rec-pair">
+                            <input type="text" inputmode="decimal" id="searchMin" class="search-input money-input" placeholder="最低">
+                            <span class="search-sep">—</span>
+                            <input type="text" inputmode="decimal" id="searchMax" class="search-input money-input" placeholder="最高">
+                        </div>
                     </div>
-                </div>
-                <div class="search-field">
-                    <span class="search-label">日期范围</span>
-                    <div class="search-range">
-                        <div id="searchFrom" class="search-input dt-input" data-placeholder="起始日期"></div>
-                        <span class="search-sep">—</span>
-                        <div id="searchTo" class="search-input dt-input" data-placeholder="结束日期"></div>
+                    <div class="rec-row rec-row-in"><span class="rec-row-k">日期</span>
+                        <div class="rec-pair">
+                            <div id="searchFrom" class="search-input dt-input" data-placeholder="起始"></div>
+                            <span class="search-sep">—</span>
+                            <div id="searchTo" class="search-input dt-input" data-placeholder="结束"></div>
+                        </div>
                     </div>
                 </div>
                 <div class="search-field">
@@ -481,33 +479,20 @@
     <div class="mask sheet-mask form-mask" id="detailMask">
         <div class="sheet edit-dialog" id="detailSheet">
             <div class="sheet-grip" id="detailGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>账单详情</h3></div></div>
+            <!-- 1020-I：照记一笔的列表卡：时间、金额、收支、分类、统计、备注一行一行，有的才显示原账单 / 退款记录、来源、AI 标记 -->
             <div class="form-box">
-                <div class="field">
-                    <label class="field-label">记账时间</label>
-                    <div class="detail-val" id="detailTime"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">金额</label>
-                    <div class="detail-val" id="detailMoney"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">分类</label>
-                    <div class="detail-val" id="detailCat"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">收支</label>
-                    <div class="detail-val" id="detailType"></div>
-                </div>
-                <!-- 1010-J2：退款 → 原账单是哪笔；原账单 → 退了哪几笔。没有关联时整栏隐藏 -->
-                <div class="field" id="detailRefundField" style="display:none">
-                    <label class="field-label" id="detailRefundLabel">原账单</label>
-                    <div class="detail-val detail-refund" id="detailRefundVal"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">备注</label>
-                    <div class="detail-val detail-remark" id="detailRemark"></div>
+                <div class="rec-list detail-list" id="detailList">
+                    <div class="rec-row detail-row"><span class="rec-row-k">时间</span><span class="rec-row-v" id="detailTime"></span></div>
+                    <div class="rec-row detail-row"><span class="rec-row-k">金额</span><span class="rec-row-v detail-money" id="detailMoney"></span></div>
+                    <div class="rec-row detail-row"><span class="rec-row-k">收支</span><span class="rec-row-v" id="detailType"></span></div>
+                    <div class="rec-row detail-row"><span class="rec-row-k">分类</span><span class="rec-row-v" id="detailCat"></span></div>
+                    <div class="rec-row detail-row"><span class="rec-row-k">统计</span><span class="rec-row-v" id="detailMode"></span></div>
+                    <div class="rec-row detail-row detail-block"><span class="rec-row-k">备注</span><div class="detail-remark" id="detailRemark"></div></div>
+                    <!-- 1010-J2：退款 → 原账单是哪笔；原账单 → 退了哪几笔。没有关联时整行隐藏 -->
+                    <div class="rec-row detail-row detail-block" id="detailRefundField" style="display:none"><span class="rec-row-k" id="detailRefundLabel">原账单</span><div class="detail-refund" id="detailRefundVal"></div></div>
                 </div>
             </div>
+            <!-- 1020-I：「修改」整宽在上，「关闭」在下 -->
             <div class="dialog-btn ui-stack form-btns">
                 <button class="ui-btn primary block" id="detailEdit">修改</button>
                 <button class="ui-btn block" id="detailClose">关闭</button>
@@ -520,26 +505,22 @@
         <div class="sheet edit-dialog" id="refundSheet">
             <div class="sheet-grip" id="refundGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>退款</h3></div></div>
             <div class="refund-sum" id="refundSum"></div>
-            <div class="form-box">
-                <div class="field">
-                    <label class="field-label">退款方式</label>
-                    <div class="cat-chips mode-chips" id="refundKind">
-                        <div class="cc" data-v="all">全额退款</div>
-                        <div class="cc" data-v="part">部分退款</div>
-                    </div>
+            <!-- 1020-I：「全额 | 部分」两个一样大的按钮；退款金额靠右（部分退款时用数字键盘，全额时只读）；时间、备注是列表行 -->
+            <div class="form-box rec-form">
+                <div class="cat-chips io-chips io-pair" id="refundKind" role="radiogroup" aria-label="退款方式">
+                    <div class="cc" data-v="all" role="radio"><span class="cc-t">全额</span></div>
+                    <div class="cc" data-v="part" role="radio"><span class="cc-t">部分</span></div>
                 </div>
-                <div class="field">
-                    <label class="field-label">退款金额</label>
-                    <input type="text" inputmode="decimal" id="refundMoney" class="money-input" placeholder="">
+                <div class="rec-money-row">
+                    <span class="rec-cur" aria-hidden="true">¥</span>
+                    <input type="text" inputmode="decimal" id="refundMoney" class="money-input rec-money" placeholder="" aria-label="退款金额">
                 </div>
-                <div class="field">
-                    <label class="field-label">退款时间</label>
-                    <div id="refundTime" class="dt-input" data-placeholder="钱退回来的时间"></div>
+                <div class="rec-list">
+                    <button type="button" class="rec-row" id="refundTimeRow"><span class="rec-row-k">时间</span><span class="rec-row-v" id="refundTimeTxt"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="refundRemarkRow"><span class="rec-row-k">备注</span><span class="rec-row-v rec-row-txt" id="refundRemarkVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
-                <div class="field">
-                    <label class="field-label">备注（选填）</label>
-                    <textarea id="refundRemark" class="remark-area" placeholder="比如：七天无理由退货" maxlength="5000" rows="2"></textarea>
-                </div>
+                <div id="refundTime" class="dt-input rec-time-raw" data-placeholder="钱退回来的时间"></div>
+                <textarea id="refundRemark" class="remark-area rec-remark" placeholder="比如：七天无理由退货" maxlength="5000" rows="1" aria-hidden="true" tabindex="-1"></textarea>
             </div>
             <div class="dialog-btn ui-stack form-btns">
                 <button class="ui-btn primary block" id="refundOk">确认退款</button>
@@ -596,31 +577,20 @@
     <div class="mask sheet-mask form-mask" id="tplEditMask">
         <div class="sheet edit-dialog" id="tplEditSheet">
             <div class="sheet-grip" id="tplEditGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3 id="tplEditTitle">新建模板</h3></div></div>
-            <div class="form-box">
-                <div class="field">
-                    <label class="field-label">名字（可不填，最多 10 字）</label>
-                    <input type="text" id="tplEditName" maxlength="20" placeholder="不填就用备注或分类">
+            <!-- 1020-I：照记一笔方案 D 排：名字、固定金额（可不填，靠右）一张小列表卡 → 收支两个按钮 → 分类 4 个最近常用 → 更多 / 统计 / 备注 -->
+            <div class="form-box rec-form">
+                <div class="rec-list">
+                    <label class="rec-row rec-row-in"><span class="rec-row-k">名字</span><input type="text" id="tplEditName" class="rec-row-input" maxlength="20" placeholder="可不填，最多 10 字"></label>
+                    <label class="rec-row rec-row-in"><span class="rec-row-k">金额</span><input type="text" inputmode="decimal" id="tplEditMoney" class="money-input rec-row-input" placeholder="不带金额（每次不一样）"></label>
                 </div>
-                <div class="field">
-                    <label class="field-label">分类</label>
-                    <div class="cat-chips" id="tplEditCats"></div>
+                <div class="cat-chips io-chips io-pair" id="tplEditTypes" role="radiogroup" aria-label="收支"></div>
+                <div class="cat-chips rec-cats" id="tplEditCats" aria-label="最近常用的分类"></div>
+                <div class="rec-list">
+                    <button type="button" class="rec-row" id="tplEditCatMore"><span class="rec-row-k">更多</span><span class="rec-row-v" id="tplEditCatMoreVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="tplEditMode" data-mode="normal"><span class="rec-row-k">统计</span><span class="rec-row-v" id="tplEditModeVal">计入</span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="tplEditRemarkRow"><span class="rec-row-k">备注</span><span class="rec-row-v rec-row-txt" id="tplEditRemarkVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
-                <div class="field">
-                    <label class="field-label">收支</label>
-                    <div class="cat-chips io-chips" id="tplEditTypes"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">统计</label>
-                    <div class="cat-chips mode-chips" id="tplEditMode"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">备注（可不填）</label>
-                    <textarea id="tplEditRemark" class="remark-area" maxlength="5000" rows="2"></textarea>
-                </div>
-                <div class="field">
-                    <label class="field-label">固定金额（可不填，每次不一样的就空着）</label>
-                    <input type="text" inputmode="decimal" id="tplEditMoney" class="money-input" placeholder="不带金额">
-                </div>
+                <textarea id="tplEditRemark" class="remark-area rec-remark" maxlength="5000" rows="1" aria-hidden="true" tabindex="-1"></textarea>
                 <p id="tplEditErr" class="ask-err" style="display:none"></p>
             </div>
             <div class="dialog-btn ui-stack form-btns">
@@ -787,22 +757,17 @@
     <div class="mask sheet-mask form-mask" id="dayMask">
         <div class="sheet edit-dialog" id="daySheet">
             <div class="sheet-grip" id="dayGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3 id="dayDlgTitle">添加日子</h3></div></div>
-            <div class="form-box">
-                <div class="field">
-                    <label class="field-label">名称（最多 8 字）</label>
-                    <input type="text" id="dayName" maxlength="16" placeholder="例如：入职"><!-- 1013-C：同上，字数在保存时按实际字数检查 -->
+            <!-- 1020-I：名称一行（点了弹文字小面板）、目标日期一行（和记账时间同一个样子）、置顶一行带开关、预览那句在下面 -->
+            <div class="form-box rec-form">
+                <div class="rec-list">
+                    <label class="rec-row rec-row-in"><span class="rec-row-k">名称</span><input type="text" id="dayName" class="rec-row-input" maxlength="16" placeholder="例如：入职（最多 8 字）"></label><!-- 1013-C：字数在保存时按实际字数检查 -->
                 </div>
-                <div class="field">
-                    <label class="field-label">目标日期</label>
-                    <div id="dayDate" class="dt-input" data-placeholder="选择日期"></div>
+                <button type="button" class="rec-time" id="dayDateLine" aria-label="选目标日期"><svg class="rec-time-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span class="rec-time-txt" id="dayDateTxt">选择目标日期</span><svg class="rec-row-arrow rec-time-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                <div id="dayDate" class="dt-input rec-time-raw" data-placeholder="选择日期"></div>
+                <div class="rec-list">
+                    <div class="rec-row day-pin-row" id="dayPinRow" role="button"><span class="rec-row-k">置顶</span><span class="rec-row-v day-pin-hint">排在入口卡首位</span><div class="day-switch" id="dayPin"></div></div>
                 </div>
                 <div class="day-preview" id="dayPreview"></div>
-                <div class="field">
-                    <div class="day-pin-row">
-                        <label class="field-label" style="margin:0;">置顶（排在入口卡首位）</label>
-                        <div class="day-switch" id="dayPin"></div>
-                    </div>
-                </div>
             </div>
             <div class="dialog-btn ui-stack form-btns">
                 <button class="ui-btn primary block" id="daySave">保存</button>
@@ -816,12 +781,12 @@
     <div class="mask sheet-mask form-mask" id="dayMgrMask">
         <div class="sheet edit-dialog" id="dayMgrSheet">
             <div class="sheet-grip" id="dayMgrGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>日子管理</h3></div></div>
-            <div class="dm-label">记账页入口卡显示条数</div>
-            <div class="dm-hint">最少 3 条，最多 99 条。超出的日子仍可在本页看到，不会丢。</div>
-            <input type="text" id="dmCount" class="dm-num"
-                   inputmode="numeric" maxlength="2" placeholder="3">
-            <div class="dm-sep"></div>
-            <button class="dm-batch" id="dmBatch">批量删除日子</button>
+            <!-- 1020-I：「入口卡显示几条」「批量删除日子」做成列表行 -->
+            <div class="rec-list dm-list">
+                <label class="rec-row rec-row-in"><span class="rec-row-k dm-k">入口卡显示</span><input type="text" id="dmCount" class="rec-row-input dm-num" inputmode="numeric" maxlength="2" placeholder="3"><span class="dm-unit">条</span></label>
+                <button type="button" class="rec-row" id="dmBatch"><span class="rec-row-k dm-k">批量删除日子</span><span class="rec-row-v"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+            </div>
+            <div class="dm-hint">入口卡最少 3 条，最多 99 条。超出的日子仍可在日子页看到，不会丢。</div>
             <div class="dialog-btn ui-stack form-btns">
                 <button class="ui-btn primary block" id="dmSave">保存</button>
                 <button class="ui-btn block" id="dmClose">取消</button>
@@ -885,26 +850,26 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1020-H"></script>
-    <script src="app/store.js?v=1020-H"></script>
-    <script src="app/select.js?v=1020-H"></script>
-    <script src="app/keypad.js?v=1020-H"></script>
-    <script src="app/text.js?v=1020-H"></script>
-    <script src="app/sheet.js?v=1020-H"></script>
-    <script src="app/ask.js?v=1020-H"></script>
-    <script src="app/date.js?v=1020-H"></script>
-    <script src="app/ai-export.js?v=1020-H"></script>
-    <script src="app/import-entry.js?v=1020-H"></script>
-    <script src="app/forms.js?v=1020-H"></script>
-    <script src="app/ledger.js?v=1020-H"></script>
-    <script src="app/cats.js?v=1020-H"></script>
-    <script src="app/stats.js?v=1020-H"></script>
-    <script src="app/days.js?v=1020-H"></script>
-    <script src="app/settings.js?v=1020-H"></script>
-    <script src="app/tabs.js?v=1020-H"></script>
-    <script src="app/login.js?v=1020-H"></script>
-    <script src="app/back.js?v=1020-H"></script>
-    <script src="app/boot.js?v=1020-H"></script>
+    <script src="app/base.js?v=1020-I"></script>
+    <script src="app/store.js?v=1020-I"></script>
+    <script src="app/select.js?v=1020-I"></script>
+    <script src="app/keypad.js?v=1020-I"></script>
+    <script src="app/text.js?v=1020-I"></script>
+    <script src="app/sheet.js?v=1020-I"></script>
+    <script src="app/ask.js?v=1020-I"></script>
+    <script src="app/date.js?v=1020-I"></script>
+    <script src="app/ai-export.js?v=1020-I"></script>
+    <script src="app/import-entry.js?v=1020-I"></script>
+    <script src="app/forms.js?v=1020-I"></script>
+    <script src="app/ledger.js?v=1020-I"></script>
+    <script src="app/cats.js?v=1020-I"></script>
+    <script src="app/stats.js?v=1020-I"></script>
+    <script src="app/days.js?v=1020-I"></script>
+    <script src="app/settings.js?v=1020-I"></script>
+    <script src="app/tabs.js?v=1020-I"></script>
+    <script src="app/login.js?v=1020-I"></script>
+    <script src="app/back.js?v=1020-I"></script>
+    <script src="app/boot.js?v=1020-I"></script>
 
 </body>
 </html>

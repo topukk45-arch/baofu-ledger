@@ -7,9 +7,9 @@ function chip(d, boxId, name) {
   const box = $(boxId);
   const el = box && find(box);
   if (el) return el;
-  const m = /^(bill|edit)CatChips$/.exec(boxId);
+  const m = /^(bill|edit)CatChips$|^tplEditCats$/.exec(boxId);
   if (!m) return el;
-  $(m[1] + 'CatMore').click();
+  $((m[1] || 'tplEdit') + 'CatMore').click();
   const all = $('catDrawerAll');
   return all && find(all);
 }
@@ -22,4 +22,14 @@ function pickMode(d, boxId, name) {
 }
 // 统计那一行现在写的
 const modeText = (d, boxId) => { const v = d.getElementById(boxId).querySelector('.rec-row-v'); return v ? v.textContent : ''; };
-module.exports = { chip, pickMode, modeText };
+// 1020-I：批量改分类改用分类抽屉：choose(d, '游戏')：提示框的选项里有就点它 + 确定；没有、分类抽屉开着，就在抽屉里点那个分类
+function choose(d, label) {
+  const ac = d.getElementById('askChoices');
+  const el = ac && [...ac.querySelectorAll('.cc')].find(e => (e.querySelector('.cc-label') || e).textContent === label && d.getElementById('askMask').style.display === 'flex');
+  if (el) { el.click(); d.getElementById('askOk').click(); return; }
+  const all = d.getElementById('catDrawerAll');
+  const c = all && [...all.querySelectorAll('.cc')].find(e => e.textContent === label);
+  if (!c) throw new Error('找不到「' + label + '」');
+  c.click();
+}
+module.exports = { chip, pickMode, modeText, choose };

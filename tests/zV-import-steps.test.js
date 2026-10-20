@@ -77,7 +77,7 @@ const MANY = () => [
     const row = t.d.querySelector('#impCpGroups .imp-cp-row');
     ok(row && /某虚构平台甲/.test(row.textContent) && /待选/.test(row.querySelector('.imp-mark').textContent), '2 按对方选分类：整行一块，标「待选」');
     row.click();
-    ok(sheetOpen(t) && raw('uiPickList').classList.contains('filter-chips') && raw('uiPickList').firstElementChild.textContent === '未分类', '2 点整行弹选分类面板（分类块，「未分类」第一个）');
+    ok(sheetOpen(t) && (raw('uiPickList').classList.contains('filter-chips') || raw('uiPickList').classList.contains('cat-grid4')) && raw('uiPickList').firstElementChild.textContent === '未分类', '2 点整行弹选分类面板（分类块，「未分类」第一个）');
     [...t.d.querySelectorAll('#uiPickList .cc')].find(x => x.textContent === '购物').click();
     ok(!sheetOpen(t) && t.S().edits.cpCats['某虚构平台甲'] === '购物', '2 点一下就选中、面板关掉，照旧记进 edits.cpCats');
     ok(/已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row[data-cp="某虚构平台甲"] .imp-mark').textContent) && /购物/.test(t.d.querySelector('#impCpGroups .imp-cp-row[data-cp="某虚构平台甲"]').textContent), '2 那一行标「已选」，写着「购物」');

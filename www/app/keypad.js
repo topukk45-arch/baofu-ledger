@@ -8,7 +8,7 @@
         //   已经有金额再打开：接着输（照微信转账），不整个替换——替换容易一碰就把原来的数清掉。
         //   设置里「用系统键盘输入金额」打开就照旧用系统输入法。
         const KP_INT_MAX=8;
-        const KP_FIELDS={ billMoney:'确定', editMoney:'确定', tplEditMoney:'确定', searchMin:'确定', searchMax:'确定' };
+        const KP_FIELDS={ billMoney:'确定', editMoney:'确定', tplEditMoney:'确定', searchMin:'确定', searchMax:'确定', refundMoney:'确定' };   // 1020-I：退款金额（部分退款时才弹，全额时 data-kp-lock）
         let kpTarget=null, kpOnOk=null, kpHost=null;
         function kpOn(){ try{ return localStorage.getItem('app_sys_money_kb')!=='1'; }catch(_){ return true; } }
         function kpFieldSet(el, on){
@@ -163,7 +163,7 @@
         else document.addEventListener('touchstart', kpOutside, { capture:true, passive:true });
         Object.keys(KP_FIELDS).forEach(id=>{
             const el=$(id); if(!el) return;
-            const go=e=>{ if(!kpOn()) return; if(e && e.type==='focus') el.blur(); kpOpen(el); };
+            const go=e=>{ if(!kpOn() || el.dataset.kpLock==='1') return; if(e && e.type==='focus') el.blur(); kpOpen(el); };
             el.addEventListener('click', go);
             el.addEventListener('focus', go);
         });

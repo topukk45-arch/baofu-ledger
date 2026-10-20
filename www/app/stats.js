@@ -1,6 +1,6 @@
 (function(){
         const { $, escapeHtml, fabWake, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
-        const { IMP_APPS, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, modeTag, odScheduleSync, refundedMap, refundedTag, refundedTotal, refundsOf, saveStoreSafe, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { IMP_APPS, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, odScheduleSync, refundedMap, refundedTag, refundedTotal, refundsOf, saveStoreSafe, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, playSlide } = window.JiwenDate;   // 用到前面模块的
         const { devImportOn, loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
@@ -806,7 +806,9 @@
             $('detailType').innerHTML = (isExp
                 ? '<span class="io-tag io-out">支出</span>'
                 : (isRefund(rec) ? '<span class="io-tag io-refund">退款</span>' : '<span class="io-tag io-in">收入</span>'))
-                + modeTag(rec, true) + refundedTag(rec, refundedMap(all));
+                + refundedTag(rec, refundedMap(all));
+            // 1020-I：统计单独一行（原来是收支后面的小标签）
+            $('detailMode').textContent = ({ normal:'计入', skip:'不计', flow:'往来' })[recMode(rec)];
             paintDetailRefund(rec, all);
             paintDetailSource(rec);
             paintDetailAiFlag(rec, all);
@@ -824,11 +826,12 @@
             const app=rec.src && IMP_APPS.includes(rec.src.app) ? (rec.src.app==='alipay' ? '支付宝' : '微信') : '';
             if(!app){ if(f) f.remove(); return; }
             if(!f){
-                f=document.createElement('div'); f.className='field'; f.id='detailSrcField';
-                const remarkField=$('detailRemark').parentNode; remarkField.parentNode.insertBefore(f, remarkField.nextSibling);
+                f=document.createElement('div'); f.className='rec-row detail-row detail-block'; f.id='detailSrcField';   // 1020-I：列表卡里一行
+                $('detailList').appendChild(f);
             }
             f.textContent='';
-            const v=document.createElement('div'); v.className='detail-val'; v.id='detailSrc'; v.style.color='var(--c-text-soft)'; v.style.fontSize='12.5px';
+            const k=document.createElement('span'); k.className='rec-row-k'; k.textContent='来源'; f.appendChild(k);
+            const v=document.createElement('div'); v.className='detail-src'; v.id='detailSrc';
             v.textContent = rec.src.merged ? `已和${app}账单合并（你记的这条，补上了来源）` : rec.src.sum ? `来自${app}账单（几笔合成的一条）` : `来自${app}账单`;
             f.appendChild(v);
             if(rec.src.merged && devImportOn()){
@@ -861,12 +864,12 @@
             let f=$('detailAiField');
             if(!rec.aiFlag){ if(f) f.remove(); return; }
             if(!f){
-                f=document.createElement('div'); f.className='field'; f.id='detailAiField';
-                const remarkField=$('detailRemark').parentNode; remarkField.parentNode.insertBefore(f, remarkField.nextSibling);
+                f=document.createElement('div'); f.className='rec-row detail-row detail-block'; f.id='detailAiField';   // 1020-I：列表卡里一行
+                $('detailList').appendChild(f);
             }
             f.textContent='';
-            const lab=document.createElement('label'); lab.className='field-label'; lab.textContent='AI 标记'; f.appendChild(lab);
-            const box=document.createElement('div'); box.className='detail-val'; box.style.display='block';
+            const lab=document.createElement('span'); lab.className='rec-row-k'; lab.textContent='AI 标记'; f.appendChild(lab);
+            const box=document.createElement('div'); box.className='detail-ai';
             const v=document.createElement('div'); v.id='detailAiFlag'; v.style.color='var(--c-neg)'; v.textContent=aiFlagText(rec, all); box.appendChild(v);
             if(rec.aiFlag.why){ const w=document.createElement('div'); w.id='detailAiWhy'; w.style.color='var(--c-text-soft)'; w.style.fontSize='12.5px'; w.style.marginTop='4px'; w.textContent='理由：'+rec.aiFlag.why; box.appendChild(w); }
             f.appendChild(box);

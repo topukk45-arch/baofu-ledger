@@ -84,7 +84,8 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   const opts = [...t.d.querySelectorAll('#uiPickList .cc')];
   ok(sheetOpen() && $('uiSheetMask').className.includes('sheet-mask') && $('uiSheet').className.includes('sheet') && $('uiSheet').querySelector('.sheet-grip .sheet-handle') && $('uiSheetTitle').textContent === '归到哪个分类',
     '11 选分类面板：和筛选同一套样子（sheet-mask / sheet / 拖动条），标题写选什么');
-  ok($('uiPickList').classList.contains('filter-chips') && opts.length === ns.options.length && opts.filter(b => b.classList.contains('sel')).length === 1 && opts.every(b => !b.closest('.ui-sheet-foot')),
+  // 1020-I 起选分类用分类抽屉：「全部」那一格（一行 4 个的分类块）也叫 uiPickList
+  ok(($('uiPickList').classList.contains('filter-chips') || $('uiPickList').classList.contains('cat-grid4')) && opts.length === ns.options.length && opts.filter(b => b.classList.contains('sel')).length === 1 && opts.every(b => !b.closest('.ui-sheet-foot')),
     '11 分类是筛选里那种分类块，一个不少，当前那项高亮');
   ok([...$('uiSheetFoot').querySelectorAll('button')].map(b => b.textContent).join() === '取消', '11 底部只有「取消」');
   let changed = 0; ns.addEventListener('change', () => changed++);

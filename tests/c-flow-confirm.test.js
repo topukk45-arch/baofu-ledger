@@ -1,5 +1,6 @@
 // 1010-C 专项：往来 + 确认弹窗清单。node test4.js <html>
 const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
+const RC=require('./helpers/rec');   // 1020-I：批量改分类用分类抽屉
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark:remark||''},extra||{});
@@ -27,7 +28,7 @@ function bootSync(records){
     const d=dom.window.document, $=id=>d.getElementById(id);
     const recs=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey())).archives['默认存档'].records;
     const chip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===txt);
-    const choose=txt=>{ chip('askChoices',txt).click(); $('askOk').click(); };
+    const choose=txt=>RC.choose(d, txt);   // 1020-I：批量改分类在分类抽屉里选
     const filterKw=kw=>{ $('filterFab').click(); $('searchKeyword').value=kw; $('sheetApply').click(); };
     return { w:dom.window, d, $, recs, chip, choose, filterKw, errs };
 }

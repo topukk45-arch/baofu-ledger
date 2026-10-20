@@ -106,12 +106,14 @@ const recs = [
   const choose = label => [...$('askChoices').querySelectorAll('.cc')].find(b => (b.querySelector('.cc-label') || b).textContent === label).click();
   w.JiwenLedger.openBatchMenu(); await settle();
   choose('改分类'); $('askOk').click(); await settle();
-  ok(t.ask() && t.ask().title === '选择分类', '6 改分类：选分类');
-  choose('购物'); $('askOk').click(); await settle();
+  // 1020-I：选分类用分类抽屉（共用底部面板）
+  const drawer = () => w.JiwenSheet.isOpen() && $('uiSheetTitle').textContent === '改成哪个分类';
+  ok(drawer() && !t.ask(), '6 改分类：选分类（分类抽屉）');
+  [...$('catDrawerAll').querySelectorAll('.cc')].find(b => b.textContent === '购物').click(); await settle();
   ok(t.ask() && t.ask().title === '批量改分类', '6 选了：确认框');
   await t.askCancel(); await settle();
-  ok(t.ask() && t.ask().title === '选择分类', '6 确认框取消：回到选分类');
-  await t.askCancel(); await settle();
+  ok(drawer(), '6 确认框取消：回到选分类');
+  w.JiwenSheet.back(); await settle();
   ok(t.ask() && t.ask().title === '批量操作', '6 选分类取消：回到批量操作（原来就是）');
   choose('标为不计'); $('askOk').click(); await settle();
   ok(t.ask() && t.ask().title === '批量修改统计', '6 标为不计：确认框');

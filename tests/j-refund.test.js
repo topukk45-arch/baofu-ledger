@@ -55,7 +55,7 @@ function bootSync(records, arcExtra){
   ok(t.$('refundKind').querySelector('.sel').dataset.v==='all' && t.$('refundMoney').value==='100.00' && t.$('refundMoney').readOnly, '默认全额：金额填好且只读');
   ok(t.$('refundTime').dataset.value==='2026-10-10T14:00', '退款时间默认现在');
   t.kind('part');
-  ok(t.$('refundMoney').value==='' && !t.$('refundMoney').readOnly && t.$('refundMoney').placeholder==='最多 100.00', '部分退款：清空可填');
+  ok(t.$('refundMoney').value==='' && !t.$('refundMoney').classList.contains('ro') && !t.$('refundMoney').dataset.kpLock && t.$('refundMoney').placeholder==='最多 100.00', '部分退款：清空可填（1020-I 起用数字键盘填）');
   t.$('refundCancel').click();
   ok(t.$('refundMask').style.display==='none' && !t.refunds().length, '取消不产生记录');
 }
@@ -245,7 +245,7 @@ function bootSync(records, arcExtra){
   t.$('filterFab').click(); t.$('searchKeyword').value='鞋子'; t.$('sheetApply').click();
   t.$('batchBar').querySelector('[data-act="batch"]').click();
   ok(t.$('askMsg').textContent.startsWith('对当前筛选命中的 1 条记录') && t.$('askMsg').textContent.includes('另有 1 条退款记录不参与'), '菜单说明：'+t.$('askMsg').textContent);
-  const choose=label=>{ [...t.$('askChoices').querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===label).click(); t.$('askOk').click(); };
+  const choose=label=>RC.choose(t.d, label);   // 1020-I：批量改分类在分类抽屉里选
   choose('改分类'); choose('游戏');
   ok(t.$('askList').querySelectorAll('.al-row').length===1, '确认清单只有原账单');
   t.$('askOk').click();

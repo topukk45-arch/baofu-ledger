@@ -37,15 +37,16 @@
         //   选的是这 4 个以外的：「更多」那一行右边写这个分类名（加粗）；选的是这 4 个之一：右边空着。
         //   不默认选中任何分类——分类为必选项，由用户主动点选
         let billCatSel='';
-        const recentOf={ bill:[], edit:[] };
+        const recentOf={ bill:[], edit:[], tplEdit:[] };
+        const catBoxOf=p=>$(p==='tplEdit' ? 'tplEditCats' : p+'CatChips');   // 模板面板的分类块原来就叫 tplEditCats
         function paintCatRow(p, sel){
-            $(p+'CatChips').querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.textContent===sel));
+            catBoxOf(p).querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.textContent===sel));
             const out = sel && !recentOf[p].includes(sel);
             const v=$(p+'CatMoreVal'); v.textContent = out ? sel : ''; v.classList.toggle('on', !!out);
         }
         function renderRecentChips(p, type, onPick){
             recentOf[p]=recentCats(type, 4);
-            const box=$(p+'CatChips');
+            const box=catBoxOf(p);
             box.innerHTML='';
             recentOf[p].forEach(c=>{
                 const b=document.createElement('div');
@@ -73,28 +74,29 @@
         }
         // 分类抽屉（共用底部面板 JiwenSheet.cats）：点一个就选好、关掉，回到记一笔 / 修改；「管理分类」打开分类管理，关了回到抽屉
         function openCatDrawer(p){
-            const isBill = p==='bill';
-            const type = isBill ? billTypeSel : editTypeSel;
-            const pick = isBill ? pickBillCat : pickEditCat;
+            const type = p==='bill' ? billTypeSel : p==='edit' ? editTypeSel : tplEditType;
+            const pick = p==='bill' ? pickBillCat : p==='edit' ? pickEditCat : pickTplCat;
             const again=()=>openCatDrawer(p);
-            window.JiwenSheet.cats({ type, value: isBill ? billCatSel : editCatSel, recent: recentOf[p], onPick: pick,
+            const maskId = p==='bill' ? 'addMask' : p==='edit' ? 'editMask' : 'tplEditMask';
+            window.JiwenSheet.cats({ type, value: p==='bill' ? billCatSel : p==='edit' ? editCatSel : tplEditCat, recent: recentOf[p], onPick: pick,
                 onManage: ()=>{
                     window.JiwenCats.openCatManager();
                     const m=$('catMask');
-                    const ob=new MutationObserver(()=>{ if(m.style.display==='none'){ ob.disconnect(); if($(isBill ? 'addMask' : 'editMask').style.display==='flex') again(); } });
+                    const ob=new MutationObserver(()=>{ if(m.style.display==='none'){ ob.disconnect(); if($(maskId).style.display==='flex') again(); } });
                     ob.observe(m, { attributes:true, attributeFilter:['style'] });
                 } });
         }
         $('billCatMore').addEventListener('click', ()=>openCatDrawer('bill'));
         $('editCatMore').addEventListener('click', ()=>openCatDrawer('edit'));
+        $('tplEditCatMore').addEventListener('click', ()=>openCatDrawer('tplEdit'));
         // 备注那一行：右边写已经写好的备注（一行，太长省略），没写空着；点了弹文字小面板（备注框本身藏着，值还在它身上）
         function paintRemarkRow(p){ const t=$(p+'Remark').value.replace(/\s+/g,' ').trim(); $(p+'RemarkVal').textContent=t; }
-        ['bill','edit'].forEach(p=>{
+        ['bill','edit','tplEdit'].forEach(p=>{
             $(p+'RemarkRow').addEventListener('click', ()=>window.openTextPanel($(p+'Remark')));
             $(p+'Remark').addEventListener('input', ()=>paintRemarkRow(p));
         });
         // 别处直接改了备注框的值（模板、期初余额、接着填）以后，调这个把那一行跟上
-        function syncRecRows(){ paintRemarkRow('bill'); paintRemarkRow('edit'); }
+        function syncRecRows(){ paintRemarkRow('bill'); paintRemarkRow('edit'); paintRemarkRow('tplEdit'); paintRemarkRow('refund'); }
 
         // 分类增删改/排序后调用：若记账弹窗正开着，重渲染标签使其立即反映最新分类。
         // 尽量保留用户当前已选的分类（若它还存在）。
@@ -295,13 +297,17 @@
             refundKindSel=kind;
             $('refundKind').querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===kind));
             const inp=$('refundMoney');
+            // 1020-I：全额时金额只读（数字键盘不弹）；部分退款弹 App 的数字键盘（设置里选了系统键盘的照旧弹系统的）
+            const kpOn=window.JiwenKeypad && window.JiwenKeypad.kpOn();
             if(kind==='all'){
-                inp.value=rem.toFixed(2); inp.readOnly=true; inp.classList.add('ro');
+                inp.value=rem.toFixed(2); inp.readOnly=true; inp.classList.add('ro'); inp.dataset.kpLock='1';
+                if(window.JiwenKeypad && window.JiwenKeypad.kpTarget===inp) window.kpClose();
                 try{ inp.blur(); }catch(_){}
             } else {
-                inp.value=''; inp.readOnly=false; inp.classList.remove('ro');
+                inp.value=''; inp.readOnly=!!kpOn; inp.classList.remove('ro'); delete inp.dataset.kpLock;
                 inp.placeholder=`最多 ${rem.toFixed(2)}`;
-                try{ inp.focus(); }catch(_){}
+                if(kpOn){ if($('refundMask').style.display==='flex') window.kpOpen(inp); }
+                else { try{ inp.focus(); }catch(_){} }
             }
         }
         function openRefund(id){
@@ -316,7 +322,7 @@
                 + ` <span class="rs-when">${String(o.time).replace('T',' ')}</span></div>`
                 + `<div class="rs-nums"><span>原金额 <b>${safeNum(o.money).toFixed(2)}</b></span>`
                 + `<span>已退 <b>${done.toFixed(2)}</b></span><span>还能退 <b class="pos">${rem.toFixed(2)}</b></span></div>`;
-            $('refundRemark').value='';
+            $('refundRemark').value=''; paintRemarkRow('refund');
             const now=nowDtValue();
             setDtInput($('refundTime'), now<o.time ? o.time : now);
             $('refundMask').style.display='flex';
@@ -329,6 +335,10 @@
             setRefundKind(el.dataset.v, refundRemain(data, o));
         });
         $('refundTime').addEventListener('click', ()=>openDtPicker($('refundTime')));
+        // 1020-I：时间、备注是列表行：点了弹日期选择 / 文字小面板，选好了那一行跟着变（时间那一行是 refundTimeTxt，setDtInput 顺手写）
+        $('refundTimeRow').addEventListener('click', ()=>openDtPicker($('refundTime')));
+        $('refundRemarkRow').addEventListener('click', ()=>window.openTextPanel($('refundRemark')));
+        $('refundRemark').addEventListener('input', ()=>paintRemarkRow('refund'));
         $('refundCancel').addEventListener('click', closeRefund);
         $('refundOk').addEventListener('click', ()=>{
             const data=getUserData();
@@ -426,13 +436,20 @@
         //   只填模板要的：名字（可不填）、分类、收支、口径、备注、固定金额（可不填）；没有记账时间。
         //   保存只改存档里的 tpls：不写记录、不改账本版本（saveTplStore），回到模板列表。
         let tplEditId=null, tplEditCat='', tplEditType='';
+        // 1020-I：照记一笔方案 D：分类 4 个最近常用（按选的收支算）+「更多」那一行（分类抽屉），收支两个一样大的按钮
+        function pickTplCat(c){
+            const prev=tplEditCat; tplEditCat=c;
+            paintCatRow('tplEdit', c);
+            autoModeOnCat($('tplEditMode'), prev, c);
+        }
         function tplEditChips(){
-            const cb=$('tplEditCats'); cb.innerHTML='';
-            getCats().forEach(c=>{ const b=document.createElement('div'); b.className='cc'+(c===tplEditCat?' sel':''); b.textContent=c;
-                b.onclick=()=>{ const prev=tplEditCat; tplEditCat=c; cb.querySelectorAll('.cc').forEach(x=>x.classList.toggle('sel', x===b)); autoModeOnCat($('tplEditMode'), prev, c); }; cb.appendChild(b); });
+            renderRecentChips('tplEdit', tplEditType, pickTplCat);
+            paintCatRow('tplEdit', tplEditCat);
             const tb=$('tplEditTypes'); tb.innerHTML='';
-            [{v:'expense', t:'支出', cls:'sel-out'}, {v:'income', t:'收入', cls:'sel-in'}].forEach(o=>{ const b=document.createElement('div'); b.className='cc'+(o.v===tplEditType?' '+o.cls:''); b.textContent=o.t;
-                b.onclick=()=>{ tplEditType=o.v; tb.querySelectorAll('.cc').forEach(x=>x.classList.remove('sel-out','sel-in')); b.classList.add(o.cls); }; tb.appendChild(b); });
+            [{v:'expense', t:'支出', cls:'sel-out'}, {v:'income', t:'收入', cls:'sel-in'}].forEach(o=>{ const b=document.createElement('div'); b.className='cc'+(o.v===tplEditType?' '+o.cls:''); b.setAttribute('role','radio');
+                { const sp=document.createElement('span'); sp.className='cc-t'; sp.textContent=o.t; b.appendChild(sp); }
+                b.onclick=()=>{ const changed=tplEditType!==o.v; tplEditType=o.v; tb.querySelectorAll('.cc').forEach(x=>x.classList.remove('sel-out','sel-in')); b.classList.add(o.cls);
+                    if(changed){ renderRecentChips('tplEdit', tplEditType, pickTplCat); paintCatRow('tplEdit', tplEditCat); } }; tb.appendChild(b); });
         }
         function openTplEditor(id){
             const t=id ? getTpls().find(x=>x.id===id) : null;
@@ -442,7 +459,7 @@
             tplEditType=t ? t.type : '';
             $('tplEditTitle').textContent=t ? '编辑模板' : '新建模板';
             $('tplEditName').value=t ? (t.name||'') : '';
-            $('tplEditRemark').value=t ? (t.remark||'') : '';
+            $('tplEditRemark').value=t ? (t.remark||'') : ''; paintRemarkRow('tplEdit');
             $('tplEditMoney').value=t && t.money!=null ? safeNum(t.money).toFixed(2) : '';
             setModeChips($('tplEditMode'), t ? t.mode : 'normal');
             tplEditChips();
