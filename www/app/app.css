@@ -798,7 +798,7 @@
             line-height:48px; font-size:16px; font-weight:bold; background:var(--c-surface); color:var(--c-text); box-shadow:none; transform:none; }
         .io-chips.io-mini .cc.sel-out { background:var(--c-neg); color:#fff; }
         .io-chips.io-mini .cc.sel-in { background:var(--c-pos); color:#fff; }
-        /* 1019-Z：统计口径一行三个小按钮（计入 / 只算结余 / 不计入），说明只在不是「计入」时显示 */
+        /* 1019-Z：统计一行三个小按钮（计入 / 往来 / 不计），说明只在不是「计入」时显示 */
         .mode-chips.mode-mini { display:flex; gap:8px; flex-wrap:nowrap; margin:0; }
         .mode-chips.mode-mini .cc { flex:1 1 0; min-width:0; margin:0; padding:0 6px; height:var(--ui-tap); line-height:46px; font-size:14px; text-align:center; white-space:nowrap; }
         .rec-mode .skip-hint { margin-top:6px; }
@@ -1190,8 +1190,8 @@
         .ask-extra-btn:hover { border-color:var(--c-accent);
             box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.3); }
 
-        /* ===== 不计入收支 / 批量操作（1010-B）=====
-           「不计入」一律用中性灰：它既不是收入也不是支出，不该沾语义色的红/绿。 */
+        /* ===== 不计 / 批量操作（1010-B）=====
+           「不计」一律用中性灰：它既不是收入也不是支出，不该沾语义色的红/绿。 */
         .io-skip { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
             background:#efefef; border:1px solid #d6d6d6; color:#888; }
         .amt-skip, .pos.amt-skip, .neg.amt-skip { color:#9a9a9a !important; }
@@ -1200,8 +1200,8 @@
         .summary-filter { flex-wrap:wrap; }
         .summary-filter .filter-nums { min-width:0; flex:1 1 auto; }
 
-        /* ===== 只算结余 / 统计口径选择 / 确认弹窗清单（1010-C）=====
-           「只算结余」用灰蓝，和「不计入」的灰区分开；都不沾语义色的红/绿。 */
+        /* ===== 往来 / 统计选择 / 确认弹窗清单（1010-C）=====
+           「往来」用灰蓝，和「不计」的灰区分开；都不沾语义色的红/绿。 */
         .io-flow { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
             background:#e8eef5; border:1px solid #c9d5e3; color:#5a6f87; }
         .sf-io.flow { color:#5a6f87; background:#e8eef5; border-color:#c9d5e3; }
@@ -1260,7 +1260,7 @@
         .ask-list .al-row:active { background:var(--c-chip); }
         .al-go { flex:0 0 auto; color:var(--c-text-soft); font-size:15px; line-height:1; margin-left:-2px; }
 
-        /* 统计日历：当天只有「不计入 / 只算结余」的记录——有账，但不进收支 */
+        /* 统计日历：当天只有「不计 / 往来」的记录——有账，但不进收支 */
         .stat-cal .day.has.excl { background:#eef0f3; border:1px dashed #c6cdd5; }
         .stat-cal .day.excl.sel { background:var(--c-sel-bg); border:1px solid transparent; }
 

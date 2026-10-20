@@ -5,7 +5,7 @@
 // 和 core.js 同样的写法：浏览器里是全局变量 JiwenImportWrite，Node 里直接 require。
 //
 // 记录的写法：
-//   新增 / 不计入：{ time, money, type, cat, remark, 口径, src:{app}, cp, pm, oc, batch }（cp、pm 是名单里的编号）
+//   新增 / 不计：{ time, money, type, cat, remark, 口径, src:{app}, cp, pm, oc, batch }（cp、pm 是名单里的编号）
 //   退款：type income + refundOf（原单：这批新增的 → 临时编号；合进手记的 → 那条手记；以前导入的 → 那条记录），
 //         分类、口径由主页面写入时照原单同步
 //   合并：手记的时间改成账单时间（多笔合一取最早那笔），加 src:{app, merged:true}、cp、batch；分类、备注、口径、金额不动
@@ -117,7 +117,7 @@
       mem.forEach(function (d) { sumDone[d.key] = true; order(d.key, d.time, 0, ref); if (g.appendTo) change(g.appendTo).nos.push(noOf(d.key)); });
     });
 
-    // ---- 新增、不计入 ----
+    // ---- 新增、不计 ----
     rows.forEach(function (d) {
       if ((d.group !== 'add' && d.group !== 'neutral') || sumDone[d.key]) return;
       var o = base(d);
@@ -182,7 +182,7 @@
         if (od && od.group === 'merge') o.refundOf = { id: od.into };
         else if (od && tmpOfKey[od.key]) o.refundOf = { tmp: tmpOfKey[od.key] };
       }
-      if (!o.refundOf) setMode(o, d.mode);     // 没挂原单的（只算结余）
+      if (!o.refundOf) setMode(o, d.mode);     // 没挂原单的（往来）
       var t = newRec(o);
       order(d.key, d.time, 0, { tmp: t });
     });

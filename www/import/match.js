@@ -18,7 +18,7 @@
 //   分类：第一轮配完，先从合并里学「对方 → 分类」，再给没合并的行推荐分类（第二轮的「部分付款」要用）。
 //   第二轮 拿不准的进待处理、不新增：金额相近（3 天内、差额不超过 5 元和 20% 中较小的那个、高低都算）、
 //     部分付款（同一天、账单比手记少、推荐的分类和手记一样）、差 4–7 天金额相同。都没有 → 新增（漏记）。
-//   「不计入」的行只做第一轮精确配对，而且只和手记里同样「不计入」的配；配不上照常导入，不进待处理。
+//   「不计」的行只做第一轮精确配对，而且只和手记里同样「不计」的配；配不上照常导入，不进待处理。
 // 新增的桶：merge（合并）。按净额配上的，那几条退款行改进「跳过」（已按净额并进手记），照样登记单号。
 //
 // 1017-UI4（第三轮真机试用）：整体按「最近的优先」——先找同一天「几笔加起来」的凑法，再配相差 0 天正好相等的单笔（和凑法不沾边的一对一合并，
@@ -65,7 +65,7 @@
   function dayStr(n) { var x = new Date(n * 86400000); return x.toISOString().slice(0, 10); }
   function tkey(row) { return row.time + ':' + (row.sec === null || row.sec === undefined ? '00' : (row.sec < 10 ? '0' : '') + row.sec); }
 
-  // 「不计入」的行要知道方向：账单里写了收支就用；微信「/」、支付宝「不计收支」看类型和商品说明猜，猜不出就不配
+  // 「不计」的行要知道方向：账单里写了收支就用；微信「/」、支付宝「不计收支」看类型和商品说明猜，猜不出就不配
   var OUT_WORDS = ['还款', '提现', '转入', '买入', '申购', '存入', '缴纳'], IN_WORDS = ['转出', '赎回', '卖出', '退回'];
   function neutralDir(item, row) {
     if (item.io === 'income' || item.io === 'expense') return item.io;
@@ -160,7 +160,7 @@
         if (o) { var a = refundsOf.get(o); if (!a) refundsOf.set(o, a = []); a.push(it); }
       }
     });
-    // 要配的账单行：④ 的「新增」（合并成汇总记录的不配）和「不计入」
+    // 要配的账单行：④ 的「新增」（合并成汇总记录的不配）和「不计」
     var bills = [];
     rowItems.forEach(function (it) {
       var r = rowOf(parsed, it);
@@ -198,7 +198,7 @@
       if (d === 1) multiSums = groupCombos(comboList.concat(sameDay), function (m) { mstate.set(m.id, 'reserved'); reservedBy[m.id] = 'multisum'; }, 0);
       // 1017-UI6：跨天的要看分类冲不冲突，先给剩下的账单推一次分类（用同一天合并里学到的；最后还会按全部合并重推一次）
       if (d === 1) preClassify();
-      // 这一层的边：账单 ↔ 手记（同收支、金额相同或等于净额、相差正好 d 天、手记还没用、不计入的只配不计入的手记）
+      // 这一层的边：账单 ↔ 手记（同收支、金额相同或等于净额、相差正好 d 天、手记还没用、不计的只配不计的手记）
       var edges = [];
       bills.forEach(function (b) {
         if (b.done) return;
@@ -209,7 +209,7 @@
             if (Math.abs(dd) !== d || !free(m) || seen.has(m.id)) return;
             // 1017-UI6：跨天的只认「手记比账单晚」（事后补记），手记早的一律不自动合并；普通行分类冲突的也不自动合并（都进待你确认）
             if (dd < 0 || (!b.neutral && catClash(b, m))) return;
-            // 不计入的账单碰上同金额的普通手记：不合并，记下来让确认页提示一句
+            // 不计的账单碰上同金额的普通手记：不合并，记下来让确认页提示一句
             if (b.neutral && m.mode !== 'skip') { (b.normalHits = b.normalHits || []).indexOf(m.id) < 0 && b.normalHits.push(m.id); return; }
             seen.add(m.id); edges.push([b, m]);
           };
@@ -248,7 +248,7 @@
           B.forEach(function (b, i) { var m = M[i]; mstate.set(m.id, 'used'); usedBy[m.id] = b; b.done = true; merges.push({ b: b, m: m, days: d }); });
           return;
         }
-        // 拿不准：整组进待处理（不计入的照常导入），手记留住
+        // 拿不准：整组进待处理（不计的照常导入），手记留住
         M.forEach(function (m) { mstate.set(m.id, 'reserved'); reservedBy[m.id] = 'ambiguous'; });
         B.forEach(function (b) {
           b.done = true;
@@ -342,7 +342,7 @@
     });
     stats.nearMerged = nearMerged.length;
 
-    // ---------- 第二轮：拿不准的进待处理（只有普通行；不计入的配不上照常导入）----------
+    // ---------- 第二轮：拿不准的进待处理（只有普通行；不计的配不上照常导入）----------
     bills.forEach(function (b) {
       if (b.done || b.neutral) return;
       var it = b.it, kinds = [], cands = [], seen = new Set();
@@ -400,7 +400,7 @@
     // ---------- ④ 留下的「本批没配上」的微信退款：在账本里找原单（1016-E：先找真原单，找不到才用记号）----------
     //   同对方、在它之前、金额正好相等、还没被退过的以前导入的支出只有一笔 → 直接挂上；几笔 → 待处理让你选；
     //   一笔都没有：有记号（原单以前被忽略了）→ 退款也跳过，登记记号「已用」和退款自己的单号；
-    //   还没有：账本里有金额更大的候选 → 待处理；什么都没有 → 只算结余
+    //   还没有：账本里有金额更大的候选 → 待处理；什么都没有 → 往来
     var cands2 = Array.isArray(ctx.refundCands) ? ctx.refundCands : [];
     var claimedRec = {}, claimedMark = {};
     rowItems.filter(function (it) { return it.flags.indexOf('needLedger') >= 0 && it.bucket === 'refund'; })
@@ -433,7 +433,7 @@
           it.bucket = 'pending'; it.why = 'refundcands'; it.mode = 'normal';
           it.cands = cs.map(function (x) { return { record: x.id }; });
           it.msg = '账本里有 ' + cs.length + ' 笔可能是这笔退款的原单，请你选';
-        } else { it.why = 'noorig'; it.msg = '这一批和账本里都没找到原单，按「只算结余」导入'; it.mode = 'flow'; }
+        } else { it.why = 'noorig'; it.msg = '这一批和账本里都没找到原单，按「往来」导入'; it.mode = 'flow'; }
       });
 
     // ---------- 1017-UI4：跨天的选法（排最后、默认收起）----------
@@ -501,7 +501,7 @@
         if (m.type !== b.type) why = '收支不一样（账单是' + (b.type === 'income' ? '收入' : '支出') + '，手记是' + (m.type === 'income' ? '收入' : '支出') + '）';
         else if (mstate.get(m.id) === 'used') { var u = usedBy[m.id]; why = '已经和 ' + (u ? md(u.r.time) + ' ' + yuan(u.fen) + ' 元那笔账单' : '别的账单') + '合并了'; }
         else if (mstate.get(m.id) === 'reserved' && (it.cands || []).every(function (c) { return c.record !== m.id; })) why = reservedBy[m.id] === 'multisum' ? '留给了「几笔加起来正好是一条手记」那一组' : '留给了「金额一样、分不清谁是谁」那一组';
-        else if (b.neutral && m.mode !== 'skip') why = '不计入的账单只和同样不计入的手记配';
+        else if (b.neutral && m.mode !== 'skip') why = '不计的账单只和同样不计的手记配';
         else if ((m.fen === b.fen || m.fen === b.net) && dd >= 1 && dayNo(m.time) < b.day) why = '你记的比账单早 ' + dd + ' 天：手记比账单早的不自动合并' + (b.neutral ? '' : '，已列为候选');
         else if ((m.fen === b.fen || m.fen === b.net) && dd >= 1 && dd <= EXACT_DAYS && catClash(b, m)) why = '分类对不上（账单像「' + billCat(b) + '」，手记是「' + (m.cat || '未分类') + '」）：跨天的不自动合并，已列为候选';
         else if (m.fen === b.fen || m.fen === b.net) why = dd <= EXACT_DAYS ? '金额、日期都对得上，已列为候选' : '金额一样，但差了 ' + dd + ' 天（3 天内才自动合并，4–7 天的列为候选）';

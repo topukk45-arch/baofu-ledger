@@ -12,7 +12,7 @@
 //      route(解析结果, { known, rules }) 只看 known，查不到就当没有。
 //
 // 桶（每一行只进一个，各桶的笔数之和 = 文件笔数）：
-//   add 新增候选 / skip 跳过 / neutral 不计入 / refund 退款 / pending 待处理 / error 出错
+//   add 新增候选 / skip 跳过 / neutral 不计 / refund 退款 / pending 待处理 / error 出错
 // 逐行的顺序（命中一条就停）：③ 的出错和重复 → 状态 → 单号表去重 → 类型规则 → 退款 → 不计收支 → 没见过的类型 → 合并。
 // 找原单时在整批全部行里找（含已经因为状态跳过的），这样「原单交易关闭 → 两条都跳过」才找得到原单。
 // 1016-C：
@@ -25,7 +25,7 @@
 //   1016-E 收紧记号：退款进来先找真原单（配对那一步在账本里找以前导入的、同对方同金额、在它之前、还没退过的支出，唯一就挂上），
 //     找不到才用记号；记号只认原单之后 180 天内的退款、一个只认一次（认领后登记「已用」键 refundUsedKey，退款自己的单号登记成忽略，
 //     重复导入同一份文件直接按忽略跳过）。这里只给退款标上认得到哪个记号（markerHit），跳不跳过由 match.js 定。
-//   微信信用卡还款、零钱提现 / 充值、零钱通、理财通：不管账单写的收 / 支，一律不计入（ownmove）。
+//   微信信用卡还款、零钱提现 / 充值、零钱通、理财通：不管账单写的收 / 支，一律不计（ownmove）。
 (function (root, factory) {
   var api = factory();
   if (typeof module === 'object' && module && module.exports) module.exports = api;
@@ -50,7 +50,7 @@
   // ---- 微信交易类型 ----
   var WX_TYPES = ['商户消费', '扫二维码付款', '分分捐', '转账', '转账-退款', '微信红包', '微信红包（单发）', '微信红包（群红包）',
                   '企业微信红包', '零钱提现', '零钱充值', '二维码收款'];
-  // 钱在自己的账户之间挪（还信用卡、零钱提现 / 充值、零钱通、理财通）：不管账单写的收 / 支，一律不计入（1016-C）
+  // 钱在自己的账户之间挪（还信用卡、零钱提现 / 充值、零钱通、理财通）：不管账单写的收 / 支，一律不计（1016-C）
   var WX_NEUTRAL_RE = /信用卡还款|零钱提现|零钱充值|零钱通|理财通/;
   var PETTY_TYPES = { wechat: ['分分捐'] };            // 已知的零碎扣款：按月合并
   var RECEIPT_TYPES = { wechat: ['二维码收款'] };       // 收款：一个月太多时建议按天合并（支付宝的收款名称还没核对，先不认）
@@ -185,9 +185,9 @@
       // 类型规则（用户的优先）
       var tr = typeRule(it);
       if (tr === 'skip') { put(it, 'skip', 'typerule', '按你定的规则跳过类型「' + r.kind + '」'); return; }
-      if (tr === 'transfer') { put(it, 'neutral', 'typerule', '按你定的规则当转账（不计入）'); it.mode = 'skip'; return; }
-      // 自己账户之间挪钱：不计入（用户定成「正常收支」的除外）
-      if (it.app === 'wechat' && tr !== 'normal' && WX_NEUTRAL_RE.test(r.kind || '')) { put(it, 'neutral', 'ownmove', '「' + r.kind + '」是自己账户之间挪钱，不计入'); it.mode = 'skip'; return; }
+      if (tr === 'transfer') { put(it, 'neutral', 'typerule', '按你定的规则当转账（不计）'); it.mode = 'skip'; return; }
+      // 自己账户之间挪钱：不计（用户定成「正常收支」的除外）
+      if (it.app === 'wechat' && tr !== 'normal' && WX_NEUTRAL_RE.test(r.kind || '')) { put(it, 'neutral', 'ownmove', '「' + r.kind + '」是自己账户之间挪钱，不计'); it.mode = 'skip'; return; }
       // 退款
       if (isAliRefundRow(it) || (it.app === 'wechat' && (tr === 'refund' || isWxRefundType(r.kind)))) { it.isRefund = true; return; }
       // 支付宝原单本身是「退款成功」：钱退回来了（有没有单独的退款行都跳过）
@@ -241,13 +241,13 @@
         if (o.why === 'ignored') { put(rf, 'skip', 'origignored', '原单以前跳过 / 忽略了，退款也跳过'); rf.regIgnore = [rf.key]; return; }
         if (o.why === 'imported' && o.r.io === 'expense') { var kk = known[o.key]; attachRec(rf, kk.id, kk.rec); return; }
         if (o.bucket === 'add' && o.r.io === 'expense') { attachRow(rf, o); return; }
-        noOrig(rf, 'noorig', '原单不是一笔支出，按「只算结余」导入');
+        noOrig(rf, 'noorig', '原单不是一笔支出，按「往来」导入');
         return;
       }
       var k = known['alipay|' + rf.r.no];
       if (k && k.st === 0 && k.rec && k.rec.type === 'expense') { attachRec(rf, k.id, k.rec); return; }
       if (k && k.st === 1) { put(rf, 'skip', 'origignored', '原单以前跳过 / 忽略了，退款也跳过'); rf.regIgnore = [rf.key]; return; }
-      noOrig(rf, 'noorig', '没找到原单，按「只算结余」导入');
+      noOrig(rf, 'noorig', '没找到原单，按「往来」导入');
     });
 
     // ---- 微信退款：时间在前、同对方、金额对得上 ----
@@ -261,9 +261,9 @@
     function attachWx(rf, o) {
       if (o.why === 'imported') { var kk = known[o.key]; attachRec(rf, kk.id, kk.rec); return; }
       if (attachRow(rf, o) && (o.r.kind === '转账' || o.r.status === '对方已退还') && rf.r.kind === '转账-退款') {
-        // 转账被退回：两条一起标「不计入」
-        put(o, 'neutral', 'transferback', '转账被对方退回，两条都不计入'); o.mode = 'skip';
-        put(rf, 'neutral', 'transferback', '转账被对方退回，两条都不计入'); rf.mode = 'skip';
+        // 转账被退回：两条一起标「不计」
+        put(o, 'neutral', 'transferback', '转账被对方退回，两条都不计'); o.mode = 'skip';
+        put(rf, 'neutral', 'transferback', '转账被对方退回，两条都不计'); rf.mode = 'skip';
       }
     }
     var doneO = new Set();

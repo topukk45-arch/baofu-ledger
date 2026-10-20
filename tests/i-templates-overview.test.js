@@ -75,7 +75,7 @@ function bootSync(arc, extraArchives){
 {
   const tpls=[
     {id:'a', type:'expense', cat:'订阅', remark:'视频会员', money:157, mode:'normal'},
-    {id:'b', type:'expense', cat:'转账', remark:'信用卡还款', money:null, mode:'normal'},   // 转账会自动切不计入，模板口径要优先
+    {id:'b', type:'expense', cat:'转账', remark:'信用卡还款', money:null, mode:'normal'},   // 转账会自动切不计，模板口径要优先
     {id:'c', type:'income', cat:'其他', remark:'借出还回', money:500, mode:'flow'},
   ];
   const t=await boot({ tpls });
@@ -97,10 +97,10 @@ function bootSync(arc, extraArchives){
   ok(t.arcOf().records.length===before, '只填表，不入账');
   ok((t.$('billTime').dataset.value || t.$('billTime').textContent)===time0, '时间不动');
   t.clickChip('billTplChips','信用卡还款');
-  ok(t.$('billMoney').value==='' && t.$('billMode').dataset.mode==='normal', '不带金额 → 金额清空；口径以模板为准（不被转账自动改成不计入）');
+  ok(t.$('billMoney').value==='' && t.$('billMode').dataset.mode==='normal', '不带金额 → 金额清空；口径以模板为准（不被转账自动改成不计）');
   ok(t.d.activeElement===t.$('billMoney') || (t.$('kpMask').style.display==='flex' && t.$('billMoney').classList.contains('kp-on')), '不带金额：聚焦金额弹键盘（1019-P 起弹的是 App 的数字键盘）');
   t.clickChip('billTplChips','借出还回500');
-  ok(t.$('billTypeChips').querySelector('.sel-in') && t.$('billMode').dataset.mode==='flow', '收入 + 只算结余');
+  ok(t.$('billTypeChips').querySelector('.sel-in') && t.$('billMode').dataset.mode==='flow', '收入 + 往来');
   ok(t.$('billTplChips').querySelectorAll('.cc.sel').length===1, '只高亮当前模板');
   t.$('addBill').click();
   const r=t.arcOf().records.at(-1);
@@ -128,7 +128,7 @@ function bootSync(arc, extraArchives){
   const rows=()=>[...t.$('tplList').querySelectorAll('.tpl-item')];
   ok(t.$('tplMask').style.display==='flex' && rows().length===3, '管理弹窗列出 3 个');
   ok(rows()[0].querySelector('button').disabled, '第一个的 ↑ 不可点');
-  ok(rows()[2].querySelector('.cat-name').textContent==='转账' && rows()[2].querySelector('.tpl-sub').textContent==='支出 · 转账 · 不带金额 · 不计入', '没备注用分类名；副标题写全');
+  ok(rows()[2].querySelector('.cat-name').textContent==='转账' && rows()[2].querySelector('.tpl-sub').textContent==='支出 · 转账 · 不带金额 · 不计', '没备注用分类名；副标题写全');
   rows()[1].querySelector('button').click();
   ok(t.arcOf().tpls.map(x=>x.id).join()==='b,a,c', '往前挪');
   [...rows()[1].querySelectorAll('button')].pop().click();
@@ -198,7 +198,7 @@ function bootSync(arc, extraArchives){
   const recs=[
     R('g10','2026-10-02T10:00',150,'expense','游戏'), R('d10','2026-10-03T10:00',600,'expense','餐饮'),
     R('t10','2026-10-04T10:00',483,'expense','出行'), R('o10','2026-10-05T10:00',208.8,'expense','其他'),
-    R('s10','2026-10-05T10:00',99,'expense','订阅','',{skip:true}),            // 不计入：不进预算外
+    R('s10','2026-10-05T10:00',99,'expense','订阅','',{skip:true}),            // 不计：不进预算外
     R('g09','2026-09-02T10:00',250,'expense','游戏'), R('d09','2026-09-03T10:00',1100,'expense','餐饮'),
     R('d01','2026-01-03T10:00',100,'expense','餐饮'),
     R('d25','2025-12-03T10:00',9999,'expense','餐饮'),                         // 去年：不算

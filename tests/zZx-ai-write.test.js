@@ -69,7 +69,7 @@ const MAN = [{ id: 'm1', time: '2026-10-06T09:30', money: 36, type: 'expense', c
   ok(JSON.stringify(t.arch().importRules || null) === rules0 && JSON.stringify(t.arch().cats) === cats0, '1 不存分类规则、不新建分类');
   // 导入记录页上的「AI 修改」那一行
   const aiRow = qa('.imp-log').find(x => x.dataset.batch === al.b);
-  ok(aiRow && aiRow.classList.contains('imp-log-aimod') && /AI 修改/.test(aiRow.textContent) && /分类 1 条、备注 1 条、口径 1 条、标记 1 条/.test(aiRow.textContent) && !aiRow.querySelector('.imp-log-ai') && aiRow.querySelector('.imp-log-undo'), '2 导入记录：「AI 修改」一行写改了什么，有「撤销」、没有「AI 检查」');
+  ok(aiRow && aiRow.classList.contains('imp-log-aimod') && /AI 修改/.test(aiRow.textContent) && /分类 1 条、备注 1 条、统计 1 条、标记 1 条/.test(aiRow.textContent) && !aiRow.querySelector('.imp-log-ai') && aiRow.querySelector('.imp-log-undo'), '2 导入记录：「AI 修改」一行写改了什么，有「撤销」、没有「AI 检查」');
   // ===== 3. 撤销这次 AI 修改：和改之前逐字节一致 =====
   const p1 = await t.st().undoPlan(al.b);
   ok(same(p1.chain, [al.b]) && /把 AI 改过的 4 条记录改回去/.test(t.w.JiwenImportUndo.describe(p1)), '3 撤 AI 修改的确认框：「把 AI 改过的 4 条记录改回去」');

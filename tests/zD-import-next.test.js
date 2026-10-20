@@ -1,5 +1,5 @@
 // 1016-T 导完指下一步（jsdom 跑整个 App）。node zD-import-next.test.js [index.html]
-// 结果页「接下来可以」：去看统计（统计页收支）、按过去几个月设预算（统计页预算）、补一笔期初余额（打开记一笔：收入、只算结余、备注期初余额）；
+// 结果页「接下来可以」：去看统计（统计页收支）、按过去几个月设预算（统计页预算）、补一笔期初余额（打开记一笔：收入、往来、备注期初余额）；
 // 写明导入的结余不等于实际余额。账单全是虚构的。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
@@ -20,7 +20,7 @@ const file = d => [['微信' + d + '.csv', B.bill('wechat', [wx(d, 1000 + d)], {
   const shown = id => $(id).style.display !== 'none';
   await t.importFiles(file(1), null, { stay: true });
   ok($('impNext') && $('impNextStats') && $('impNextBudget') && $('impNextOpening'), '1 结果页有「接下来可以」三个按钮');
-  ok(/不等于钱包里的实际余额/.test($('impNext').textContent) && /只算结余/.test($('impNext').textContent), '1 写明导入的结余不等于实际余额');
+  ok(/不等于钱包里的实际余额/.test($('impNext').textContent) && /往来/.test($('impNext').textContent), '1 写明导入的结余不等于实际余额');
   $('impNextStats').click(); await t.idle();
   ok($('impPage').style.display === 'none' && shown('pageStats') && shown('statPaneFlow'), '2 去看统计：导入页关掉，到统计页收支');
   await t.importFiles(file(2), null, { stay: true });
@@ -29,7 +29,7 @@ const file = d => [['微信' + d + '.csv', B.bill('wechat', [wx(d, 1000 + d)], {
   await t.importFiles(file(3), null, { stay: true });
   $('impNextOpening').click(); await t.idle();
   ok($('impPage').style.display === 'none' && $('addMask').style.display === 'flex', '4 补期初余额：打开记一笔');
-  ok(t.w.eval('JiwenForms.billTypeSel') === 'income' && $('billMode').dataset.mode === 'flow' && $('billRemark').value === '期初余额', '4 记一笔里已经选好：收入、只算结余、备注「期初余额」');
+  ok(t.w.eval('JiwenForms.billTypeSel') === 'income' && $('billMode').dataset.mode === 'flow' && $('billRemark').value === '期初余额', '4 记一笔里已经选好：收入、往来、备注「期初余额」');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

@@ -66,7 +66,7 @@ const days = [{ id: 'd1', name: '虚构纪念日', date: '2026-12-25' }, { id: '
   if (!w.Range.prototype.getClientRects || !w.document.createRange().getClientRects().length) w.Range.prototype.getClientRects = () => [{ top: 10, height: 19, width: 30 }];
   w.openPerfPage(); await wait(50);
   const first = ($('perfList') ? $('perfList').textContent : '').split('\n')[0];
-  ok(/^按钮里的字上下差多少（这台手机当场量/.test(first) && /分类块 .* 统计口径 .* 收支 .* 主按钮 /.test(first), '三 性能记录页第一行：这台手机当场量的按钮里的字差多少 ' + first.slice(0, 40));
+  ok(/^按钮里的字上下差多少（这台手机当场量/.test(first) && /分类块 .* 统计 .* 收支 .* 主按钮 /.test(first), '三 性能记录页第一行：这台手机当场量的按钮里的字差多少 ' + first.slice(0, 40));
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`\n${pass} 通过，${fail} 失败`);

@@ -415,7 +415,7 @@
                 if(e.kind==='打开面板' || e.kind==='关闭面板') return `${e.at} ${e.kind} ${e.ms}ms（${e.what}）`;
                 return e.at+' '+JSON.stringify(e);
             }
-            // 1020-D：按钮里的字上下居中没有（这台手机的字体当场量）：照分类块、统计口径、收支、主按钮的样子各摆一个看不见的，
+            // 1020-D：按钮里的字上下居中没有（这台手机的字体当场量）：照分类块、统计、收支、主按钮的样子各摆一个看不见的，
             //   量「字形」的上下中心（canvas 的 actualBoundingBox）和框（边框以内）的上下中心差多少，正数偏下、负数偏上；
             //   再写字体的上下留白（fontBoundingBox）和中文字形高低（em），手机上字看着偏上时把这一行复制给开发者
             function fontCenterLine(){
@@ -423,7 +423,7 @@
                     const box=document.createElement('div');
                     box.style.cssText='position:fixed;left:0;top:0;width:360px;visibility:hidden;pointer-events:none;z-index:-1';
                     box.innerHTML='<div class="edit-dialog"><div class="cat-chips"><div class="cc">吃饭</div></div>'
-                        +'<div class="mode-chips mode-mini"><div class="cc">只算结余</div></div>'
+                        +'<div class="mode-chips mode-mini"><div class="cc">往来</div></div>'
                         +'<div class="cat-chips io-chips io-mini"><div class="cc">支出</div></div>'
                         +'<button class="ui-btn primary block">保存</button></div>';
                     document.body.appendChild(box);
@@ -441,7 +441,7 @@
                         const d=Math.round((ink-(t+bt)/2)*10)/10; return (d>0?'+':'')+d;
                     };
                     const q=sel=>box.querySelector(sel);
-                    const out=`按钮里的字上下差多少（这台手机当场量，正数偏下、负数偏上，单位 px）：分类块 ${one(q('.cat-chips:not(.io-chips) .cc'))} · 统计口径 ${one(q('.mode-mini .cc'))} · 收支 ${one(q('.io-mini .cc'))} · 主按钮 ${one(q('.ui-btn'))}｜${em}｜${getComputedStyle(q('.cc')).fontFamily}`;
+                    const out=`按钮里的字上下差多少（这台手机当场量，正数偏下、负数偏上，单位 px）：分类块 ${one(q('.cat-chips:not(.io-chips) .cc'))} · 统计 ${one(q('.mode-mini .cc'))} · 收支 ${one(q('.io-mini .cc'))} · 主按钮 ${one(q('.ui-btn'))}｜${em}｜${getComputedStyle(q('.cc')).fontFamily}`;
                     box.remove();
                     return out;
                 }catch(_){ return ''; }

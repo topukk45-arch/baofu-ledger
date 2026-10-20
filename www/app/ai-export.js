@@ -17,7 +17,7 @@
             const amt=safeNum(r.money).toFixed(2);
             const cat=(r.cat||'未分类');
             const remark=(r.remark||'').trim();
-            return `${md} ${io} ${cat} ${amt} 元${remark?`（备注：${remark}）`:''}${rf?'【退款】':''}${isSkip(r)?'【不计入收支】':(isFlow(r)?'【只算结余】':'')}`;
+            return `${md} ${io} ${cat} ${amt} 元${remark?`（备注：${remark}）`:''}${rf?'【退款】':''}${isSkip(r)?'【不计】':(isFlow(r)?'【往来】':'')}`;
         }
 
         // 给定一批记录 + 范围标签，拼出完整的「prompt + 结构化账单」纯文本
@@ -31,8 +31,8 @@
             const refundN=refundRecs.length;
             const refundSum=round2(refundRecs.reduce((s,r)=>s+safeNum(r.money),0));
             const exclParts=[];
-            if(skipN) exclParts.push(`${skipN} 笔不计入收支`);
-            if(flowN) exclParts.push(`${flowN} 笔只算结余`);
+            if(skipN) exclParts.push(`${skipN} 笔不计`);
+            if(flowN) exclParts.push(`${flowN} 笔往来`);
             const bal=inc-exp;
 
             // 分类占比（按支出）
@@ -53,7 +53,7 @@
 1. 概括这段时间的整体消费情况（钱主要花在哪、收支是否健康）；
 2. 指出其中值得注意的地方（异常大额、占比过高的分类、可优化的开销）；
 3. 给出 3~5 条具体、可执行的省钱或预算建议，别讲空泛的大道理。
-如果数据太少不足以分析，直接说明即可。${refundN?'\n标注【退款】的记录是之前某笔支出退回的钱，已从对应分类的支出里扣掉（支出、分类占比都是扣完后的净额），不是收入。':''}${exclParts.length?'\n标注【不计入收支】（重复记录，如信用卡还款）或【只算结余】（资金往来，如期初存款、垫付报销、借出借入）的记录，已从总览和分类占比中排除，分析消费时不要再把它们算进去。':''}
+如果数据太少不足以分析，直接说明即可。${refundN?'\n标注【退款】的记录是之前某笔支出退回的钱，已从对应分类的支出里扣掉（支出、分类占比都是扣完后的净额），不是收入。':''}${exclParts.length?'\n标注【不计】（重复记录，如信用卡还款）或【往来】（资金往来，如期初存款、垫付报销、借出借入）的记录，已从总览和分类占比中排除，分析消费时不要再把它们算进去。':''}
 
 ────────────────
 ■ 统计维度：${dimLabel}

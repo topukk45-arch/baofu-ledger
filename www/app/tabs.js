@@ -72,7 +72,7 @@
             // 收在这里就不必在每个调用点各加一行（漏一个就是显示旧账号的日子）。
             if(typeof renderDaysCard==='function') renderDaysCard();
         }
-        // 1016-T：导入结果页「接下来」的三个去处（import/ui.js 调）：去看统计、去设预算、补一笔期初余额（只算结余的收入）
+        // 1016-T：导入结果页「接下来」的三个去处（import/ui.js 调）：去看统计、去设预算、补一笔期初余额（往来的收入）
         window.JiwenImportNext={
             stats(){ const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('flow'); },
             budget(){ JiwenStats.bgSuggestOpen=true; const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('budget'); },   // 1016-Z9：直接打开预算建议

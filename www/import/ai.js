@@ -14,7 +14,7 @@
 //   或 { ok:false, why:'noblock'|'nohead'|'batch'|'time', ... }（整份拒收）。
 //   只读 ```记问 开头的代码块（代码块外面的字一概不看，outside 数一下有几行）；代码块第一行要是「记问修改建议 v1 批次 X 导出 Y」，
 //   批次号不是这一次、或导出时间不是这一批记下的导出时间之一 → 整份拒收。下面一行一条「#号 | 改什么 | 改成什么 | 理由」（全角竖线也认）：
-//   改什么只认四种：分类（要是可选分类里的）、备注、口径（计入 / 只算结余 / 不计入）、标记（可能重复 / 可能漏配，后面可以跟「#号」说的是哪一笔）；
+//   改什么只认四种：分类（要是可选分类里的）、备注、统计（计入 / 不计 / 往来；老叫法「口径」「不计入」「只算结余」也认）、标记（可能重复 / 可能漏配，后面可以跟「#号」说的是哪一笔）；
 //   号对不上（不在这次导出里、或是没进账本的那几行）、分类不在名单里、改金额 / 时间 / 对方、新建 / 删除、格式乱的、和现在一样的、
 //   同一条同一项提了两次的（只认第一次）→ 一律不认，列进「没看懂的几行」（bad，带原因）。删掉了的那一笔照样列出来，标 gone（界面上灰掉、不能勾）。
 (function (root, factory) {
@@ -27,7 +27,7 @@
   var VERSION = '1017-K';
   var AI_MAX_ROWS = 300;          // 一段最多几行（太长有的 AI 会截断；以后好调）
   var HEAD = '记问修改建议 v1';    // AI 回复代码块的第一行要原样抄这几个字 + 批次 + 导出时间
-  var MODE_NAME = { normal: '计入', flow: '只算结余', skip: '不计入' };
+  var MODE_NAME = { normal: '计入', skip: '不计', flow: '往来' };
 
   // ---------- 打码 ----------
   //   11 位手机号（前后不连着别的数字）留前 3 后 4；15 位以上连续数字（卡号、身份证、单号）只留后 4 位；
@@ -62,7 +62,7 @@
     return c.map(csvCell).join(',');
   }
   function header(o) {
-    var h = ['号', '时间', '金额', '收支', '分类', '口径', '去向'];
+    var h = ['号', '时间', '金额', '收支', '分类', '统计', '去向'];
     if (o.cp) h.push('对方');
     if (o.remark) { h.push('商品说明'); h.push('备注'); }
     return h.join(',');
@@ -79,7 +79,7 @@
     lines.push('');
     lines.push('规矩：');
     lines.push('- 只能提建议：不能新建、删除记录，不能改金额和时间，不能改配对；');
-    lines.push('- 只能改四样：分类、备注、口径（计入 / 只算结余 / 不计入）、标记（可能重复 / 可能漏配）；');
+    lines.push('- 只能改四样：分类、备注、统计（计入 / 不计 / 往来）、标记（可能重复 / 可能漏配）；');
     lines.push('- 只能改有「#号」的这几行，「去向」是跳过、待处理、不导入的那几行没进账本，只能看、不能改；');
     lines.push('- 拿不准的不要提，每条都写理由。');
     if (!o.cp || !o.remark) lines.push('- 这次' + (!o.cp && !o.remark ? '没发对方名、商品说明和备注' : !o.cp ? '没发对方名' : '没发商品说明和备注') + '，只看有的这几列。');
@@ -90,7 +90,7 @@
     lines.push('然后一行一条：#号 | 改什么 | 改成什么 | 理由');
     lines.push('- 改分类：#2 | 分类 | 零食 | 便利店买饮料');
     lines.push('- 改备注：#5 | 备注 | 夜宵配送费 | 和 #4 是同一单');
-    lines.push('- 改口径：#7 | 口径 | 不计入 | 自己账户之间转钱');
+    lines.push('- 改统计：#7 | 统计 | 不计 | 自己账户之间转钱');
     lines.push('- 标记：#3 | 标记 | 可能重复 #2 | 同一分钟、同金额、同对方（「可能重复」「可能漏配」后面可以写说的是哪一笔）');
     lines.push('代码块外面写什么都行，记问只读代码块里的。');
     lines.push('');
@@ -117,8 +117,8 @@
   }
 
   // ---------- 1017-I 读回复 ----------
-  var FIELD = { '分类': 'cat', '备注': 'remark', '口径': 'mode', '标记': 'flag' };
-  var MODE_OF = { '计入': 'normal', '只算结余': 'flow', '不计入': 'skip' };
+  var FIELD = { '分类': 'cat', '备注': 'remark', '统计': 'mode', '口径': 'mode', '标记': 'flag' };   // 1020-F：「口径」是老叫法，照样认
+  var MODE_OF = { '计入': 'normal', '不计': 'skip', '往来': 'flow', '不计入': 'skip', '只算结余': 'flow' };   // 1020-F：后两个是老叫法，照样认
   var FLAG_OF = { '可能重复': 'dup', '可能漏配': 'miss' };
   var NOT_ALLOWED = [[/金额|钱数|money/i, '不能改金额'], [/时间|日期|time|date/i, '不能改时间'], [/新建|新增|添加|增加/, '不能新建记录'], [/删除|删掉|删|去掉这笔|作废/, '不能删除记录'],
                      [/对方|商户|收款方/, '不能改对方'], [/收支|类型/, '不能改收支'], [/合并|配对|拆开/, '这一版不能改配对']];
@@ -186,7 +186,7 @@
       var n = +nm[1], row = byN[n];
       if (!row) { badLine(l, '没有 #' + n + ' 这一笔（不在这次导出里，或是没进账本的那几行）'); return; }
       var field = FIELD[fieldRaw];
-      if (!field) { var na = NOT_ALLOWED.filter(function (x) { return x[0].test(fieldRaw); })[0]; badLine(l, na ? na[1] : '「' + fieldRaw + '」改不了（只能改分类、备注、口径、标记）'); return; }
+      if (!field) { var na = NOT_ALLOWED.filter(function (x) { return x[0].test(fieldRaw); })[0]; badLine(l, na ? na[1] : '「' + fieldRaw + '」改不了（只能改分类、备注、统计、标记）'); return; }
       var it = { n: n, id: row.id, field: field, why: why, line: l, gone: !!row.gone };
       if (field === 'cat') {
         if (cats.indexOf(value) < 0) { badLine(l, '分类「' + value + '」不在你的分类里'); return; }
@@ -196,9 +196,9 @@
         it.value = value; it.cur = row.cat;
       } else if (field === 'mode') {
         var m = MODE_OF[value];
-        if (!m) { badLine(l, '口径只能是计入、只算结余、不计入'); return; }
-        if (row.refund) { badLine(l, '退款的口径跟着原来那笔走，不能单独改'); return; }
-        if (row.hasRefunds) { badLine(l, '有退款挂在这笔上，口径要和退款一起改，去账单里改'); return; }
+        if (!m) { badLine(l, '统计只能是计入、不计、往来'); return; }
+        if (row.refund) { badLine(l, '退款的统计跟着原来那笔走，不能单独改'); return; }
+        if (row.hasRefunds) { badLine(l, '有退款挂在这笔上，统计要和退款一起改，去账单里改'); return; }
         if (!row.gone && row.mode === m) { badLine(l, '已经是「' + value + '」了'); return; }
         it.value = m; it.cur = row.mode;
       } else if (field === 'remark') {

@@ -1,5 +1,5 @@
 // 1017-UI11 两个显示小毛病（jsdom 跑整个 App）。node zZz-import-display.test.js [index.html]
-// 不计入的行在「金额要你看一眼」里不写「→ 未分类」；对方名显示前去掉多余空格（含全角）和空括号（只改显示，存的原文不动）。账单全是虚构的。
+// 不计的行在「金额要你看一眼」里不写「→ 未分类」；对方名显示前去掉多余空格（含全角）和空括号（只改显示，存的原文不动）。账单全是虚构的。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
 const B = require('./helpers/bills');
@@ -33,12 +33,12 @@ const TX = () => [
   const t = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
   const q = s => t.d.querySelector(s), raw = id => t.d.getElementById(id), S = () => t.S();
   await pick(t, bill(TX())); const UI = t.w.JiwenImportUI;
-  // ===== 1. 金额要你看一眼：不计入的行不写分类 =====
+  // ===== 1. 金额要你看一眼：不计的行不写分类 =====
   const ac = S().plan.sections.amountChecks.find(x => /某虚构银行/.test(x.cp));
   ok(ac, '1 零钱提现 3000 元进了「金额要你看一眼」（大额）');
   UI._goStep(S().view.steps.indexOf('amount') >= 0 ? 'amount' : 'overview');
   const ar = Array.from(t.d.querySelectorAll('.imp-amount-row')).find(r => /某虚构银行/.test(r.textContent));
-  ok(ar && /（不计入）/.test(ar.textContent) && !/→ 未分类/.test(ar.textContent) && !/→/.test(ar.querySelector('.grow').textContent), '1 不计入的行：写「（不计入）」，不写「→ 未分类」：' + (ar ? ar.querySelector('.grow').textContent : ''));
+  ok(ar && /（不计）/.test(ar.textContent) && !/→ 未分类/.test(ar.textContent) && !/→/.test(ar.querySelector('.grow').textContent), '1 不计的行：写「（不计）」，不写「→ 未分类」：' + (ar ? ar.querySelector('.grow').textContent : ''));
   // ===== 2. 对方名：多余空格、空括号显示前去掉；存的原文不动 =====
   ok(S().plan.rows.some(d => d.cp === ODD), '2 方案里这一行存的还是原文（带全角空格和空括号）');
   UI._goStep('cat');

@@ -238,7 +238,7 @@
   }
 
   // 给确认框的大白话摘要（⑦b 的界面另做，这里先给开发开关里的临时按钮用）
-  var FIELD_NAME = { cat: '分类', remark: '备注', skip: '口径', flow: '口径', aiFlag: '标记', time: '时间', money: '金额', src: '来源', cp: '对方', batch: '批次' };
+  var FIELD_NAME = { cat: '分类', remark: '备注', skip: '统计', flow: '统计', aiFlag: '标记', time: '时间', money: '金额', src: '来源', cp: '对方', batch: '批次' };
   var WHY = { ai: 'AI 修改了这批的记录', same: '合并或追加了同一条记录', refund: '有退款挂在这批的记录上', names: '用到了这批新加的对方名或支付方式', cat: '用到了这批新建的分类', marker: '用到了这批登记的退款记号', pending: '处理了这批留下的待处理' };
   function describe(p) {
     if (!p || !p.ok) return '找不到这次导入的记录。';
@@ -254,7 +254,7 @@
       });
     }
     // 1017-K：只撤一次 AI 修改：只说改回几条
-    if (isAi(p.target) && p.chain.length === 1) out.push('把 AI 改过的 ' + t.aiRestored + ' 条记录改回去（分类、备注、口径、标记）。');
+    if (isAi(p.target) && p.chain.length === 1) out.push('把 AI 改过的 ' + t.aiRestored + ' 条记录改回去（分类、备注、统计、标记）。');
     else {
       out.push('删掉 ' + t.deleted + ' 条导入的记录，还原 ' + t.restored + ' 条合并过的手记' + (t.sums ? '，汇总记录还原 ' + t.sums + ' 条' : '') + (t.links ? '，退款改挂还原 ' + t.links + ' 条' : '') + '。');
       if (t.aiRestored) out.push('AI 改过的 ' + t.aiRestored + ' 条记录改回去。');

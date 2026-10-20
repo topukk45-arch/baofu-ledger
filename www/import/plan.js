@@ -21,9 +21,9 @@
 //     几条手记都被选完了，剩下的账单也自动新增。「都不是」= 这一组每笔都选「作为新增」。
 //   多笔合一（sections.sums）：确认后这几笔都合并到那条手记（手记金额不变），同组没用上的账单自动新增。
 //   转账往来（sections.transfers）：只认交易类型（微信转账、各种微信红包，支付宝转账红包），相邻两笔隔不到 3 天串成一段，
-//     一段里有转出也有转入才列出来；「都标成不计入」就是把这几笔的 mode 改成 'skip'，汇总和差额跟着变，合计照旧差 0 分。
+//     一段里有转出也有转入才列出来；「都标成不计」就是把这几笔的 mode 改成 'skip'，汇总和差额跟着变，合计照旧差 0 分。
 //   合并记录（分分捐、收款按天、勾上的零碎扣款）在明细里显示成一行（groups 里的 { summary: true }），点开看每一笔；
-//     分分捐默认分类：存档里有公益类分类就用它，没有用「其他」。合并记录不进「按对方选分类」，不计入的行也不进。
+//     分分捐默认分类：存档里有公益类分类就用它，没有用「其他」。合并记录不进「按对方选分类」，不计的行也不进。
 //   全额退款的弱提醒（sections.refundHints）：所有配对做完以后，3 天内同金额的手记没被别的账单合并掉，才挂一句，不算待处理。
 //   套话（「收款方备注:二维码收款」这类）不当标题、不写进备注：每行的 title / note 见 cleanDesc。
 (function (root, factory) {
@@ -45,9 +45,9 @@
     BIG_TOP_MIN: 50000     // ……但不到 500 元的不算「大额」（免得小账单也列出来，待真实数据调）
   };
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
-  var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计入', skip: '跳过', error: '出错', excluded: '你勾掉的' };
+  var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计', skip: '跳过', error: '出错', excluded: '你勾掉的' };
   // 差额拆解的各项（按这个顺序列）
-  var PARTS = [['newNormal', '新增（计入）'], ['newFlow', '新增（只算结余）'], ['neutral', '不计入'], ['merge', '和手记合并'],
+  var PARTS = [['newNormal', '新增（计入）'], ['newFlow', '新增（往来）'], ['neutral', '不计'], ['merge', '和手记合并'],
                ['refund', '退款'], ['pending', '待你确认'], ['skip', '跳过'], ['excluded', '你勾掉的'],
                ['aliRefund', '支付宝统计里已扣掉的退款']];   // 1016-I：支付宝头部的「支出」是扣掉退款以后的，这一项是负数
   var IOS = ['expense', 'income', 'neutral'];
@@ -170,7 +170,7 @@
       if (d.group === 'pending' && e.pick && !(it.msum && e.pick.record)) {
         if (e.pick === 'drop') { d.group = 'excluded'; d.reason = '待你确认里选了「不要了」'; }
         else if (e.pick === 'new') {
-          if (refundish(it)) { d.group = 'refund'; d.mode = 'flow'; d.reason = '不挂原单，按只算结余导入'; }
+          if (refundish(it)) { d.group = 'refund'; d.mode = 'flow'; d.reason = '不挂原单，按往来导入'; }
           else { d.group = 'add'; d.reason = '待你确认里选了「作为新增」'; }
         } else if (e.pick.record && !refundish(it)) {
           if (!pickedRecords[e.pick.record] && (it.cands || []).some(function (c) { return c.record === e.pick.record; })) { d.group = 'merge'; d.into = e.pick.record; d.reason = '待你确认里选了和这条手记合并'; pickedRecords[e.pick.record] = d.key; }
@@ -183,7 +183,7 @@
       }
       if (e.exclude && (d.group === 'add' || d.group === 'neutral' || d.group === 'refund')) { d.group = 'excluded'; d.reason = '你勾掉了'; }
       if (e.mode && (d.group === 'add' || d.group === 'neutral')) d.mode = e.mode;
-      // 1016-G：口径改成不计入的挪进「不计入」组，不计入改回计入 / 只算结余的挪回「新增」，顶上的笔数跟着变
+      // 1016-G：口径改成不计的挪进「不计」组，不计改回计入 / 往来的挪回「新增」，顶上的笔数跟着变
       if (d.group === 'add' && d.mode === 'skip') d.group = 'neutral';
       else if (d.group === 'neutral' && d.mode !== 'skip') d.group = 'add';
     });
@@ -255,7 +255,7 @@
     var cpg = {};
     rows.forEach(function (d) {
       if (d.src !== 'row' || d.catFrom !== 'rec' || d.cat !== '未分类') return;
-      // 1016-H：待你确认的不进，等选成新增（「都不是」或被自动作为新增）再进；不计入的、转账往来里的也不用选
+      // 1016-H：待你确认的不进，等选成新增（「都不是」或被自动作为新增）再进；不计的、转账往来里的也不用选
       if (['add', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;
       var k = clean(d.cp) || '（没有交易对方）';
       var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [], wd: 0, we: 0 });
@@ -452,12 +452,12 @@
       var big = d.fen > AMOUNT.BIG_FEN || (i < AMOUNT.BIG_TOP && d.fen >= AMOUNT.BIG_TOP_MIN);
       if (!big) return;
       checks.push({ key: d.key, kind: 'big', fen: d.fen, cat: d.cat, cp: d.cp, time: d.time, mode: d.mode,
-                    why: (d.fen > AMOUNT.BIG_FEN ? '单笔超过 ' + yuan(AMOUNT.BIG_FEN) + ' 元' : '这次最大的几笔之一') + '，看看收支和「计入 / 不计入」对不对' });
+                    why: (d.fen > AMOUNT.BIG_FEN ? '单笔超过 ' + yuan(AMOUNT.BIG_FEN) + ' 元' : '这次最大的几笔之一') + '，看看收支和「计入 / 不计」对不对' });
       if (d.tags.indexOf('big') < 0) d.tags.push('big');
     });
     sec.amountChecks = checks;
 
-    // ---- 1.1（1016-Z4）提现服务费：微信「零钱提现」备注里写着「服务费¥2.20」的，零钱提现本身照旧不计入，服务费单独记一笔支出 ----
+    // ---- 1.1（1016-Z4）提现服务费：微信「零钱提现」备注里写着「服务费¥2.20」的，零钱提现本身照旧不计，服务费单独记一笔支出 ----
     //   分类：存档里有「手续费」「服务费」就用，没有用「其他」，再没有就「未分类」。只在这笔提现这次真要写进去时记（再导时提现跳过，服务费也不会再记）
     var feeCat = ['手续费', '服务费', '其他', '其它'].filter(function (c) { return cats.indexOf(c) >= 0; })[0] || '未分类';
     sec.fees = [];
@@ -477,7 +477,7 @@
       if (!g) { records++; return; }
       if (!seenG[g.id]) { seenG[g.id] = true; if (!g.appendTo) records++; }
     });
-    // 要登记的单号：新增、不计入、退款、合并，加上按净额并进手记的退款行
+    // 要登记的单号：新增、不计、退款、合并，加上按净额并进手记的退款行
     var orders = 0;
     rows.forEach(function (d) {
       if (d.src !== 'row') return;

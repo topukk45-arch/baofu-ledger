@@ -898,7 +898,7 @@
     if (!d) return { t: '→ 没有要定的了', step: null };
     var more = keys.length > 1 ? '（共 ' + keys.length + ' 笔）' : '', g = d.group, t;
     if (g === 'merge') { var m = S.manualById[d.into]; t = '→ 和 ' + (m ? mdhm(m.time) + ' ' + (m.cat || '') : '') + ' 的手记合并'; }
-    else if (g === 'neutral') t = '→ 挪到不计入组';
+    else if (g === 'neutral') t = '→ 挪到不计组';
     else if (g === 'excluded') t = '→ 不导入（勾掉了）';
     else if (g === 'refund') t = '→ 当作退款';
     else if (g === 'skip') t = '→ 跳过';
@@ -1143,7 +1143,7 @@
   // 中间几步：要你定的
   var STEP_INTRO = {
     match: function (n, l) { return ['有 ' + n + ' 件和你记的对不上' + (l ? '，还剩 ' + l + ' 件没定' : '，都定过了'), '选一笔就和手记合并；不选的先放进待处理，以后再定。']; },
-    refund: function (n, l) { return ['退款和转账有 ' + n + ' 件' + (l ? '，还剩 ' + l + ' 件没定' : '，都定过了'), '转账往来可以标成不计入；找不到原单的退款先放进待处理，以后再挂。']; },
+    refund: function (n, l) { return ['退款和转账有 ' + n + ' 件' + (l ? '，还剩 ' + l + ' 件没定' : '，都定过了'), '转账往来可以标成不计；找不到原单的退款先放进待处理，以后再挂。']; },
     cat: function (n, l) { return ['给 ' + n + ' 件选分类' + (l ? '，还剩 ' + l + ' 件没定' : '，都定过了'), '不选的照推荐导入；按对方选了的，以后同一个对方直接归过去。']; },
     amount: function (n, l) { return ['有 ' + n + ' 笔金额要你看一眼' + (l ? '，还剩 ' + l + ' 笔没看' : '，都看过了'), '分类照常推荐、钱照常导入，只是提醒你看一眼；不对就点开改。']; }
   };
@@ -1393,7 +1393,7 @@
       chips.appendChild(ch);
     });
     c.appendChild(chips);
-    if (p.sections.fees && p.sections.fees.length) { var fe = el('div', 'imp-soft', '零钱提现的服务费 ' + p.sections.fees.length + ' 笔，共 ' + yuan(p.sections.fees.reduce(function (s0, x) { return s0 + x.fen; }, 0)) + ' 元，单独记成支出（分类「' + p.sections.feeCat + '」；提现本身照旧不计入）'); fe.id = 'impFees'; c.appendChild(fe); }
+    if (p.sections.fees && p.sections.fees.length) { var fe = el('div', 'imp-soft', '零钱提现的服务费 ' + p.sections.fees.length + ' 笔，共 ' + yuan(p.sections.fees.reduce(function (s0, x) { return s0 + x.fen; }, 0)) + ' 元，单独记成支出（分类「' + p.sections.feeCat + '」；提现本身照旧不计）'); fe.id = 'impFees'; c.appendChild(fe); }
     var ms = Plan.missed(p);
     if (ms.n) { var ml = el('div', 'imp-line', '这段时间漏记了 ' + ms.n + ' 笔，共 ' + yuan(ms.out) + ' 元' + (ms.inc ? '（另有收入 ' + yuan(ms.inc) + ' 元）' : '') + '（没和手记配上、要新建的）'); ml.id = 'impMissed'; c.appendChild(ml); }
     if (p.records !== p.importN) c.appendChild(el('div', 'imp-soft', '导入 ' + p.importN + ' 笔，分分捐、收款这类合并以后，实际新建 ' + p.records + ' 条记录'));
@@ -1439,7 +1439,7 @@
       typeRows.forEach(function (t) {
         var r = el('div', 'imp-row-opt'); var k = t.app + '|' + t.type; r.dataset.item = 'ty:' + k;
         r.appendChild(el('span', 'grow', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔，共 ' + yuan(t.fen) + ' 元'));
-        r.appendChild(select([['', '照收支导入（放进其他）'], ['normal', '照收支导入'], ['transfer', '当转账（不计入）'], ['refund', '当退款挂到原单'], ['skip', '跳过']], S.types[k] || '',
+        r.appendChild(select([['', '照收支导入（放进其他）'], ['normal', '照收支导入'], ['transfer', '当转账（不计）'], ['refund', '当退款挂到原单'], ['skip', '跳过']], S.types[k] || '',
           function (v) { if (v) S.types[k] = v; else delete S.types[k]; rerun(); }, 'imp-type-sel', '「' + t.type + '」（' + APP[t.app] + '）' + t.n + ' 笔'));
         r.appendChild(mk(!!S.types[k]));
         c.appendChild(r);
@@ -1461,9 +1461,9 @@
       ac.appendChild(el('h4', null, '金额要你看一眼（' + s.amountChecks.length + ' 笔）'));
       s.amountChecks.forEach(function (x) {
         var r = el('div', 'imp-row-opt imp-tap imp-amount-row'); r.dataset.key = x.key; r.dataset.kind = x.kind; r.dataset.item = 'am:' + x.key;
-        // 1017-UI11：不计入的行不显示分类（1016-G 定的规矩，这里也一样）
+        // 1017-UI11：不计的行不显示分类（1016-G 定的规矩，这里也一样）
         var ad = rowByKey(x.key), askip = ad && (ad.group === 'neutral' || ad.mode === 'skip');
-        r.appendChild(el('span', 'grow', (cpShow(x.cp) || '—') + ' · ' + yuan(x.fen) + ' 元' + (askip ? '（不计入）' : ' → ' + (x.cat || '未分类') + (x.kind === 'abnormal' ? '？' : '')) + ' 理由：' + x.why));
+        r.appendChild(el('span', 'grow', (cpShow(x.cp) || '—') + ' · ' + yuan(x.fen) + ' 元' + (askip ? '（不计）' : ' → ' + (x.cat || '未分类') + (x.kind === 'abnormal' ? '？' : '')) + ' 理由：' + x.why));
         r.appendChild(mk(!!S.view.seen['am:' + x.key] || !!S.edits.rows[x.key], true));
         r.addEventListener('click', function () { S.view.seen['am:' + x.key] = true; openSheet(x.key); });
         ac.appendChild(r);
@@ -1691,11 +1691,11 @@
           cb.addEventListener('change', function () { setModeEdit(k, cb.checked ? 'skip' : 'normal'); replan(); });
           r.appendChild(cb); r.appendChild(el('span', 'grow', fmtTime(d.time) + ' · ' + (d.cp || '—') + ' · ' + (d.type === 'expense' ? '转出 ' : '转入 ') + yuan(d.fen)));
           var sw = el('span', 'imp-switch imp-tr-state' + (cb.checked ? ' on' : ''));
-          sw.appendChild(el('i')); sw.appendChild(document.createTextNode(cb.checked ? '不计入' : '计入'));
+          sw.appendChild(el('i')); sw.appendChild(document.createTextNode(cb.checked ? '不计' : '计入'));
           r.style.cursor = 'pointer'; r.appendChild(sw);
           box.appendChild(r);
         });
-        var all = btn(t.allSkip ? '都恢复计入' : '这几笔都标成不计入', t.allSkip ? 'imp-btn' : 'imp-btn gold', function () {
+        var all = btn(t.allSkip ? '都恢复计入' : '这几笔都标成不计', t.allSkip ? 'imp-btn' : 'imp-btn gold', function () {
           t.keys.forEach(function (k) { setModeEdit(k, t.allSkip ? 'normal' : 'skip'); });
           replan();
         });
@@ -1705,7 +1705,7 @@
         else if (S.view.seen['tr:' + t.id] && ts.n < t.keys.length) box.appendChild(el('div', 'imp-soft', '其余 ' + (t.keys.length - ts.n) + ' 笔保持计入。'));
         tc.appendChild(box);
       });
-      tc.appendChild(el('div', 'imp-soft', '只收微信转账、微信红包、支付宝转账红包，相邻两笔隔不到 3 天的串成一段。随礼、还钱这类来回抵掉的，可以标成不计入。'));
+      tc.appendChild(el('div', 'imp-soft', '只收微信转账、微信红包、支付宝转账红包，相邻两笔隔不到 3 天的串成一段。随礼、还钱这类来回抵掉的，可以标成不计。'));
       out.transfers = tc;
     }
     // 全额退款的弱提醒（不算待处理，不用选）
@@ -1721,7 +1721,7 @@
       out.refundHints = hc;
     }
     var nt = s.notes, items = [];
-    if (nt.neutralVsNormal.length) items.push(['neutralVsNormal', nt.neutralVsNormal.length + ' 笔「不计入」的账单和同金额的普通手记撞上了，没合并，请看一眼是不是记重了']);
+    if (nt.neutralVsNormal.length) items.push(['neutralVsNormal', nt.neutralVsNormal.length + ' 笔「不计」的账单和同金额的普通手记撞上了，没合并，请看一眼是不是记重了']);
     if (nt.joined.length) items.push(['joined', nt.joined.length + ' 笔是被换行拆开、拼回来的']);
     if (nt.noNote.length) items.push(['noNote', nt.noNote.length + ' 笔单号带了附加信息，已按开头部分去重（附加信息挪进了备注）']);
     if (nt.overlap.length) items.push(['overlap', nt.overlap.length + ' 笔新增落在以前导入过的时间段里，可能是你删过的']);
@@ -1753,7 +1753,7 @@
 
   // ---------- 全部明细 ----------
   var TAGNAME = { abnormal: '金额偏高', big: '大额', joined: '拼回', noNote: '单号带附加信息', overlap: '以前导入过这段', otherType: '新类型', otherStatus: '新状态', neutralVsNormal: '撞上普通手记' };
-  var MODENAME = { normal: '计入', flow: '只算结余', skip: '不计入' };
+  var MODENAME = { normal: '计入', skip: '不计', flow: '往来' };
   function renderDetails(p) {
     var wrap = el('div'); wrap.id = 'impDetails';
     var tg = btn(S.view.details ? '收起全部明细' : '查看全部明细', 'imp-btn', function () { S.view.details = !S.view.details; render(); });
@@ -1800,7 +1800,7 @@
       if (d.fen !== null) row.appendChild(el('span', 'al-amt', yuan(d.fen)));
     } else {
       row.appendChild(el('span', 'al-time', fmtTime(d.time)));
-      // 1016-G：不计入的不显示分类，金额不带正负号
+      // 1016-G：不计的不显示分类，金额不带正负号
       var skipRow = d.group === 'neutral' || d.mode === 'skip';
       var c = el('span', 'al-cat'); if (!skipRow) c.appendChild(el('span', 'cat-tag', d.cat || '未分类')); row.appendChild(c);
       row.appendChild(el('span', 'al-remark', cpShow(d.title || d.cp) || '—'));
@@ -1813,7 +1813,7 @@
     var why = el('div', 'imp-why');
     var bits = [];
     if (d.reason) bits.push(d.reason);
-    if (d.src === 'row' && (d.group === 'add' || d.group === 'neutral') && d.mode !== 'normal') bits.push('口径：' + MODENAME[d.mode]);
+    if (d.src === 'row' && (d.group === 'add' || d.group === 'neutral') && d.mode !== 'normal') bits.push('统计：' + MODENAME[d.mode]);
     why.textContent = bits.join(' · ');
     d.tags.forEach(function (t) { if (TAGNAME[t]) why.appendChild(el('span', 'imp-tag', TAGNAME[t])); });
     item.appendChild(why);
@@ -2007,7 +2007,7 @@
     }
     if (d.canMode) {
       var mode0 = dr.mode || d.mode;
-      ['normal', 'flow', 'skip'].forEach(function (m) {
+      ['normal', 'skip', 'flow'].forEach(function (m) {
         var b = btn(MODENAME[m], mode0 === m ? 'imp-btn gold' : 'imp-btn', function () { setDraft({ mode: m === ((d.item && d.item.mode) || 'normal') ? null : m }); });      // 改回这一行原来的口径 = 去掉改动
         b.className += ' imp-mode'; b.dataset.mode = m; acts.appendChild(b);
       });
@@ -2063,7 +2063,7 @@
       var cb2 = btn('还是待确认', !dr.pick && SH.keep ? 'imp-btn gold' : 'imp-btn', function () { SH.keep = true; setDraft({ pick: null }); }); cb2.id = 'impPickClear';     // 明确点了也算定了
       a2.appendChild(nb); a2.appendChild(db); a2.appendChild(cb2); sh.appendChild(a2);
     }
-    // 1016-G：为什么没配上（默认收起）；不计入的行同样收起
+    // 1016-G：为什么没配上（默认收起）；不计的行同样收起
     if (d.item && d.item.trace && d.group !== 'merge') {
       var tb = el('div', 'imp-trace'); tb.id = 'impTrace'; tb.style.marginTop = '8px';
       var tt = btn('为什么没配上手记 ▸', 'imp-link imp-trace-toggle', function () { var o2 = tb.classList.toggle('open'); tt.textContent = o2 ? '为什么没配上手记 ▾' : '为什么没配上手记 ▸'; });
@@ -2120,7 +2120,7 @@
     if (g === 'skip') return { t: '已跳过：' + (d.reason || ''), cls: 'skip', step: null };
     if (g === 'excluded') return { t: '不导入：' + (d.reason || '你勾掉了'), cls: 'skip', step: null };
     if (g === 'pending') return { t: '留在待处理' + (d.reason ? '：' + d.reason : ''), cls: 'pend', step: null };
-    if (g === 'neutral') return { t: '不计入', cls: '', step: null };
+    if (g === 'neutral') return { t: '不计', cls: '', step: null };
     if (g === 'refund') return { t: '当作退款', cls: '', step: null };
     if (g === 'error') return { t: '读不出来', cls: 'skip', step: null };
     return { t: '新建 · ' + (d.cat || '未分类'), cls: '', step: null };
@@ -2223,7 +2223,7 @@
     var key = SH.key;
     sh.innerHTML = ''; sh.dataset.key = key; sh.dataset.mode = 'refundpick';
     sh.appendChild(el('h4', null, '把这笔 +' + yuan(d.fen) + ' 挂到哪一笔上？'));
-    sh.appendChild(el('div', 'imp-soft', '挂上以后当作那笔的退款：分类、口径跟着那笔，那笔的支出减掉这些（比如 AA 收回的钱、跨月退款、换个渠道的赔付）。'));
+    sh.appendChild(el('div', 'imp-soft', '挂上以后当作那笔的退款：分类、统计跟着那笔，那笔的支出减掉这些（比如 AA 收回的钱、跨月退款、换个渠道的赔付）。'));
     var bk = btn('‹ 回到这笔账单', 'imp-link', function () { SH.mode = ''; paintSheet(); }); bk.id = 'impRefundPickBack'; sh.appendChild(bk);
     // 1017-E：候选列表上面加搜索框（金额、对方、商品说明、备注），只在页面上过滤
     var rpRows = [], rtip = el('div', 'imp-search-tip'); rtip.id = 'impRefundPickTip';
@@ -2260,7 +2260,7 @@
   }
 
   // ---------- 底部按钮、复制 ----------
-  var BUCKET_LINE = [['add', '新增'], ['merge', '和手记合并'], ['neutral', '不计入'], ['refund', '退款'], ['pending', '待处理'],
+  var BUCKET_LINE = [['add', '新增'], ['merge', '和手记合并'], ['neutral', '不计'], ['refund', '退款'], ['pending', '待处理'],
                      ['skip', '跳过'], ['error', '出错'], ['excluded', '你勾掉的']];
   function onImport(onlyKeys) {
     if (!S || !S.plan || !S.plan.canImport || S.phase !== 'confirm') return;
@@ -2289,7 +2289,7 @@
       if (r.type === 'income') inc += f; else exp += f;
     });
     var mp = [];
-    if (exp) mp.push('支出 ' + yuan(exp) + ' 元'); if (inc) mp.push('收入 ' + yuan(inc) + ' 元'); if (nRef) mp.push('退款 ' + nRef + ' 笔 ' + yuan(refFen) + ' 元'); if (nSkip) mp.push(nSkip + ' 条不计入');
+    if (exp) mp.push('支出 ' + yuan(exp) + ' 元'); if (inc) mp.push('收入 ' + yuan(inc) + ' 元'); if (nRef) mp.push('退款 ' + nRef + ' 笔 ' + yuan(refFen) + ' 元'); if (nSkip) mp.push(nSkip + ' 条不计');
     if (ws.records.length) L.push(['新建 ' + ws.records.length + ' 条记录', mp.join('，')]);
     if (ws.only) {
       L.push(['只写这 ' + ws.records.length + ' 笔', '不合并手记、不登记其余的单号、不进待处理、不存规则；以后再导同一份账单，其余的照样会出现']);
@@ -2431,7 +2431,7 @@
     var n2 = btn('按过去几个月设预算 ›', 'ui-btn block', goNext('budget')); n2.id = 'impNextBudget';
     var n3 = btn('补一笔期初余额 ›', 'ui-btn block', goNext('opening')); n3.id = 'impNextOpening';
     nr.appendChild(n1); nr.appendChild(n2); nr.appendChild(n3); nx.appendChild(nr);
-    nx.appendChild(el('div', 'imp-soft', '导进来的只是这段时间的收支差额，不等于钱包里的实际余额。想让结余对上，补一笔「只算结余」的期初余额（不算收入）。'));
+    nx.appendChild(el('div', 'imp-soft', '导进来的只是这段时间的收支差额，不等于钱包里的实际余额。想让结余对上，补一笔「往来」的期初余额（不算收入）。'));
     b.appendChild(nx);
     var bk = el('div', 'imp-card');
     bk.appendChild(el('div', 'imp-soft', '写之前自动备份了一份。导错了可以点下面「撤销这次导入」整批撤销，以后也能在「设置 → 导入记录」里撤销。'));
@@ -2487,7 +2487,7 @@
       // 1017-K：AI 修改（不是导入）：写改了哪一次导入的几条、各改了什么
       var ofL = l.kind === 'ai' ? logs.filter(function (x) { return x.b === l.of && x.kind !== 'ai'; })[0] : null;
       var aiWhat = function () { var f = { cat: 0, remark: 0, mode: 0, aiFlag: 0 }; (l.chg || []).forEach(function (c) { var w = c.was || {}; if ('cat' in w) f.cat++; if ('remark' in w) f.remark++; if ('skip' in w || 'flow' in w) f.mode++; if ('aiFlag' in w) f.aiFlag++; });
-        return [['cat', '分类'], ['remark', '备注'], ['mode', '口径'], ['aiFlag', '标记']].filter(function (x) { return f[x[0]]; }).map(function (x) { return x[1] + ' ' + f[x[0]] + ' 条'; }).join('、'); };
+        return [['cat', '分类'], ['remark', '备注'], ['mode', '统计'], ['aiFlag', '标记']].filter(function (x) { return f[x[0]]; }).map(function (x) { return x[1] + ' ' + f[x[0]] + ' 条'; }).join('、'); };
       if (l.kind === 'ai') {
         g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · AI 修改'));
         g.appendChild(el('div', 'imp-soft', '按 AI 的建议改了 ' + nChg + ' 条记录（' + aiWhat() + '）' + (ofL ? ' · 是 ' + String(ofL.at || '').replace('T', ' ').slice(5) + ' 那次导入的' : '')));
@@ -2624,7 +2624,7 @@
     fallbackCopy(text); return Promise.resolve(false);
   }
   // ---------- 1017-J：导回来（粘贴 AI 的回复 → 修改建议页）----------
-  var AI_FIELD_NAME = { cat: '分类', remark: '备注', mode: '口径', flag: '标记' };
+  var AI_FIELD_NAME = { cat: '分类', remark: '备注', mode: '统计', flag: '标记' };
   var AI_FLAG_NAME = { dup: '可能重复', miss: '可能漏配' };
   var AI_WHY = { noblock: '没找到记问的修改建议，请把 AI 的整段回复复制过来（要带上「记问修改建议 v1 批次 … 导出 …」那一行）。',
                  nohead: '```记问 那一段的第一行不是「记问修改建议 v1 批次 … 导出 …」。请让 AI 原样抄那一行。',
@@ -2665,7 +2665,7 @@
   function aiKey(it) { return it.n + '|' + it.field; }
   function aiChangeText(it, R) {
     if (it.field === 'cat') return ['分类', (it.cur || '未分类') + ' → ', it.value];
-    if (it.field === 'mode') return ['口径', (window.JiwenImportAI.MODE_NAME[it.cur] || '计入') + ' → ', window.JiwenImportAI.MODE_NAME[it.value]];
+    if (it.field === 'mode') return ['统计', (window.JiwenImportAI.MODE_NAME[it.cur] || '计入') + ' → ', window.JiwenImportAI.MODE_NAME[it.value]];
     if (it.field === 'remark') return R.remarkMode[aiKey(it)] === 'replace' ? ['备注', '换成 ', it.value] : ['备注', '后面加上 ', it.value];
     var ref = it.ref ? R.rows[it.ref] : null;
     return ['标记', '', AI_FLAG_NAME[it.value] + (ref ? '（说的是 #' + ref.n + ' ' + fmtTime(ref.time) + ' ' + (cpShow(ref.cp) || '') + ' ' + yuan(ref.fen) + '）' : '')];
@@ -2677,7 +2677,7 @@
     var usable = items.filter(function (x) { return !x.gone; });
     var c0 = el('div', 'imp-card'); c0.id = 'impAiReviewHead';
     c0.appendChild(el('div', 'imp-line', 'AI 提了 ' + (items.length + R.r.bad.length) + ' 条，能用的 ' + usable.length + ' 条' + (R.r.bad.length ? '，没看懂 ' + R.r.bad.length + ' 行（放在最后）' : '') + '。'));
-    c0.appendChild(el('div', 'imp-soft', '默认都不勾，勾上的才改；只改分类、备注、口径和标记，不新建、不删除、不改金额和时间。改之前自动备份，能在「设置 → 导入记录」里整批撤销。'));
+    c0.appendChild(el('div', 'imp-soft', '默认都不勾，勾上的才改；只改分类、备注、统计和标记，不新建、不删除、不改金额和时间。改之前自动备份，能在「设置 → 导入记录」里整批撤销。'));
     // 1017-R：一条能用的都没有（空状态）：写清楚为什么、怎么办，跟在顶上那块后面往下排
     if (!items.length) { var e0 = el('div', 'imp-soft imp-ai-empty', R.r.bad.length ? '没有能直接改的建议。没看懂的几行放在下面，写了原因；可以让 AI 按导出时说的格式重写一遍再粘贴。' : 'AI 没提修改建议，这一批看起来没问题。'); e0.id = 'impAiEmpty'; c0.appendChild(e0); }
     b.appendChild(c0);
@@ -2732,7 +2732,7 @@
       body: function (box) {
         var paint = function () {
           box.innerHTML = '';
-          [['时间', String(row.time || '').replace('T', ' ')], ['对方', cpShow(row.cp)], ['金额', row.fen !== undefined ? (row.type === 'income' ? '收入 ' : '支出 ') + yuan(row.fen) : ''], ['分类', row.cat], ['口径', window.JiwenImportAI.MODE_NAME[row.mode]],
+          [['时间', String(row.time || '').replace('T', ' ')], ['对方', cpShow(row.cp)], ['金额', row.fen !== undefined ? (row.type === 'income' ? '收入 ' : '支出 ') + yuan(row.fen) : ''], ['分类', row.cat], ['统计', window.JiwenImportAI.MODE_NAME[row.mode]],
            ['备注', row.remark], ['去向', row.dest], ['AI 建议', AI_FIELD_NAME[it.field] + '：' + aiChangeText(it, { rows: R.rows, remarkMode: { } }).slice(1).join('')], ['AI 的理由', it.why || '（没写）'], ['AI 原话', it.line]]
             .forEach(function (kv) { if (kv[1]) box.appendChild(el('div', 'pc-sub', kv[0] + '：' + kv[1])); });
           if (it.field === 'remark' && !it.gone) {
@@ -2766,7 +2766,7 @@
     window.JiwenSheet.open({ title: '确认修改', onDismiss: function () {},
       body: function (box) {
         var l = el('div', 'imp-cf-list');
-        [['cat', '改分类'], ['remark', '改备注'], ['mode', '改口径'], ['flag', '打「AI 觉得可疑」的标记']].forEach(function (x) {
+        [['cat', '改分类'], ['remark', '改备注'], ['mode', '改统计'], ['flag', '打「AI 觉得可疑」的标记']].forEach(function (x) {
           if (!cnt[x[0]]) return; var i0 = el('div', 'imp-cf-item'); i0.appendChild(el('i')); var t0 = el('div'); t0.appendChild(el('b', null, x[1] + ' ' + cnt[x[0]] + ' 条')); i0.appendChild(t0); l.appendChild(i0);
         });
         box.appendChild(l);
@@ -2801,7 +2801,7 @@
   // ---------- 第二期：管理导入规则 ----------
   // 你的分类规则（关键词 → 分类，关键词越长越先用）、分类对照（推荐分类 → 你的分类）、类型规则（没见过的交易类型 / 状态怎么处理）。
   // 每改一下就存一次（只改存档设置里的规则，不动已经入账的记录）。内置词表不在这里（看不到、改不了）。
-  var TYPE_AS_NAME = { normal: '照收支导入', transfer: '当转账（不计入）', refund: '当退款挂到原单', skip: '跳过', import: '导入' };
+  var TYPE_AS_NAME = { normal: '照收支导入', transfer: '当转账（不计）', refund: '当退款挂到原单', skip: '跳过', import: '导入' };
   function openRules(notice) {
     build();
     runId++;
@@ -2986,7 +2986,7 @@
         var lb = el('div', 'imp-soft', '分类 '); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '6px'; lb.style.flex = '1 1 100%'; var sw = wrapSel(se, (it.cp || '—') + ' · ' + yuan(it.amt) + ' 元'); sw.style.flex = '1'; lb.appendChild(sw); acts.appendChild(lb);
         if (sug[x.key]) { var sh0 = el('div', 'imp-soft imp-pend-sug', '按推荐先选了「' + sug[x.key].cat + '」（' + sug[x.key].reason + '），不对就改'); sh0.style.flex = '1 1 100%'; acts.appendChild(sh0); }
       }
-      var nb = btn(x.refund ? '作为新增（只算结余）' : '作为新增', 'imp-btn imp-pend-new', function () {
+      var nb = btn(x.refund ? '作为新增（往来）' : '作为新增', 'imp-btn imp-pend-new', function () {
         act([{ key: x.key, do: 'new', cat: se ? se.value : '未分类' }], '已作为新增记进账本');
       });
       var db = btn('不要了', 'imp-btn imp-pend-drop', function () { act([{ key: x.key, do: 'drop' }], '这笔不要了'); });

@@ -78,7 +78,7 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   ok(t.rowOf('游戏').classList.contains('open') && items.length===4, '展开：4 笔计入预算的游戏消费');
   ok(items.map(i=>i.querySelector('.sf-time').textContent).join()==='10-09 14:15,10-09 14:14,10-06 10:00,10-04 16:20', '时间倒序');
   ok(items[0].querySelector('.sf-remark').textContent==='游戏充值' && items[0].querySelector('.sf-amt').textContent==='−98.97', '备注与金额');
-  ok(det.querySelector('.bg-detail-head span').textContent==='4 笔；另有 1 笔不计入 / 只算结余，未算在内', '说明另有不计入的');
+  ok(det.querySelector('.bg-detail-head span').textContent==='4 笔；另有 1 笔不计 / 往来，未算在内', '说明另有不计的');
   ok(!det.textContent.includes('九月'), '不混入别的月份');
   items[0].click();
   ok(t.$('detailMask').style.display==='flex' && t.$('detailRemark').textContent==='游戏充值' && t.$('detailEdit').style.display==='', '点一笔看详情，可修改');
@@ -101,7 +101,7 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   const t=await boot(B); t.tab('budget');
   t.rowOf('游戏').click();
   ok(!t.$('statPaneBudget').querySelector('[data-act="bgJump"]') && !t.$('statPaneBudget').textContent.includes('在账单里查看'), '明细里不再有「在账单里查看」');
-  ok(t.$('bgGroups').querySelector('.bg-detail-head span').textContent==='4 笔；另有 1 笔不计入 / 只算结余，未算在内', '明细顶部说明：'+t.$('bgGroups').querySelector('.bg-detail-head span').textContent);
+  ok(t.$('bgGroups').querySelector('.bg-detail-head span').textContent==='4 笔；另有 1 笔不计 / 往来，未算在内', '明细顶部说明：'+t.$('bgGroups').querySelector('.bg-detail-head span').textContent);
   // 未设预算：展开列表 → 点「出行」行
   t.$('bgUnsetCard').querySelector('[data-act="bgUnsetToggle"]').click();
   const urow=c=>[...t.$('bgUnsetCard').querySelectorAll('.bgu-row')].find(r=>r.dataset.cat===c);

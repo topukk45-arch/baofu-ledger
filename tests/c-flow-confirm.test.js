@@ -1,4 +1,4 @@
-// 1010-C 专项：只算结余 + 确认弹窗清单。node test4.js <html>
+// 1010-C 专项：往来 + 确认弹窗清单。node test4.js <html>
 const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
@@ -34,7 +34,7 @@ function bootSync(records){
 const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:true}):r);
 
 (async()=>{
-// ===== 1. 账单页：只算结余进结余、不进收支 =====
+// ===== 1. 账单页：往来进结余、不进收支 =====
 {
     let rs=oct(); rs=mark(rs,['cc1','cc2'],'skip'); rs=mark(rs,['dep','lpo','lpi','par'],'flow');
     const t=await boot(rs);
@@ -44,12 +44,12 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     ok(q('.ov-in')==='+100.00' && q('.ov-out')==='−29.00', '总览收支只含「计入」：'+ov);
     // 结余 = 存款 + 4500 - 3999.00 - 800 + 100 - 16 - 13（信用卡不算）
     const bal=(50000.00+4500-3999.00-800+100-16-13).toFixed(2);
-    ok(q('.ov-net')===bal, '结余含资金往来、不含不计入：应为 '+bal+'，实际 '+q('.ov-net'));
-    ok(!t.$('catStats').textContent.includes('存款') && !t.$('catStats').textContent.includes('购物'), '分类汇总不出现「存款」「购物（全是只算结余）」');
+    ok(q('.ov-net')===bal, '结余含资金往来、不含不计：应为 '+bal+'，实际 '+q('.ov-net'));
+    ok(!t.$('catStats').textContent.includes('存款') && !t.$('catStats').textContent.includes('购物'), '分类汇总不出现「存款」「购物（全是往来）」');
     t.filterKw('笔记本');
     const rows=[...t.$('billList').querySelectorAll('tr')];
-    ok(rows.length===2 && rows.every(r=>r.querySelector('.io-flow') && r.querySelector('.amt-flow')), '只算结余行有灰蓝标签与金额');
-    ok(t.$('summaryFilter').textContent.includes('（其中 2 条只算结余）'), '小计说明只算结余条数');
+    ok(rows.length===2 && rows.every(r=>r.querySelector('.io-flow') && r.querySelector('.amt-flow')), '往来行有灰蓝标签与金额');
+    ok(t.$('summaryFilter').textContent.includes('（其中 2 条往来）'), '小计说明往来条数');
     // 结余列：购物卡那行（最新正常记录）的结余应等于总结余
     const t2=await boot(rs);
     const top=[...t2.$('billList').querySelectorAll('tr')][0];
@@ -67,8 +67,8 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     ok(cell(4).classList.contains('has') && !cell(4).querySelector('.da'), '4 号只有资金往来：可点开、不显示金额');
     ok(cell(1).querySelector('.da').textContent==='-16', '1 号只算夜宵 -16');
     cell(4).click();
-    ok(t.$('statFlowList').querySelectorAll('.sf-io.flow').length===2, '当日明细标出只算结余');
-    ok(!t.$('statMonthCatList').textContent.includes('购物'), '饼图不含只算结余');
+    ok(t.$('statFlowList').querySelectorAll('.sf-io.flow').length===2, '当日明细标出往来');
+    ok(!t.$('statMonthCatList').textContent.includes('购物'), '饼图不含往来');
 }
 
 // ===== 3. AI 导出 =====
@@ -77,8 +77,8 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     const t=await boot(rs);
     const txt=t.w.JiwenAiExport.buildAiText(rs.filter(r=>r.time.startsWith('2026-10')),'2026年10月','按月');
     ok(txt.includes('收入 100.00 元，支出 29.00 元'), 'AI 总览只含计入');
-    ok(txt.includes('（其中 2 笔不计入收支、3 笔只算结余）'), 'AI 写明两类排除条数');
-    ok((txt.match(/【只算结余】/g)||[]).length===4 && (txt.match(/【不计入收支】/g)||[]).length===3, 'AI 明细逐条标注（含提示语里各一次）');
+    ok(txt.includes('（其中 2 笔不计、3 笔往来）'), 'AI 写明两类排除条数');
+    ok((txt.match(/【往来】/g)||[]).length===4 && (txt.match(/【不计】/g)||[]).length===3, 'AI 明细逐条标注（含提示语里各一次）');
 }
 
 // ===== 4. 批量 + 清单弹窗 =====
@@ -87,16 +87,16 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     t.filterKw('笔记本');
     t.$('batchBar').querySelector('[data-act="batch"]').click();
     const opts=[...t.$('askChoices').querySelectorAll('.cc')].map(e=>(e.querySelector('.cc-label')||e).textContent);
-    ok(opts.join('|')==='改分类|标为只算结余|标为不计入|恢复计入', '批量菜单四项：'+opts.join('|'));
-    t.choose('标为只算结余');
+    ok(opts.join('|')==='改分类|恢复计入|标为不计|标为往来', '批量菜单四项：'+opts.join('|'));
+    t.choose('标为往来');
     const list=t.$('askList'), rows=[...list.querySelectorAll('.al-row')];
     ok(list.style.display!=='none' && rows.length===2, '确认弹窗列出全部 2 条');
     ok(rows.every(r=>['al-time','al-cat','al-remark','al-amt'].every(c=>r.querySelector('.'+c))), '每行固定四列');
     ok(rows[0].querySelector('.al-time').textContent==='10-04 16:30', '时间列格式 MM-DD HH:mm');
     ok(rows.map(r=>r.querySelector('.al-amt').textContent).sort().join(',')==='+4500.00,−3999.00', '金额带正负号与两位小数');
-    ok(t.$('askMsg').textContent==='把下面这 2 条记录改成「只算结余」（挂在上面的退款跟着改）。改完可以马上「撤销这次操作」。', '标题句不再拼样例文字');
+    ok(t.$('askMsg').textContent==='把下面这 2 条记录改成「往来」（挂在上面的退款跟着改）。改完可以马上「撤销这次操作」。', '标题句不再拼样例文字');
     t.$('askOk').click();
-    ok(t.recs().filter(r=>r.flow===true).map(r=>r.id).sort().join()==='lpi,lpo', '批量标为只算结余');
+    ok(t.recs().filter(r=>r.flow===true).map(r=>r.id).sort().join()==='lpi,lpo', '批量标为往来');
     ok(t.$('askList').style.display==='none', '完成弹窗不带清单');
     t.$('askExtra').click();
     ok(t.recs().every(r=>!('flow' in r) && !('skip' in r)), '撤销后全部恢复计入');
@@ -115,7 +115,7 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     // XSS：备注里的 HTML 只当文字
     const t3=await boot(oct());
     t3.filterKw('img');
-    t3.$('batchBar').querySelector('[data-act="batch"]').click(); t3.choose('标为不计入');
+    t3.$('batchBar').querySelector('[data-act="batch"]').click(); t3.choose('标为不计');
     const rk=t3.$('askList').querySelector('.al-remark');
     ok(rk.textContent.includes('<img') && !t3.$('askList').querySelector('img') && !t3.w.__pwn, '备注中的 HTML 不会被执行');
     ok(t.errs.length+t2.errs.length+t3.errs.length===0, '无脚本错误');

@@ -101,12 +101,13 @@
             });
         }
 
-        // ===== 统计口径选择：计入 / 只算结余 / 不计入 =====
-        // 选「转账」分类时自动切到「不计入」——只在**切换到**转账的那一下、且当前还是「计入」时触发。
-        // 自动切的会打 data-auto 标记：切走到别的分类时恢复「计入」，免得一笔餐饮被悄悄带成不计入。
+        // ===== 统计选择：计入 / 不计 / 往来 =====
+        // 1020-F 改叫法（老叫法：统计口径，三种叫计入 / 只算结余 / 不计入），存的值 normal / skip / flow 不变。
+        // 选「转账」分类时自动切到「不计」——只在**切换到**转账的那一下、且当前还是「计入」时触发。
+        // 自动切的会打 data-auto 标记：切走到别的分类时恢复「计入」，免得一笔餐饮被悄悄带成不计。
         // 用户手动点过就清掉标记，之后完全听用户的。
         const SKIP_DEFAULT_CATS=['转账'];
-        const MODE_OPTS=[ {v:'normal', t:'计入'}, {v:'flow', t:'只算结余'}, {v:'skip', t:'不计入'} ];
+        const MODE_OPTS=[ {v:'normal', t:'计入'}, {v:'skip', t:'不计'}, {v:'flow', t:'往来'} ];
         function paintModeChips(box){
             const cur=box.dataset.mode||'normal';
             box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===cur));
@@ -203,7 +204,7 @@
                 const c=[...$('billCatChips').querySelectorAll('.cc')].find(el=>el.textContent===t.cat);
                 if(c) c.click();
             }
-            // 分类点击可能触发「转账 → 自动不计入」，模板里存的口径优先，放在分类之后设
+            // 分类点击可能触发「转账 → 自动不计」，模板里存的口径优先，放在分类之后设
             setModeChips($('billMode'), t.mode||'normal');
             billRemark.value=t.remark||'';
             billMoney.value = t.money!=null ? String(round2(t.money)) : '';
@@ -333,7 +334,7 @@
             if(!tpls.length){
                 list.innerHTML='<div class="tpl-empty">还没有常用模板。<br>点下面的「新建模板」，或者记一笔、修改账单时点底部的「存为常用」，就能加进来。</div>';
             }
-            const MODE_TXT={ flow:' · 只算结余', skip:' · 不计入' };
+            const MODE_TXT={ flow:' · 往来', skip:' · 不计' };
             tpls.forEach((t,i)=>{
                 const div=document.createElement('div'); div.className='cat-item tpl-item';
                 const left=document.createElement('div'); left.className='cat-left';
@@ -639,7 +640,7 @@
             const note=$('editRefundNote');
             if(rf){
                 const o=data.find(r=>r.id===item.refundOf);
-                note.innerHTML=`<b>这是一笔退款</b>，分类「${escapeHtml(item.cat||'未分类')}」和统计口径跟着原账单走。`
+                note.innerHTML=`<b>这是一笔退款</b>，分类「${escapeHtml(item.cat||'未分类')}」和统计跟着原账单走。`
                     + (o ? `<br>原账单：${String(o.time).replace('T',' ')} · ${escapeHtml((o.remark||'').trim()||o.cat)} · −${safeNum(o.money).toFixed(2)}`
                          + `，还能退 ${round2(safeNum(o.money)-refundedTotal(data,o.id,item.id)).toFixed(2)}（含这笔）` : '');
                 note.style.display='';

@@ -12,7 +12,7 @@ function baseRecords(){
         R('a2','2026-08-31T15:19',7575.94,'expense','其他','信用卡还款'),
         R('a3','2026-09-01T12:00',14,'expense','餐饮','午饭'),
         R('a4','2026-09-10T19:43',5200,'income','其他','工资'),
-        R('a5','2026-09-12T10:00',100,'expense','转账','只有不计入的一天',{skip:true}),
+        R('a5','2026-09-12T10:00',100,'expense','转账','只有不计的一天',{skip:true}),
     ];
     // 20 条「游戏充值」散在 3 个分类，用来测批量跨页
     for(let i=0;i<20;i++) rs.push(R('g'+i,`2026-09-${String(13+(i%10)).padStart(2,'0')}T2${i%10}:00`,10+i,'expense',['其他','购物','餐饮'][i%3],'游戏充值'));
@@ -43,25 +43,25 @@ function bootSync(records, extra){
 }
 
 (async()=>{
-// ===== 1. 记一笔：三选一 + 转账自动切不计入 =====
+// ===== 1. 记一笔：三选一 + 转账自动切不计 =====
 {
     const t=await boot(); const box=t.$('billMode'); const mode=()=>box.dataset.mode;
     const pick=txt=>[...box.querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===txt).click();
     t.$('fabAdd').click();
     ok(mode()==='normal' && box.querySelector('.cc.sel').textContent==='计入', '新表单默认「计入」');
-    ok(t.$('billModeHint').textContent.includes('正常计入'), '下方有口径说明');
+    ok(t.$('billModeHint').textContent.includes('算进收入、支出和结余'), '下方有口径说明');
     t.chip('billCatChips','转账').click();
-    ok(mode()==='skip', '选转账自动切到不计入');
+    ok(mode()==='skip', '选转账自动切到不计');
     t.chip('billCatChips','餐饮').click();
     ok(mode()==='normal', '自动切的，换分类会恢复计入');
     t.chip('billCatChips','转账').click(); pick('计入');
     t.chip('billCatChips','转账').click();
     ok(mode()==='normal', '手动改回计入后再点转账不强制切');
-    t.chip('billCatChips','餐饮').click(); pick('只算结余');
+    t.chip('billCatChips','餐饮').click(); pick('往来');
     t.chip('billCatChips','转账').click();
-    ok(mode()==='flow', '已手动选只算结余时，选转账不覆盖');
+    ok(mode()==='flow', '已手动选往来时，选转账不覆盖');
     ok(t.$('billModeHint').textContent.includes('资金往来'), '说明随选项变化');
-    pick('不计入');
+    pick('不计');
     t.$('billMoney').value='1234.56'; t.chip('billTypeChips','支出').click(); t.$('billRemark').value='信用卡';
     t.$('addBill').click();
     const added=t.recs().find(r=>r.money===1234.56);
@@ -69,7 +69,7 @@ function bootSync(records, extra){
     t.$('askCancel').click();
     t.$('fabAdd').click();
     ok(mode()==='normal', '再记一笔时复位为计入');
-    pick('只算结余'); t.$('billMoney').value='4500'; t.chip('billCatChips','其他').click(); t.chip('billTypeChips','收入').click(); t.$('addBill').click();
+    pick('往来'); t.$('billMoney').value='4500'; t.chip('billCatChips','其他').click(); t.chip('billTypeChips','收入').click(); t.$('addBill').click();
     const f=t.recs().find(r=>r.money===4500);
     ok(f && f.flow===true && !('skip' in f), '保存为 flow');
     t.$('askCancel').click();
@@ -90,8 +90,8 @@ function bootSync(records, extra){
     t.w.openEdit('a3'); t.$('editMoney').value='15'; t.$('saveEdit').click();
     ok(t.byId('a3').foo==='keep' && t.byId('a3').money===15, '修改不丢未知字段');
     ok(!('skip' in t.byId('a3')), '未开启时不写 skip 字段');
-    t.w.openEdit('a5'); [...t.$('editMode').querySelectorAll('.cc')].find(e=>e.textContent==='只算结余').click(); t.$('saveEdit').click();
-    ok(!('skip' in t.byId('a5')) && t.byId('a5').flow===true, '改成只算结余：skip 删除、flow 写入');
+    t.w.openEdit('a5'); [...t.$('editMode').querySelectorAll('.cc')].find(e=>e.textContent==='往来').click(); t.$('saveEdit').click();
+    ok(!('skip' in t.byId('a5')) && t.byId('a5').flow===true, '改成往来：skip 删除、flow 写入');
     t.w.openEdit('a5'); [...t.$('editMode').querySelectorAll('.cc')].find(e=>e.textContent==='计入').click(); t.$('saveEdit').click();
     ok(!('skip' in t.byId('a5')) && !('flow' in t.byId('a5')), '改回计入：两个字段都删除');
 }
@@ -114,17 +114,17 @@ function bootSync(records, extra){
     const ov=t.$('summaryOverall').textContent;
     const out=14+100*0+[...Array(20).keys()].reduce((s,i)=>s+10+i,0); // 午饭 + 20 条游戏
     const q=c=>t.$('summaryOverall').querySelector(c).textContent;
-    ok(ov.includes('共 25 条') && q('.ov-out')==='−'+out.toFixed(2) && q('.ov-in')==='+5200.00', '总览不含不计入：'+ov);
-    ok(!t.$('catStats').textContent.includes('转账'), '全部不计入的「转账」不出现在分类汇总');
+    ok(ov.includes('共 25 条') && q('.ov-out')==='−'+out.toFixed(2) && q('.ov-in')==='+5200.00', '总览不含不计：'+ov);
+    ok(!t.$('catStats').textContent.includes('转账'), '全部不计的「转账」不出现在分类汇总');
     const rows=[...t.$('billList').querySelectorAll('tr')];
-    // 找到 a5（09-12 只有不计入）与其前一笔（时间正序前一笔）的结余应相同
+    // 找到 a5（09-12 只有不计）与其前一笔（时间正序前一笔）的结余应相同
     const balOf=time=>{ const tr=rows.find(r=>r.textContent.includes(time)); return tr && tr.querySelector('[data-label="结余"]').textContent; };
     t.filterKw('信用卡');
-    ok([...t.$('billList').querySelectorAll('tr')].filter(r=>r.querySelector('.io-skip') && r.querySelector('.amt-skip')).length===2, '不计入行有灰色标签和灰色金额');
+    ok([...t.$('billList').querySelectorAll('tr')].filter(r=>r.querySelector('.io-skip') && r.querySelector('.amt-skip')).length===2, '不计行有灰色标签和灰色金额');
     const sf=t.$('summaryFilter').textContent;
-    ok(sf.includes('命中 2 条（其中 2 条不计入）') && sf.includes('支出 0.00'), '筛选小计说明不计入条数：'+sf);
+    ok(sf.includes('命中 2 条（其中 2 条不计）') && sf.includes('支出 0.00'), '筛选小计说明不计条数：'+sf);
     ok(t.$('batchBar').querySelector('[data-act="batch"]'), '筛选生效时有批量按钮');
-    // 结余：a5（100 不计入）那一行结余应等于它前一笔
+    // 结余：a5（100 不计）那一行结余应等于它前一笔
     const t2=await boot(baseRecords());
     const all=[...t2.$('billList').querySelectorAll('tr')].map(r=>({ t:r.querySelector('[data-label="记账时间"]').textContent, b:r.querySelector('[data-label="结余"]').textContent }));
     // 第一页是最新 15 条，a5 在 09-12，翻页找
@@ -135,7 +135,7 @@ function bootSync(records, extra){
         if(i>=0 && rowsNow[i+1]) found=[rowsNow[i].b, rowsNow[i+1].b];
         const nx=[...t2.$('pager').querySelectorAll('button')].pop(); if(nx && !nx.disabled) nx.click(); else break;
     }
-    ok(found && found[0]===found[1], '不计入那一行结余与上一笔相同：'+JSON.stringify(found));
+    ok(found && found[0]===found[1], '不计那一行结余与上一笔相同：'+JSON.stringify(found));
 }
 
 // ===== 5. 统计页 =====
@@ -145,12 +145,12 @@ function bootSync(records, extra){
     t.d.querySelector('.tab-btn[data-tab="stats"]').click();
     const cells=[...t.$('statCal').querySelectorAll('.day')];
     const c12=cells.find(c=>c.querySelector('.dn') && c.querySelector('.dn').textContent==='12');
-    ok(c12.classList.contains('has') && !c12.querySelector('.da'), '只有不计入的那天可点、但不显示金额');
+    ok(c12.classList.contains('has') && !c12.querySelector('.da'), '只有不计的那天可点、但不显示金额');
     ok(!c12.innerHTML.includes('NaN'), '不出现 NaN');
-    ok(!t.$('statMonthCatList').textContent.includes('转账'), '饼图不含不计入');
+    ok(!t.$('statMonthCatList').textContent.includes('转账'), '饼图不含不计');
     c12.click();
-    ok(t.$('statFlowList').querySelector('.sf-io.skip'), '当日明细标出不计入');
-    ok(t.$('statMonthOut').textContent==='−'+(14+[...Array(20).keys()].reduce((s,i)=>s+10+i,0)).toFixed(2), '当月支出不含不计入：'+t.$('statMonthOut').textContent);
+    ok(t.$('statFlowList').querySelector('.sf-io.skip'), '当日明细标出不计');
+    ok(t.$('statMonthOut').textContent==='−'+(14+[...Array(20).keys()].reduce((s,i)=>s+10+i,0)).toFixed(2), '当月支出不含不计：'+t.$('statMonthOut').textContent);
 }
 
 // ===== 6. AI 导出 =====
@@ -159,9 +159,9 @@ function bootSync(records, extra){
     const t=await boot(recs);
     const aug=recs.filter(r=>r.time.startsWith('2026-08'));
     const txt=t.w.JiwenAiExport.buildAiText(aug,'2026年8月','按月');
-    ok(txt.includes('支出 0.00 元') && txt.includes('共 2 笔（其中 2 笔不计入收支）'), 'AI 总览排除不计入');
-    ok(txt.includes('已从总览和分类占比中排除') && (txt.match(/【不计入收支】/g)||[]).length===2+1, 'AI 提示语与明细标注');
-    ok(txt.includes('（本期无支出）'), '全部不计入时分类占比为空');
+    ok(txt.includes('支出 0.00 元') && txt.includes('共 2 笔（其中 2 笔不计）'), 'AI 总览排除不计');
+    ok(txt.includes('已从总览和分类占比中排除') && (txt.match(/【不计】/g)||[]).length===2+1, 'AI 提示语与明细标注');
+    ok(txt.includes('（本期无支出）'), '全部不计时分类占比为空');
 }
 
 // ===== 7. 批量操作 =====
@@ -169,7 +169,7 @@ function bootSync(records, extra){
     const t=await boot();
     t.filterKw('信用卡');
     t.$('batchBar').querySelector('[data-act="batch"]').click();
-    t.choose('标为不计入');
+    t.choose('标为不计');
     ok(t.$('askMsg').textContent.includes('把下面这 2 条') && t.$('askOk').textContent==='改这 2 条' && t.$('askOk').classList.contains('warn'), '确认框写明条数');
     t.$('askOk').click();
     ok(t.byId('a1').skip===true && t.byId('a2').skip===true, '批量标记成功');
@@ -208,7 +208,7 @@ function bootSync(records, extra){
 {
     const t=await boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_小明.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
     t.w.JiwenStats.openDetail('a5');
-    ok(t.$('detailType').textContent.includes('不计入收支') && t.$('detailMoney').querySelector('.amt-skip'), '详情显示不计入');
+    ok(t.$('detailType').textContent.includes('不计') && t.$('detailMoney').querySelector('.amt-skip'), '详情显示不计');
     ok(t.$('odStatus').textContent.includes('（云盘文件名不随存档改名）'), '文件名对不上时有说明');
     const t2=await boot(null,[['onedrive_link_小明__默认存档', JSON.stringify({uri:'u',name:'记问存档_默认存档.json',lastSyncAt:1,lastError:null,blocked:false,lastCount:1})]]);
     ok(!t2.$('odStatus').textContent.includes('不随存档改名'), '文件名一致时不显示说明');

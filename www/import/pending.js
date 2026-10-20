@@ -108,7 +108,7 @@
         out.orders.push({ app: x.app, no: x.no, time: x.t, st: 0, ref: { tmp: o.tmp }, batch: b });
       } else if (a.do === 'new') {
         var nr = { tmp: 'p' + (++n), time: x.t, money: x.amt / 100, type: x.io === 'income' ? 'income' : 'expense', cat: a.cat || '未分类', remark: x.d || '', src: { app: x.app }, batch: b };
-        if (isRefund(x)) nr.flow = true;          // 没挂原单的退款：只算结余（和导入时找不到原单一样）
+        if (isRefund(x)) nr.flow = true;          // 没挂原单的退款：往来（和导入时找不到原单一样）
         var c2 = cpIdx(x.cp, b); if (c2 !== undefined) nr.cp = c2;
         out.records.push(nr); logOf(b).add.push(nr.tmp);
         out.orders.push({ app: x.app, no: x.no, time: x.t, st: 0, ref: { tmp: nr.tmp }, batch: b });

@@ -30,27 +30,27 @@ function bootSync(){
 const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b.dataset.id).sort().join();
 
 (async()=>{
-// ===== 1. 筛选：统计口径 =====
+// ===== 1. 筛选：统计 =====
 {
   const t=await boot();
   t.$('filterFab').click();
   const opts=[...t.$('filterModeChips').querySelectorAll('.cc')].map(e=>e.textContent);
-  ok(opts.join()==='全部,计入,只算结余,不计入', '口径选项四个：'+opts.join());
+  ok(opts.join()==='全部,计入,不计,往来', '口径选项四个：'+opts.join());
   ok(t.$('filterModeChips').querySelector('.sel').textContent==='全部', '默认「全部」');
-  t.chip('filterModeChips','只算结余').click();
+  t.chip('filterModeChips','往来').click();
   ok(ids(t)==='a,b,cc,dep,lp', '只改草稿，未点完成列表不变');
   t.$('sheetApply').click();
-  ok(ids(t)==='dep,lp', '只看只算结余：'+ids(t));
-  ok(t.$('summaryFilter').querySelector('.filter-badge').textContent==='只算结余', '徽标显示口径名');
+  ok(ids(t)==='dep,lp', '只看往来：'+ids(t));
+  ok(t.$('summaryFilter').querySelector('.filter-badge').textContent==='往来', '徽标显示口径名');
   ok(t.$('batchBar').style.display==='' && t.$('filterFab').classList.contains('active-filter'), '口径筛选算「正在筛选」：出批量入口、筛选按钮有红点');
   // 叠加分类
   t.$('filterFab').click();
-  ok(t.$('filterModeChips').querySelector('.sel').textContent==='只算结余', '重开面板回显已提交的口径');
+  ok(t.$('filterModeChips').querySelector('.sel').textContent==='往来', '重开面板回显已提交的口径');
   t.chip('filterChips','购物').click(); t.$('sheetApply').click();
-  ok(ids(t)==='lp' && t.$('summaryFilter').querySelector('.filter-badge').textContent==='购物·只算结余', '与分类叠加：'+ids(t));
-  // 计入 / 不计入
-  t.$('filterFab').click(); t.chip('filterChips','全部').click(); t.chip('filterModeChips','不计入').click(); t.$('sheetApply').click();
-  ok(ids(t)==='cc', '只看不计入');
+  ok(ids(t)==='lp' && t.$('summaryFilter').querySelector('.filter-badge').textContent==='购物·往来', '与分类叠加：'+ids(t));
+  // 计入 / 不计
+  t.$('filterFab').click(); t.chip('filterChips','全部').click(); t.chip('filterModeChips','不计').click(); t.$('sheetApply').click();
+  ok(ids(t)==='cc', '只看不计');
   t.$('filterFab').click(); t.chip('filterModeChips','计入').click(); t.$('sheetApply').click();
   ok(ids(t)==='a,b', '只看计入');
   // 面板里清除全部：只清草稿
@@ -59,7 +59,7 @@ const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b
   t.$('sheetApply').click();
   ok(ids(t)==='a,b,cc,dep,lp', '点完成后才生效');
   // 浮钮一键清除
-  t.$('filterFab').click(); t.chip('filterModeChips','不计入').click(); t.$('sheetApply').click();
+  t.$('filterFab').click(); t.chip('filterModeChips','不计').click(); t.$('sheetApply').click();
   t.$('clearFilterFab').click();
   ok(ids(t)==='a,b,cc,dep,lp' && t.$('batchBar').style.display==='none', '✕ 一键清除连口径一起清');
   t.$('filterFab').click();
@@ -75,10 +75,10 @@ const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b
   const rows=[...t.$('askChoices').querySelectorAll('.cc')];
   ok(rows.length===4 && rows.every(r=>r.querySelector('.cc-label') && r.querySelector('.cc-desc') && r.querySelector('.cc-desc').textContent.length>8), '四个选项都有说明');
   const desc=l=>rows.find(r=>r.querySelector('.cc-label').textContent===l).querySelector('.cc-desc').textContent;
-  ok(desc('标为只算结余')===t.$('billModeHint').textContent || desc('标为只算结余').startsWith('资金往来'), '只算结余说明与记一笔一致');
-  ok(desc('标为不计入').startsWith('重复记录'), '不计入说明');
+  ok(desc('标为往来')===t.$('billModeHint').textContent || desc('标为往来').startsWith('资金往来'), '往来说明与记一笔一致');
+  ok(desc('标为不计').startsWith('哪里都不算'), '不计说明');
   rows[2].click(); t.$('askOk').click();
-  ok(t.$('askTitle').textContent==='批量修改统计口径', '带说明的选项照常可选');
+  ok(t.$('askTitle').textContent==='批量修改统计', '带说明的选项照常可选');
 }
 
 // ===== 3. 整片面板下滑关闭 =====
@@ -117,7 +117,7 @@ const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b
   const pd=(()=>{ t.touch(sheet,'touchstart',200,500); const r=t.touch(sheet,'touchmove',203,502); t.touch(sheet,'touchend',203,502); return r; })();
   ok(mask.classList.contains('open') && sheet.style.transform==='', '点按不触发拖动');
   // 下拉关闭 = 丢弃草稿
-  t.chip('filterModeChips','不计入').click();
+  t.chip('filterModeChips','不计').click();
   swipe(200,500,800,30,20);
   ok(!mask.classList.contains('open') && t.$('batchBar').style.display==='none', '下拉关闭不提交草稿');
   // 阻尼：拉 110px（扣掉 10px 起拖距离）位移应为 80px

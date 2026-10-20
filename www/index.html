@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1020-E">
+    <link rel="stylesheet" href="app/app.css?v=1020-F">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-E</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-F</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -368,7 +368,7 @@
                     </div>
                 </div>
                 <div class="search-field">
-                    <span class="search-label">统计口径</span>
+                    <span class="search-label">统计</span>
                     <div class="cat-chips mode-chips filter-mode-chips" id="filterModeChips"></div>
                 </div>
                 <div class="search-field">
@@ -387,7 +387,7 @@
 
     <!-- 记账弹窗 -->
     <!-- 1019-Q：记一笔 / 修改排紧：金额放最上面（大字）+ 旁边小的「支出 / 收入」；记账时间一行小字（点了弹日期时间选择）；
-         分类照旧是圆角块；统计口径收进「更多」（不是「计入」时自动展开）；备注一行（点了弹文字输入小面板）；「保存」固定在面板底部。
+         分类照旧是圆角块；统计收进「更多」（不是「计入」时自动展开）；备注一行（点了弹文字输入小面板）；「保存」固定在面板底部。
          记的内容和规则不变（收支照旧必选、不默认选中）。 -->
     <div class="mask sheet-mask form-mask" id="addMask">
         <div class="sheet edit-dialog rec-sheet" id="addSheet">
@@ -416,9 +416,9 @@
                     <div class="cat-chips" id="billCatChips"></div>
                     <select id="billCat" style="display:none"></select>
                 </div>
-                <!-- 1019-Z：统计口径不再收进「更多」：一行三个小按钮，说明只在不是「计入」时显示 -->
+                <!-- 1019-Z：统计不再收进「更多」：一行三个小按钮，说明只在不是「计入」时显示 -->
                 <div class="field rec-mode">
-                    <label class="field-label">统计口径</label>
+                    <label class="field-label">统计</label>
                     <div class="cat-chips mode-chips mode-mini" id="billMode"></div>
                     <div class="skip-hint" id="billModeHint"></div>
                 </div>
@@ -458,7 +458,7 @@
                     <select id="editCat" style="display:none"></select>
                 </div>
                 <div class="field rec-mode lock-on-refund">
-                    <label class="field-label">统计口径</label>
+                    <label class="field-label">统计</label>
                     <div class="cat-chips mode-chips mode-mini" id="editMode"></div>
                     <div class="skip-hint" id="editModeHint"></div>
                 </div>
@@ -612,7 +612,7 @@
                     <div class="cat-chips io-chips" id="tplEditTypes"></div>
                 </div>
                 <div class="field">
-                    <label class="field-label">统计口径</label>
+                    <label class="field-label">统计</label>
                     <div class="cat-chips mode-chips" id="tplEditMode"></div>
                 </div>
                 <div class="field">
@@ -887,26 +887,26 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1020-E"></script>
-    <script src="app/store.js?v=1020-E"></script>
-    <script src="app/select.js?v=1020-E"></script>
-    <script src="app/keypad.js?v=1020-E"></script>
-    <script src="app/text.js?v=1020-E"></script>
-    <script src="app/sheet.js?v=1020-E"></script>
-    <script src="app/ask.js?v=1020-E"></script>
-    <script src="app/date.js?v=1020-E"></script>
-    <script src="app/ai-export.js?v=1020-E"></script>
-    <script src="app/import-entry.js?v=1020-E"></script>
-    <script src="app/forms.js?v=1020-E"></script>
-    <script src="app/ledger.js?v=1020-E"></script>
-    <script src="app/cats.js?v=1020-E"></script>
-    <script src="app/stats.js?v=1020-E"></script>
-    <script src="app/days.js?v=1020-E"></script>
-    <script src="app/settings.js?v=1020-E"></script>
-    <script src="app/tabs.js?v=1020-E"></script>
-    <script src="app/login.js?v=1020-E"></script>
-    <script src="app/back.js?v=1020-E"></script>
-    <script src="app/boot.js?v=1020-E"></script>
+    <script src="app/base.js?v=1020-F"></script>
+    <script src="app/store.js?v=1020-F"></script>
+    <script src="app/select.js?v=1020-F"></script>
+    <script src="app/keypad.js?v=1020-F"></script>
+    <script src="app/text.js?v=1020-F"></script>
+    <script src="app/sheet.js?v=1020-F"></script>
+    <script src="app/ask.js?v=1020-F"></script>
+    <script src="app/date.js?v=1020-F"></script>
+    <script src="app/ai-export.js?v=1020-F"></script>
+    <script src="app/import-entry.js?v=1020-F"></script>
+    <script src="app/forms.js?v=1020-F"></script>
+    <script src="app/ledger.js?v=1020-F"></script>
+    <script src="app/cats.js?v=1020-F"></script>
+    <script src="app/stats.js?v=1020-F"></script>
+    <script src="app/days.js?v=1020-F"></script>
+    <script src="app/settings.js?v=1020-F"></script>
+    <script src="app/tabs.js?v=1020-F"></script>
+    <script src="app/login.js?v=1020-F"></script>
+    <script src="app/back.js?v=1020-F"></script>
+    <script src="app/boot.js?v=1020-F"></script>
 
 </body>
 </html>

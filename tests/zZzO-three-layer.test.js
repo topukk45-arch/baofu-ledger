@@ -113,8 +113,8 @@ const recs = [
   ok(t.ask() && t.ask().title === '选择分类', '6 确认框取消：回到选分类');
   await t.askCancel(); await settle();
   ok(t.ask() && t.ask().title === '批量操作', '6 选分类取消：回到批量操作（原来就是）');
-  choose('标为不计入'); $('askOk').click(); await settle();
-  ok(t.ask() && t.ask().title === '批量修改统计口径', '6 标为不计入：确认框');
+  choose('标为不计'); $('askOk').click(); await settle();
+  ok(t.ask() && t.ask().title === '批量修改统计', '6 标为不计：确认框');
   await t.askCancel(); await settle();
   ok(t.ask() && t.ask().title === '批量操作', '6 确认框取消：回到批量操作');
   await t.askCancel(); await settle();

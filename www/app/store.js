@@ -37,14 +37,14 @@
                 }
             });
         }
-        // 收支统计口径：只有「计入」算
+        // 收支统计：只有「计入」算
         function statContrib(r){
             if(recMode(r)!=='normal') return { inc:0, exp:0 };
             const a=safeNum(r.money);
             if(isRefund(r)) return { inc:0, exp:-a };      // 退款：冲抵支出，不算收入
             return r.type==='expense' ? { inc:0, exp:a } : { inc:a, exp:0 };
         }
-        // 结余口径：「计入」「只算结余」都算，只有「不计入」不算
+        // 结余口径：「计入」「往来」都算，只有「不计」不算
         function balContrib(r){
             if(isSkip(r)) return { inc:0, exp:0 };
             const a=safeNum(r.money);
@@ -53,14 +53,14 @@
         // 账单行 / 详情里的口径标签与金额配色（计入时都是空串，输出与旧版逐字节一致）
         function modeTag(r, full){
             const m=recMode(r);
-            if(m==='skip') return `<span class="io-skip">${full?'不计入收支':'不计入'}</span>`;
-            if(m==='flow') return '<span class="io-flow">只算结余</span>';
+            if(m==='skip') return '<span class="io-skip">不计</span>';
+            if(m==='flow') return '<span class="io-flow">往来</span>';
             return '';
         }
         // ===== 分类月预算（1010-G）=====
         // 存在存档里：archive.budgets = { 分类名: 每月上限 }，跟着存档走（导出 / 云备份 / 导入都带上）。
         // 已花 = 该月、该分类、支出、且口径为「计入」的金额之和——与统计页、AI 导出同一口径；
-        // 不计入 / 只算结余的记录不占预算。月份按记录时间算，不按录入时间。
+        // 不计 / 往来的记录不占预算。月份按记录时间算，不按录入时间。
         function getBudgets(){
             const a=curArchive(loadStore());
             return (a && a.budgets && typeof a.budgets==='object') ? a.budgets : {};
@@ -760,7 +760,7 @@
         //   撤销照导入撤销那一套；撤原来那次导入要先撤它（undo.js 算依赖）。AI 修改前也自动备份一份（键 …_bk_<时间>_a，和导入前的共用 3 份）。
         const IMP_APPS=['alipay','wechat'];
         const IMP_LOG_MAX=10;
-        const IMP_TYPE_AS=['normal','transfer','refund','skip'];   // 新交易类型怎么处理：照收/支、转账不计入、当退款（1.1）、跳过
+        const IMP_TYPE_AS=['normal','transfer','refund','skip'];   // 新交易类型怎么处理：照收/支、转账不计、当退款（1.1）、跳过
         const IMP_STATUS_AS=['import','skip'];                      // 新交易状态：导入 / 跳过
         const IMP_BATCH_RE=/^[0-9a-z]{1,40}$/;
         const IMP_AI_FLAGS=['dup','miss'];      // 1017-G：AI 标记的类型：可能重复、可能漏配

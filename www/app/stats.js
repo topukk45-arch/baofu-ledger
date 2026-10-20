@@ -341,7 +341,7 @@
                     + (rm ? `<span class="sf-remark">${escapeHtml(rm)}</span>` : `<span class="sf-cat">${escapeHtml(r.cat)}</span>`)
                     + `</div><span class="sf-amt ${rf?'pos':'neg'}">${rf?'+':'−'}${safeNum(x.r.money).toFixed(2)}</span></div>`;
             }).join('') + `</div>` : `<div class="bg-detail-empty">这个月还没有计入的支出</div>`;
-            const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计入 / 只算结余，未算在内`:''}`;
+            const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计 / 往来，未算在内`:''}`;
             // 【1013-E】设了预算的分类，展开后就地改上限，不用再跑去设置里的分类管理
             const edit = r.limit>0 ? `<button class="mini-btn bg-edit" data-act="bgSet" data-cat="${escapeHtml(r.cat)}">改预算</button>` : '';
             // 【1013-E】说明和「改预算」放在明细最上面：这个月要是有几十笔，不用滑到底才能改
@@ -525,8 +525,8 @@
             let mIn=0, mOut=0;
             dec.forEach(x=>{
                 if(x.y!==statYear || x.mo!==statMonth) return;
-                dayHas[x.d]=true;               // 不计入的记录也算「这天有账」：格子照样能点开看明细
-                // ……但不计金额（不计入 / 只算结余都不进收支统计），只记下「这天有这类记录」用来打标签
+                dayHas[x.d]=true;               // 不计的记录也算「这天有账」：格子照样能点开看明细
+                // ……但不计金额（不计 / 往来都不进收支统计），只记下「这天有这类记录」用来打标签
                 const m=recMode(x.r);
                 if(m==='flow'){ dayFlow[x.d]=true; return; }
                 if(m==='skip'){ daySkip[x.d]=true; return; }
@@ -559,23 +559,23 @@
                 cell.className='day';
                 const has=!!dayHas[day];
                 if(has) cell.classList.add('has');
-                // 当天有账、但全是不计入 / 只算结余：换一种底色，一眼和「花了钱的日子」分开
+                // 当天有账、但全是不计 / 往来：换一种底色，一眼和「花了钱的日子」分开
                 const excl = has && dayNet[day]===undefined;
                 if(excl) cell.classList.add('excl');
                 if(isThisMonth && today.getDate()===day) cell.classList.add('today');
                 if(statSelDay===day && has) cell.classList.add('sel');
 
                 let inner=`<div class="dn">${day}</div>`;
-                // 当天只有不计入的记录时 dayNet 没有这一天：只显示日期、不显示金额（否则会是 NaN）
+                // 当天只有不计的记录时 dayNet 没有这一天：只显示日期、不显示金额（否则会是 NaN）
                 if(has && dayNet[day]!==undefined){
                     const n=round2(dayNet[day]);   // 收支浮点相消可能剩 -5e-17，不归整会渲染成「-0」
                     const col = n>=0 ? 'var(--c-pos,#2f7d57)' : 'var(--c-neg,#d05a52)';
                     inner+=`<div class="da" style="color:${col}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
                 }
-                // 口径标签：当天有「只算结余」就标「结余」，有「不计入」就标「不计」，两者都有就都标。
+                // 统计标签：当天有「不计」就标「不计」，有「往来」就标「往来」，两者都有就都标（1020-F 起「结余」改叫「往来」，先不计后往来）。
                 // 普通日子里夹着这类记录也照样标，免得以为那天的净额就是全部。
                 if(dayFlow[day] || daySkip[day] || dayRefund[day]){
-                    inner+=`<div class="day-tags">${dayRefund[day]?'<span class="dtag refund">退款</span>':''}${dayFlow[day]?'<span class="dtag flow">结余</span>':''}${daySkip[day]?'<span class="dtag skip">不计</span>':''}</div>`;
+                    inner+=`<div class="day-tags">${dayRefund[day]?'<span class="dtag refund">退款</span>':''}${daySkip[day]?'<span class="dtag skip">不计</span>':''}${dayFlow[day]?'<span class="dtag flow">往来</span>':''}</div>`;
                 }
                 cell.innerHTML=inner;
                 if(has){
@@ -627,7 +627,7 @@
                     return `<div class="sf-item" data-act="sfItem" data-id="${escapeHtml(r.id)}">
                         <div class="sf-top">
                             <span class="sf-time">${hm}</span>
-                            <span class="sf-io ${isOut?'out':(rf?'refund':'in')}">${io}</span>${isSkip(r)?'<span class="sf-io skip">不计入</span>':(isFlow(r)?'<span class="sf-io flow">只算结余</span>':'')}
+                            <span class="sf-io ${isOut?'out':(rf?'refund':'in')}">${io}</span>${isSkip(r)?'<span class="sf-io skip">不计</span>':(isFlow(r)?'<span class="sf-io flow">往来</span>':'')}
                             <span class="sf-cat">${escapeHtml(cat)}</span>
                             ${remark?`<span class="sf-remark">${escapeHtml(remark)}</span>`:''}
                         </div>

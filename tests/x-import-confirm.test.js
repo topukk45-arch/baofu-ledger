@@ -140,7 +140,7 @@ const before = await t.snapshot();
   ok(t.$('impTypes') && t.$('impTypes').textContent.includes('群收款'), '1 没见过的交易类型：问一次');
   ok(t.$('impNewCats') && t.$('impNewCats').textContent.includes('交通出行') && !t.$('impNewCats').querySelector('input').checked, '1 新建分类：老用户默认不勾');
   ok(t.$('impCpGroups') && [...t.$('impCpGroups').querySelectorAll('.imp-row-opt')].some(r => r.dataset.cp === '某某'), '1 未分类按对方归组');
-  ok(t.$('impNotes') && t.$('impNotes').textContent.includes('撞上了'), '1 提个醒：不计入的提现和同金额的普通手记撞上了');
+  ok(t.$('impNotes') && t.$('impNotes').textContent.includes('撞上了'), '1 提个醒：不计的提现和同金额的普通手记撞上了');
   ok(t.$('impStorage').textContent.includes('MB'), '1 存储预检：' + t.$('impStorage').textContent);
 }
 
@@ -174,11 +174,11 @@ const before = await t.snapshot();
   // 新建分类勾上
   const nc = t.$('impNewCats').querySelector('input'); nc.click();
   ok(t.S().plan.groups.add.filter(d => d.cat === '交通出行').length === 4, '2 勾上新建「交通出行」：那 4 笔跟着变');
-  // 没见过的类型：选「当转账」→ 重算，群收款挪到不计入
+  // 没见过的类型：选「当转账」→ 重算，群收款挪到不计
   const nb = t.S().plan.counts.neutral;
   t.select(t.d.querySelector('.imp-type-sel'), 'transfer');
   await until(() => t.S().plan && t.S().plan.counts.neutral === nb + 1);
-  ok(t.S().plan.counts.neutral === nb + 1 && t.S().plan.groups.neutral.some(d => d.kind === '群收款'), '2 群收款选「当转账」：重新算，挪进不计入');
+  ok(t.S().plan.counts.neutral === nb + 1 && t.S().plan.groups.neutral.some(d => d.kind === '群收款'), '2 群收款选「当转账」：重新算，挪进不计');
   ok(t.S().plan.mergeM === M0 + 1 && t.S().plan.groups.add.filter(d => d.cat === '交通出行').length === 4, '2 重算以后，之前的改动照样套回去');
 }
 
@@ -308,16 +308,16 @@ const before = await t.snapshot();
   t.$('impPendGroups').querySelector('.imp-pg-undo').click();
   t.$('impPendGroups').querySelector('.imp-pg-none').click();
   ok(four.every(x => t.S().plan.rows.find(d => d.key === keyOf(x)).group === 'add'), '7 都不是：全部新增');
-  // 转账往来：一键不计入
+  // 转账往来：一键不计
   const tc = t.$('impTransfers');
   ok(tc && tc.querySelectorAll('.imp-tr-cb').length === 4 && !tc.textContent.includes('数码科技'), '7 转账往来：4 笔，长名带 * 的商户不在里面');
   tc.querySelector('.imp-tr-all').click();
   const p2 = t.S().plan, f0 = p2.files[0].diff;
   ok(t.$('impTransfers').querySelectorAll('.imp-tr-cb:checked').length === 4 && f0.expense.unreadable === 0 && f0.income.unreadable === 0
-     && f0.expense.parts.find(x => x.key === 'neutral').fen === 50000, '7 一键都标成不计入：勾上 4 笔，差额照样 0 分');
-  ok(p2.rows.find(d => d.key === keyOf(shop)).mode === 'normal', '7 长名带 * 的商户没被标成不计入');
+     && f0.expense.parts.find(x => x.key === 'neutral').fen === 50000, '7 一键都标成不计：勾上 4 笔，差额照样 0 分');
+  ok(p2.rows.find(d => d.key === keyOf(shop)).mode === 'normal', '7 长名带 * 的商户没被标成不计');
   ok([...t.$('impTransfers').querySelectorAll('.imp-switch')].length === 4 && [...t.$('impTransfers').querySelectorAll('.imp-switch')].every(x => x.classList.contains('on')), '7 行尾是开关，都打开了（1016-H）');
-  ok([...t.$('impTransfers').querySelectorAll('.imp-tr-state')].every(x => x.textContent === '不计入') && t.chip('neutral') === p2.counts.neutral && p2.counts.neutral >= 4, '7 勾上的行尾写「不计入」，顶上「不计入」的笔数跟着变（1016-G）');
+  ok([...t.$('impTransfers').querySelectorAll('.imp-tr-state')].every(x => x.textContent === '不计') && t.chip('neutral') === p2.counts.neutral && p2.counts.neutral >= 4, '7 勾上的行尾写「不计」，顶上「不计」的笔数跟着变（1016-G）');
   ok(!(t.$('impCpGroups') && /某亲戚/.test(t.$('impCpGroups').textContent)), '7 转账往来里的人不再出现在按对方选分类里（1016-G）');
   // 明细：分分捐一行、套话显示对方
   t.$('impDetailsToggle').click();
@@ -326,10 +326,10 @@ const before = await t.snapshot();
   ok(sr && sr.textContent.includes('分分捐 · 3 月 · 25 笔 · 0.25 元') && t.d.querySelectorAll('.imp-list[data-group="add"] .al-row').length < 25, '7 分分捐在明细里一行');
   sr.click();
   ok(t.d.querySelectorAll('.imp-members .imp-sub-row').length === 25, '7 点开看 25 笔');
-  t.d.querySelector('.imp-gh[data-group="neutral"]').click();     // 1016-G：标成不计入的挪进了「不计入」组
+  t.d.querySelector('.imp-gh[data-group="neutral"]').click();     // 1016-G：标成不计的挪进了「不计」组
   const giftRow = t.d.querySelector('.al-row[data-key="' + keyOf(gift[0]) + '"]');
   ok(giftRow && giftRow.querySelector('.al-remark').textContent === '某亲戚甲', '7 「转账备注:微信转账」不当标题，显示交易对方');
-  ok(giftRow && !giftRow.querySelector('.cat-tag') && !/[−+]/.test(giftRow.querySelector('.al-amt').textContent), '7 不计入的行：不显示分类，金额不带正负号（1016-G）');
+  ok(giftRow && !giftRow.querySelector('.cat-tag') && !/[−+]/.test(giftRow.querySelector('.al-amt').textContent), '7 不计的行：不显示分类，金额不带正负号（1016-G）');
   // 候选：最像排第一，其他收起
   t.d.querySelector('.imp-gh[data-group="pending"]').click();
   t.d.querySelector('.al-row[data-key="' + keyOf(noodle) + '"]').click();

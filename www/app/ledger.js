@@ -54,10 +54,10 @@
         //   清除全部 → 只清草稿，要点完成才生效。
         // draftCat 暂存分类选择，避免直接改 filterCat（filterCat 是已提交状态，renderBill 读它）。
         let draftCat='__all';
-        // 统计口径筛选的草稿值：'' 全部 / 'normal' / 'flow' / 'skip'。与 draftCat 同一套草稿规则：
+        // 统计筛选的草稿值：'' 全部 / 'normal' / 'flow' / 'skip'。与 draftCat 同一套草稿规则：
         // 面板里点只改草稿，点「完成」才提交进 searchState.mode。
         let draftMode='';
-        const FILTER_MODE_OPTS=[ {v:'', t:'全部'}, {v:'normal', t:'计入'}, {v:'flow', t:'只算结余'}, {v:'skip', t:'不计入'} ];
+        const FILTER_MODE_OPTS=[ {v:'', t:'全部'}, {v:'normal', t:'计入'}, {v:'skip', t:'不计'}, {v:'flow', t:'往来'} ];
         function renderFilterModeChips(){
             const box=$('filterModeChips'); if(!box) return;
             if(!box.children.length){
@@ -178,9 +178,9 @@
 
         // ===== 搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加 =====
         // 金额存数字（null 表示不限）；日期存 'YYYY-MM-DD'（null 表示不限）；关键词存小写串。
-        // mode：统计口径筛选，null 表示不限，否则为 'normal' / 'flow' / 'skip'
+        // mode：统计筛选，null 表示不限，否则为 'normal' / 'flow' / 'skip'
         const searchState={ keyword:'', min:null, max:null, from:null, to:null, mode:null };
-        const MODE_NAME={ normal:'计入', flow:'只算结余', skip:'不计入' };
+        const MODE_NAME={ normal:'计入', skip:'不计', flow:'往来' };
 
         // 是否有任意搜索条件生效（用于显示「清除」入口、高亮筛选按钮、空结果提示文案）
         function hasActiveSearch(){
@@ -239,7 +239,7 @@
                 if(searchState.from && day < searchState.from) return false;
                 if(searchState.to && day > searchState.to) return false;
             }
-            // 统计口径
+            // 统计
             if(searchState.mode && recMode(r)!==searchState.mode) return false;
             return true;
         }
@@ -332,7 +332,7 @@
             //   【1013-G】以前直接挂在记录上（__bal）；现在记录是账本缓存里共用的、冻结的，不能往上挂东西
             const balOf=new Map();
             allAsc.forEach(item=>{
-                const c=balContrib(item);        // 结余口径：只有「不计入」不算，「只算结余」照算
+                const c=balContrib(item);        // 结余口径：只有「不计」不算，「往来」照算
                 running += c.inc - c.exp;
                 running = Math.round(running*100)/100;   // 每步对齐到分，避免浮点误差累积（如 19.99 显示成 20.00）
                 balOf.set(item, running);
@@ -370,7 +370,7 @@
                 balIn+=b.inc; balOut+=b.exp;
             });
             totalIn=round2(totalIn); totalOut=round2(totalOut);
-            // 结余走结余口径：期初存款这类「只算结余」不进收入，但必须进结余
+            // 结余走结余口径：期初存款这类「往来」不进收入，但必须进结余
             const net=round2(round2(balIn)-round2(balOut));
 
             // 筛选状态下额外提示当前子集的收支，避免「为什么数字对不上」的疑惑
@@ -390,8 +390,8 @@
                 let fIn=0, fOut=0, fSkip=0, fFlow=0;
                 asc.forEach(item=>{ const c=statContrib(item); fIn+=c.inc; fOut+=c.exp; if(isSkip(item)) fSkip++; else if(isFlow(item)) fFlow++; });
                 const fEx=[];
-                if(fSkip) fEx.push(`${fSkip} 条不计入`);
-                if(fFlow) fEx.push(`${fFlow} 条只算结余`);
+                if(fSkip) fEx.push(`${fSkip} 条不计`);
+                if(fFlow) fEx.push(`${fFlow} 条往来`);
                 fIn=round2(fIn); fOut=round2(fOut);
                 // 徽标文案：有分类显示分类名，否则显示「搜索」；都为真则合并
                 // 徽标按「分类 · 搜索 · 口径」拼，有几样写几样
@@ -402,7 +402,7 @@
                 const badge=bp.join('·')||'搜索';
                 fBar.innerHTML=
                     `<span class="filter-badge">${escapeHtml(badge)}</span>`+
-                    // 「其中 N 条不计入」：否则会出现「命中 4 条、支出 0.00」这种看着像 bug 的组合
+                    // 「其中 N 条不计」：否则会出现「命中 4 条、支出 0.00」这种看着像 bug 的组合
                     // 分「段」排：命中 / 收入 / 支出各一段，窄屏折行时只在段与段之间断开
                     `<span class="filter-nums">`+
                         `<span class="fn-seg">命中 <b>${asc.length}</b> 条${fEx.length?`<em class="fn-ex">（其中 ${fEx.join('、')}）</em>`:''}</span>`+
@@ -503,13 +503,13 @@
             // 退款记录的分类 / 口径永远跟原账单走，不单独改（1010-J）
             const list=hit.filter(r=>!isRefund(r));
             const rfN=hit.length-list.length;
-            if(!list.length){ customAlert(`命中的 ${rfN} 条都是退款记录。退款的分类和口径跟着原账单走，请改原账单。`); return; }
+            if(!list.length){ customAlert(`命中的 ${rfN} 条都是退款记录。退款的分类和统计跟着原账单走，请改原账单。`); return; }
             customChoose(`对当前筛选命中的 ${list.length} 条记录（不只是这一页）：${rfN?`\n另有 ${rfN} 条退款记录不参与，会跟着各自的原账单一起变。`:''}`, [
                 // 说明文字与记一笔里的口径说明（MODE_HINT）同源，两处永远一致
                 { value:'cat',    label:'改分类',       desc:'把这些记录统一改到同一个分类，比如把「永劫无间」归到「游戏」' },
-                { value:'flow',   label:'标为只算结余', desc:MODE_HINT.flow },
-                { value:'skip',   label:'标为不计入',   desc:MODE_HINT.skip },
-                { value:'normal', label:'恢复计入',     desc:'取消上面两种标记：'+MODE_HINT.normal }
+                { value:'normal', label:'恢复计入',     desc:'取消「不计」「往来」：'+MODE_HINT.normal },
+                { value:'skip',   label:'标为不计',     desc:MODE_HINT.skip },
+                { value:'flow',   label:'标为往来',     desc:MODE_HINT.flow }
             ], (act)=>{
                 if(act==='cat'){
                     const onCat=(cat)=>{
@@ -522,11 +522,11 @@
                     const pickCat=()=>customChoose('改成哪个分类？', getCats().map(c=>({ value:c, label:c })), onCat, '选择分类', openBatchMenu, { layout:'list' });
                     pickCat();
                 } else {
-                    const NAME={ normal:'计入', flow:'只算结余', skip:'不计入' };
+                    const NAME={ normal:'计入', skip:'不计', flow:'往来' };
                     const targets=list.filter(r=>recMode(r)!==act);   // 已经是目标口径的不重复改
                     if(!targets.length){ customAlert(`这 ${list.length} 条已经都是「${NAME[act]}」了。`); return; }
                     customConfirm(`把下面这 ${targets.length} 条记录改成「${NAME[act]}」（挂在上面的退款跟着改）。改完可以马上「撤销这次操作」。`,
-                        ()=>applyBatch(targets.map(r=>r.id), { mode:act }), '批量修改统计口径',
+                        ()=>applyBatch(targets.map(r=>r.id), { mode:act }), '批量修改统计',
                         { okText:`改这 ${targets.length} 条`, list:targets, danger:true, onCancel:openBatchMenu });   // 1019-S：取消回到批量操作
                 }
             }, '批量操作', null, { layout:'list' });
