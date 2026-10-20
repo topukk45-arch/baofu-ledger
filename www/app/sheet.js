@@ -18,20 +18,34 @@
             //   · 跟手有 0.8 的阻尼，拉起来略「沉」，不容易一碰就飞
             const DRAG_SLOP=10, DISMISS_MIN=140, DISMISS_RATIO=0.28, FLING_MIN_PX=80, FLING_V=0.8, DRAG_RESIST=0.8;
             function dismissDistance(){ return Math.max(DISMISS_MIN, (sheet.offsetHeight||0)*DISMISS_RATIO); }
-            let tCand=false, tDrag=false, tY0=0, tX0=0, tDY=0, tLastY=0, tLastT=0, tVel=0;
-            function touchReset(){ tCand=false; tDrag=false; tDY=0; tVel=0; }
+            let tCand=false, tDrag=false, tY0=0, tX0=0, tDY=0, tLastY=0, tLastT=0, tVel=0, tChain=[];
+            function touchReset(){ tCand=false; tDrag=false; tDY=0; tVel=0; tChain=[]; }
+            // 1020-C：手指按下的地方往上数，一直到面板，哪些框能上下滚（textarea、列表、overflow 能滚的块，面板自己也算）。
+            //   规矩：这些框只要有一个没在最顶上，往下拉就是滚框（交给原生）；都在最顶上、手指还往下拉，才算拉面板。
+            //   往上滑永远是滚框，不动面板。原来只看面板自己 sheet.scrollTop，框里滑到底以后就划不回去（AI 导出的文字框）。
+            function scrollsY(n){
+                if(!(n.scrollHeight>n.clientHeight+1)) return false;
+                if(n===sheet || n.tagName==='TEXTAREA') return true;
+                const oy=getComputedStyle(n).overflowY; return oy==='auto' || oy==='scroll' || oy==='overlay';
+            }
+            function chainOf(el){
+                const a=[];
+                for(let n=el; n && n.nodeType===1; n=n.parentElement){ if(scrollsY(n)) a.push(n); if(n===sheet) break; }
+                return a;
+            }
+            const chainAtTop=()=>sheet.scrollTop<=0 && tChain.every(n=>n.scrollTop<=0);
             sheet.addEventListener('touchstart', e=>{
                 if(!sheetShown(sheetMask) || e.touches.length!==1){ touchReset(); return; }
                 const p=e.touches[0];
                 tCand=true; tDrag=false; tY0=p.clientY; tX0=p.clientX; tDY=0;
-                tLastY=p.clientY; tLastT=Date.now(); tVel=0;
+                tLastY=p.clientY; tLastT=Date.now(); tVel=0; tChain=chainOf(e.target);
             }, {passive:true});
             sheet.addEventListener('touchmove', e=>{
                 if(!tCand) return;
                 const p=e.touches[0];
                 const dy=p.clientY-tY0, dx=p.clientX-tX0;
                 if(!tDrag){
-                    const atTop = sheet.scrollTop<=0;
+                    const atTop = chainAtTop();
                     // 已在顶部还往下拉：原生这时也滚不动，先拦住，免得浏览器把这次手势「认领」成滚动
                     if(dy>0 && atTop && e.cancelable) e.preventDefault();
                     if(Math.abs(dy)<DRAG_SLOP && Math.abs(dx)<DRAG_SLOP) return;
@@ -235,7 +249,9 @@
             });
 
             // 弹窗内列表（可滚动区域）到顶/到底时，阻止滚动冒泡到背景，进一步防穿透
-            document.querySelectorAll('.cat-list, .ask-msg, .edit-dialog, .dt-dialog').forEach(el=>{
+            // 1020-C：.cat-list（分类管理、常用模板的列表）、.ask-msg 不再拦：拦了以后面板收不到手指在列表里的移动，
+            //   列表在最顶上往下拉也关不掉面板（往下拉关面板见 bindSheetDrag）。背景本来就被滚动锁锁住了，不会穿透。
+            document.querySelectorAll('.edit-dialog, .dt-dialog').forEach(el=>{
                 el.addEventListener('touchmove', e=>{ e.stopPropagation(); }, {passive:true});
             });
         })();

@@ -59,7 +59,7 @@
             if(shownNow) kpReveal(); else requestAnimationFrame(kpReveal);
         }
         function kpClose(){
-            kpDelStop();   // 1019-Z2：长按退格时键盘关了，停下
+            kpHoldStop();   // 1019-Z2：长按时键盘关了，停下
             if($('kpMask').style.display!=='flex' && !kpTarget) return;
             $('kpMask').style.display='none';
             if(kpTarget) kpTarget.classList.remove('kp-on');
@@ -70,37 +70,44 @@
         $('kpGrid').addEventListener('click', e=>{
             const b=e.target.closest('.kp-key'); if(!b) return;
             if(b.id==='kpOk'){ const f=kpOnOk; kpClose(); if(f) f(); return; }
-            if(b.id==='kpDel' && kpDelSkipClick){ kpDelSkipClick=false; return; }   // 1019-Z2：按下时已经删过了（长按那套），这一下 click 不再删
+            if(kpHoldSkip===b && performance.now()-kpHoldSkipAt<1500){ kpHoldSkip=null; return; }
+            kpHoldSkip=null;   // 1019-Z2 / 1020-C：按下时已经输过了（长按那套），这一下 click 不再输
             kpKey(b.dataset.k);
         });
-        // 1019-Z2：退格长按连续删：按下先删一个，停 KP_DEL_FIRST（400 毫秒）后开始连续删，先每 100 毫秒一个，按住超过 1 秒后每 50 毫秒一个，
-        //   删到空为止；松手、被打断、手指滑出按键立刻停（触屏按下以后事件一直送给这个键，所以每次移动都看手指还在不在键上）
+        // 1019-Z2：退格长按连续删；1020-C 起数字键、小数点也一样（长按连续输入）：按下先输 / 删一个，停 KP_DEL_FIRST（400 毫秒）后开始连续，
+        //   先每 100 毫秒一个，按住超过 1 秒后每 50 毫秒一个；输不进去了（超过位数、小数点已经有了、开头的 0）或删到空就自己停；
+        //   松手、被打断、手指滑出按键立刻停（触屏按下以后事件一直送给这个键，所以每次移动都看手指还在不在键上）
         const KP_DEL_FIRST=400, KP_DEL_SLOW=100, KP_DEL_FAST=50, KP_DEL_SPEEDUP=1000;
-        var kpDelT=null, kpDelAt=0, kpDelSkipClick=false;   // var：kpClose 在上面，早调用也不会因为还没初始化报错
-        function kpDelStop(){ if(kpDelT){ clearTimeout(kpDelT); kpDelT=null; } $('kpDel').classList.remove('kp-pressed'); }
-        function kpDelTick(){
-            kpDelT=null;
-            if(!kpTarget || !(kpTarget.value||'')){ kpDelStop(); return; }
-            kpKey('del');
-            if(!(kpTarget.value||'')){ kpDelStop(); return; }
-            kpDelT=setTimeout(kpDelTick, (performance.now()-kpDelAt)>=KP_DEL_SPEEDUP ? KP_DEL_FAST : KP_DEL_SLOW);
+        var kpHoldT=null, kpHoldAt=0, kpHoldKey=null, kpHoldEl=null, kpHoldSkip=null, kpHoldSkipAt=0;   // var：kpClose 在上面，早调用也不会因为还没初始化报错
+        function kpHoldStop(){ if(kpHoldT){ clearTimeout(kpHoldT); kpHoldT=null; } if(kpHoldEl) kpHoldEl.classList.remove('kp-pressed'); kpHoldEl=null; kpHoldKey=null; }
+        // 按一下：值变了返回 true（没变 = 输不进去 / 删空了，长按就该停）
+        function kpStep(k){ if(!kpTarget) return false; const v0=kpTarget.value||''; kpKey(k); return !!kpTarget && (kpTarget.value||'')!==v0; }
+        function kpHoldTick(){
+            kpHoldT=null;
+            if(!kpTarget || !kpHoldKey){ kpHoldStop(); return; }
+            if(!kpStep(kpHoldKey) || (kpHoldKey==='del' && !(kpTarget.value||''))){ kpHoldStop(); return; }
+            kpHoldT=setTimeout(kpHoldTick, (performance.now()-kpHoldAt)>=KP_DEL_SPEEDUP ? KP_DEL_FAST : KP_DEL_SLOW);
         }
         (function(){
-            const del=$('kpDel');
-            del.addEventListener('pointerdown', e=>{
+            const grid=$('kpGrid');
+            grid.addEventListener('pointerdown', e=>{
+                const b=e.target.closest && e.target.closest('.kp-key');
+                if(!b || b.id==='kpOk' || b.dataset.k==null) return;
                 if(e.button!=null && e.button>0) return;
-                kpDelSkipClick=true; kpDelStop();
-                del.classList.add('kp-pressed');
-                kpDelAt=performance.now();
-                kpKey('del');
-                if(kpTarget && (kpTarget.value||'')) kpDelT=setTimeout(kpDelTick, KP_DEL_FIRST);
+                kpHoldStop();
+                kpHoldSkip=b; kpHoldSkipAt=performance.now(); kpHoldEl=b; kpHoldKey=b.dataset.k;
+                b.classList.add('kp-pressed');
+                kpHoldAt=performance.now();
+                const moved=kpStep(kpHoldKey);
+                if(moved && !(kpHoldKey==='del' && !(kpTarget && kpTarget.value))) kpHoldT=setTimeout(kpHoldTick, KP_DEL_FIRST);
             });
-            del.addEventListener('pointermove', e=>{
-                if(!del.classList.contains('kp-pressed') || e.clientX==null) return;
-                const r=del.getBoundingClientRect();
-                if(r.width && (e.clientX<r.left || e.clientX>r.right || e.clientY<r.top || e.clientY>r.bottom)) kpDelStop();
+            grid.addEventListener('pointermove', e=>{
+                const b=kpHoldEl; if(!b || e.clientX==null) return;
+                const r=b.getBoundingClientRect();
+                if(r.width && (e.clientX<r.left || e.clientX>r.right || e.clientY<r.top || e.clientY>r.bottom)) kpHoldStop();
             });
-            ['pointerup','pointercancel','pointerleave'].forEach(ev=>del.addEventListener(ev, kpDelStop));
+            ['pointerup','pointercancel'].forEach(ev=>grid.addEventListener(ev, kpHoldStop));
+            grid.addEventListener('pointerout', e=>{ if(kpHoldEl && e.target===kpHoldEl && !kpHoldEl.contains(e.relatedTarget)) kpHoldStop(); });   // 相当于这个键的 pointerleave
         })();
         // 键盘外面点一下 / 开始滑：收起键盘，这一下照常交给页面（不拦）；点的是另一个金额框就换过去
         const kpOutside=e=>{

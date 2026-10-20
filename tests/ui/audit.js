@@ -3,7 +3,7 @@
 //   2. 主按钮在屏幕上的位置（离底部多远），主按钮在屏幕上半部分的标出来；
 //   3. 页面内容占了屏幕多高、下面空了多少。
 // 不是自动测试（不进 run-all，打包机上没有浏览器），改界面前后手动跑一遍对比：
-//   NODE_PATH=$(npm root -g) node tests/ui/audit.js 输出目录 [--only 配置名] [--shots]
+//   NODE_PATH=$(npm root -g) node tests/ui/audit.js 输出目录 [--only 配置名] [--part 段号,段号] [--shots]
 //   配置：main（412×970 浅色）、narrow（360×780）、dark（412×970、系统深色）、big（412×970、字号 ×1.15）
 // 结果：输出目录/audit-<配置>.json、summary.md；--shots 时每页一张截图 <配置>-<页面>.png。
 // 数据全是虚构的（tests/helpers/bills.js 生成账单，手记、分类、对方名都是编的）。
@@ -17,6 +17,9 @@ const FIX = path.join(__dirname, '..', 'fixtures');
 const OUT = path.resolve(process.argv[2] || 'ui-audit-out');
 const ONLY = (process.argv.indexOf('--only') > 0) ? process.argv[process.argv.indexOf('--only') + 1] : null;
 const SHOTS = process.argv.includes('--shots');
+// --part 3,8：只跑这几段（不给就全跑）
+const PARTS = (process.argv.indexOf('--part') > 0) ? process.argv[process.argv.indexOf('--part') + 1].split(',').map(Number) : null;
+const want = n => !PARTS || PARTS.includes(n);
 const MIN = 48, GAP = 8;
 const CONFIGS = [
   { name: 'main', w: 412, h: 970 },
@@ -53,7 +56,8 @@ const seedOf = (o) => {
   if (o.dev) ls.app_dev_import = '1';
   if (o.recs) {
     ls.accounts = JSON.stringify([{ id: ID, name: '小明' }]); ls.app_logged_in_user = ID; ls['app_time_repaired_' + ID] = '1';
-    ls['store_' + ID] = JSON.stringify({ archives: { '默认存档': Object.assign({ cats: o.cats || BASE_CATS.slice(0, 8), records: o.recs }, o.budgets ? { budgets: o.budgets } : {}) }, last: '默认存档', accountName: '小明' });
+    ls['store_' + ID] = JSON.stringify({ archives: { '默认存档': Object.assign({ cats: o.cats || BASE_CATS.slice(0, 8), records: o.recs }, o.budgets ? { budgets: o.budgets } : {}, o.tpls ? { tpls: o.tpls } : {}) }, last: '默认存档', accountName: '小明' });
+    if (o.extra) Object.assign(ls, o.extra(ID));
   } else ls.accounts = '[]';
   return ls;
 };
@@ -258,7 +262,7 @@ async function run(cfg, port, browser) {
   const tab = async (page, t) => { await click(page, `.tab-btn[data-tab="${t}"]`); await page.waitForTimeout(400); };
 
   // ===== 1. 新用户：登录页 → 新建账号 → 「怎么开始」→ 空账本小入口、记一笔、选文件页、教程 =====
-  {
+  if (want(1)) {
     const page = await newPage({ ls: seedOf({ dev: true }) });
     await measure(page, 'login', { primary: ['#newAccountBtn'] });
     await click(page, '#newAccountBtn'); await askOpen(page);
@@ -294,7 +298,7 @@ async function run(cfg, port, browser) {
   }
 
   // ===== 2. 老用户：几百条、分类很多：账单、统计、预算、设置；导入全流程 =====
-  {
+  if (want(2)) {
     const page = await newPage({ ls: seedOf({ dev: true, recs: richManual(), cats: BASE_CATS }) });
     await tab(page, 'ledger');
     await measure(page, 'ledger-list', { primary: ['.act-add'], more: true });
@@ -418,7 +422,7 @@ async function run(cfg, port, browser) {
   }
 
   // ===== 3. 月初导入提醒（11 月 5 日，上次导到 9 月底）=====
-  {
+  if (want(3)) {
     const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(40), cats: BASE_CATS.slice(0, 10) }), now: '2026-11-05T10:00:00' });
     await tab(page, 'settings');
     await click(page, '#devImportBtn'); await page.waitForSelector('#impPick');
@@ -431,7 +435,7 @@ async function run(cfg, port, browser) {
   }
 
   // ===== 4. 「用记问打开」：开发开关开着直接进导入页、关着只提示 =====
-  {
+  if (want(4)) {
     const csv = richBills()[1].buffer.toString('base64');
     const page = await newPage({ ls: seedOf({ dev: false, recs: oldRecords(20) }), openFile: { name: '支付宝交易明细.csv', data: csv } });
     await page.waitForTimeout(500);
@@ -441,7 +445,7 @@ async function run(cfg, port, browser) {
   }
 
   // ===== 5. 开发开关关着：导入相关的东西一点都不能露出来 =====
-  {
+  if (want(5)) {
     const page = await newPage({ ls: seedOf({ dev: false, recs: oldRecords(3) }) });
     const leaks = [];
     const KW = /导入（开发中）|导入账单|导入记录|管理导入规则|待确认|可以导了|存储已用|账本和备份占用|预算建议|单号表|怎么开始|一次导进来|微信、支付宝/;
@@ -458,7 +462,7 @@ async function run(cfg, port, browser) {
   }
   // ===== 6. 键盘弹起（1019-B）：记一笔、修改、日子三个弹窗，下沿贴着键盘、没有缝，标题看得见 =====
   //   安卓上键盘弹起是 WebView 整个变矮（adjustResize），这里把视口高度减掉 320 来模拟。
-  {
+  if (want(6)) {
     const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(40), cats: BASE_CATS.slice(0, 10) }) });
     await tab(page, 'ledger');
     const KB = 320;
@@ -489,7 +493,7 @@ async function run(cfg, port, browser) {
     await page.close();
   }
   // ===== 7. 分类管理按 1.3 倍字号（1019-C）：分类名完整、不贴边，预算那段先省略 =====
-  if (cfg.name === 'main' || cfg.name === 'narrow') {
+  if (want(7) && (cfg.name === 'main' || cfg.name === 'narrow')) {
     const keep = cfg.scale; cfg.scale = 1.3;
     const cats = ['未分类', '购物', '红包', '水电燃气费', '人情往来', '咖啡奶茶', '地铁公交', '房租物业'];
     const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(20), cats, budgets: { '购物': 1350, '红包': 2840, '水电燃气费': 12000, '人情往来': 800 } }) });
@@ -503,6 +507,80 @@ async function run(cfg, port, browser) {
     }));
     results.push({ name: 'cat-manager-x1.3', cfg: cfg.name, cat: true, rows: r });
     if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-cat-manager-x1.3.png`) });
+    await page.close();
+  }
+  // ===== 8. 面板里能滚的地方（1020-C）：手指在能上下滚的框里，先滚框；框已经在最顶上还往下拉，才算拉面板 =====
+  //   用 CDP 发真的触摸事件（和手指一样走浏览器自己的滚动），每处：往上滑到底 → 往下滑回顶（面板不能被关掉）→ 在顶上往下拉（面板关掉）。
+  if (want(8)) {
+    const tpls = Array.from({ length: 24 }, (_, i) => ({ id: 't' + i, name: '虚构模板' + i, type: 'expense', cat: BASE_CATS[1 + i % 6], remark: '', money: 10 + i, mode: 'normal' }));
+    const days = Array.from({ length: 24 }, (_, i) => ({ id: 'd' + i, name: '虚构日子' + i, date: `2026-${pad(1 + i % 12)}-${pad(1 + i)}` }));
+    const perf = Array.from({ length: 50 }, (_, i) => ({ at: '10-20 09:' + pad(i % 60) + ':00', ts: Date.parse('2026-10-20T09:00:00') + i * 60000, kind: '打开面板', ms: 100 + i, what: '虚构' + i }));
+    const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(60), cats: BASE_CATS, tpls,
+      extra: id => ({ ['days_' + id]: JSON.stringify(days), app_perf_log: JSON.stringify(perf) }) }) });
+    const cdp = await page.context().newCDPSession(page);
+    const swipe = async (x, y0, y1, steps = 10) => {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: y0 }] });
+      for (let i = 1; i <= steps; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y0 + (y1 - y0) * i / steps }] }); await page.waitForTimeout(16); }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+      await page.waitForTimeout(350);
+    };
+    // 找面板里要滑的那个框：给了选择器就用它，不然找面板里能滚、最大的那个（面板自己也算）
+    const info = (maskId, sel) => page.evaluate(([maskId, sel]) => {
+      const m = maskId ? document.getElementById(maskId) : [...document.querySelectorAll('.mask')].filter(x => x.style.display === 'flex').pop();
+      const open = !!m && m.style.display === 'flex';
+      if (!open) return { open };
+      const sh = m.querySelector('.sheet') || m.firstElementChild;
+      const can = n => n.scrollHeight > n.clientHeight + 1 && (n === sh || n.tagName === 'TEXTAREA' || /auto|scroll/.test(getComputedStyle(n).overflowY));
+      let el = sel ? m.querySelector(sel) : null;
+      if (!el) el = [sh, ...sh.querySelectorAll('*')].filter(can).sort((a, b) => b.clientHeight - a.clientHeight)[0];
+      if (!el) return { open, none: true };
+      document.querySelectorAll('[data-swipe-el]').forEach(x => x.removeAttribute('data-swipe-el')); el.setAttribute('data-swipe-el', '1');
+      const r = el.getBoundingClientRect(), vb = Math.min(r.bottom, innerHeight), vt = Math.max(r.top, 0);
+      return { open, x: Math.round(r.left + r.width / 2), top: vt, bottom: vb, st: el.scrollTop, max: el.scrollHeight - el.clientHeight, what: el.id || el.className || el.tagName };
+    }, [maskId, sel || null]);
+    const shown = id => page.evaluate(id => { const m = id ? document.getElementById(id) : [...document.querySelectorAll('.mask')].filter(x => x.style.display === 'flex').pop(); return !!m && m.style.display === 'flex'; }, id);
+    const check = async (name, maskId, sel, opener) => {
+      await opener(); await page.waitForTimeout(500);
+      let i0 = await info(maskId, sel);
+      const r = { name: 'swipe-' + name, cfg: cfg.name, swipe: true, what: i0.what, max: i0.max };
+      if (!i0.open) { r.err = '面板没打开'; results.push(r); return; }
+      if (i0.none) { r.err = '装得下，不用滚'; results.push(r); await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400); return; }
+      const lo = i0.top + (i0.bottom - i0.top) * 0.8, hi = i0.top + (i0.bottom - i0.top) * 0.2;
+      // 很长的框（AI 导出几千 px）一下一下滑太久：先真滑几下（要真的往下走），再直接放到离底一屏，最后几下再真滑到底；回去同样
+      const jump = v => page.evaluate(v => { const el = document.querySelector('[data-swipe-el]'); el.scrollTop = v; }, v);
+      const page1 = Math.max(80, i0.bottom - i0.top);
+      for (let k = 0; k < 25; k++) { const s = await info(maskId, sel); if (!s.open || s.st >= s.max - 1) break; if (k === 4 && s.st > 0 && s.max - s.st > page1 * 2) await jump(s.max - page1); await swipe(i0.x, lo, hi); }
+      let s = await info(maskId, sel); r.bottom = s.open && s.st >= s.max - 1; r.openAfterUp = s.open;
+      if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-swipe-${name}.png`) });
+      for (let k = 0; k < 25; k++) { s = await info(maskId, sel); if (!s.open || s.st <= 0) break; if (k === 4 && s.st < s.max && s.st > page1 * 2) await jump(page1); await swipe(i0.x, hi, lo); }
+      s = await info(maskId, sel); r.top = s.open && s.st <= 0; r.openAfterDown = s.open;
+      if (s.open) { await swipe(i0.x, i0.top + 20, Math.min(i0.top + 20 + 420, cfg.h - 10), 12); await page.waitForTimeout(400); }
+      r.closed = !(await shown(maskId));
+      r.ok = r.bottom && r.top && r.openAfterUp && r.openAfterDown && r.closed;
+      results.push(r);
+      await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400);
+    };
+    await tab(page, 'settings');
+    await check('ai-export', 'aiExpMask', '#aiExpText', () => page.evaluate(() => window.JiwenAiExport.openAiExport(Array.from({ length: 300 }, (_, i) => `2026-10-${(i % 28) + 1} 虚构记录 ${i} 支出 ${i + 1}.00 元`).join('\n'), '虚构')));
+    await check('cat-manager', null, null, () => click(page, '#manageCatSetting'));
+    await check('templates', null, null, () => click(page, '#manageTplSetting'));
+    await check('perf-log', null, null, () => page.evaluate(() => window.openPerfPage()));
+    await check('sheet-long-list', null, null, () => page.evaluate(() => window.JiwenSheet.pick({ title: '虚构长列表', options: Array.from({ length: 60 }, (_, i) => ({ value: 'v' + i, label: '虚构选项 ' + i })), onPick() {} })));
+    await check('sheet-cat-pick', null, null, () => page.evaluate(() => window.JiwenSheet.pick({ title: '选分类', chips: true, options: Array.from({ length: 120 }, (_, i) => ({ value: 'c' + i, label: '虚构分类' + i })), onPick() {} })));
+    await check('sheet-body-text', null, null, () => page.evaluate(() => window.JiwenSheet.open({ title: '导入页那种面板', body: el => { const ta = document.createElement('textarea'); ta.readOnly = true; ta.style.cssText = 'width:100%;height:300px'; ta.value = Array.from({ length: 200 }, (_, i) => '虚构第 ' + i + ' 行').join('\n'); el.appendChild(ta); } })));
+    // 日子管理是一页（不是面板）：整页上下滑，滑到底再滑回顶
+    {
+      await tab(page, 'ledger');
+      await page.evaluate(() => { const b = document.getElementById('daysManageBtn'); if (b) b.click(); }); await page.waitForTimeout(500);
+      const y = () => page.evaluate(() => ({ y: Math.round(scrollY), max: document.documentElement.scrollHeight - innerHeight, on: document.getElementById('pageDays').style.display === 'block' }));
+      let a = await y(); const r = { name: 'swipe-days-page', cfg: cfg.name, swipe: true, what: 'pageDays', max: a.max };
+      for (let k = 0; k < 25 && a.y < a.max - 1; k++) { await swipe(cfg.w / 2, cfg.h * 0.7, cfg.h * 0.25); a = await y(); }
+      r.bottom = a.y >= a.max - 1; r.openAfterUp = a.on;
+      for (let k = 0; k < 25 && a.y > 0; k++) { await swipe(cfg.w / 2, cfg.h * 0.25, cfg.h * 0.7); a = await y(); }
+      r.top = a.y <= 0; r.openAfterDown = a.on; r.closed = true; r.ok = r.bottom && r.top && a.on;
+      if (r.max <= 0) { r.err = '装得下，不用滚'; r.ok = null; }
+      results.push(r);
+    }
     await page.close();
   }
   return results;
@@ -528,6 +606,7 @@ async function run(cfg, port, browser) {
     all[c].forEach(m => {
       if (m.name === 'devoff-leaks') return;
       if (m.cat) { const bad = m.rows.filter(x => x.cut || x.gap < 8 || x.h < 48); md.push(`| ${m.name} | ${m.rows.length} 行 | 分类名被截 ${m.rows.filter(x => x.cut).length} 行 | 离 › 不到 8px ${m.rows.filter(x => x.gap < 8).length} 行 | 行高 ${Math.min(...m.rows.map(x => x.h))}px 起 | ${bad.length ? '有问题' : ''} | | |`); return; }
+      if (m.swipe) { md.push(`| ${m.name} | ${m.what} 能滚 ${m.max}px | ${m.err || ''}滑到底 ${m.bottom ? '✓' : '✗'} | 滑回顶 ${m.top ? '✓' : '✗'}${m.openAfterDown === false ? '（面板被关掉了）' : ''} | 顶上往下拉关面板 ${m.closed ? '✓' : '✗'} | ${m.ok === false ? '有问题' : ''} | | |`); return; }
       if (m.kb) { md.push(`| ${m.name} | 键盘弹起：${m.kbOpen ? '认出来了' : '没认出来'} | 小面板下沿离键盘 ${m.gap}px | 标题离顶 ${m.gripTop}px | 下面那层动了 ${m.lowerMoved == null ? '-' : m.lowerMoved}px | ${m.gap > 1 || m.gripTop < 0 || m.lowerMoved ? '有问题' : ''} | ${m.H} | |`); return; }
       const pr = m.prim.slice(0, 3).map(p => `${p.name.split(' ')[0]} ${p.offscreen ? '要往下滑' : p.fromBottom}`).join('；') || '—';
       md.push(`| ${m.name} | ${m.n} | ${m.small.length} | ${m.tight.length} | ${pr} | ${m.prim.some(p => p.upper) ? '是' : ''} | ${m.contentBottom} / ${m.H} | ${m.blank} |`);
