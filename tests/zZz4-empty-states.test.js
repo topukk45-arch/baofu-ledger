@@ -31,7 +31,7 @@ const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '某虚构店', 
   $('impAiCopy').click(); await t.until(() => t.ask()); await t.askOk();
   const at = t.S().ai.at;
   $('impAiPasteBtn').click(); await t.until(() => $('impAiPaste'));
-  $('impAiPaste').value = ['记问修改建议 v1 批次 ' + lg.b + ' 导出 ' + at, '#99 | 分类 | 吃饭 | 号不对'].join('\n'); $('impAiPasteGo').click();
+  $('impAiPaste').value = ['记问修改建议 v2 批次 ' + lg.b + ' 导出 ' + at, '#99 | 分类 | 吃饭 | 号不对'].join('\n'); $('impAiPasteGo').click();
   await t.until(() => $('impAiReviewHead'));
   ok($('impAiEmpty') && /没有能直接改的建议/.test($('impAiEmpty').textContent), '5 AI 修改建议一条能用的都没有：写为什么、怎么办');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));

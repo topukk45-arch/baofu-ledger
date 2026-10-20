@@ -24,9 +24,10 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1017-K';
+  var VERSION = '1021-T15';
   var AI_MAX_ROWS = 300;          // 一段最多几行（太长有的 AI 会截断；以后好调）
-  var HEAD = '记问修改建议 v1';    // AI 回复代码块的第一行要原样抄这几个字 + 批次 + 导出时间
+  var HEAD = '记问修改建议 v2';    // AI 回复代码块的第一行要原样抄这几个字 + 批次 + 导出时间
+  // 1021-T15：v2 起编号按时间排（以前按写入顺序），已经导出过、还没粘回来的 v1 回复一律不认（号对不上）
   var MODE_NAME = { normal: '计入', skip: '不计', flow: '往来' };
 
   // ---------- 打码 ----------
@@ -74,12 +75,14 @@
              r.mode === 'skip' ? '' : (r.cat == null ? '未分类' : r.cat), MODE_NAME[r.mode] || '计入', r.dest || ''];
     if (o.cp) c.push(cp);
     if (o.remark) { c.push(desc); c.push(rm); }
+    if (o.raw) { c.push(RAW_IO[r.pio] || ''); c.push(r.status || ''); }   // 1021-T15：账单里原来的收 / 支和交易状态
     return c.map(csvCell).join(',');
   }
   function header(o) {
     var h = ['号', '时间', '金额', '收支', '分类', '统计', '去向'];
     if (o.cp) h.push('对方');
     if (o.remark) { h.push('商品说明'); h.push('备注'); }
+    if (o.raw) { h.push('账单收支'); h.push('状态'); }
     return h.join(',');
   }
   // 回复格式的第一行（导回来时按它认是哪一次导出）
@@ -110,13 +113,18 @@
     lines.push('代码块外面写什么都行，记问只读代码块里的。');
     lines.push('');
     lines.push('可选分类：' + (d.cats || []).join('、'));
+    // 1021-T15：这一批推荐新建、还没建的分类也能用（写了记问会先建好分类再改）
+    if (d.newCats && d.newCats.length) lines.push('也可以用的新分类（这次推荐新建、还没建的，选了记问会先建好）：' + d.newCats.join('、'));
+    if (d.raw) lines.push('「账单收支」「状态」是账单里原来写的（比如退款原来写的是「不计收支」「退款成功」），帮你看收支方向对不对。');
     lines.push('');
     lines.push('明细（# 是这次导出临时编的号；金额单位是元）：');
     return lines;
   }
   // → { parts:[{ text, from, to, n }], total（要发的笔数）, head（回复第一行）}
+  var RAW_IO = { income: '收入', expense: '支出', neutral: '不计收支' };
   function exportText(d, opts) {
     var o = { cp: !opts || opts.cp !== false, remark: !opts || opts.remark !== false, mask: !opts || opts.mask !== false };
+    o.raw = !!d.raw && (o.cp || o.remark);   // 「只发金额、分类、日期」时不带账单里的收支和状态
     var rows = (d.rows || []).filter(function (r) { return r && !r.gone; });
     var chunks = [];
     for (var i = 0; i < rows.length; i += AI_MAX_ROWS) chunks.push(rows.slice(i, i + AI_MAX_ROWS));
@@ -147,7 +155,7 @@
   function normLine(l) {
     return String(l).replace(/｜/g, '|').replace(/＃/g, '#').trim().replace(/^(?:[-*•·]\s+)+/, '').trim();
   }
-  var HEAD_RE = /^记问修改建议\s*v1\s*批次\s*(\S+)\s*导出\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*$/;
+  var HEAD_RE = /^记问修改建议\s*v2\s*批次\s*(\S+)\s*导出\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*$/;
   var ITEM_RE = /^#?\s*\d+\s*\|/;
   function headOf(l) { return HEAD_RE.exec(l.replace(/^[`*]+|[`*]+$/g, '').trim()); }
   // 只按前 3 个竖线切成 4 段：第 3 个竖线后面的全部算理由（理由里带 | 不会错位）
@@ -186,7 +194,8 @@
     if (hm[1] !== ctx.batch) return { ok: false, why: 'batch', got: hm[1], want: ctx.batch };
     if ((ctx.aiAt || []).indexOf(hm[2]) < 0) return { ok: false, why: 'time', got: hm[2], want: (ctx.aiAt || []).slice() };
     var byN = {}; (ctx.rows || []).forEach(function (r) { if (r && Number.isInteger(r.n)) byN[r.n] = r; });
-    var cats = ctx.cats || [], items = [], bad = [], seen = {};
+    var newCats = (ctx.newCats || []).filter(function (c) { return (ctx.cats || []).indexOf(c) < 0; });
+    var cats = (ctx.cats || []).concat(newCats), items = [], bad = [], seen = {};
     var badLine = function (l, why) { bad.push({ line: l, why: why }); };
     lines.slice(1).forEach(function (l) {
       if (/^记问修改建议/.test(l)) { if (l === lines[0]) return; badLine(l, '另一次导出的回复'); return; }   // 分几段回复的，每段开头那一行重复出现，跳过
@@ -209,6 +218,7 @@
         if (row.hasRefunds) { badLine(l, '有退款挂在这笔上，分类要和退款一起改，去账单里改'); return; }
         if (!row.gone && row.cat === value) { badLine(l, '已经是「' + value + '」了'); return; }
         it.value = value; it.cur = row.cat;
+        if (newCats.indexOf(value) >= 0) it.newCat = true;   // 1021-T15：要先新建的分类
       } else if (field === 'mode') {
         var m = MODE_OF[value];
         if (!m) { badLine(l, '统计只能是计入、不计、往来'); return; }

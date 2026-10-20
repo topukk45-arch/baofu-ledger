@@ -210,7 +210,14 @@ function geoCheck(arg) {
     const pts = [[r.left + 2, r.top + 2], [r.right - 2, r.top + 2], [r.left + 2, r.bottom - 2], [r.right - 2, r.bottom - 2], [(r.left + r.right) / 2, (r.top + r.bottom) / 2]]
       .filter(([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight);
     const hits = new Set();
-    pts.forEach(([x, y]) => { const h = document.elementFromPoint(x, y); if (!h || h === el || el.contains(h) || h.contains(el) || decor(h)) return; hits.add(nm(h)); });
+    // 不算：内容只是滚到了固定栏下面（所在的滚动区还能往下滚）；数字键盘盖住记一笔 / 修改的保存那排（1019-Y 定的）
+    const canScroll = (() => { for (let x = el.parentElement; x; x = x.parentElement) { const cs = getComputedStyle(x); if (/(auto|scroll)/.test(cs.overflowY) && x.scrollTop + x.clientHeight < x.scrollHeight - 1) return true; }
+      const se = document.scrollingElement; return se.scrollTop + innerHeight < se.scrollHeight - 1; })();
+    const fixedBar = h => { for (let x = h; x && x !== document.body; x = x.parentElement) { const p = getComputedStyle(x).position; if (p === 'fixed' || p === 'sticky') return true; } return false; };
+    pts.forEach(([x, y]) => { const h = document.elementFromPoint(x, y); if (!h || h === el || el.contains(h) || h.contains(el) || decor(h)) return;
+      if (canScroll && fixedBar(h) && !h.closest('.mask')) return;
+      if (h.closest('#kpMask') && el.closest('.rec-foot')) return;
+      hits.add(nm(h)); });
     if (hits.size) out.cover.push(nm(el) + ' 被 ' + [...hits].join('、') + ' 盖住');
   });
   const sheets = [...document.querySelectorAll('.mask')].filter(m => getComputedStyle(m).display !== 'none' && !m.classList.contains('sheet-ghost'))

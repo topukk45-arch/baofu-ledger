@@ -2659,6 +2659,16 @@
       if (my !== runId || !S || S.phase !== 'aiexport') return;
       var n = d.rows.length;
       S.ai.data = { batch: d.batch, at: S.ai.at, cats: d.cats, rows: d.rows.concat(S.ai.extra.map(function (x, i) { return Object.assign({ n: n + i + 1 }, x); })) };
+      // 1021-T15：从结果页进来时方案还在手上：带上这一批推荐新建、还没建的分类（AI 能用、选了先建），和每一笔账单里原来的收支、状态
+      var pl = prev && prev.plan;
+      if (o.from === 'result' && pl) {
+        S.ai.data.newCats = ((pl.sections && pl.sections.newCats) || []).filter(function (c) { return !c.on && d.cats.indexOf(c.name) < 0; }).map(function (c) { return c.name; });
+        var raw = {}, dup = {};
+        pl.rows.forEach(function (x) { if (x.src !== 'row') return; var k = x.time + '|' + x.fen + '|' + (x.cp || ''); if (raw[k]) dup[k] = 1; raw[k] = { pio: x.pio, status: x.status || '' }; });
+        S.ai.data.rows.forEach(function (r) { var k = r.time + '|' + r.fen + '|' + (r.cp || ''), x = !dup[k] && raw[k]; if (x) { r.pio = x.pio; r.status = x.status; } });
+        S.ai.extra.forEach(function (r) { var k = r.time + '|' + r.fen + '|' + (r.cp || ''), x = !dup[k] && raw[k]; if (x) { r.pio = x.pio; r.status = x.status; } });
+        S.ai.data.raw = true;
+      }
       renderAiExport();
     }, function (e) {
       if (my !== runId || !S) return;
@@ -2755,7 +2765,7 @@
           var text = document.getElementById('impAiPaste').value, msg = document.getElementById('impAiPasteMsg');
           if (!text.trim()) { msg.textContent = '还没粘贴。'; return; }
           store().aiExportRows(a.batch).then(function (d) {
-            var r = window.JiwenImportAI.parseReply(text, { batch: a.batch, aiAt: d.aiAt, cats: d.cats, rows: d.rows });
+            var r = window.JiwenImportAI.parseReply(text, { batch: a.batch, aiAt: d.aiAt, cats: d.cats, rows: d.rows, newCats: (a.data && a.data.newCats) || [] });
             if (!r.ok) { msg.textContent = AI_WHY[r.why] || '读不出来。'; return; }
             var ver = null; try { ver = store().archiveInfo().ver; } catch (_) {}
             done(); openAiReview(r, d, ver);
@@ -2774,7 +2784,7 @@
   function aiReviewBack() { S.phase = 'aiexport'; delete S.ai.review; setHead('交给 AI 检查', '‹ 返回'); renderAiExport(); }
   function aiKey(it) { return it.n + '|' + it.field; }
   function aiChangeText(it, R) {
-    if (it.field === 'cat') return ['分类', (it.cur || '未分类') + ' → ', it.value];
+    if (it.field === 'cat') return ['分类', (it.cur || '未分类') + ' → ', it.value + (it.newCat ? '（新建）' : '')];
     if (it.field === 'mode') return ['统计', (window.JiwenImportAI.MODE_NAME[it.cur] || '计入') + ' → ', window.JiwenImportAI.MODE_NAME[it.value]];
     if (it.field === 'remark') return R.remarkMode[aiKey(it)] === 'replace' ? ['备注', '换成 ', it.value] : ['备注', '后面加上 ', it.value];
     var ref = it.ref ? R.rows[it.ref] : null;
@@ -2895,7 +2905,7 @@
     var R = S.ai.review, changes = window.JiwenImportAI.changesOf(sel, R.rows, R.remarkMode);
     if (!changes.length) return;
     S.phase = 'writing'; progress('正在改…', 1, 2);
-    store().aiApply({ of: S.ai.batch, changes: changes }, { ver: R.ver }).then(function (r) {
+    store().aiApply({ of: S.ai.batch, changes: changes, newCats: (S.ai.data && S.ai.data.newCats) || [] }, { ver: R.ver }).then(function (r) {
       dom.prog.style.display = 'none';
       openLogs('已按 AI 的建议改了 ' + r.changed + ' 条记录。改错了可以在下面「AI 修改」那一次点「撤销」（你后来又改过的不会动）。');
     }, function (e) {

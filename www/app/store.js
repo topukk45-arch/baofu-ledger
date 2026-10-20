@@ -1667,6 +1667,9 @@
                 (lg.add||[]).forEach(id=>{ if(!(id in kind)){ ids.push(id); kind[id]={ add:true }; } });
                 (lg.chg||[]).forEach(c=>{ if(!(c.id in kind)){ ids.push(c.id); kind[c.id]={ chg:c }; } });
                 const refunded=new Set(); recs.forEach(r=>{ if(r.refundOf) refunded.add(r.refundOf); });
+                // 1021-T15：按时间排好再编号（同一批每次一样；时间一样的按写入顺序）；删掉了的排最后
+                const tOf=id=>{ const r=byId.get(id); return r && typeof r.time==='string' ? r.time : '\uffff'; };
+                ids.map((id, i)=>({ id, i, t:tOf(id) })).sort((x, y)=>x.t<y.t ? -1 : x.t>y.t ? 1 : x.i-y.i).forEach((x, k)=>{ ids[k]=x.id; });
                 const rows=ids.map((id, i)=>{
                     const r=byId.get(id), n=i+1;
                     if(!r) return { n, id, gone:true };
@@ -1710,6 +1713,13 @@
                 if(!logs.some(l=>l.kind!=='ai' && l.b===o.of)) throw impErr('nolog');
                 const store=loadStore(t.e.id), a=store.archives[t.name], recs=a.records, at=new Map(recs.map((r, i)=>[r.id, i]));
                 const FIELDS=['cat','remark','skip','flow','aiFlag'];
+                // 1021-T15：AI 选了这一批推荐新建、还没建的分类：先建好（8 个字以内），导入记录记进 catsAdded，撤销这次 AI 修改时没人用的一起删
+                const catsAdded=[];
+                (Array.isArray(o.newCats) ? o.newCats : []).forEach(c=>{
+                    if(typeof c!=='string' || !c.trim() || c.length>8 || a.cats.includes(c)) return;
+                    if(!changes.some(x=>x.set && x.set.cat===c)) return;
+                    a.cats.push(c); catsAdded.push(c);
+                });
                 const cur=(r, k)=>(k in r && r[k]!==undefined) ? (r[k]!==null && typeof r[k]==='object' ? JSON.stringify(r[k]) : r[k]) : null;
                 const chg=[];
                 changes.forEach(c=>{
@@ -1739,7 +1749,7 @@
                 const saved=await impBkSave(t, 'ai', b, { b, what:(byRec ? '按新规则重新分类 ' : '按 AI 的建议改 ') + chg.length + ' 条记录' + (ofLog ? '（' + String(ofLog.at||'').replace('T', ' ') + ' 那次导入的）' : '') });
                 const d=new Date(), cl=(a.cps||[]).length, pl=(a.pms||[]).length;
                 logs.push({ kind:'ai', of:o.of, b, at:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`, apps:[], from:'', to:'',
-                            add:[], h:[], chg, cpLen:cl, pmLen:pl, cpEnd:cl, pmEnd:pl, catsAdded:[], rulesAdded:{ cat:[], type:[] } });
+                            add:[], h:[], chg, cpLen:cl, pmLen:pl, cpEnd:cl, pmEnd:pl, catsAdded, rulesAdded:{ cat:[], type:[] } });
                 if(byRec) logs[logs.length-1].by='rec';
                 const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, cl, pl);
                 try{

@@ -39,7 +39,7 @@ const MAN = [{ id: 'm1', time: '2026-10-06T09:30', money: 36, type: 'expense', c
     await t.until(() => $('impAiReviewHead'));
     return { rows, nOf };
   };
-  const REPLY = (b, at, n) => ['```记问', '记问修改建议 v1 批次 ' + b + ' 导出 ' + at,
+  const REPLY = (b, at, n) => ['```记问', '记问修改建议 v2 批次 ' + b + ' 导出 ' + at,
     `#${n('某虚构便利店')} | 分类 | 零食 | 便利店买饮料`, `#${n('某虚构超市')} | 备注 | 囤货 | 一次买了很多`, `#${n('某虚构银行')} | 口径 | 不计入 | 信用卡还款`,
     `#${n('某虚构书店')} | 标记 | 可能重复 #${n('某虚构便利店')} | 虚构的理由`, '```'].join('\n');
   const { rows, nOf } = await toReview(REPLY);

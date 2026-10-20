@@ -28,7 +28,7 @@ ok(files.length > 30 && !left.length, '1 www 下没有老叫法（读 AI 回复�
 // 2. 读 AI 回复：新老叫法都认
 const CTX = { batch: 'b88', aiAt: ['2026-10-20 10:00:00'], cats: ['未分类', '吃饭'],
   rows: [1, 2, 3, 4, 5, 6].map(n => ({ n, id: 'r' + n, cat: '吃饭', mode: 'normal', remark: '' })) };
-const reply = lines => '```记问\n记问修改建议 v1 批次 b88 导出 2026-10-20 10:00:00\n' + lines.join('\n') + '\n```';
+const reply = lines => '```记问\n记问修改建议 v2 批次 b88 导出 2026-10-20 10:00:00\n' + lines.join('\n') + '\n```';
 const r = AI.parseReply(reply(['#1 | 统计 | 不计 | 新叫法', '#2 | 统计 | 往来 | 新叫法', '#3 | 口径 | 不计入 | 老叫法', '#4 | 口径 | 只算结余 | 老叫法', '#5 | 统计 | 不计入 | 新字段老值', '#6 | 口径 | 往来 | 老字段新值']), CTX);
 const v = n => (r.items.filter(x => x.n === n)[0] || {}).value;
 ok(r.ok && r.items.length === 6 && !r.bad.length, '2 六条都认：' + r.items.length + ' 条，没看懂 ' + (r.bad || []).length);

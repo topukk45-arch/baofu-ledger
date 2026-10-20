@@ -36,7 +36,7 @@ const F = [['微信.csv', B.bill('wechat', TX, { range: RANGE }).bytes]];
     const i = rs.findIndex(r => r.id === idOf('某虚构超市')); rs[i] = Object.assign({}, rs[i], { remark: '我自己改的' });
     t.w.JiwenStore.saveStore(st); await t.idle(); }
   const n1 = nOf('某虚构便利店'), n2 = nOf('某虚构书店'), n3 = nOf('某虚构超市'), n4 = nOf('某虚构银行');
-  const REPLY = ['看了一下，建议如下：', '```记问', '记问修改建议 v1 批次 ' + lg.b + ' 导出 ' + at,
+  const REPLY = ['看了一下，建议如下：', '```记问', '记问修改建议 v2 批次 ' + lg.b + ' 导出 ' + at,
     `#${n1} | 分类 | 零食 | 便利店买饮料`, `#${n2} | 分类 | 购物 | 买书`, `#${n3} | 备注 | 囤货 | 一次买了很多`, `#${n4} | 口径 | 不计入 | 信用卡还款`,
     `#${n3} | 标记 | 可能重复 #${n2} | 同一天`, `#${n2} | 金额 | 30.00 | 想改金额`, '这一行乱了', '```'].join('\n');
   // ===== 1. 粘贴：读不出来的写原因、留在面板里 =====
