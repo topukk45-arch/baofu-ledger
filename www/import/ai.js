@@ -40,10 +40,25 @@
     return s;
   }
   // 对方像个人：带 *（微信、支付宝给个人打的码）、或者原始分类是转账 / 红包 / 扫二维码付款
-  function personal(cp, oc) {
+  //   1021-T5（实测 10-20，隐私）：宁可多打——打错了只是 AI 看到「个人」，漏打就是把别人的名字发出去了。多认几种：
+  //   支付宝原始分类「收入」「转账红包」、微信「二维码收款」；商品说明有收钱码 / 收款 / 转账；
+  //   对方名里没有商户字样（公司、店、有限、商行、中心、平台……）而且是英文名（「X. Y. ZZZ」「Adeline」这种）、
+  //   一个字、或者两三个字且第一个字是常见的姓
+  var SHOP_RE = /公司|店|有限|商行|中心|平台|超市|商城|银行|集团|医院|学校|大学|餐|酒店|宾馆|馆|厂|局|站|部|科技|网络|服务|铁路|航空|12306|支付宝|微信|美团|淘宝|天猫|京东|拼多多|抖音|饿了么|滴滴|闲鱼|财付通|基金|保险|证券|理财|余额宝|花呗|零钱|政府|委员会|协会|工作室|会所|俱乐部|药房|诊所|物业|电力|燃气|水务|移动|联通|电信/i;
+  var SURNAME = '王李张刘陈杨黄赵吴周徐孙马朱胡郭何高林罗郑梁谢宋唐许韩冯邓曹彭曾肖田董袁潘于蒋蔡余杜叶程苏魏吕丁任沈姚卢姜崔钟谭陆汪范金石廖贾夏韦付方白邹孟熊秦邱江尹薛闫段雷侯龙史陶黎贺顾毛郝龚邵万钱严覃武戴莫孔向汤常温康施文牛樊葛邢安齐易乔伍庞颜倪庄聂章鲁岳翟殷詹申欧耿关兰焦俞左柳甘祝包宁尚符舒阮柯纪梅童凌毕单季裴霍涂成苗谷盛曲翁冉骆蓝路游辛靳管柴蒙鲍华喻祁蒲房滕屈饶解牟艾尤阳时穆农司卓古吉缪简车项连芦麦褚娄窦戚岑景党宫费卜冷晏席卫米柏宗瞿桂全佟应臧闵苟邬边卞姬师和仇栾隋商刁沙荣巫寇桑郎甄丛仲虞敖巩明佘池查麻苑迟邝';
+  function personal(cp, oc, desc) {
     var c = String(cp || '').trim();
     if (c.indexOf('*') >= 0) return true;
-    return /转账|红包|扫二维码付款/.test(String(oc || ''));
+    if (/转账|红包|扫二维码付款|二维码收款|^收入$/.test(String(oc || ''))) return true;
+    if (/收钱码|收款|转账/.test(String(desc || ''))) return true;
+    if (!c || SHOP_RE.test(c)) return false;
+    if (/^[A-Za-z][A-Za-z.\s'’·-]*$/.test(c) && c.length <= 40) return true;          // 英文名：C. Q. WEN、Adeline
+    var han = c.replace(/[\s·.]/g, '');
+    if (/^[\u4e00-\u9fa5]+$/.test(han)) {
+      if (han.length === 1) return true;                                               // 一个字：夏、雨
+      if (han.length <= 3 && SURNAME.indexOf(han.charAt(0)) >= 0) return true;         // 两三个字、常见姓开头
+    }
+    return false;
   }
 
   // ---------- 全文 ----------
@@ -54,7 +69,7 @@
   function yuan(fen) { return (fen / 100).toFixed(2); }
   function rowCells(r, o) {
     var cp = r.cp || '', desc = r.desc || '', rm = r.remark || '';
-    if (o.mask) { if (personal(cp, r.oc)) cp = '个人'; cp = mask(cp); desc = mask(desc); rm = mask(rm); }
+    if (o.mask) { if (personal(cp, r.oc, r.desc || r.remark)) cp = '个人'; cp = mask(cp); desc = mask(desc); rm = mask(rm); }
     var c = ['#' + r.n, String(r.time || '').replace('T', ' ').slice(0, 16), yuan(r.fen), r.type === 'income' ? '收入' : '支出',
              r.mode === 'skip' ? '' : (r.cat == null ? '未分类' : r.cat), MODE_NAME[r.mode] || '计入', r.dest || ''];
     if (o.cp) c.push(cp);
