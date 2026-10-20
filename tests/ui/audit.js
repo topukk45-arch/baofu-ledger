@@ -220,6 +220,24 @@ function geoCheck(arg) {
       hits.add(nm(h)); });
     if (hits.size) out.cover.push(nm(el) + ' 被 ' + [...hits].join('、') + ' 盖住');
   });
+  // c. 1021-T16：一行里的东西互相压住（「餐饮 ›」压在文字上）；d. 字被省略号截断（「交通…」）
+  out.overlap = []; out.trunc = [];
+  document.querySelectorAll('.imp-row-opt, .rec-row, .cs-row, .imp-item, .bg-suggest-row').forEach(row => {
+    if (!vis(row)) return;
+    const kids = [...row.children].filter(vis).map(e => ({ e, r: e.getBoundingClientRect() }));
+    for (let i = 0; i < kids.length; i++) for (let j = i + 1; j < kids.length; j++) {
+      const a = kids[i].r, b = kids[j].r, w = Math.min(a.right, b.right) - Math.max(a.left, b.left), h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      if (w > 2 && h > 2) out.overlap.push(nm(kids[i].e) + ' 和 ' + nm(kids[j].e) + ' 压在一起');
+    }
+  });
+  document.querySelectorAll('body *').forEach(e => {
+    if (e.children.length || !vis(e)) return;
+    const cs = getComputedStyle(e); if (cs.textOverflow !== 'ellipsis' && !(e.parentElement && getComputedStyle(e.parentElement).textOverflow === 'ellipsis')) return;
+    const box = cs.textOverflow === 'ellipsis' ? e : e.parentElement, r = box.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > innerHeight) return;
+    if (box.scrollWidth > box.clientWidth + 1) out.trunc.push(nm(box) + ' 被截断（' + box.textContent.trim().slice(0, 12) + '）');
+  });
+  out.trunc = [...new Set(out.trunc)].slice(0, 10);
   const sheets = [...document.querySelectorAll('.mask')].filter(m => getComputedStyle(m).display !== 'none' && !m.classList.contains('sheet-ghost'))
     .map(m => ({ m, z: +getComputedStyle(m).zIndex || 0, s: m.querySelector('.sheet') })).filter(x => x.s && vis(x.s)).sort((a, b) => a.z - b.z);
   const top = sheets.length ? sheets[sheets.length - 1].s : null;
@@ -976,9 +994,9 @@ async function run(cfg, port, browser) {
       md.push(`| ${m.name} | ${m.n} | ${m.small.length} | ${m.tight.length} | ${pr} | ${m.prim.some(p => p.upper) ? '是' : ''} | ${m.contentBottom} / ${m.H} | ${m.blank} |`);
     });
     // 第 3 轮开工前：被盖住 / 半截露
-    const geo = all[c].filter(m => m.geo && (m.geo.cover.length || m.geo.half.length));
-    md.push('', `被盖住 / 半截露：${geo.length ? geo.length + ' 页有问题' : '没有'}`);
-    geo.forEach(m => md.push(`- ${m.name}：${m.geo.cover.concat(m.geo.half).slice(0, 8).join('；')}`));
+    const geo = all[c].filter(m => m.geo && (m.geo.cover.length || m.geo.half.length || (m.geo.overlap || []).length || (m.geo.trunc || []).length));
+    md.push('', `被盖住 / 半截露 / 压字 / 截断：${geo.length ? geo.length + ' 页有问题' : '没有'}`);
+    geo.forEach(m => md.push(`- ${m.name}：${m.geo.cover.concat(m.geo.half, m.geo.overlap || [], m.geo.trunc || []).slice(0, 10).join('；')}`));
     const lk = all[c].find(m => m.name === 'devoff-leaks');
     if (lk) md.push('', `开关关着：露出来的 ${lk.leaks.length} 处${lk.leaks.length ? '（' + lk.leaks.join('；') + '）' : ''}；请求 import/ 下的文件 ${lk.importRequests.length} 个；页面报错 ${lk.errs.length} 个`);
     md.push('');

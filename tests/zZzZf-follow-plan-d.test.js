@@ -113,7 +113,7 @@ const recs = [
   w.JiwenSheet.back(); await tick();
   if (shown('askMask')) $('askCancel').click();
   w.JiwenSheet.pick({ title: '这一笔归到哪个分类', sub: '虚构对方 · 12.00 元', chips: true, options: ['未分类', '吃饭', '购物'].map(v => ({ value: v, label: v })), value: '吃饭', onPick() {} });
-  ok($('catDrawerAll') && $('uiSheetSub').textContent === '虚构对方 · 12.00 元 · 共 3 个' && $('uiPickList').querySelector('.cc.sel').dataset.value === '吃饭', '六 导入页那种选分类面板（chips）：也是分类抽屉，副标题照留');
+  ok($('catDrawerAll') && $('uiSheetSub').textContent === '虚构对方 · 12.00 元 · 可选的分类 3 个' && $('uiPickList').querySelector('.cc.sel').dataset.value === '吃饭', '六 导入页那种选分类面板（chips）：也是分类抽屉，副标题照留（1021-T16 起「共 3 个」写成「可选的分类 3 个」）');
   w.JiwenSheet.back();
   w.JiwenSheet.pick({ title: '并到哪个已有分类', chips: true, options: [{ value: '', label: '不并，照原样' }, { value: '吃饭', label: '吃饭' }], value: '', onPick() {} });
   ok(!$('catDrawerAll') && $('uiPickList').querySelectorAll('.cc').length === 2, '六 有「不并」这种不是分类的选项：照旧一排分类块');

@@ -198,7 +198,7 @@
             function pick(o){
                 const opts=o.options||[];
                 // 1020-I：选分类的（chips，选项就是分类名）一律用分类抽屉（导入页的选分类面板也是这个）
-                if(o.chips && opts.length && opts.every(x=>x.value===x.label && x.value)) return cats({ title:o.title, subText:o.sub, cats:opts.map(x=>x.value), value:o.value, onPick:o.onPick, onCancel:o.onCancel });
+                if(o.chips && opts.length && opts.every(x=>x.value===x.label && x.value)) return cats({ title:o.title, subText:o.sub, cats:opts.map(x=>x.value), value:o.value, onPick:o.onPick, onCancel:o.onCancel, countLabel:'可选的分类' });   // 1021-T16：导入页「共 7 个」看不懂，写「可选的分类 N 个」
                 open({ title:o.title, sub:o.sub, onDismiss:o.onCancel,
                     body(box, done){
                         const wrap=document.createElement('div');
@@ -233,7 +233,7 @@
                 const all=(o.cats||getCats()).slice();
                 const rec=(o.recent||recentCats(o.type)).filter(c=>all.includes(c)).slice(0, 4);
                 const tn=o.type==='expense' ? '支出 · ' : o.type==='income' ? '收入 · ' : '';
-                open({ title:o.title||'选分类', sub:(o.subText ? o.subText+' · ' : '')+`${tn}共 ${all.length} 个`, onDismiss:o.onCancel,
+                open({ title:o.title||'选分类', sub:(o.subText ? o.subText+' · ' : '')+(o.countLabel ? `${o.countLabel} ${all.length} 个` : `${tn}共 ${all.length} 个`), onDismiss:o.onCancel,
                     body(box, done){
                         const mk=(c)=>{ const b=document.createElement('button'); b.type='button'; b.className='cc'+(c===o.value?' sel':''); const sp=document.createElement('span'); sp.className='cc-t'; sp.textContent=c; b.appendChild(sp); b.dataset.value=c;
                             b.addEventListener('click', ()=>{ done(); if(o.onPick) o.onPick(c); }); return b; };
