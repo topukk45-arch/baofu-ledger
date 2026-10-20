@@ -834,7 +834,7 @@
     var inCp = {}; p.sections.cpGroups.forEach(function (g) { (g.keys || []).forEach(function (k) { inCp[k] = 1; }); });
     return p.rows.filter(function (d) {
       var r = d.item && d.item.rec;
-      return d.src === 'row' && d.group === 'add' && !d.summary && d.canCat && d.mode !== 'skip' && r && r.conf === 'low' && !inCp[d.key] && (d.catFrom === 'rec' || d.catFrom === 'edit');
+      return d.src === 'row' && d.group === 'add' && !d.summary && d.canCat && d.mode !== 'skip' && r && r.conf === 'low' && !inCp[d.key] && !d.inCpGroup && (d.catFrom === 'rec' || d.catFrom === 'edit');
     });
   }
   function typeKeys(s) {
@@ -1600,7 +1600,12 @@
         var r = el('div', 'imp-row-opt imp-tap imp-cp-row'); r.dataset.cp = g.cp; r.dataset.item = 'cp:' + g.cp;
         // 1016-Z1：规律说明「工作日中午 12 点左右」放在前面，帮你认出是谁（只是提示，不自动分类）
         var desc = cpShow(g.cp) + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元' + (g.hint ? ' · ' + g.hint : '') + (g.n > 1 ? ' · 每笔 ' + (g.min === g.max ? yuan(g.min) : yuan(g.min) + '–' + yuan(g.max)) + ' 元' : '') + ' → 选个分类';
-        r.appendChild(el('span', 'grow', desc));
+        var gw = el('span', 'grow'); gw.appendChild(document.createTextNode(desc));
+        // 1021-T10：同一对方别的几笔已经归了哪类、组里有几笔退款，写在下面一行（同一对方不再裂成「已处理」和「待选」两半）
+        var oth = g.others ? Object.keys(g.others).map(function (c) { return g.others[c] + ' 笔已归到「' + c + '」'; }) : [];
+        if (g.refundN) oth.push('其中 ' + g.refundN + ' 笔是退款 +' + yuan(g.refundFen));
+        if (oth.length) gw.appendChild(el('div', 'imp-soft imp-cp-others', '同一个对方：' + oth.join(' · ')));
+        r.appendChild(gw);
         // 1017-UI2：整行都能点，点了弹选分类面板（选了同一个也算定过）；下拉框留在行里（藏着），照旧也能用它改
         var setCp = function (v) { S.view.seen['cp:' + g.cp] = true; if (v === '未分类') delete S.edits.cpCats[g.cp]; else S.edits.cpCats[g.cp] = v; replan(); };
         var sub0 = cpShow(g.cp) + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元';

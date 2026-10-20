@@ -273,6 +273,16 @@
       var o = byRef[d.refundTo.row.file + ':' + d.refundTo.row.row];
       d.cat = o ? o.cat : '未分类';
     });
+    // 1021-T10（实测 10-20）：同一对方放一组：组外同一个对方已经有分类的几笔数一数（组里写「另有 3 笔已归到充值缴费」），
+    //   组里的退款也数出来；这些行标上 inCpGroup，不再同时出现在「推荐要你看一眼」的单笔里
+    rows.forEach(function (d) {
+      if (d.src !== 'row' || ['add', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;
+      var k = clean(d.cp) || '（没有交易对方）', g = cpg[k];
+      if (!g) return;
+      d.inCpGroup = k;
+      if (g.keys.indexOf(d.key) >= 0) { if (d.group === 'refund') { g.refundN = (g.refundN || 0) + d.units; g.refundFen = (g.refundFen || 0) + d.fen; } return; }
+      var oc = g.others || (g.others = {}); oc[d.cat] = (oc[d.cat] || 0) + d.units;
+    });
 
     // ---- 时间重叠：新增落在同一来源以前导入过的时间段里 ----
     (input.overlaps || []).forEach(function (ov) {
@@ -381,7 +391,7 @@
       Object.keys(g.hours).forEach(function (h) { if (g.hours[h] > hn) { hn = g.hours[h]; hb = +h; } });
       var hour = hn * 2 > g.keys.length ? hb : null;
       return { cp: g.cp, n: g.n, fen: g.fen, min: g.min, max: g.max, hour: hour, cat: cpCats[k] || null, keys: g.keys,
-               hint: patternHint(g.keys.length, g.wd, g.we, g.hours) };
+               hint: patternHint(g.keys.length, g.wd, g.we, g.hours), others: g.others || null, refundN: g.refundN || 0, refundFen: g.refundFen || 0 };
     }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; });
     var notes = { neutralVsNormal: [], joined: [], noNote: [], overlap: [] };
     rows.forEach(function (d) { d.tags.forEach(function (t) { if (notes[t] && d.key) notes[t].push(d.key); }); });
