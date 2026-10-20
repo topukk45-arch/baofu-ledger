@@ -649,6 +649,16 @@ async function run(cfg, port, browser) {
     await C('filter', '#filterSheetMask');
     await page.close();
   }
+  // ===== 10. 选色面板（1020-E）：外观设置 → 自定义主色，App 自己的底部面板（色块、色相 / 深浅 / 鲜艳条、色值），量点击区域、主按钮位置 =====
+  if (want(10)) {
+    const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(20), cats: BASE_CATS.slice(0, 8) }) });
+    await tab(page, 'settings');
+    await click(page, '#themeBtn'); await page.waitForTimeout(400);
+    await measure(page, 'theme', { scope: '#themeMask', primary: [] , scrollTop: false });
+    await click(page, '#customColorBtn'); await page.waitForTimeout(500);
+    await measure(page, 'color-picker', { scope: '#uiSheetMask', primary: ['#cpApply'], scrollTop: false });
+    await page.close();
+  }
   return results;
 }
 

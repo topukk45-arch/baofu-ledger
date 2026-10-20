@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1020-D">
+    <link rel="stylesheet" href="app/app.css?v=1020-E">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-D</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-E</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -660,11 +660,12 @@
             </div>
 
             <div class="field" style="margin-top:14px;">
-                <label class="field-label">自定义主色（拾色器）</label>
+                <label class="field-label">自定义主色</label>
+                <!-- 1020-E：不再用系统的选色框（安卓上是白底的，和 App 不搭），点这一行打开 App 自己的选色面板 -->
+                <button type="button" class="theme-pick-row" id="customColorBtn"><span class="theme-pick-dot" id="customColorDot"></span><span class="theme-pick-txt">自己调一个颜色</span><span class="theme-pick-val" id="customColorVal">#3f6f6b</span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
+                <input type="hidden" id="customColor" value="#3f6f6b">
                 <div class="theme-custom-row">
-                    <input type="color" id="customColor" value="#3f6f6b">
-                    <button class="mini-btn gold" id="applyCustomBtn">应用此色</button>
-                    <button class="mini-btn" id="resetThemeBtn">恢复默认</button>
+                    <button class="ui-btn small" id="resetThemeBtn">恢复默认</button>
                 </div>
                 <p class="theme-tip">提示：太浅或太亮的颜色会自动加深，按钮文字也会自动配黑/白，保证清晰。</p>
             </div>
@@ -886,26 +887,26 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1020-D"></script>
-    <script src="app/store.js?v=1020-D"></script>
-    <script src="app/select.js?v=1020-D"></script>
-    <script src="app/keypad.js?v=1020-D"></script>
-    <script src="app/text.js?v=1020-D"></script>
-    <script src="app/sheet.js?v=1020-D"></script>
-    <script src="app/ask.js?v=1020-D"></script>
-    <script src="app/date.js?v=1020-D"></script>
-    <script src="app/ai-export.js?v=1020-D"></script>
-    <script src="app/import-entry.js?v=1020-D"></script>
-    <script src="app/forms.js?v=1020-D"></script>
-    <script src="app/ledger.js?v=1020-D"></script>
-    <script src="app/cats.js?v=1020-D"></script>
-    <script src="app/stats.js?v=1020-D"></script>
-    <script src="app/days.js?v=1020-D"></script>
-    <script src="app/settings.js?v=1020-D"></script>
-    <script src="app/tabs.js?v=1020-D"></script>
-    <script src="app/login.js?v=1020-D"></script>
-    <script src="app/back.js?v=1020-D"></script>
-    <script src="app/boot.js?v=1020-D"></script>
+    <script src="app/base.js?v=1020-E"></script>
+    <script src="app/store.js?v=1020-E"></script>
+    <script src="app/select.js?v=1020-E"></script>
+    <script src="app/keypad.js?v=1020-E"></script>
+    <script src="app/text.js?v=1020-E"></script>
+    <script src="app/sheet.js?v=1020-E"></script>
+    <script src="app/ask.js?v=1020-E"></script>
+    <script src="app/date.js?v=1020-E"></script>
+    <script src="app/ai-export.js?v=1020-E"></script>
+    <script src="app/import-entry.js?v=1020-E"></script>
+    <script src="app/forms.js?v=1020-E"></script>
+    <script src="app/ledger.js?v=1020-E"></script>
+    <script src="app/cats.js?v=1020-E"></script>
+    <script src="app/stats.js?v=1020-E"></script>
+    <script src="app/days.js?v=1020-E"></script>
+    <script src="app/settings.js?v=1020-E"></script>
+    <script src="app/tabs.js?v=1020-E"></script>
+    <script src="app/login.js?v=1020-E"></script>
+    <script src="app/back.js?v=1020-E"></script>
+    <script src="app/boot.js?v=1020-E"></script>
 
 </body>
 </html>

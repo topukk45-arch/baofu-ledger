@@ -36,6 +36,7 @@
             const chainAtTop=()=>sheet.scrollTop<=0 && tChain.every(n=>n.scrollTop<=0);
             sheet.addEventListener('touchstart', e=>{
                 if(!sheetShown(sheetMask) || e.touches.length!==1){ touchReset(); return; }
+                if(e.target && e.target.closest && e.target.closest('[data-nodrag]')){ touchReset(); return; }   // 1020-E：选色面板的色相 / 深浅条上拖，不算拉面板
                 const p=e.touches[0];
                 tCand=true; tDrag=false; tY0=p.clientY; tX0=p.clientX; tDY=0;
                 tLastY=p.clientY; tLastT=Date.now(); tVel=0; tChain=chainOf(e.target);

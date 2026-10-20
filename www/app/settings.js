@@ -249,7 +249,7 @@
                         applyPrimary(p.color);
                         const pf=loadPrefs(); pf.primary=p.color; savePrefs(pf);
                         renderPresets(p.color);
-                        $('customColor').value=p.color;
+                        $('customColor').value=p.color; paintCustomRow();
                     };
                     box.appendChild(sw);
                 });
@@ -258,22 +258,108 @@
                 const pf=loadPrefs();
                 const cur=pf.primary||DEFAULT_PRIMARY;
                 $('customColor').value = /^#[0-9a-fA-F]{6}$/.test(cur)?cur:DEFAULT_PRIMARY;
+                paintCustomRow();
                 renderPresets(cur);
                 themeMask.style.display='flex';
+            }
+            // 1020-E：「自定义主色」那一行：色块 + 色值
+            function paintCustomRow(){
+                const c=$('customColor').value;
+                $('customColorDot').style.background=c; $('customColorVal').textContent=c;
             }
             $('themeBtn').addEventListener('click', openTheme);
             $('closeTheme').addEventListener('click', ()=>{ themeMask.style.display='none'; });
 
-            $('applyCustomBtn').addEventListener('click', ()=>{
-                const c=$('customColor').value;
-                applyPrimary(c);
-                const pf=loadPrefs(); pf.primary=c; savePrefs(pf);
-                renderPresets(c);
-            });
+            // ===== 1020-E：App 自己的选色面板（不用系统的选色框：安卓上是白底的，和 App 不搭）=====
+            //   共用底部面板 JiwenSheet：一排常用色块 + 色相条 + 深浅条 + 鲜艳条，下面写现在选的色值、能直接输入色值；
+            //   选的时候整个 App 实时跟着变（applyPrimary，只改样子不存），「应用」才存（和原来「应用此色」一样存选的色值），
+            //   「取消」、往下拉、返回键都恢复打开前的颜色。「太浅太亮自动加深」照旧在 buildPalette 里，这里写出实际用的是哪个色。
+            const CP_COMMON=['#3f6f6b','#8a7f66','#6b5a82','#5f5b54','#a8553f','#3a5a7a','#6b7245','#9c5b63',
+                '#b0413e','#c26a2b','#1565c0','#ad1457'];   // 前 8 个是预设主题，后 4 个补几种常见的；两排
+            const HEX_RE=/^#[0-9a-fA-F]{6}$/;
+            function openColorPicker(){
+                const pf=loadPrefs();
+                const orig=HEX_RE.test(pf.primary||'') ? pf.primary.toLowerCase() : DEFAULT_PRIMARY;
+                let cur=HEX_RE.test($('customColor').value) ? $('customColor').value.toLowerCase() : orig;
+                let hsl=rgbToHsl(hexToRgb(cur));
+                let raf=0, els={};
+                // 取消时原样放回：打开时 html 上的样式（主题色都在这里）和 theme-color（没存过主题时 App 用的是样式表里默认的颜色，不能用「再套一次」来恢复）
+                const root=document.documentElement, meta=document.querySelector('meta[name="theme-color"]');
+                const origStyle=root.getAttribute('style'), origMeta=meta ? meta.getAttribute('content') : null;
+                const restore=()=>{ if(raf){ cancelAnimationFrame(raf); raf=0; }
+                    if(origStyle==null) root.removeAttribute('style'); else root.setAttribute('style', origStyle);
+                    if(meta && origMeta!=null) meta.setAttribute('content', origMeta); };
+                const preview=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; applyPrimary(cur); }); };
+                const setHex=(hex, fromHsl)=>{
+                    cur=hex.toLowerCase();
+                    if(!fromHsl) hsl=rgbToHsl(hexToRgb(cur));
+                    paint(); preview();
+                };
+                const bars=[
+                    { k:'h', label:'色相', max:360, grad:()=>`linear-gradient(to right, ${[0,60,120,180,240,300,360].map(h=>hslToHex(h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,35),60))).join(',')})` },
+                    { k:'l', label:'深浅', max:100, grad:()=>`linear-gradient(to right, ${hslToHex(hsl.h,hsl.s,8)}, ${hslToHex(hsl.h,hsl.s,50)}, ${hslToHex(hsl.h,hsl.s,92)})` },
+                    { k:'s', label:'鲜艳', max:100, grad:()=>`linear-gradient(to right, ${hslToHex(hsl.h,0,hsl.l)}, ${hslToHex(hsl.h,100,hsl.l)})` }
+                ];
+                function paint(){
+                    bars.forEach(b=>{ const e=els[b.k]; if(!e) return; e.track.style.background=b.grad(); e.thumb.style.left=(Math.max(0,Math.min(1,hsl[b.k]/b.max))*100)+'%';
+                        e.thumb.style.background=b.k==='h' ? hslToHex(hsl.h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,35),60)) : cur; });
+                    if(els.dot) els.dot.style.background=cur;
+                    if(els.hex && document.activeElement!==els.hex){ els.hex.value=cur; els.hex.classList.remove('bad'); }
+                    if(els.sw) [...els.sw.children].forEach(x=>x.classList.toggle('on', x.dataset.c===cur));
+                    if(els.note){ const used=buildPalette(cur)['--c-primary'].toLowerCase();
+                        els.note.textContent = used!==cur ? `这个颜色太浅或太亮，按钮上看不清字，实际会用深一点的 ${used}。` : '整个 App 已经换成这个颜色看看效果，点「应用」才存。'; }
+                }
+                window.JiwenSheet.open({ title:'自定义主色', sub:'点色块，或者拖下面的条；整个 App 跟着变，点「应用」才存',
+                    onDismiss(){ restore(); },
+                    body(outer){
+                        const box=document.createElement('div'); box.className='cp-wrap'; outer.appendChild(box);   // 面板正文是竖排 flex，装进一个普通的块里，不被拉开
+                        const sw=document.createElement('div'); sw.className='cp-swatches'; sw.id='cpSwatches';
+                        CP_COMMON.forEach(c=>{ const b=document.createElement('button'); b.type='button'; b.className='cp-sw'; b.dataset.c=c; b.style.background=c; b.setAttribute('aria-label', c);
+                            b.addEventListener('click', ()=>setHex(c)); sw.appendChild(b); });
+                        box.appendChild(sw); els.sw=sw;
+                        bars.forEach(b=>{
+                            const lab=document.createElement('div'); lab.className='cp-label'; lab.innerHTML=`<span>${b.label}</span>`;
+                            const bar=document.createElement('div'); bar.className='cp-bar'; bar.id='cpBar'+b.k.toUpperCase(); bar.setAttribute('data-nodrag','1');
+                            const track=document.createElement('div'); track.className='cp-track';
+                            const thumb=document.createElement('div'); thumb.className='cp-thumb';
+                            bar.appendChild(track); bar.appendChild(thumb);
+                            let dragging=false;
+                            const at=e=>{ const r=track.getBoundingClientRect(); if(!r.width) return;
+                                const f=Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
+                                hsl[b.k]=Math.round(f*b.max*10)/10; setHex(hslToHex(hsl.h,hsl.s,hsl.l), true); };
+                            bar.addEventListener('pointerdown', e=>{ dragging=true; try{ bar.setPointerCapture(e.pointerId); }catch(_){} at(e); });
+                            bar.addEventListener('pointermove', e=>{ if(dragging) at(e); });
+                            ['pointerup','pointercancel'].forEach(ev=>bar.addEventListener(ev, ()=>{ dragging=false; }));
+                            box.appendChild(lab); box.appendChild(bar);
+                            els[b.k]={ track, thumb };
+                        });
+                        const now=document.createElement('div'); now.className='cp-now';
+                        const dot=document.createElement('span'); dot.className='cp-now-dot'; dot.id='cpNowDot';
+                        const hex=document.createElement('input'); hex.type='text'; hex.className='cp-hex'; hex.id='cpHex'; hex.maxLength=7;
+                        hex.setAttribute('autocomplete','off'); hex.setAttribute('autocapitalize','off'); hex.setAttribute('spellcheck','false'); hex.setAttribute('aria-label','色值，比如 #3f6f6b');
+                        hex.addEventListener('input', ()=>{ let v=hex.value.trim(); if(v && v[0]!=='#') v='#'+v;
+                            if(HEX_RE.test(v)){ hex.classList.remove('bad'); setHex(v); } else hex.classList.toggle('bad', v.length>=7); });
+                        hex.addEventListener('blur', ()=>{ hex.value=cur; hex.classList.remove('bad'); });
+                        now.appendChild(dot); now.appendChild(hex); box.appendChild(now);
+                        const note=document.createElement('p'); note.className='cp-note'; note.id='cpNote'; box.appendChild(note);
+                        Object.assign(els, { dot, hex, note });
+                        paint();
+                    },
+                    foot(box, done){
+                        const st=document.createElement('div'); st.className='ui-stack';
+                        const ok=document.createElement('button'); ok.type='button'; ok.className='ui-btn primary block'; ok.id='cpApply'; ok.textContent='应用';
+                        ok.addEventListener('click', ()=>{ done(); if(raf){ cancelAnimationFrame(raf); raf=0; } applyPrimary(cur); const p=loadPrefs(); p.primary=cur; savePrefs(p);
+                            $('customColor').value=cur; paintCustomRow(); renderPresets(cur); });
+                        const no=document.createElement('button'); no.type='button'; no.className='ui-btn block'; no.id='cpCancel'; no.textContent='取消';
+                        no.addEventListener('click', ()=>{ done(); restore(); });
+                        st.appendChild(ok); st.appendChild(no); box.appendChild(st);
+                    } });
+            }
+            $('customColorBtn').addEventListener('click', openColorPicker);
             $('resetThemeBtn').addEventListener('click', ()=>{
                 applyPrimary(DEFAULT_PRIMARY);
                 const pf=loadPrefs(); pf.primary=DEFAULT_PRIMARY; savePrefs(pf);
-                $('customColor').value=DEFAULT_PRIMARY;
+                $('customColor').value=DEFAULT_PRIMARY; paintCustomRow();
                 renderPresets(DEFAULT_PRIMARY);
             });
 

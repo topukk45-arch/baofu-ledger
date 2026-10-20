@@ -1021,10 +1021,33 @@
         .theme-swatch.active::after { content:"✓"; position:absolute; inset:0;
             display:flex; align-items:center; justify-content:center; color:var(--c-on-primary);
             font-size:18px; text-shadow:0 1px 2px rgba(0,0,0,0.4); }
-        .theme-custom-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-        .theme-custom-row input[type=color] { width:48px; height:40px; padding:0;
-            border:1px solid var(--c-border); border-radius:8px; background:var(--c-surface);
-            cursor:pointer; }
+        .theme-custom-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:10px; }
+        /* 1020-E：自定义主色一行（点开 App 自己的选色面板）+ 选色面板 */
+        .theme-pick-row { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); padding:0 12px;
+            background:var(--c-surface); border:1px solid var(--c-border-mid); border-radius:12px; color:var(--c-text);
+            font-size:16px; font-family:inherit; text-align:left; cursor:pointer; }
+        .theme-pick-row:active { background:var(--c-chip); }
+        .theme-pick-dot { width:26px; height:26px; border-radius:50%; flex:none; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15); }
+        .theme-pick-txt { flex:1 1 auto; }
+        .theme-pick-val { color:var(--c-text-soft); font-size:14px; font-variant-numeric:tabular-nums; }
+        .cp-swatches { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 14px; }
+        .cp-sw { width:var(--ui-tap); height:var(--ui-tap); border-radius:50%; border:2px solid transparent; padding:0; cursor:pointer;
+            box-shadow:0 1px 4px rgba(0,0,0,0.15); position:relative; }
+        .cp-sw.on { border-color:var(--c-text); }
+        .cp-sw.on::after { content:"✓"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#fff;
+            font-size:18px; text-shadow:0 1px 2px rgba(0,0,0,0.5); }
+        .cp-label { display:flex; justify-content:space-between; font-size:13px; color:var(--c-text-soft); margin:0 0 6px; }
+        /* 色相 / 深浅 / 鲜艳 条：整条 48px 高都能按、能拖；手指按在上面拖不算拉面板（data-nodrag），也不让浏览器滚动（touch-action:none） */
+        .cp-bar { position:relative; height:var(--ui-tap); margin:0 0 12px; touch-action:none; cursor:pointer; }
+        .cp-track { position:absolute; left:0; right:0; top:12px; height:24px; border-radius:12px; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.12); }
+        .cp-thumb { position:absolute; top:6px; width:28px; height:36px; margin-left:-14px; border-radius:10px; background:transparent;
+            border:3px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.3); pointer-events:none; }
+        .cp-now { display:flex; align-items:center; gap:12px; margin:4px 0 4px; }
+        .cp-now-dot { width:var(--ui-tap); height:var(--ui-tap); border-radius:12px; flex:none; box-shadow:inset 0 0 0 1px rgba(0,0,0,0.15); }
+        .cp-hex { flex:1 1 auto; min-width:0; min-height:var(--ui-tap); padding:0 12px; font-size:18px; font-family:inherit; letter-spacing:1px;
+            border:1px solid var(--c-border-mid); border-radius:12px; background:var(--c-surface); color:var(--c-text); text-transform:lowercase; }
+        .cp-hex.bad { border-color:var(--c-neg); }
+        .cp-note { font-size:13px; color:var(--c-text-soft); line-height:1.6; margin:6px 0 0; min-height:21px; }
         .theme-tip { color:var(--c-text-soft); font-size:12px; margin-top:8px; }
 
         /* ===== 日子（倒数日）=====
