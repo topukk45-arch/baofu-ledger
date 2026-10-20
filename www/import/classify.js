@@ -24,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1021-T3';
+  var VERSION = '1021-T7';
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -122,7 +122,10 @@
     var words = builtinIndex(ctx.merchants);
     var G = (ctx.merchants && ctx.merchants.games) || { cat: '游戏', strong: [], weak: [], notWith: [] };
     var gameOn = cats.indexOf(G.cat) >= 0;
-    var nonPlat = words.filter(function (x) { return !isPlatform(x[0]); });
+    var SELLS = (ctx.merchants && ctx.merchants.sellsAll) || [];
+    // 1021-T7：平台名和「什么都卖」的综合商超都只算低、排在商品说明和支付宝分类后面
+    var weakWord = function (w) { return isPlatform(w) || SELLS.indexOf(w) >= 0; };
+    var nonPlat = words.filter(function (x) { return !weakWord(x[0]); });
     // 两家互借：清洗后的对方 → 支付宝分类（取次数最多的，打平不借）
     var borrow = new Map();
     (ctx.borrowRows || []).forEach(function (r) {
@@ -156,7 +159,9 @@
       var hit = findIn(words, cc) || findIn(words, cp);
       var hd = findIn(nonPlat, r.desc || '');
       var aw = r.app === 'alipay' ? aliWant(r.kind) : null;
-      if (hit && !isPlatform(hit[0])) return { want: hit[1], layer: 'builtin', conf: 'mid', reason: '内置：' + hit[0] + ' → ' + hit[1] };
+      if (hit && !weakWord(hit[0])) return { want: hit[1], layer: 'builtin', conf: 'mid', reason: '内置：' + hit[0] + ' → ' + hit[1] };
+      // 1021-T7：商品说明里的词和支付宝分类说的是同一类 → 两个依据一致，升到「中」
+      if (hd && aw && aw === hd[1]) return { want: hd[1], layer: 'builtin', conf: 'mid', reason: '内置（商品说明里的「' + hd[0] + '」）和支付宝分类一致 → ' + hd[1], descOnly: true, cc: cc, agree: true };
       if (hd) return { want: hd[1], layer: 'builtin', conf: 'low', reason: '内置（商品说明里的「' + hd[0] + '」）→ ' + hd[1], descOnly: true, cc: cc };
       // 1016-Z4：游戏词（存档里有「游戏」分类才推荐）：首充、月卡、战令、钻石……→ 游戏（把握中）
       var gs = gameHit(G.strong, cc + ' ' + cp + ' ' + (r.desc || ''));
@@ -166,7 +171,7 @@
       if (aw === '收入' && RECEIPT_RE.test(cp + ' ' + (r.desc || ''))) return { want: '收款', layer: 'alipay', conf: 'mid', reason: '支付宝分类：收入（收钱码 / 转账收款）→ 收款' };
       if (aw) return { want: aw, layer: 'alipay', conf: 'mid', reason: '支付宝分类：' + aw };
       // 平台名：最后才用，把握低
-      if (hit) return { want: hit[1], layer: 'builtin', conf: 'low', reason: '内置（平台「' + hit[0] + '」，卖什么的都有）→ ' + hit[1] };
+      if (hit) return { want: hit[1], layer: 'builtin', conf: 'low', reason: '内置（' + (isPlatform(hit[0]) ? '平台' : '综合商超') + '「' + hit[0] + '」，卖什么的都有）→ ' + hit[1] };
       // 1016-Z4：「礼包」→ 游戏，把握低、排在最后；说明里有流量、零食这类词时不算（那些词前面已经认过了）
       var gwText = cc + ' ' + cp + ' ' + (r.desc || '');
       if (gameOn && gameHit(G.weak, gwText) && !gameHit(G.notWith, gwText)) return { cat: G.cat, layer: 'builtin', conf: 'low', reason: '内置（「礼包」多半是游戏）→ ' + G.cat };
@@ -194,6 +199,8 @@
         c = mapOf[x.want];
         x.reason = '你的对照：' + x.want + ' → ' + c + '（' + x.reason + '）';
       }
+      // 1021-T7：理由里写落到了你的哪个分类（同义落地时，推荐名和你的分类名不一样）
+      if (c && c !== x.want && x.reason.indexOf('你的对照') !== 0) x.reason += '（落到你的「' + c + '」）';
       if (c) x.cat = c; else need[x.want] = (need[x.want] || 0) + 1;
     });
     var other = land('其他', cats);
