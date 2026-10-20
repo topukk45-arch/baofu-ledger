@@ -92,6 +92,8 @@
         //   往上取整到 10 元；中位数是 0 的不建议。只算不写，写不写、写哪几个由你勾
         // 1019-J：MIN_MEDIAN：每月中位数不到 50 元的不建议（零星几笔，比如「存款」大多是收入、支出偶尔一两块钱）；这个分类收入比支出多的也不建议
         const BUDGET_SUGGEST={ MIN_MONTHS:3, MAX_MONTHS:6, ROUND:10, MIN_MEDIAN:50 };
+        // 1021-T11（实测 10-20）：未分类（「你有很多账没分类」不是预算）、转账这类默认不计的分类不给预算建议
+        const BUDGET_SUGGEST_SKIP=['未分类', '转账'];
         function budgetSuggest(dec, now){
             now=now||new Date();
             const cur=now.getFullYear()*12+now.getMonth(), has=new Set(), sums=new Map(), incs=new Map();
@@ -108,6 +110,7 @@
             if(months.length<BUDGET_SUGGEST.MIN_MONTHS) return { months:months.length, list:[] };
             const list=[];
             sums.forEach((o, c)=>{
+                if(BUDGET_SUGGEST_SKIP.includes(c)) return;
                 const vs=months.map(m=>Math.max(0, round2(o.get(m)||0))).sort((a, b)=>a-b), n=vs.length;
                 const med=n%2 ? vs[(n-1)/2] : (vs[n/2-1]+vs[n/2])/2;
                 if(!(med>0) || med<BUDGET_SUGGEST.MIN_MEDIAN) return;
@@ -143,7 +146,10 @@
                 const box=document.createElement('div'); box.id='bgSuggestList';
                 // 1019-G：勾选框超过 3 个，顶上放「全选」，全勾上了变「全不选」
                 let allBtn=null;
-                const syncAll=()=>{ if(!allBtn) return; const cbs=[...box.querySelectorAll('input[type=checkbox]')]; allBtn.textContent=(cbs.length && cbs.every(c=>c.checked)) ? '全不选' : '全选'; };
+                // 1021-T11：一个都没勾（或没有能写的）时「写入勾上的」点不了
+                let go=null;
+                const syncGo=()=>{ if(!go) return; const n=[...box.querySelectorAll('input[type=checkbox]')].filter(c=>c.checked).length; go.disabled=!n; go.textContent=n ? `写入勾上的 ${n} 个` : '写入勾上的'; };
+                const syncAll=()=>{ syncGo(); if(!allBtn) return; const cbs=[...box.querySelectorAll('input[type=checkbox]')]; allBtn.textContent=(cbs.length && cbs.every(c=>c.checked)) ? '全不选' : '全选'; };
                 // 1019-J：建议值和现在的预算一样的，不一行一行列，收成一行「其余 N 个分类和建议一致」
                 const sameAs=S.list.filter(x=>cats.includes(x.cat) && budgets[x.cat]>0 && Math.abs(safeNum(budgets[x.cat])-x.suggest)<0.005);
                 S.list.filter(x=>cats.includes(x.cat) && sameAs.indexOf(x)<0).forEach(x=>{
@@ -166,7 +172,7 @@
                     same.textContent=`${box.children.length ? '其余' : ''} ${sameAs.length} 个分类和建议一致：${sameAs.map(x=>x.cat).join('、')}`.trim();
                     card.appendChild(same);
                 }
-                const go=document.createElement('button'); go.type='button'; go.className='mini-btn gold'; go.id='bgSuggestApply'; go.textContent='写入勾上的';
+                go=document.createElement('button'); go.type='button'; go.className='mini-btn gold'; go.id='bgSuggestApply'; go.textContent='写入勾上的';
                 go.addEventListener('click', ()=>{
                     const pick=[...box.querySelectorAll('.bg-suggest-row')].filter(r=>r.querySelector('input').checked).map(r=>S.list.find(x=>x.cat===r.dataset.cat));
                     if(!pick.length){ customAlert('一个都没勾。', '预算建议'); return; }
@@ -178,7 +184,7 @@
                     customAlert(`写好了 ${pick.length} 个分类的每月预算。以后可以在「设置 → 管理账单分类」或预算页里改。`, '预算建议');
                     renderStats();
                 });
-                foot.appendChild(go);
+                foot.appendChild(go); syncGo();
             }
             const cl=document.createElement('button'); cl.type='button'; cl.className='mini-btn'; cl.id='bgSuggestClose'; cl.textContent='收起';
             cl.addEventListener('click', ()=>{ bgSuggestOpen=false; renderBudgetSuggest(dec); });
