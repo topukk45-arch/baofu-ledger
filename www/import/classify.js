@@ -24,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Z4';
+  var VERSION = '1021-T3';
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -66,7 +66,9 @@
     '医疗健康': ['医疗', '健康', '看病', '医药'],
     '酒店旅游': ['旅游', '旅行', '酒店'],
     '生活服务': ['生活', '服务'],
-    '收入': ['工资', '收入'],
+    // 1021-T3（实测 10-20）：收入不再落「工资」——工资只来自你的规则或你手动选。收钱码、个人转账、闲鱼这类另推「收款」
+    '收入': ['收入'],
+    '收款': ['收款', '收入'],
     '其他': ['其他', '其它']
   };
   function land(want, cats) {
@@ -76,6 +78,7 @@
     return null;
   }
 
+  var RECEIPT_RE = /收钱码|收款|转账|闲鱼|二手/;
   var CARRIER_RE = /(联通|移动|电信)(股份有限公司|有限责任公司|有限公司|分公司|公司|集团)?$/;
   var PLATFORMS = ['淘宝', '天猫', '京东', '拼多多', '抖音商城', '唯品会'];
   function isPlatform(word) { return PLATFORMS.some(function (p) { return String(word).indexOf(p) >= 0; }); }
@@ -159,6 +162,8 @@
       var gs = gameHit(G.strong, cc + ' ' + cp + ' ' + (r.desc || ''));
       if (gameOn && gs) return { cat: G.cat, layer: 'builtin', conf: 'mid', reason: '内置：' + gs + ' → ' + G.cat };
       // 5. 支付宝分类对照
+      //   1021-T3：支付宝「收入」里收钱码 / 转账 / 闲鱼这类是别人付给你的钱 → 推「收款」（存档里没有就是新建分类建议，老用户默认不建、落未分类）
+      if (aw === '收入' && RECEIPT_RE.test(cp + ' ' + (r.desc || ''))) return { want: '收款', layer: 'alipay', conf: 'mid', reason: '支付宝分类：收入（收钱码 / 转账收款）→ 收款' };
       if (aw) return { want: aw, layer: 'alipay', conf: 'mid', reason: '支付宝分类：' + aw };
       // 平台名：最后才用，把握低
       if (hit) return { want: hit[1], layer: 'builtin', conf: 'low', reason: '内置（平台「' + hit[0] + '」，卖什么的都有）→ ' + hit[1] };
