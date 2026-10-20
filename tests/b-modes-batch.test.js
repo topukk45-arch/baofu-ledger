@@ -1,5 +1,6 @@
 // 1010-C 回归（原 1010-B 用例）测试：node test2.js <html>
 const fs = require('fs');
+const RC=require('./helpers/rec');
 const { JSDOM } = require('jsdom'); const IDB=require('./helpers/idb');
 const html = fs.readFileSync(process.argv[2] || require('path').join(__dirname,'..','www','index.html'), 'utf8');
 let pass=0, fail=0;
@@ -36,7 +37,7 @@ function bootSync(records, extra){
     const d=dom.window.document, $=id=>d.getElementById(id);
     const recs=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey())).archives['默认存档'].records;
     const byId=id=>recs().find(r=>r.id===id);
-    const chip=(boxId,text)=>[...$(boxId).querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===text);
+    const chip=(boxId,text)=>RC.chip(d, boxId, text);   // 1020-G：分类不在最近常用 4 个里的从分类抽屉选
     const choose=text=>{ chip('askChoices',text).click(); $('askOk').click(); };
     const filterKw=kw=>{ $('filterFab').click(); $('searchKeyword').value=kw; $('sheetApply').click(); };
     return { w:dom.window, d, $, recs, byId, chip, choose, filterKw, errs };
@@ -46,10 +47,10 @@ function bootSync(records, extra){
 // ===== 1. 记一笔：三选一 + 转账自动切不计 =====
 {
     const t=await boot(); const box=t.$('billMode'); const mode=()=>box.dataset.mode;
-    const pick=txt=>[...box.querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===txt).click();
+    const pick=txt=>RC.pickMode(t.d, 'billMode', txt);   // 1020-G：统计是一行，点了弹统计面板
     t.$('fabAdd').click();
-    ok(mode()==='normal' && box.querySelector('.cc.sel').textContent==='计入', '新表单默认「计入」');
-    ok(t.$('billModeHint').textContent.includes('算进收入、支出和结余'), '下方有口径说明');
+    ok(mode()==='normal' && RC.modeText(t.d,'billMode')==='计入', '新表单默认「计入」');
+    box.click(); ok(t.d.getElementById('modePick').textContent.includes('算进收入、支出和结余'), '下方有口径说明'); t.w.JiwenSheet.back();
     t.chip('billCatChips','转账').click();
     ok(mode()==='skip', '选转账自动切到不计');
     t.chip('billCatChips','餐饮').click();
@@ -60,7 +61,7 @@ function bootSync(records, extra){
     t.chip('billCatChips','餐饮').click(); pick('往来');
     t.chip('billCatChips','转账').click();
     ok(mode()==='flow', '已手动选往来时，选转账不覆盖');
-    ok(t.$('billModeHint').textContent.includes('资金往来'), '说明随选项变化');
+    box.click(); ok(t.d.querySelector('#modePick .mode-pick-row.sel').textContent.includes('资金往来'), '说明随选项变化'); t.w.JiwenSheet.back();
     pick('不计');
     t.$('billMoney').value='1234.56'; t.chip('billTypeChips','支出').click(); t.$('billRemark').value='信用卡';
     t.$('addBill').click();
@@ -90,9 +91,9 @@ function bootSync(records, extra){
     t.w.openEdit('a3'); t.$('editMoney').value='15'; t.$('saveEdit').click();
     ok(t.byId('a3').foo==='keep' && t.byId('a3').money===15, '修改不丢未知字段');
     ok(!('skip' in t.byId('a3')), '未开启时不写 skip 字段');
-    t.w.openEdit('a5'); [...t.$('editMode').querySelectorAll('.cc')].find(e=>e.textContent==='往来').click(); t.$('saveEdit').click();
+    t.w.openEdit('a5'); RC.pickMode(t.d, 'editMode', '往来'); t.$('saveEdit').click();
     ok(!('skip' in t.byId('a5')) && t.byId('a5').flow===true, '改成往来：skip 删除、flow 写入');
-    t.w.openEdit('a5'); [...t.$('editMode').querySelectorAll('.cc')].find(e=>e.textContent==='计入').click(); t.$('saveEdit').click();
+    t.w.openEdit('a5'); RC.pickMode(t.d, 'editMode', '计入'); t.$('saveEdit').click();
     ok(!('skip' in t.byId('a5')) && !('flow' in t.byId('a5')), '改回计入：两个字段都删除');
 }
 

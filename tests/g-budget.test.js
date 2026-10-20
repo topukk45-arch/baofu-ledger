@@ -1,5 +1,6 @@
 // 1010-G 预算专项：node test8.js <html>
 const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
+const RC=require('./helpers/rec');   // 1020-G：选分类（不在最近常用 4 个里的从抽屉选）、选统计（面板）
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark},extra||{});
@@ -24,7 +25,7 @@ function bootSync(records, budgets){
   const errs=[]; dom.window.addEventListener('error',e=>errs.push(e.message));
   const d=dom.window.document,$=id=>d.getElementById(id);
   const arc=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey())).archives['默认存档'];
-  const chip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent===txt);
+  const chip=(box,txt)=>RC.chip(d, box, txt);
   const stats=()=>d.querySelector('.tab-btn[data-tab="stats"]').click();
   const catRow=c=>[...$('catList').querySelectorAll('.cat-item')].find(r=>r.dataset.cat===c);
   // 1019-C 起行里不放按钮：点整行打开操作面板，再在面板里找按钮（预算 → 设预算 / 改预算，删除 → 删除这个分类）
@@ -82,7 +83,7 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
   const add=(money,cat,type,mode)=>{
     t.$('fabAdd').click(); t.$('billMoney').value=String(money);
     t.chip('billCatChips',cat).click(); t.chip('billTypeChips',type).click();
-    if(mode) [...t.$('billMode').querySelectorAll('.cc')].find(e=>e.textContent===mode).click();
+    if(mode) RC.pickMode(t.d, 'billMode', mode);
     t.$('addBill').click();
     const msg=t.$('askMsg').textContent; t.$('askCancel').click(); return msg;
   };

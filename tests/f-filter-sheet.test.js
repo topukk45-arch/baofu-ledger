@@ -1,5 +1,6 @@
 // 1010-F 专项：node test7.js <html>
 const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
+const RC=require('./helpers/rec');   // 1020-G：选分类（不在最近常用 4 个里的从抽屉选）、选统计（面板）
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark},extra||{});
@@ -75,7 +76,7 @@ const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b
   const rows=[...t.$('askChoices').querySelectorAll('.cc')];
   ok(rows.length===4 && rows.every(r=>r.querySelector('.cc-label') && r.querySelector('.cc-desc') && r.querySelector('.cc-desc').textContent.length>8), '四个选项都有说明');
   const desc=l=>rows.find(r=>r.querySelector('.cc-label').textContent===l).querySelector('.cc-desc').textContent;
-  ok(desc('标为往来')===t.$('billModeHint').textContent || desc('标为往来').startsWith('资金往来'), '往来说明与记一笔一致');
+  ok(desc('标为往来')===t.w.JiwenBase.MODE_HINT.flow || desc('标为往来').startsWith('资金往来'), '往来说明与记一笔一致');
   ok(desc('标为不计').startsWith('哪里都不算'), '不计说明');
   rows[2].click(); t.$('askOk').click();
   ok(t.$('askTitle').textContent==='批量修改统计', '带说明的选项照常可选');

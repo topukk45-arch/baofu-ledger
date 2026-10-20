@@ -36,7 +36,7 @@
             closeText();
             el.dispatchEvent(new Event('input', { bubbles:true })); el.dispatchEvent(new Event('change', { bubbles:true }));
             const b=TXT_REVEAL[el.id];
-            if(b && window.__revealSave){ setTimeout(()=>window.__revealSave(el, $(b)), 60); }
+            if(b && window.__revealSave){ setTimeout(()=>window.__revealSave(el.offsetParent ? el : ($(el.id+'Row')||el), $(b)), 60); }   // 1020-G：备注框藏着时按「备注」那一行算
         }
         $('txtOk').addEventListener('click', txtOk);
         $('txtCancel').addEventListener('click', closeText);

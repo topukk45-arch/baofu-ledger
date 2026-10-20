@@ -35,6 +35,7 @@
             el.value=v;
             el.dispatchEvent(new Event('input', { bubbles:true }));
             kpPaint();
+            if(kpCaretEl){ kpCaretEl.style.animation='none'; void kpCaretEl.offsetWidth; kpCaretEl.style.animation=''; kpCaretPlace(); }
         }
         // 把金额框滚到键盘上面：它所在的面板底下先垫一块键盘那么高的空白，再滚
         function kpReveal(){
@@ -47,6 +48,45 @@
             const r=el.getBoundingClientRect(), over=r.bottom + 12 - kTop;
             if(over>0 && host) host.scrollTop += over;
         }
+        // 1020-G：正在输的金额框里，数字后面一根闪动的竖线（原来 1019-Z1 是把下面那条线换成主色、加粗）。
+        //   框是只读的（不弹系统输入法），浏览器自己的光标出不来，所以另画一根：每一帧按框的位置、字的宽度、靠左 / 靠右放过去
+        //   （面板会滚、会滑，跟着走），数字键盘关了就收起来。系统「减少动画」时不闪。
+        let kpCaretEl=null, kpCaretRaf=0, kpCaretCtx=null;
+        function kpTextW(el, txt){
+            if(!txt) return 0;
+            try{
+                if(!kpCaretCtx){ const c=document.createElement('canvas'); kpCaretCtx=c.getContext && c.getContext('2d'); }
+                if(!kpCaretCtx) return 0;
+                const cs=getComputedStyle(el);
+                kpCaretCtx.font=`${cs.fontStyle||'normal'} ${cs.fontWeight||'400'} ${cs.fontSize||'16px'} ${cs.fontFamily||'sans-serif'}`;
+                return kpCaretCtx.measureText(txt).width || 0;
+            }catch(_){ return 0; }
+        }
+        function kpCaretPlace(){
+            const el=kpTarget, c=kpCaretEl; if(!c) return;
+            if(!el || !el.isConnected){ c.style.display='none'; return; }
+            const r=el.getBoundingClientRect();
+            if(!(r.width>0 && r.height>0)){ c.style.display='none'; return; }
+            const cs=getComputedStyle(el), px=v=>parseFloat(v)||0;
+            const left=r.left+px(cs.borderLeftWidth)+px(cs.paddingLeft), right=r.right-px(cs.borderRightWidth)-px(cs.paddingRight);
+            const w=Math.min(kpTextW(el, el.value||''), Math.max(0, right-left));
+            const al=cs.textAlign;
+            let x = (al==='right'||al==='end') ? right+1 : (al==='center' ? (left+right)/2 + w/2 + 1 : left+w+1);
+            x=Math.max(left, Math.min(right+1, x));
+            const fs=px(cs.fontSize)||16, h=Math.round(fs*1.05);
+            const top=r.top + (r.height-h)/2;
+            const ks=$('kpSheet').getBoundingClientRect();   // 金额框被数字键盘盖住时（还没滚上来）不画
+            if(ks.height>0 && top+h/2>ks.top){ c.style.display='none'; return; }
+            c.style.left=Math.round(x)+'px'; c.style.top=Math.round(top)+'px'; c.style.height=h+'px';
+            c.style.display='block';
+        }
+        function kpCaretLoop(){ kpCaretPlace(); kpCaretRaf = kpTarget ? requestAnimationFrame(kpCaretLoop) : 0; }
+        function kpCaretOn(){
+            if(!kpCaretEl){ kpCaretEl=document.createElement('div'); kpCaretEl.id='kpCaret'; kpCaretEl.setAttribute('aria-hidden','true'); document.body.appendChild(kpCaretEl); }
+            kpCaretEl.style.animation='none'; void kpCaretEl.offsetWidth; kpCaretEl.style.animation='';   // 每次换框、每按一下从「亮」开始闪
+            if(!kpCaretRaf) kpCaretLoop(); else kpCaretPlace();
+        }
+        function kpCaretOff(){ if(kpCaretRaf){ cancelAnimationFrame(kpCaretRaf); kpCaretRaf=0; } if(kpCaretEl) kpCaretEl.style.display='none'; }
         function kpOpen(el, opts){
             opts=opts||{};
             if(kpTarget && kpTarget!==el) kpTarget.classList.remove('kp-on');
@@ -57,6 +97,7 @@
             const shownNow=$('kpMask').style.display==='flex';
             $('kpMask').style.display='flex';
             if(shownNow) kpReveal(); else requestAnimationFrame(kpReveal);
+            kpCaretOn();
         }
         function kpClose(){
             kpHoldStop();   // 1019-Z2：长按时键盘关了，停下
@@ -65,6 +106,7 @@
             if(kpTarget) kpTarget.classList.remove('kp-on');
             if(kpHost) kpHost.classList.remove('kp-lift');
             kpTarget=null; kpOnOk=null; kpHost=null;
+            kpCaretOff();
         }
         window.kpOpen=kpOpen; window.kpClose=kpClose;   // 给测试用
         $('kpGrid').addEventListener('click', e=>{

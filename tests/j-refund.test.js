@@ -1,5 +1,6 @@
 // 1010-J 专项：退款。node test13.js <html>
 const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
+const RC=require('./helpers/rec');   // 1020-G：选分类（不在最近常用 4 个里的从抽屉选）、选统计（面板）
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark:remark||''},extra||{});
@@ -172,8 +173,8 @@ function bootSync(records, arcExtra){
   t.$('askOk').click(); t.$('cancelEdit').click();
   // 改分类 + 口径：退款跟着改
   t.w.openEdit('buy');
-  [...t.$('editCatChips').querySelectorAll('.cc')].find(e=>e.textContent==='游戏').click();
-  t.$('editMode').querySelector('[data-v="flow"]').click();
+  RC.chip(t.d, 'editCatChips', '游戏').click();
+  RC.pickMode(t.d, 'editMode', '往来');
   t.$('saveEdit').click();
   const rf=t.refunds()[0];
   ok(rf.cat==='游戏' && rf.flow===true, '退款跟着改分类和口径：'+JSON.stringify(rf));

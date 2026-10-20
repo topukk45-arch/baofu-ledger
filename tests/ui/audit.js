@@ -155,8 +155,8 @@ function measureInPage(arg) {
     });
     r.width = r.right - r.left; r.height = r.bottom - r.top; return r;
   };
-  // 分段按钮（.seg、底栏、1020-D 起记一笔的收支 .io-mini）几个挨着是一组，组内不算间距
-  const groupOf = e => e.closest('.seg, .tab-bar, .ui-seg, .io-mini');
+  // 分段按钮（.seg、底栏、1020-D 起记一笔的收支 .io-mini）几个挨着是一组，组内不算间距；1020-G 起列表卡（.rec-list、统计面板 .mode-pick）里的行挨着也不算（和设置页的列表一样，中间一道细线）
+  const groupOf = e => e.closest('.seg, .tab-bar, .ui-seg, .io-mini, .rec-list, .mode-pick');
   const items = els.map(e => { const r = hitRect(e); return { e, r, layer: layerOf(e), name: label(e), grp: groupOf(e) }; });
   const small = [], tight = [];
   items.forEach(x => { if (x.r.height < MIN - 0.5 || x.r.width < MIN - 0.5) small.push({ name: x.name, w: Math.round(x.r.width), h: Math.round(x.r.height), top: Math.round(x.r.top) }); });
@@ -481,11 +481,12 @@ async function run(cfg, port, browser) {
       await page.waitForTimeout(300);
     };
     await click(page, '.act-add'); await page.waitForTimeout(400);
-    await kbCheck('add-record', 'txtMask', '#billRemark', 'addMask');
+    await page.evaluate(() => window.kpClose && window.kpClose()); await page.waitForTimeout(100);   // 1020-G：数字键盘盖着下半屏，先收起来再点备注那一行
+    await kbCheck('add-record', 'txtMask', '#billRemarkRow', 'addMask');   // 1020-G：备注是列表卡里一行
     await page.evaluate(() => { const r = document.querySelector('#billList [data-act="edit"]'); if (r) window.openEdit(r.dataset.id); });
     await page.waitForTimeout(400);
     const editOpen = await page.evaluate(() => { if (document.getElementById('editMask').style.display !== 'flex') { const b = document.getElementById('detailEdit'); if (b && document.getElementById('detailMask').style.display === 'flex') b.click(); } return document.getElementById('editMask').style.display === 'flex'; });
-    if (editOpen) await kbCheck('edit-record', 'txtMask', '#editRemark', 'editMask');
+    if (editOpen) await kbCheck('edit-record', 'txtMask', '#editRemarkRow', 'editMask');
     await page.evaluate(() => { const b = document.getElementById('daysAdd') || document.querySelector('.days-add'); if (b) b.click(); });
     await page.waitForTimeout(300);
     const dayOpen = await page.evaluate(() => document.getElementById('dayMask').style.display === 'flex');

@@ -81,7 +81,7 @@
                 openAddModal();
                 const inc=[...$('billTypeChips').children].find(x=>x.textContent==='收入'); if(inc) inc.click();
                 setModeChips($('billMode'), 'flow');
-                billRemark.value='期初余额';
+                billRemark.value='期初余额'; JiwenForms.syncRecRows();
             }
         };
         // ============================================================
@@ -303,10 +303,10 @@
                 const blank=formState('addMask');
                 if(v.time) setDtInput(billTime, v.time);
                 billMoney.value=v.money||'';
-                const cc=[...$('billCatChips').children].find(c=>c.textContent===v.cat && cats.includes(v.cat)); if(cc) cc.click();
                 const tc=[...$('billTypeChips').children].find(c=>c.textContent===(v.type==='expense'?'支出':v.type==='income'?'收入':'')); if(tc) tc.click();
+                if(v.cat && cats.includes(v.cat)) JiwenForms.pickBillCat(v.cat);   // 1020-G：分类不一定在最近常用那 4 个里，直接选
                 if(v.mode) setModeChips($('billMode'), v.mode);
-                billRemark.value=v.remark||'';
+                billRemark.value=v.remark||''; JiwenForms.syncRecRows();
                 Promise.resolve().then(()=>{ formSnaps.addMask=blank; });   // 恢复出来的算「填过」，关的时候照样问
             } else if(f.kind==='edit'){
                 const rec=getUserData().find(r=>r.id===f.id);
@@ -317,11 +317,11 @@
                 if(v.time) setDtInput(editTime, v.time);
                 editMoney.value=v.money||'';
                 if(!rec.refundOf){   // 退款记录的分类 / 收支 / 口径跟着原账单，不动
-                    renderEditCatChips(cats.includes(v.cat) ? v.cat : '');
                     renderEditTypeChips(v.type);
+                    renderEditCatChips(cats.includes(v.cat) ? v.cat : '', v.type);
                     if(v.mode) setModeChips($('editMode'), v.mode);
                 }
-                editRemark.value=v.remark||'';
+                editRemark.value=v.remark||''; JiwenForms.syncRecRows();
                 Promise.resolve().then(()=>{ formSnaps.editMask=blank; });
             }
         }

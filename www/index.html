@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1020-F">
+    <link rel="stylesheet" href="app/app.css?v=1020-G">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-F</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-G</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -386,51 +386,46 @@
     </div>
 
     <!-- 记账弹窗 -->
-    <!-- 1019-Q：记一笔 / 修改排紧：金额放最上面（大字）+ 旁边小的「支出 / 收入」；记账时间一行小字（点了弹日期时间选择）；
-         分类照旧是圆角块；统计收进「更多」（不是「计入」时自动展开）；备注一行（点了弹文字输入小面板）；「保存」固定在面板底部。
-         记的内容和规则不变（收支照旧必选、不默认选中）。 -->
+    <!-- 1020-G：记一笔 / 修改照草图「方案 D」：记账时间一行 → 金额（大字、靠右）→ 收支两个按钮 → 分类一行 4 个最近常用
+         → 列表卡（更多 / 统计 / 备注）→ 保存 → 「关闭 | 存为常用」。记的内容和规则不变（收支照旧必选、不默认选中）。 -->
     <div class="mask sheet-mask form-mask" id="addMask">
         <div class="sheet edit-dialog rec-sheet" id="addSheet">
             <div class="sheet-grip" id="addGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>记一笔</h3></div></div>
             <div class="form-box rec-form">
-                <button type="button" class="rec-time" id="billTimeLine" aria-label="改记账时间"><svg class="rec-time-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span class="rec-time-txt" id="billTimeTxt"></span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
+                <button type="button" class="rec-time" id="billTimeLine" aria-label="改记账时间"><svg class="rec-time-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span class="rec-time-txt" id="billTimeTxt"></span><svg class="rec-row-arrow rec-time-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 <div id="billTime" class="dt-input rec-time-raw" data-placeholder="选择记账时间"></div>
                 <div class="rec-money-row">
                     <span class="rec-cur" aria-hidden="true">¥</span>
                     <input type="text" inputmode="decimal" id="billMoney" class="money-input rec-money" placeholder="0.00" aria-label="金额">
-                    <!-- 收支：小的切换，必选、不默认选中 -->
-                    <div class="cat-chips io-chips io-mini" id="billTypeChips"></div>
-                    <select id="billType" style="display:none">
-                        <option value="expense">支出（花销）</option>
-                        <option value="income">收入（存入）</option>
-                    </select>
                 </div>
+                <!-- 收支：两个一样大的按钮，必选、不默认选中；选中的主色实心 -->
+                <div class="cat-chips io-chips io-pair" id="billTypeChips" role="radiogroup" aria-label="收支"></div>
+                <select id="billType" style="display:none">
+                    <option value="expense">支出（花销）</option>
+                    <option value="income">收入（存入）</option>
+                </select>
                 <!-- 常用模板（1010-I）：没有模板时整行隐藏 -->
                 <div class="field" id="billTplField" style="display:none">
                     <label class="field-label">常用</label>
                     <div class="cat-chips tpl-chips" id="billTplChips"></div>
                 </div>
-                <div class="field">
-                    <label class="field-label">分类</label>
-                    <!-- 固定顺序的横排标签：顺序由「管理分类」页拖动决定，一点即选 -->
-                    <div class="cat-chips" id="billCatChips"></div>
-                    <select id="billCat" style="display:none"></select>
+                <!-- 1020-G：分类一行 4 个「最近常用」；别的在「更多」里（分类抽屉） -->
+                <div class="cat-chips rec-cats" id="billCatChips" aria-label="最近常用的分类"></div>
+                <select id="billCat" style="display:none"></select>
+                <!-- 1020-G：一张列表卡：更多（分类抽屉）/ 统计（计入 · 不计 · 往来）/ 备注 -->
+                <div class="rec-list">
+                    <button type="button" class="rec-row" id="billCatMore"><span class="rec-row-k">更多</span><span class="rec-row-v" id="billCatMoreVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="billMode" data-mode="normal"><span class="rec-row-k">统计</span><span class="rec-row-v" id="billModeVal">计入</span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="billRemarkRow"><span class="rec-row-k">备注</span><span class="rec-row-v rec-row-txt" id="billRemarkVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
-                <!-- 1019-Z：统计不再收进「更多」：一行三个小按钮，说明只在不是「计入」时显示 -->
-                <div class="field rec-mode">
-                    <label class="field-label">统计</label>
-                    <div class="cat-chips mode-chips mode-mini" id="billMode"></div>
-                    <div class="skip-hint" id="billModeHint"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">备注</label>
-                    <textarea id="billRemark" class="remark-area rec-remark" placeholder="点这里写备注" maxlength="5000" rows="1"></textarea>
-                </div>
-                <button class="tpl-save-btn" id="billSaveTpl">存为常用</button>
+                <textarea id="billRemark" class="remark-area rec-remark" maxlength="5000" rows="1" aria-hidden="true" tabindex="-1"></textarea>
             </div>
-            <div class="dialog-btn ui-stack form-btns rec-foot">
+            <div class="dialog-btn form-btns rec-foot">
                 <button class="ui-btn primary block" id="addBill">保存</button>
-                <button class="ui-btn block" id="closeAdd">关闭</button>
+                <div class="ui-pair">
+                    <button class="ui-btn" id="closeAdd">关闭</button>
+                    <button class="ui-btn" id="billSaveTpl">存为常用</button>
+                </div>
             </div>
         </div>
     </div>
@@ -441,40 +436,39 @@
             <div class="form-box rec-form">
                 <!-- 1010-J：退款记录 / 有退款的原账单，在这里说明关联关系 -->
                 <div class="refund-note" id="editRefundNote" style="display:none"></div>
-                <button type="button" class="rec-time" id="editTimeLine" aria-label="改记账时间"><svg class="rec-time-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span class="rec-time-txt" id="editTimeTxt"></span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
+                <button type="button" class="rec-time" id="editTimeLine" aria-label="改记账时间"><svg class="rec-time-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span class="rec-time-txt" id="editTimeTxt"></span><svg class="rec-row-arrow rec-time-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 <div id="editTime" class="dt-input rec-time-raw" data-placeholder="选择记账时间"></div>
                 <div class="rec-money-row">
                     <span class="rec-cur" aria-hidden="true">¥</span>
                     <input type="text" inputmode="decimal" id="editMoney" class="money-input rec-money" placeholder="0.00" aria-label="金额">
-                    <div class="cat-chips io-chips io-mini lock-on-refund" id="editTypeChips"></div>
-                    <select id="editType" style="display:none">
-                        <option value="expense">支出（花销）</option>
-                        <option value="income">收入（存入）</option>
-                    </select>
                 </div>
-                <div class="field lock-on-refund">
-                    <label class="field-label">分类</label>
-                    <div class="cat-chips" id="editCatChips"></div>
-                    <select id="editCat" style="display:none"></select>
+                <!-- 收支：两个一样大的按钮，必选、不默认选中；选中的主色实心 -->
+                <div class="cat-chips io-chips io-pair lock-on-refund" id="editTypeChips" role="radiogroup" aria-label="收支"></div>
+                <select id="editType" style="display:none">
+                    <option value="expense">支出（花销）</option>
+                    <option value="income">收入（存入）</option>
+                </select>
+                <!-- 1020-G：分类一行 4 个「最近常用」；别的在「更多」里（分类抽屉） -->
+                <div class="cat-chips rec-cats lock-on-refund" id="editCatChips" aria-label="最近常用的分类"></div>
+                <select id="editCat" style="display:none"></select>
+                <!-- 1020-G：一张列表卡：更多（分类抽屉）/ 统计（计入 · 不计 · 往来）/ 备注 -->
+                <div class="rec-list">
+                    <button type="button" class="rec-row lock-on-refund" id="editCatMore"><span class="rec-row-k">更多</span><span class="rec-row-v" id="editCatMoreVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row lock-on-refund" id="editMode" data-mode="normal"><span class="rec-row-k">统计</span><span class="rec-row-v" id="editModeVal">计入</span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="editRemarkRow"><span class="rec-row-k">备注</span><span class="rec-row-v rec-row-txt" id="editRemarkVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
-                <div class="field rec-mode lock-on-refund">
-                    <label class="field-label">统计</label>
-                    <div class="cat-chips mode-chips mode-mini" id="editMode"></div>
-                    <div class="skip-hint" id="editModeHint"></div>
-                </div>
-                <div class="field">
-                    <label class="field-label">备注</label>
-                    <textarea id="editRemark" class="remark-area rec-remark" placeholder="点这里写备注" maxlength="5000" rows="1"></textarea>
-                </div>
+                <textarea id="editRemark" class="remark-area rec-remark" maxlength="5000" rows="1" aria-hidden="true" tabindex="-1"></textarea>
                 <div class="rec-extra">
-                    <button class="tpl-save-btn refund-btn" id="editRefundBtn">退款</button>
-                    <button class="tpl-save-btn" id="editSaveTpl">存为常用</button>
-                    <button class="ui-btn danger block" id="deleteInEdit">删除这条记录</button>
+                    <button class="ui-btn block refund-btn" id="editRefundBtn">退款</button>
+                    <button class="ui-btn warn block" id="deleteInEdit">删除这条记录</button>
                 </div>
             </div>
-            <div class="dialog-btn ui-stack form-btns rec-foot">
+            <div class="dialog-btn form-btns rec-foot">
                 <button class="ui-btn primary block" id="saveEdit">保存</button>
-                <button class="ui-btn block" id="cancelEdit">取消</button>
+                <div class="ui-pair">
+                    <button class="ui-btn" id="cancelEdit">取消</button>
+                    <button class="ui-btn" id="editSaveTpl">存为常用</button>
+                </div>
             </div>
         </div>
     </div>
@@ -587,9 +581,10 @@
             <input type="text" id="txtInput" class="txt-input" enterkeyhint="done">
             <textarea id="txtArea" class="txt-input" rows="3" style="display:none"></textarea>
             <div class="txt-count" id="txtCount"></div>
-            <div class="dialog-btn ui-stack form-btns">
-                <button class="ui-btn primary block" id="txtOk">确定</button>
-                <button class="ui-btn block" id="txtCancel">取消</button>
+            <!-- 1020-G：「取消 | 确定」左右并排（左退右进），省一行高度 -->
+            <div class="dialog-btn form-btns ui-pair">
+                <button class="ui-btn" id="txtCancel">取消</button>
+                <button class="ui-btn primary" id="txtOk">确定</button>
             </div>
         </div>
     </div>
@@ -887,26 +882,26 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1020-F"></script>
-    <script src="app/store.js?v=1020-F"></script>
-    <script src="app/select.js?v=1020-F"></script>
-    <script src="app/keypad.js?v=1020-F"></script>
-    <script src="app/text.js?v=1020-F"></script>
-    <script src="app/sheet.js?v=1020-F"></script>
-    <script src="app/ask.js?v=1020-F"></script>
-    <script src="app/date.js?v=1020-F"></script>
-    <script src="app/ai-export.js?v=1020-F"></script>
-    <script src="app/import-entry.js?v=1020-F"></script>
-    <script src="app/forms.js?v=1020-F"></script>
-    <script src="app/ledger.js?v=1020-F"></script>
-    <script src="app/cats.js?v=1020-F"></script>
-    <script src="app/stats.js?v=1020-F"></script>
-    <script src="app/days.js?v=1020-F"></script>
-    <script src="app/settings.js?v=1020-F"></script>
-    <script src="app/tabs.js?v=1020-F"></script>
-    <script src="app/login.js?v=1020-F"></script>
-    <script src="app/back.js?v=1020-F"></script>
-    <script src="app/boot.js?v=1020-F"></script>
+    <script src="app/base.js?v=1020-G"></script>
+    <script src="app/store.js?v=1020-G"></script>
+    <script src="app/select.js?v=1020-G"></script>
+    <script src="app/keypad.js?v=1020-G"></script>
+    <script src="app/text.js?v=1020-G"></script>
+    <script src="app/sheet.js?v=1020-G"></script>
+    <script src="app/ask.js?v=1020-G"></script>
+    <script src="app/date.js?v=1020-G"></script>
+    <script src="app/ai-export.js?v=1020-G"></script>
+    <script src="app/import-entry.js?v=1020-G"></script>
+    <script src="app/forms.js?v=1020-G"></script>
+    <script src="app/ledger.js?v=1020-G"></script>
+    <script src="app/cats.js?v=1020-G"></script>
+    <script src="app/stats.js?v=1020-G"></script>
+    <script src="app/days.js?v=1020-G"></script>
+    <script src="app/settings.js?v=1020-G"></script>
+    <script src="app/tabs.js?v=1020-G"></script>
+    <script src="app/login.js?v=1020-G"></script>
+    <script src="app/back.js?v=1020-G"></script>
+    <script src="app/boot.js?v=1020-G"></script>
 
 </body>
 </html>

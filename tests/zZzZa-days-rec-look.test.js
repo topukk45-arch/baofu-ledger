@@ -51,12 +51,13 @@ const days = [{ id: 'd1', name: '虚构纪念日', date: '2026-12-25' }, { id: '
   ok(/\.rec-time \{[^}]*min-height:var\(--ui-tap\)[^}]*font-size:16px/.test(css), '二 时间那一行 48px 高、16px 字');
   $('fabAdd').click(); await wait(420); w.kpClose();
   const io = $('billTypeChips');
-  ok(io.classList.contains('io-mini') && io.children.length === 2 && ![...io.children].some(c => /sel/.test(c.className)), '二 收支两格一组，打开时都没选（还是必选、不默认选中）');
+  ok(io.classList.contains('io-pair') && io.children.length === 2 && ![...io.children].some(c => /sel/.test(c.className)), '二 收支两格一组，打开时都没选（还是必选、不默认选中）');
   [...io.children].find(c => c.textContent === '支出').click();
-  ok(/sel-out/.test([...io.children].find(c => c.textContent === '支出').className), '二 选了支出：支出色');
+  ok(/sel-out/.test([...io.children].find(c => c.textContent === '支出').className), '二 选了支出：选中');
   [...io.children].find(c => c.textContent === '收入').click();
-  ok(/sel-in/.test([...io.children].find(c => c.textContent === '收入').className) && !/sel-out/.test([...io.children].find(c => c.textContent === '支出').className), '二 改选收入：收入色，支出取消');
-  ok(/\.io-chips\.io-mini \.cc\.sel-out \{ background:var\(--c-neg\)/.test(css) && /\.io-chips\.io-mini \.cc\.sel-in \{ background:var\(--c-pos\)/.test(css), '二 选中的支出用支出色、收入用收入色');
+  ok(/sel-in/.test([...io.children].find(c => c.textContent === '收入').className) && !/sel-out/.test([...io.children].find(c => c.textContent === '支出').className), '二 改选收入：收入选中，支出取消');
+  // 1020-G：收支是两个一样大的按钮，选中的主色实心、白字，不用红绿
+  ok(/\.io-chips\.io-pair \.cc\.sel-out, \.io-chips\.io-pair \.cc\.sel-in \{ background:var\(--c-primary-dark\)[^}]*color:var\(--c-on-primary\)/.test(css) && !/io-pair[^{]*sel-(out|in)[^{]*\{[^}]*--c-(neg|pos)/.test(css), '二 1020-G：选中的（支出、收入一样）主色实心、白字，不用红绿');
   $('addMask').style.display = 'none'; await wait(400);
 
   // 三、字居中

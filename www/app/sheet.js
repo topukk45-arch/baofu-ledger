@@ -1,5 +1,6 @@
 (function(){
         const { $, SHEET_MS } = window.JiwenBase;   // 用到前面模块的
+        const { getCats, recentCats } = window.JiwenStore;   // 用到前面模块的
         // ===== 底部浮层的「往下拉关闭」（1017-UI1 从筛选浮层里抽出来，筛选浮层和导入页的选择面板共用）=====
         //   sheetMask：遮罩（带 .open 时才接手势）；sheet：面板（.sheet）；grip：顶部抓手区（鼠标拖拽用）；onDismiss：拉够了要关时调
         //   返回 { reset }：把拖到一半的位移、过渡复位（打开 / 关闭时调）
@@ -176,10 +177,22 @@
                 bodyEl.textContent=''; footEl.textContent='';
                 if(cur.body) cur.body(bodyEl, close);
                 if(cur.foot) cur.foot(footEl, close);
+                mask.style.zIndex=String(zAbove());
                 mask.style.display='flex';
                 drag.reset();
                 sheet.scrollTop=0;
                 mask.classList.add('open');
+            }
+            // 1020-G：从别的面板里打开（记一笔的统计 / 分类抽屉、详情上的修改……）时要盖在它上面：
+            //   比现在开着的面板里最高的那层再高一层（日期选择、文字小面板、提示框、数字键盘这几种「工具层」本来就更高，不算）
+            function zAbove(){
+                let z=1000;
+                document.querySelectorAll('.mask').forEach(m=>{
+                    if(m===mask || m.style.display==='none' || !m.isConnected) return;
+                    const cs=getComputedStyle(m); if(cs.display==='none') return;
+                    const v=parseInt(cs.zIndex, 10); if(v>=z && v<1035) z=v+1;
+                });
+                return z;
             }
             function pick(o){
                 const opts=o.options||[];
@@ -208,7 +221,79 @@
                         row.appendChild(c); box.appendChild(row);
                     } });
             }
-            return { open, pick, close, isOpen, back:dismiss, _sheet:()=>sheet };
+            // 1020-G：分类抽屉（选分类）：顶上「选分类」+ 小字「支出 · 共 N 个」，分类不少于 CAT_SEARCH_MIN（12）个时有搜索框（按名字筛），
+            //   「最近常用」一行 4 个、「全部」按分类管理里的顺序一行 4 个，现在选中的高亮；点一个就选好、关掉，回到原来的面板。
+            //   底部「取消 | 管理分类」（左退右进；没给 onManage 的只有「取消」）。
+            //   o: { title, type（expense / income / 空）, value, recent（不给就按 recentCats 算）, cats（不给就是全部分类）, onPick(分类), onManage, onCancel }
+            const CAT_SEARCH_MIN=12;
+            function cats(o){
+                const all=(o.cats||getCats()).slice();
+                const rec=(o.recent||recentCats(o.type)).filter(c=>all.includes(c)).slice(0, 4);
+                const tn=o.type==='expense' ? '支出 · ' : o.type==='income' ? '收入 · ' : '';
+                open({ title:o.title||'选分类', sub:`${tn}共 ${all.length} 个`, onDismiss:o.onCancel,
+                    body(box, done){
+                        const mk=(c)=>{ const b=document.createElement('button'); b.type='button'; b.className='cc'+(c===o.value?' sel':''); b.textContent=c; b.dataset.value=c;
+                            b.addEventListener('click', ()=>{ done(); if(o.onPick) o.onPick(c); }); return b; };
+                        const sec=(h, list, id)=>{ const d=document.createElement('div'); d.className='cat-drawer-sec'; d.id=id;
+                            const t=document.createElement('div'); t.className='cat-drawer-h'; t.textContent=h; d.appendChild(t);
+                            const g=document.createElement('div'); g.className='cat-chips cat-grid4'; list.forEach(c=>g.appendChild(mk(c))); d.appendChild(g); return d; };
+                        let q=null;
+                        if(all.length>=CAT_SEARCH_MIN){
+                            const lb=document.createElement('label'); lb.className='cat-drawer-search';
+                            lb.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+                            q=document.createElement('input'); q.type='search'; q.id='catDrawerQ'; q.placeholder='搜分类'; q.setAttribute('aria-label','搜分类'); q.setAttribute('enterkeyhint','search');
+                            lb.appendChild(q); box.appendChild(lb);
+                        }
+                        const recBox=sec('最近常用', rec, 'catDrawerRecent'), allBox=sec('全部', all, 'catDrawerAll');
+                        const none=document.createElement('div'); none.className='cat-drawer-none'; none.style.display='none';
+                        box.appendChild(recBox); box.appendChild(allBox); box.appendChild(none);
+                        if(q) q.addEventListener('input', ()=>{
+                            const k=q.value.trim().toLowerCase(); let n=0;
+                            allBox.querySelectorAll('.cc').forEach(b=>{ const hit=!k || b.textContent.toLowerCase().includes(k); b.style.display=hit?'':'none'; if(hit) n++; });
+                            recBox.style.display=k ? 'none' : '';
+                            allBox.querySelector('.cat-drawer-h').textContent=k ? `找到 ${n} 个` : '全部';
+                            none.textContent=`没有「${q.value.trim()}」`; none.style.display=(k && !n) ? '' : 'none';
+                        });
+                    },
+                    foot(box){
+                        const row=document.createElement('div'); row.className='ui-pair';
+                        const c=document.createElement('button'); c.type='button'; c.className='ui-btn'; c.id='uiSheetCancel'; c.textContent='取消';
+                        c.addEventListener('click', ()=>dismiss());
+                        row.appendChild(c);
+                        if(o.onManage){
+                            const m=document.createElement('button'); m.type='button'; m.className='ui-btn'; m.id='catDrawerManage'; m.textContent='管理分类';
+                            m.addEventListener('click', ()=>{ close(); o.onManage(); });
+                            row.appendChild(m);
+                        }
+                        box.appendChild(row);
+                    } });
+            }
+            // 1020-G：统计面板（点「统计」那一行）：三行（计入 / 不计 / 往来），每行名字 + 一句说明，选中的打勾；点一下就选好并关掉；最下面「取消」
+            //   o: { value, names, hints, onPick(值), onCancel }
+            function modes(o){
+                open({ title:'统计', onDismiss:o.onCancel,
+                    body(box, done){
+                        const list=document.createElement('div'); list.className='mode-pick'; list.id='modePick'; list.setAttribute('role','radiogroup');
+                        ['normal','skip','flow'].forEach(v=>{
+                            const b=document.createElement('button'); b.type='button'; b.className='mode-pick-row'+(v===o.value?' sel':''); b.dataset.v=v;
+                            b.setAttribute('role','radio'); b.setAttribute('aria-checked', String(v===o.value));
+                            const tx=document.createElement('div'); tx.className='mode-pick-txt';
+                            const nm=document.createElement('b'); nm.textContent=o.names[v];
+                            const ht=document.createElement('span'); ht.textContent=o.hints[v];
+                            tx.appendChild(nm); tx.appendChild(ht); b.appendChild(tx);
+                            if(v===o.value) b.insertAdjacentHTML('beforeend', '<svg class="mode-pick-ok" viewBox="0 0 24 24" role="img" aria-label="已选"><path d="M5 12l5 5 9-10"/></svg>');
+                            b.addEventListener('click', ()=>{ done(); if(o.onPick) o.onPick(v); });
+                            list.appendChild(b);
+                        });
+                        box.appendChild(list);
+                    },
+                    foot(box){
+                        const c=document.createElement('button'); c.type='button'; c.className='ui-btn block'; c.id='uiSheetCancel'; c.textContent='取消';
+                        c.addEventListener('click', ()=>dismiss());
+                        box.appendChild(c);
+                    } });
+            }
+            return { open, pick, cats, modes, close, isOpen, back:dismiss, _sheet:()=>sheet };
         })();
 
         // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====

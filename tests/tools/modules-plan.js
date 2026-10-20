@@ -71,6 +71,7 @@ const CALLBACKS = {
   'settings → tabs': ['snapDrop', 'refreshCatSelectors', 'refreshAllViews'],   // 换主题、改默认进入页面后删首屏快照（同上）
   'ledger → tabs': ['refreshAllViews'],
   'forms → tabs': ['refreshAllViews'],
+  'forms → cats': ['openCatManager'],   // 1020-G：分类抽屉底部「管理分类」打开分类管理（分类管理排在记一笔后面：它要调记一笔那边的刷新），关了回到抽屉
   'stats → tabs': ['refreshAllViews'],
 };
 

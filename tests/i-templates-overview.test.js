@@ -1,5 +1,6 @@
 // 1010-I 专项：常用模板 + 预算总览「预算外 / 今年至今」。node test11.js <html>
 const fs=require('fs'); const {JSDOM}=require('jsdom'); const IDB=require('./helpers/idb');
+const RC=require('./helpers/rec');   // 1020-G：选分类（不在最近常用 4 个里的从抽屉选）、选统计（面板）
 const html=fs.readFileSync(process.argv[2]||require('path').join(__dirname,'..','www','index.html'),'utf8');
 let pass=0, fail=0; const ok=(c,n)=>{ if(c) pass++; else { fail++; console.log('  ✗ '+n); } };
 const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type,cat,remark:remark||''},extra||{});
@@ -18,7 +19,7 @@ function bootSync(arc, extraArchives){
   const st=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey()));
   const arcOf=()=>st().archives['默认存档'];
   const chipTxt=box=>[...$(box).querySelectorAll('.cc')].map(e=>e.textContent);
-  const clickChip=(box,txt)=>[...$(box).querySelectorAll('.cc')].find(e=>e.textContent===txt).click();
+  const clickChip=(box,txt)=>RC.chip(d, box, txt).click();
   const choose=label=>{ [...$('askChoices').querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent.startsWith(label)).click(); $('askOk').click(); };
   const openAdd=()=>$('fabAdd').click();
   return {w:dom.window,d,$,errs,st,arcOf,chipTxt,clickChip,choose,openAdd};
@@ -92,7 +93,7 @@ function bootSync(arc, extraArchives){
   t.clickChip('billTplChips','视频会员157');
   ok(t.$('billMoney').value==='157' && t.$('billRemark').value==='视频会员', '金额与备注已填');
   ok(t.d.activeElement!==t.$('billMoney'), '带金额：收起键盘（金额框失焦）');
-  ok(t.$('billCatChips').querySelector('.cc.sel').textContent==='订阅' && t.$('billTypeChips').querySelector('.sel-out'), '分类、支出已选');
+  ok(t.w.JiwenForms.billCatSel==='订阅' && t.$('billTypeChips').querySelector('.sel-out'), '分类、支出已选');
   ok(t.$('billMode').dataset.mode==='normal', '口径计入');
   ok(t.arcOf().records.length===before, '只填表，不入账');
   ok((t.$('billTime').dataset.value || t.$('billTime').textContent)===time0, '时间不动');

@@ -30,6 +30,9 @@ const MASKS = ['addMask', 'editMask', 'detailMask', 'refundMask', 'tplMask', 'ca
   MASKS.forEach(id => {
     const box = $(id).querySelector('.form-btns'); if (!box) { ok(false, `1 ${id} 底部按钮那排`); return; }
     const last = box.lastElementChild;
+    // 1020-G：记一笔 / 修改照方案 D：「保存」整宽在上，最下面一行「关闭 / 取消 | 存为常用」左右并排（左退右进）
+    if (box.classList.contains('rec-foot')) { const back = last.firstElementChild;
+      ok(box.firstElementChild.classList.contains('primary') && last.classList.contains('ui-pair') && back.classList.contains('ui-btn') && /取消|关闭/.test(back.textContent) && /存为常用/.test(last.lastElementChild.textContent), `1 ${id} 保存在上，最下面「${back.textContent} | 存为常用」并排`); return; }
     ok(box.classList.contains('ui-stack') && last.classList.contains('ui-btn') && /取消|关闭/.test(last.textContent), `1 ${id} 按钮竖排、「${last.textContent}」在最下面`);
   });
   // 日子：保存在上、删除整宽警示色、取消最下面

@@ -4,6 +4,7 @@
 // 只改排法：记的内容、收支必选、口径规则都不变。412×970 一屏放得下在 tests 外用真 Chromium 截图量（见提交说明）。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
+const RC = require('./helpers/rec');   // 1020-G：分类不在最近常用 4 个里的从分类抽屉选
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
 const html = fs.readFileSync(htmlFile, 'utf8');
 const WWW = path.dirname(htmlFile);
@@ -25,17 +26,18 @@ const recs = [
 
   // 1. 排法：时间一行小字 → 金额一行（¥ + 大字 + 小的收支）→ 分类 → 统计 → 备注；保存在底部那排、主按钮在上
   $('fabAdd').click(); await wait(420); w.kpClose();
-  ok(after('billTimeLine', 'billMoney') && after('billMoney', 'billCatChips') && after('billCatChips', 'billMode') && after('billMode', 'billRemark') && !$('billMoreBtn'), '1 时间 → 金额 → 分类 → 统计 → 备注（没有「更多」）');
+  // 1020-G 起照方案 D：时间 → 金额 → 收支两个按钮 → 分类 4 个 → 列表卡（更多 / 统计 / 备注）
+  ok(after('billTimeLine', 'billMoney') && after('billMoney', 'billTypeChips') && after('billTypeChips', 'billCatChips') && after('billCatChips', 'billCatMore') && after('billCatMore', 'billMode') && after('billMode', 'billRemarkRow') && !$('billMoreBtn'), '1 时间 → 金额 → 收支 → 分类 → 更多 → 统计 → 备注');
   const row = $('billMoney').closest('.rec-money-row');
-  ok(row && row.contains($('billTypeChips')) && $('billTypeChips').classList.contains('io-mini'), '1 收支是金额旁边一个小切换（同一行）');
+  ok(row && !row.contains($('billTypeChips')) && $('billTypeChips').classList.contains('io-pair'), '1 1020-G：收支是金额下面两个一样大的按钮');
   ok([...$('billTypeChips').children].map(c => c.textContent).join() === '支出,收入' && !$('billTypeChips').querySelector('.sel-out,.sel-in'), '1 收支照旧不默认选中');
   ok($('billTime').closest('.rec-time-raw') || $('billTime').classList.contains('rec-time-raw'), '1 原来的时间框藏起来（值还在它身上）');
   const now = new w.Date();   // 测试里 App 的「现在」是假的（helpers/app.js 固定的时间）
   ok($('billTimeTxt').textContent === '今天 ' + pad(now.getHours()) + ':' + pad(now.getMinutes()), '1 时间写成「今天 HH:mm」：' + $('billTimeTxt').textContent);
   const foot = $('addBill').parentElement;
-  ok(foot.classList.contains('rec-foot') && foot.firstElementChild === $('addBill') && foot.lastElementChild === $('closeAdd') && $('addBill').textContent === '保存' && $('addBill').classList.contains('primary'), '1 底部那排：「保存」（主按钮）在上、「关闭」在最下');
-  ok(!foot.contains($('billSaveTpl')) && $('addSheet').contains($('billSaveTpl')), '1 「存为常用」挪进内容里');
-  ok($('billRemark').getAttribute('rows') === '1' && $('billRemark').classList.contains('txt-field'), '1 备注一行，点了弹文字输入小面板');
+  ok(foot.classList.contains('rec-foot') && foot.firstElementChild === $('addBill') && foot.lastElementChild.contains($('closeAdd')) && $('addBill').textContent === '保存' && $('addBill').classList.contains('primary'), '1 底部那排：「保存」（主按钮）在上、「关闭」在最下');
+  ok(foot.lastElementChild.classList.contains('ui-pair') && foot.lastElementChild.firstElementChild === $('closeAdd') && foot.lastElementChild.lastElementChild === $('billSaveTpl'), '1 1020-G：最下面一行「关闭 | 存为常用」左右并排');
+  ok($('billRemark').classList.contains('txt-field') && $('billRemarkRow'), '1 备注一行，点了弹文字输入小面板');
 
   // 2. 时间：昨天 / 今年别的日子 / 往年；点那一行弹日期时间选择，选完那一行跟着变
   const y = new w.Date(now.getTime()); y.setDate(y.getDate() - 1); y.setHours(9, 5);
@@ -51,46 +53,45 @@ const recs = [
   ok(shown('dtMask'), '2 点时间那一行：弹日期时间选择');
   w.JiwenDate.closeDtPicker && w.JiwenDate.closeDtPicker(); if (shown('dtMask')) $('dtMask').style.display = 'none';
 
-  // 3. 1019-Z：统计一行三个小按钮，直接看得见；说明只在不是「计入」时显示；选了信用卡还款这类分类照旧自动变「不计」
-  const modes = () => [...$('billMode').children].map(c => c.textContent).join();
-  const hintShown = id => $(id + 'Hint').style.display !== 'none';
-  ok(modes() === '计入,不计,往来' && $('billMode').classList.contains('mode-mini') && $('billMode').querySelector('.cc.sel').dataset.v === 'normal', '3 一行三个：计入 / 不计 / 往来，默认计入');
-  ok(!hintShown('billMode'), '3 计入时不写说明');
-  [...$('billMode').children].find(c => c.dataset.v === 'flow').click();
-  ok(hintShown('billMode') && /资金往来/.test($('billModeHint').textContent), '3 点「往来」：说明出来');
+  // 3. 1020-G：统计是列表卡里一行，右边写现在的（计入 / 不计 / 往来），点了弹统计面板（三行，名字 + 说明，选中的打勾）
+  const modeTxt = id => $(id).querySelector('.rec-row-v').textContent;
+  ok(modeTxt('billMode') === '计入' && $('billMode').dataset.mode === 'normal', '3 默认计入');
+  $('billMode').click();
+  ok([...d.querySelectorAll('#modePick .mode-pick-row')].map(r => r.dataset.v).join() === 'normal,skip,flow' && d.querySelector('#modePick .mode-pick-row.sel').dataset.v === 'normal', '3 统计面板三行：计入 / 不计 / 往来，选中计入');
+  d.querySelector('#modePick .mode-pick-row[data-v="flow"]').click();
+  ok(modeTxt('billMode') === '往来' && !w.JiwenSheet.isOpen(), '3 点「往来」：选好、面板关掉，那一行写「往来」');
   w.JiwenForms.resetBillForm();
-  ok($('billMode').querySelector('.cc.sel').dataset.v === 'normal' && !hintShown('billMode'), '3 重新开一笔：回到计入、说明收起');
+  ok(modeTxt('billMode') === '计入', '3 重新开一笔：回到计入');
   w.JiwenForms.setModeChips($('billMode'), 'skip');
-  ok(hintShown('billMode') && /重复记录/.test($('billModeHint').textContent), '3 不是「计入」（模板、草稿带来的）：说明照样写');
+  ok(modeTxt('billMode') === '不计', '3 不是「计入」（模板、草稿带来的）：那一行照样写');
   w.JiwenForms.setModeChips($('billMode'), 'normal');
-  ok(!hintShown('billMode'), '3 换回计入：说明收起');
 
   // 4. 照旧记得进去：选收支、分类、填金额，点保存
   $('billMoney').value = '26.5';
   [...$('billTypeChips').children].find(c => c.textContent === '支出').click();
-  [...$('billCatChips').children].find(c => c.textContent === '吃饭').click();
+  RC.chip(d, 'billCatChips', '吃饭').click();
   $('addBill').click(); await t.idle();
   const saved = w.JiwenStore.loadStore(A.ID).archives['默认存档'].records.find(r => r.money === 26.5);
   ok(saved && saved.type === 'expense' && saved.cat === '吃饭' && !shown('addMask'), '4 照旧记进账本、记一笔关掉');
   // 收支没选：照旧拦住
   $('fabAdd').click(); await wait(420); w.kpClose();
   $('billMoney').value = '3';
-  [...$('billCatChips').children].find(c => c.textContent === '吃饭').click();
+  RC.chip(d, 'billCatChips', '吃饭').click();
   $('addBill').click(); await t.idle();
   ok(shown('addMask') && w.JiwenStore.loadStore(A.ID).archives['默认存档'].records.length === 3, '4 收支没选：照旧不让存');
   $('closeAdd').click(); await wait(400);
 
   // 5. 修改账单同一套；口径不是「计入」的一打开就展开
   w.openEdit('r2'); await t.idle();
-  ok(after('editTimeLine', 'editMoney') && $('editMoney').closest('.rec-money-row').contains($('editTypeChips')), '5 修改：时间一行、金额旁边收支');
+  ok(after('editTimeLine', 'editMoney') && after('editMoney', 'editTypeChips') && after('editTypeChips', 'editCatChips') && after('editCatChips', 'editMode'), '5 修改：同一套（时间、金额、收支、分类、列表卡）');
   ok($('editTimeTxt').textContent === '2025年3月5日 08:07' || $('editTimeTxt').textContent.endsWith('3月5日 08:07'), '5 修改：时间小字 ' + $('editTimeTxt').textContent);
-  ok($('editMode').querySelector('.cc.sel').dataset.v === 'flow' && hintShown('editMode'), '5 往来的记录：选中「往来」、写说明');
+  ok($('editMode').dataset.mode === 'flow' && modeTxt('editMode') === '往来', '5 往来的记录：那一行写「往来」');
   const ef = $('saveEdit').parentElement;
-  ok(ef.classList.contains('rec-foot') && ef.firstElementChild === $('saveEdit') && ef.lastElementChild === $('cancelEdit'), '5 底部「保存」在上、「取消」在最下');
-  ok(!ef.contains($('deleteInEdit')) && !ef.contains($('editRefundBtn')) && !ef.contains($('editSaveTpl')), '5 退款 / 存为常用 / 删除挪进内容里');
+  ok(ef.classList.contains('rec-foot') && ef.firstElementChild === $('saveEdit') && ef.lastElementChild.firstElementChild === $('cancelEdit') && ef.lastElementChild.lastElementChild === $('editSaveTpl'), '5 底部「保存」在上、最下面「取消 | 存为常用」');
+  ok(!ef.contains($('deleteInEdit')) && !ef.contains($('editRefundBtn')) && after('editRemarkRow', 'editRefundBtn') && after('editRefundBtn', 'deleteInEdit') && $('deleteInEdit').classList.contains('warn'), '5 退款 / 删除放在列表卡下面，删除用警示色');
   $('cancelEdit').click(); await wait(400);
   w.openEdit('r1'); await t.idle();
-  ok($('editMode').querySelector('.cc.sel').dataset.v === 'normal' && !hintShown('editMode'), '5 计入的记录：选中「计入」、不写说明');
+  ok($('editMode').dataset.mode === 'normal' && modeTxt('editMode') === '计入', '5 计入的记录：写「计入」');
   $('cancelEdit').click();
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));

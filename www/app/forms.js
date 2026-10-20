@@ -1,6 +1,6 @@
 (function(){
         const { $, MODE_HINT, addBill, billCat, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, escapeHtml, fillSelect, normMoney, nowDtValue, parseRecTime, recMode, round2, safeNum, sanitizeMoney, saveEdit, setRecMode } = window.JiwenBase;   // 用到前面模块的
-        const { TPL_MAX, TPL_NAME_MAX, __ledger, budgetPhrase, budgetSpentIn, charLen, curArchive, genId, getBudgets, getCats, getUserData, isRefund, loadStore, refundedTotal, refundsOf, saveStoreSafe, saveUserData, storeKey, syncRefunds, tplName, tplSame } = window.JiwenStore;   // 用到前面模块的
+        const { TPL_MAX, TPL_NAME_MAX, __ledger, recentCats, budgetPhrase, budgetSpentIn, charLen, curArchive, genId, getBudgets, getCats, getUserData, isRefund, loadStore, refundedTotal, refundsOf, saveStoreSafe, saveUserData, storeKey, syncRefunds, tplName, tplSame } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customChoose, customConfirm, customPrompt } = window.JiwenAsk;   // 用到前面模块的
         const { getDtInput, openDtPicker, setDtInput } = window.JiwenDate;   // 用到前面模块的
 
@@ -31,42 +31,77 @@
         // ===== 悬浮按钮：打开/关闭记账弹窗 =====
         const addMask=$('addMask');
 
-        // 渲染记账弹窗的分类标签：按存档里 cats 的固定顺序显示（顺序由「管理分类」页拖动决定）
-        // 不默认选中任何分类——分类为必选项，由用户主动点选
+        // ===== 1020-G：分类一行 4 个「最近常用」+「更多」那一行（分类抽屉）=====
+        //   最近常用照 recentCats：最近 60 天用得最多的 4 个，选了收支就按那一种算、没选不分收支；不够 4 个的用分类管理里排在前面的补齐。
+        //   打开面板时算一次；开着的时候点分类、从抽屉里选都不挪位置（只有换收支时按那一种重算一次）。
+        //   选的是这 4 个以外的：「更多」那一行右边写这个分类名（加粗）；选的是这 4 个之一：右边空着。
+        //   不默认选中任何分类——分类为必选项，由用户主动点选
         let billCatSel='';
-        function renderBillCatChips(){
-            const cats=getCats();
-            billCatSel='';               // 每次渲染都重置为「未选」
-            billCat.value='';
-            const box=$('billCatChips');
+        const recentOf={ bill:[], edit:[] };
+        function paintCatRow(p, sel){
+            $(p+'CatChips').querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.textContent===sel));
+            const out = sel && !recentOf[p].includes(sel);
+            const v=$(p+'CatMoreVal'); v.textContent = out ? sel : ''; v.classList.toggle('on', !!out);
+        }
+        function renderRecentChips(p, type, onPick){
+            recentOf[p]=recentCats(type, 4);
+            const box=$(p+'CatChips');
             box.innerHTML='';
-            cats.forEach(c=>{
+            recentOf[p].forEach(c=>{
                 const b=document.createElement('div');
                 b.className='cc';
                 b.textContent=c;
-                b.onclick=()=>{
-                    const prevCat=billCatSel;
-                    billCatSel=c; billCat.value=c;
-                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
-                    autoModeOnCat($('billMode'), prevCat, c);
-                };
+                b.setAttribute('role','button');
+                b.onclick=()=>onPick(c);
                 box.appendChild(b);
             });
         }
+        function pickBillCat(c){
+            const prevCat=billCatSel;
+            billCatSel=c; billCat.value=c;
+            paintCatRow('bill', c);
+            autoModeOnCat($('billMode'), prevCat, c);
+        }
+        function renderBillCatChips(keep){
+            const cats=getCats();
+            billCatSel='';               // 每次渲染都重置为「未选」
+            billCat.value='';
+            fillSelect(billCat, cats, null); billCat.value='';
+            renderRecentChips('bill', billTypeSel, pickBillCat);
+            if(keep && cats.includes(keep)){ billCatSel=keep; billCat.value=keep; }
+            paintCatRow('bill', billCatSel);
+        }
+        // 分类抽屉（共用底部面板 JiwenSheet.cats）：点一个就选好、关掉，回到记一笔 / 修改；「管理分类」打开分类管理，关了回到抽屉
+        function openCatDrawer(p){
+            const isBill = p==='bill';
+            const type = isBill ? billTypeSel : editTypeSel;
+            const pick = isBill ? pickBillCat : pickEditCat;
+            const again=()=>openCatDrawer(p);
+            window.JiwenSheet.cats({ type, value: isBill ? billCatSel : editCatSel, recent: recentOf[p], onPick: pick,
+                onManage: ()=>{
+                    window.JiwenCats.openCatManager();
+                    const m=$('catMask');
+                    const ob=new MutationObserver(()=>{ if(m.style.display==='none'){ ob.disconnect(); if($(isBill ? 'addMask' : 'editMask').style.display==='flex') again(); } });
+                    ob.observe(m, { attributes:true, attributeFilter:['style'] });
+                } });
+        }
+        $('billCatMore').addEventListener('click', ()=>openCatDrawer('bill'));
+        $('editCatMore').addEventListener('click', ()=>openCatDrawer('edit'));
+        // 备注那一行：右边写已经写好的备注（一行，太长省略），没写空着；点了弹文字小面板（备注框本身藏着，值还在它身上）
+        function paintRemarkRow(p){ const t=$(p+'Remark').value.replace(/\s+/g,' ').trim(); $(p+'RemarkVal').textContent=t; }
+        ['bill','edit'].forEach(p=>{
+            $(p+'RemarkRow').addEventListener('click', ()=>window.openTextPanel($(p+'Remark')));
+            $(p+'Remark').addEventListener('input', ()=>paintRemarkRow(p));
+        });
+        // 别处直接改了备注框的值（模板、期初余额、接着填）以后，调这个把那一行跟上
+        function syncRecRows(){ paintRemarkRow('bill'); paintRemarkRow('edit'); }
 
         // 分类增删改/排序后调用：若记账弹窗正开着，重渲染标签使其立即反映最新分类。
         // 尽量保留用户当前已选的分类（若它还存在）。
         function refreshBillCatChipsIfOpen(){
             if($('addMask').style.display!=='flex') return;
             renderTplChips();
-            const keep=billCatSel;
-            renderBillCatChips();
-            if(keep && getCats().includes(keep)){
-                billCatSel=keep; billCat.value=keep;
-                $('billCatChips').querySelectorAll('.cc').forEach(el=>{
-                    el.classList.toggle('sel', el.textContent===keep);
-                });
-            }
+            renderBillCatChips(billCatSel);
         }
 
         // 修改账单弹窗若正开着，分类增删改/排序后同步重渲染其 chips，
@@ -74,10 +109,10 @@
         function refreshEditCatChipsIfOpen(){
             if($('editMask').style.display!=='flex') return;
             const keep=editCatSel;
-            renderEditCatChips(getCats().includes(keep) ? keep : '');
+            renderEditCatChips(getCats().includes(keep) ? keep : '', editTypeSel);
         }
 
-        // 渲染收支标签：支出/收入，必选、不默认选中。选中态用语义色（支出红/收入绿）
+        // 渲染收支标签：支出/收入，必选、不默认选中。1020-G 起两个一样大的按钮，选中的主色实心（不用红绿；类名照旧 sel-out / sel-in）
         let billTypeSel='';
         function renderBillTypeChips(){
             billTypeSel='';
@@ -90,12 +125,15 @@
                 const b=document.createElement('div');
                 b.className='cc';
                 b.textContent=o.t;
+                b.setAttribute('role','radio');
                 b.onclick=()=>{
+                    const changed=billTypeSel!==o.v;
                     billTypeSel=o.v; billType.value=o.v;
                     box.querySelectorAll('.cc').forEach(el=>{
                         el.classList.remove('sel-out','sel-in');
                     });
                     b.classList.add(o.cls);
+                    if(changed) renderBillCatChips(billCatSel);   // 最近常用按这一种收支重算（选好的分类留着）
                 };
                 box.appendChild(b);
             });
@@ -108,10 +146,17 @@
         // 用户手动点过就清掉标记，之后完全听用户的。
         const SKIP_DEFAULT_CATS=['转账'];
         const MODE_OPTS=[ {v:'normal', t:'计入'}, {v:'skip', t:'不计'}, {v:'flow', t:'往来'} ];
+        const REC_MODE_NAME={ normal:'计入', skip:'不计', flow:'往来' };
         function paintModeChips(box){
             const cur=box.dataset.mode||'normal';
             box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===cur));
-            const hint=$(box.id+'Hint'); if(hint){ hint.textContent=MODE_HINT[cur]; if(box.classList.contains('mode-mini')) hint.style.display = cur==='normal' ? 'none' : ''; }   // 1019-Z：一行小按钮的，计入时不写说明
+            const v=box.querySelector('.rec-row-v'); if(v) v.textContent=REC_MODE_NAME[cur];   // 1020-G：列表卡里「统计」那一行右边写现在的
+            const hint=$(box.id+'Hint'); if(hint) hint.textContent=MODE_HINT[cur];
+        }
+        // 1020-G：点「统计」那一行弹统计面板（三行，名字 + 说明，选中的打勾，点一下就选好并关掉）
+        function openModeSheet(box){
+            window.JiwenSheet.modes({ value:getModeChips(box), names:REC_MODE_NAME, hints:MODE_HINT,
+                onPick:v=>{ box.dataset.mode=v; delete box.dataset.auto; paintModeChips(box); } });
         }
         function setModeChips(box, mode){
             if(!box) return;
@@ -130,6 +175,7 @@
         }
         ['billMode','editMode','tplEditMode'].forEach(id=>{
             const box=$(id); if(!box) return;
+            if(box.classList.contains('rec-row')){ box.addEventListener('click', ()=>openModeSheet(box)); setModeChips(box, 'normal'); return; }
             MODE_OPTS.forEach(o=>{
                 const b=document.createElement('div');
                 b.className='cc'; b.textContent=o.t; b.dataset.v=o.v;
@@ -146,6 +192,7 @@
             setModeChips($('billMode'), 'normal');
             renderBillTypeChips();
             renderBillCatChips();
+            syncRecRows();
             renderTplChips();
             setDtInput(billTime, nowDtValue());
         }
@@ -200,13 +247,10 @@
             const ioTxt = t.type==='expense' ? '支出' : '收入';
             const io=[...$('billTypeChips').querySelectorAll('.cc')].find(el=>el.textContent===ioTxt);
             if(io) io.click();
-            if((cats||getCats()).includes(t.cat)){
-                const c=[...$('billCatChips').querySelectorAll('.cc')].find(el=>el.textContent===t.cat);
-                if(c) c.click();
-            }
+            if((cats||getCats()).includes(t.cat)) pickBillCat(t.cat);
             // 分类点击可能触发「转账 → 自动不计」，模板里存的口径优先，放在分类之后设
             setModeChips($('billMode'), t.mode||'normal');
-            billRemark.value=t.remark||'';
+            billRemark.value=t.remark||''; syncRecRows();
             billMoney.value = t.money!=null ? String(round2(t.money)) : '';
             // 带金额：表单已填全，收起键盘露出「添加记录」；要改金额再点输入框。
             // 不带金额：金额还得填，直接聚焦弹键盘。
@@ -492,13 +536,8 @@
             }
             const m = normMoney(money);
             if(!cat){
-                const opts=getCats().map(c=>({ value:c, label:c }));
-                customChoose('', opts, (v)=>{
-                    billCatSel=v; billCat.value=v;
-                    $('billCatChips').querySelectorAll('.cc')
-                        .forEach(el=>el.classList.toggle('sel', el.textContent===v));
-                    addBill.click();
-                }, '分类');
+                // 1020-G：没选分类：弹分类抽屉补上，选好接着保存
+                window.JiwenSheet.cats({ type, value:'', recent:recentOf.bill, onPick:(v)=>{ pickBillCat(v); addBill.click(); } });
                 return;
             }
             if(!type){
@@ -570,27 +609,22 @@
 
         // ===== 修改弹窗的分类/收支标签（与记账弹窗同款，但打开时预选记录原有值）=====
         let editCatSel='', editTypeSel='';
-        // selected: 要预选中的分类；不传或不存在则不选中
-        function renderEditCatChips(selected){
+        // selected: 要预选中的分类；不传或不存在则不选中。1020-G 起照记一笔：4 个最近常用（按这条记录的收支算）+「更多」那一行；
+        //   这条记录现在的分类不在 4 个里的，写在「更多」那一行
+        function pickEditCat(c){
+            const prevCat=editCatSel;
+            editCatSel=c; editCat.value=c;
+            paintCatRow('edit', c);
+            autoModeOnCat($('editMode'), prevCat, c);
+        }
+        function renderEditCatChips(selected, type){
             const cats=getCats();
             // 隐藏 select 需含每个分类的 option，否则 editCat.value=c 不生效
             fillSelect(editCat, cats, null);
             editCatSel = (selected && cats.includes(selected)) ? selected : '';
             editCat.value=editCatSel;
-            const box=$('editCatChips');
-            box.innerHTML='';
-            cats.forEach(c=>{
-                const b=document.createElement('div');
-                b.className='cc'+(c===editCatSel?' sel':'');
-                b.textContent=c;
-                b.onclick=()=>{
-                    const prevCat=editCatSel;
-                    editCatSel=c; editCat.value=c;
-                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
-                    autoModeOnCat($('editMode'), prevCat, c);
-                };
-                box.appendChild(b);
-            });
+            renderRecentChips('edit', type || editTypeSel, pickEditCat);
+            paintCatRow('edit', editCatSel);
         }
         function renderEditTypeChips(selected){
             editTypeSel = (selected==='expense'||selected==='income') ? selected : '';
@@ -603,10 +637,13 @@
                 const b=document.createElement('div');
                 b.className='cc'+(o.v===editTypeSel?' '+o.cls:'');
                 b.textContent=o.t;
+                b.setAttribute('role','radio');
                 b.onclick=()=>{
+                    const changed=editTypeSel!==o.v;
                     editTypeSel=o.v; editType.value=o.v;
                     box.querySelectorAll('.cc').forEach(el=>el.classList.remove('sel-out','sel-in'));
                     b.classList.add(o.cls);
+                    if(changed) renderEditCatChips(editCatSel, o.v);
                 };
                 box.appendChild(b);
             });
@@ -623,9 +660,10 @@
             editMask.classList.toggle('over-detail', !!opts.fromDetail);
             setDtInput(editTime, item.time); editMoney.value=item.money; editRemark.value=item.remark||'';
             // 预选记录原有的分类与收支（标签式）
-            renderEditCatChips(item.cat||'未分类');
             renderEditTypeChips(item.type||'income');
+            renderEditCatChips(item.cat||'未分类', item.type||'income');
             setModeChips($('editMode'), recMode(item));
+            syncRecRows();
             paintEditRefund(item);
             editMask.style.display='flex';
         };
@@ -771,5 +809,5 @@
             m.querySelectorAll('.cc, .day-switch').forEach(e=>parts.push(e.className));
             return JSON.stringify(parts);
         }
-        window.JiwenForms = { get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenForms = { get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();

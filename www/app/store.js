@@ -3188,6 +3188,26 @@
         }
 
         function getCats(){ return curArchive(loadStore()).cats; }
+        // 1020-G：「最近常用」的分类：最近 RECENT_DAYS（60）天里用得最多的 n 个（退款不算，分类要还在名单里）；
+        //   type 是 expense / income 就只数这一种，没有就不分收支；一样多的排最近用过的在前，再按分类管理里的顺序；
+        //   不够 n 个的用分类管理里排在前面的补齐。打开面板时算一次，面板开着时位置不变（由调用的地方管）。
+        const RECENT_DAYS=60;
+        function recentCats(type, n, now){
+            n=n||4;
+            const cats=getCats(), from=new Date(now||Date.now()); from.setDate(from.getDate()-RECENT_DAYS);
+            const fromS=`${from.getFullYear()}-${String(from.getMonth()+1).padStart(2,'0')}-${String(from.getDate()).padStart(2,'0')}`;
+            const cnt=new Map(), last=new Map();
+            getUserData().forEach(r=>{
+                if(!r || isRefund(r) || !cats.includes(r.cat)) return;
+                if((type==='expense'||type==='income') && r.type!==type) return;
+                const t=String(r.time||''); if(t.slice(0,10)<fromS) return;
+                cnt.set(r.cat, (cnt.get(r.cat)||0)+1);
+                if(!last.has(r.cat) || t>last.get(r.cat)) last.set(r.cat, t);
+            });
+            const out=[...cnt.keys()].sort((a,b)=>(cnt.get(b)-cnt.get(a)) || (last.get(a)<last.get(b) ? 1 : last.get(a)>last.get(b) ? -1 : 0) || (cats.indexOf(a)-cats.indexOf(b))).slice(0, n);
+            for(const c of cats){ if(out.length>=n) break; if(!out.includes(c)) out.push(c); }
+            return out;
+        }
 
         // 【1013-G】只拷当前存档的记录数组（浅拷贝），不用把整个 store 都拼出来
         function getUserData(){
@@ -3298,5 +3318,5 @@
             const dt=new Date(y, mo-1, d);
             return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d;
         }
-        window.JiwenStore = { IMPORT_MAX_BYTES, IMP_APPS, MAX_IMPORT_RECORDS, TPL_MAX, TPL_NAME_MAX, __LEDGER_STRICT, __corruptedStores, __ledger, __ledgerKeys, __ledgerMergeNotes, __ledgerPending, accountById, accountNameError, balContrib, budgetPhrase, budgetSpentIn, catSigned, charLen, charSlice, createAccount, curArchive, daysKey, expSigned, genId, getAccounts, getBudgets, getCats, getUserData, idbBatch, idbKeys, impArchFields, impBkPrefix, impBlkDecode, impCleanAiFlag, impDraftExpire, impExportFields, impGetJson, impLogKey, impMakeBackup, impOrdersRestoreFromCloud, impPendKey, impRecHash, impRulesDropCat, impRulesRenameCat, impTarget, importArchiveFromText, isAccountId, isRefund, isValidDay, ledgerAcceptDamage, ledgerDamageNotice, ledgerDropAccount, ledgerEvictExcept, ledgerExists, ledgerGet, ledgerIdle, ledgerLoad, loadDays, loadStore, mergeImportedDays, migrateAccounts, migrateLedgersToBlocks, migrateLedgersToIdb, modeAmtCls, modeTag, nameOf, nameTaken, odBuildPayload, odClearLink, odGetLink, odGetOrdLink, odMoveLink, odOrdersSync, odPlugin, odRefreshStatusUI, odScheduleSync, odSetLink, odSetOrdLink, odSyncNow, recoverAccountsIfBroken, refundedMap, refundedTag, refundedTotal, refundsOf, sanitizeTpls, saveAccounts, saveStore, saveStoreDurable, saveStoreSafe, saveUserData, setAccountHidden, stampAccountName, statContrib, storeKey, syncRefunds, touchAccount, tplName, tplSame, trackBusy };   // store 模块对外只有这一个入口
+        window.JiwenStore = { RECENT_DAYS, recentCats, IMPORT_MAX_BYTES, IMP_APPS, MAX_IMPORT_RECORDS, TPL_MAX, TPL_NAME_MAX, __LEDGER_STRICT, __corruptedStores, __ledger, __ledgerKeys, __ledgerMergeNotes, __ledgerPending, accountById, accountNameError, balContrib, budgetPhrase, budgetSpentIn, catSigned, charLen, charSlice, createAccount, curArchive, daysKey, expSigned, genId, getAccounts, getBudgets, getCats, getUserData, idbBatch, idbKeys, impArchFields, impBkPrefix, impBlkDecode, impCleanAiFlag, impDraftExpire, impExportFields, impGetJson, impLogKey, impMakeBackup, impOrdersRestoreFromCloud, impPendKey, impRecHash, impRulesDropCat, impRulesRenameCat, impTarget, importArchiveFromText, isAccountId, isRefund, isValidDay, ledgerAcceptDamage, ledgerDamageNotice, ledgerDropAccount, ledgerEvictExcept, ledgerExists, ledgerGet, ledgerIdle, ledgerLoad, loadDays, loadStore, mergeImportedDays, migrateAccounts, migrateLedgersToBlocks, migrateLedgersToIdb, modeAmtCls, modeTag, nameOf, nameTaken, odBuildPayload, odClearLink, odGetLink, odGetOrdLink, odMoveLink, odOrdersSync, odPlugin, odRefreshStatusUI, odScheduleSync, odSetLink, odSetOrdLink, odSyncNow, recoverAccountsIfBroken, refundedMap, refundedTag, refundedTotal, refundsOf, sanitizeTpls, saveAccounts, saveStore, saveStoreDurable, saveStoreSafe, saveUserData, setAccountHidden, stampAccountName, statContrib, storeKey, syncRefunds, touchAccount, tplName, tplSame, trackBusy };   // store 模块对外只有这一个入口
 })();

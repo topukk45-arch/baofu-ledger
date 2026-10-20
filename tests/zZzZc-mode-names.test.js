@@ -57,7 +57,9 @@ ok(/分类,统计,去向/.test(ex) && /,不计,/.test(ex) && /,往来,/.test(ex)
   // 4. 记一笔的统计：计入、不计、往来，说明是新的
   $('fabAdd').click(); await wait(420); w.kpClose && w.kpClose();
   const box = $('billMode');
-  ok([...box.querySelectorAll('.cc')].map(c => c.dataset.v).join() === 'normal,skip,flow', '4 按计入、不计、往来排（值不变）');
+  box.click();
+  ok([...d.querySelectorAll('#modePick .mode-pick-row')].map(c => c.dataset.v).join() === 'normal,skip,flow' && [...d.querySelectorAll('#modePick .mode-pick-row b')].map(b => b.textContent).join() === '计入,不计,往来', '4 统计面板按计入、不计、往来排（值不变）');
+  w.JiwenSheet.back();
   const H = w.JiwenBase.MODE_HINT;
   ok(H.normal === '算进收入、支出和结余（平时都是这个）' && H.skip === '哪里都不算：信用卡还款、重复记录' && H.flow === '资金往来：转账、存取钱、借还钱，只动结余，不算进收支', '4 三句说明照新的写');
 
