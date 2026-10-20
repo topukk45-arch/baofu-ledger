@@ -304,7 +304,7 @@
   // ---------- 打开 / 关掉 ----------
   function open() {
     build(); setTokens();
-    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, receipt: true, sums: {}, ruleFix: {} }, types: {}, statuses: {},
+    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {}, seen: {}, more: {}, step: null } };
     try { dom.archive.textContent = '导入到存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
     dom.page.style.display = 'block'; barSet([]);
@@ -366,7 +366,7 @@
   function resume(d) {
     if (!S || S.phase !== 'pick') return;
     var e = d.edits || {};
-    S.edits = Object.assign({ rows: {}, cpCats: {}, newCats: {}, petty: {}, receipt: true, sums: {}, ruleFix: {} }, e);
+    S.edits = Object.assign({ rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {} }, e);
     S.types = d.types || {}; S.statuses = d.statuses || {};
     var v = d.view || {};
     S.view.step = v.step || null; S.view.seen = v.seen || {}; if (v.reconPick) S.view.reconPick = v.reconPick;
@@ -410,7 +410,7 @@
     runId++;
     if (J()) try { J().cancel(); } catch (_) {}
     dom.prog.style.display = 'none'; closeSheet(); closePicker();
-    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, receipt: true, sums: {}, ruleFix: {} }, types: {}, statuses: {},
+    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {}, seen: {}, more: {}, step: null } };
     hideSteps();
     renderPick();
@@ -439,7 +439,7 @@
     ['cpCats', 'newCats', 'petty', 'sums', 'ruleFix'].forEach(function (k) { n += Object.keys(e[k] || {}).length; });
     n += Object.keys(S.types || {}).length + Object.keys(S.statuses || {}).length;
     if (e.nearPay) n++;
-    if (e.receipt === false) n++;
+    if (e.receipt !== undefined) n++;
     if (S.view && S.view.reconPick) n += Object.keys(S.view.reconPick).length;
     return n;
   }
@@ -1124,7 +1124,7 @@
     var nw = '新建 ' + p.importN + ' 笔';
     var notes = [];
     if (g.units) notes.push('其中 ' + g.units + ' 笔合成 ' + g.lines + ' 条' + (g.appended ? '（' + g.appended + ' 笔追加到已有的汇总里）' : ''));
-    if (g.units || p.records !== p.importN) notes.push('共 ' + p.records + ' 条记录' + (p.sec && p.sec.fees && p.sec.fees.length ? '，含 ' + p.sec.fees.length + ' 笔服务费' : ''));
+    if (g.units || p.records !== p.importN) notes.push('共 ' + p.records + ' 条记录' + (p.sections && p.sections.fees && p.sections.fees.length ? '，含 ' + p.sections.fees.length + ' 笔服务费' : ''));
     if (notes.length) nw += '（' + notes.join('，') + '）';
     var parts = [nw, '和手记合并 ' + c.merge, '待处理 ' + c.pending, '跳过 ' + c.skip];
     if (c.error) parts.push('读不出 ' + c.error);
@@ -1551,7 +1551,10 @@
     if (s.receipt) {
       var rc = el('div', 'imp-card'); rc.id = 'impReceipt';
       rc.appendChild(el('h4', null, '收款按天合并')); rc.lastChild.appendChild(mk(!!S.view.seen.receipt));
-      rc.appendChild(el('div', 'imp-line', '收款 ' + s.receipt.n + ' 笔，共 ' + yuan(s.receipt.fen) + ' 元，看起来是收款账号。按天合成 ' + s.receipt.days + ' 条？'));
+      // 1021-T9：写清合哪些、按钮的意思；默认不合（一个月几百条的才默认合）
+      rc.appendChild(el('div', 'imp-line', s.receipt.bulk ? '收款 ' + s.receipt.n + ' 笔，共 ' + yuan(s.receipt.fen) + ' 元，看起来是收款账号。按天合成 ' + s.receipt.days + ' 条？'
+        : '有 ' + s.receipt.days + ' 天各收了 5 笔以上的小额收款（每笔 200 元以内），共 ' + s.receipt.n + ' 笔 ' + yuan(s.receipt.fen) + ' 元。按天合成 ' + s.receipt.days + ' 条？'));
+      rc.appendChild(el('div', 'imp-soft', '「按天合并」= 这几天每天的小额收款合成一条「收款汇总」；200 元以上的照旧一笔一条。'));
       var rr = el('div', 'imp-chips'); rr.style.marginTop = '8px';
       var yes = btn('按天合并', s.receipt.on ? 'imp-btn gold' : 'imp-btn', function () { S.view.seen.receipt = true; S.edits.receipt = true; replan(); }); yes.dataset.v = 'on';
       var no = btn('逐条导入', s.receipt.on ? 'imp-btn' : 'imp-btn gold', function () { S.view.seen.receipt = true; S.edits.receipt = false; replan(); }); no.dataset.v = 'off';

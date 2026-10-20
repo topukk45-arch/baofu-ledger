@@ -92,7 +92,8 @@
     // 1017-D：金额差一点的，哪几笔改成实付：这一笔自己定过（rows[key].pay）就按它，没定过跟「全部改成实付」（edits.nearPay）走
     var payOf = function (d) { var e = E[d.key]; return e && e.pay !== undefined ? !!e.pay : !!edits.nearPay; };
     var ruleFixE = edits.ruleFix || {};
-    var receiptOn = edits.receipt !== false;
+    // 1021-T9：收款按天合并默认不合；只有「一个月几百条」的（bulk）默认合。你点过的照你点的
+    var receiptOn = edits.receipt === true || (edits.receipt === undefined && ((input.matched && input.matched.summaries) || []).some(function (g) { return g.kind === 'receipt' && g.bulk; }));
     var parsed = input.parsed, matched = input.matched, info = input.info || {}, manualById = input.manualById || {};
     var clean = cleaner();
     var cats = info.cats || [];
@@ -364,7 +365,8 @@
     sec.unknownTypes = Object.keys(tmap).map(function (k) { return tmap[k]; });
     sec.unknownStatuses = Object.keys(smap).map(function (k) { return smap[k]; });
     var rc = (matched.summaries || []).filter(function (g) { return g.kind === 'receipt'; });
-    sec.receipt = rc.length ? { on: receiptOn, days: rc.length, n: rc.reduce(function (s, g) { return s + g.count; }, 0), fen: rc.reduce(function (s, g) { return s + g.fen; }, 0) } : null;
+    sec.receipt = rc.length ? { on: receiptOn, days: rc.length, n: rc.reduce(function (s, g) { return s + g.count; }, 0), fen: rc.reduce(function (s, g) { return s + g.fen; }, 0),
+                                bulk: rc.some(function (g) { return g.bulk; }) } : null;
     sec.petty = (matched.suspects || []).map(function (x) { var k = x.app + '|' + x.cp + '|' + x.month; return { key: k, app: x.app, cp: x.cp, month: x.month, n: x.count, fen: x.fen, on: !!pettyE[k] }; });
     // 1.1（1016-X）：金额相近、分类对得上自动合并的（多半是立减、红包）：手记比实付多多少；确认页可一键改成实付
     var nm = rows.filter(function (d) { return d.src === 'row' && d.group === 'merge' && d.why === 'near' && d.into === d.item.into && manualById[d.into]; });

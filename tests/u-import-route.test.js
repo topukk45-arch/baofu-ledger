@@ -262,7 +262,9 @@ const wx = (o) => B.txn(Object.assign({ kind: '商户消费', cp: '虚构商户'
   const p301 = parse({ app: 'wechat', txns: rc(301) }), r301 = run(p301);
   ok(r301.summaries.length === 28 && r301.summaries.every(g => g.kind === 'receipt' && g.suggest === true) && r301.summaries.reduce((s, g) => s + g.count, 0) === 301, '7 收款一个月 301 条：按天建议合并（28 天，每天一条，只是建议）');
   ok(R.lookups(p301).groups.filter(g => g.kind === 'receipt').length === 28, '7 lookups 带上收款的按天分组键');
-  ok(run(parse({ app: 'wechat', txns: rc(300) })).summaries.length === 0, '7 收款 300 条：不建议合并');
+  // 1021-T9：300 条不再整月合（不是 bulk）；但这里每天都有 5 笔以上 200 元以内的，按「一天够多的小额」建议合（默认不合，见 plan）
+  const r300 = run(parse({ app: 'wechat', txns: rc(300) }));
+  ok(r300.summaries.every(g => !g.bulk) && r301.summaries.every(g => g.bulk), '7 收款 300 条：不按整月合（不是 bulk），301 条是');
   // 疑似零碎扣款：某停车场一个月 6 次、每次 ≤ 1 元
   const pk = []; for (let i = 0; i < 6; i++) pk.push(wx({ time: T(3, 1 + i, 9, 0), no: wno(), cp: '某停车场', fen: 50 }));
   const rp = run(parse({ app: 'wechat', txns: pk }));

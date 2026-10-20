@@ -33,7 +33,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1021-T2';
+  var VERSION = '1021-T9';
   var FX_RATE = 0.05;            // 跨境退款汇率差：差 5% 以内算汇率差
   var RECEIPT_MONTH_MAX = 300;   // 一个月收款超过这么多条，建议按天合并
   var PETTY_MIN = 5, PETTY_FEN = 100;   // 疑似零碎扣款：同一对方一个月 5 次以上，且这个对方所有交易都不超过 1 元
@@ -53,7 +53,10 @@
   // 钱在自己的账户之间挪（还信用卡、零钱提现 / 充值、零钱通、理财通）：不管账单写的收 / 支，一律不计（1016-C）
   var WX_NEUTRAL_RE = /信用卡还款|零钱提现|零钱充值|零钱通|理财通/;
   var PETTY_TYPES = { wechat: ['分分捐'] };            // 已知的零碎扣款：按月合并
-  var RECEIPT_TYPES = { wechat: ['二维码收款'] };       // 收款：一个月太多时建议按天合并（支付宝的收款名称还没核对，先不认）
+  var RECEIPT_TYPES = { wechat: ['二维码收款'] };       // 收款：一个月太多时建议按天合并
+  // 1021-T9（实测 10-20）：支付宝也认收款（原始分类「收入」+ 商品说明有收钱码 / 收款）；一天 ≥ 5 笔、每笔 ≤ 200 元的那几天才建议按天合并
+  //   （只合 200 元以内的，大额单列），默认不合；一个月超过 300 条（小店主）照旧整月按天合、默认合。数字待真实数据调
+  var RECEIPT_DAY_MIN = 5, RECEIPT_ITEM_FEN = 20000;
   // 1021-T2（实测 10-20）：支付宝退款先定性、再清洗。商品说明原文以「退款」开头的（「退款-盒马工坊 xx」「退款」），不管状态写交易成功还是退款成功、
   //   收 / 支写收入还是不计收支，都是退款（单号不带「_后缀」的那种）；方向一律收入。去掉「退款-」只在显示、归组、写备注时用
   var REFUND_DESC_RE = /^\s*退款/;
@@ -120,15 +123,30 @@
   function monthOf(it) { return it.r.time.slice(0, 7); }
   function dayOf(it) { return it.r.time.slice(0, 10); }
   function inList(map, app, kind) { return !!(map[app] && map[app].indexOf(kind) >= 0); }
+  function isReceipt(it) {
+    if (it.r.io !== 'income') return false;
+    if (inList(RECEIPT_TYPES, it.app, it.r.kind)) return true;
+    return it.app === 'alipay' && it.r.kind === '收入' && /收钱码|收款/.test(it.r.desc || '');
+  }
 
-  // 收款：哪些「来源 + 月份」超过阈值
+  // 收款：哪些「来源 + 月份」超过阈值（整月按天合，默认合）；哪些「来源 + 日」够 5 笔小额（只合小额，默认不合）
   function receiptMonths(rows) {
-    var cnt = {};
+    var cnt = {}, day = {};
     rows.forEach(function (it) {
-      if (it.r.io === 'income' && inList(RECEIPT_TYPES, it.app, it.r.kind)) { var k = it.app + '|' + monthOf(it); cnt[k] = (cnt[k] || 0) + it.units; }
+      if (!isReceipt(it)) return;
+      var k = it.app + '|' + monthOf(it); cnt[k] = (cnt[k] || 0) + it.units;
+      if (it.r.fen <= RECEIPT_ITEM_FEN) { var dk = it.app + '|' + dayOf(it); day[dk] = (day[dk] || 0) + it.units; }
     });
-    var out = {}; Object.keys(cnt).forEach(function (k) { if (cnt[k] > RECEIPT_MONTH_MAX) out[k] = cnt[k]; });
+    var out = { day: {} }; Object.keys(cnt).forEach(function (k) { if (cnt[k] > RECEIPT_MONTH_MAX) out[k] = cnt[k]; });
+    Object.keys(day).forEach(function (k) { if (day[k] >= RECEIPT_DAY_MIN) out.day[k] = day[k]; });
     return out;
+  }
+  // 这一行要不要进收款按天合并：'bulk'（整月太多）/ 'day'（这一天小额够多）/ null
+  function receiptJoin(rm, it) {
+    if (!isReceipt(it)) return null;
+    if (rm[it.app + '|' + monthOf(it)]) return 'bulk';
+    if (it.r.fen <= RECEIPT_ITEM_FEN && rm.day[it.app + '|' + dayOf(it)]) return 'day';
+    return null;
   }
 
   // ---------- 1. 要查的键 ----------
@@ -147,7 +165,7 @@
     });
     var rm = receiptMonths(fl.rows);
     fl.rows.forEach(function (it) {
-      if (it.r.io === 'income' && inList(RECEIPT_TYPES, it.app, it.r.kind) && rm[it.app + '|' + monthOf(it)]) {
+      if (receiptJoin(rm, it)) {
         var gk = groupKey(it.app, 'receipt', dayOf(it));
         groups[gk] = { key: gk, app: it.app, kind: 'receipt', oc: it.r.kind, period: dayOf(it) };
       }
@@ -437,11 +455,11 @@
     rows.forEach(function (it) {
       if (it.bucket !== 'add') return;
       var gk0 = inList(PETTY_TYPES, it.app, it.r.kind) ? groupKey(it.app, 'petty', monthOf(it))
-              : (it.r.io === 'income' && inList(RECEIPT_TYPES, it.app, it.r.kind) && rm[it.app + '|' + monthOf(it)]) ? groupKey(it.app, 'receipt', dayOf(it)) : null;
+              : receiptJoin(rm, it) ? groupKey(it.app, 'receipt', dayOf(it)) : null;
       // 没有单号表、这个月（这一天）又已经有合并记录：分不清哪几笔加过了，进待处理，不往上加
       if (gk0 && known[gk0] && known[gk0].fpMode) { put(it, 'pending', 'fpgroup', '没有单号表，这个月已经有一条合并记录，分不清这笔加过没有，请你确认'); return; }
       if (inList(PETTY_TYPES, it.app, it.r.kind)) joinGroup(it, 'petty', monthOf(it), false);
-      else if (it.r.io === 'income' && inList(RECEIPT_TYPES, it.app, it.r.kind) && rm[it.app + '|' + monthOf(it)]) joinGroup(it, 'receipt', dayOf(it), true);
+      else if (receiptJoin(rm, it)) { joinGroup(it, 'receipt', dayOf(it), true); if (receiptJoin(rm, it) === 'bulk') gmap[groupKey(it.app, 'receipt', dayOf(it))].bulk = true; }
     });
     // 疑似零碎扣款：只标出来，不合并
     var byCp = {};
@@ -497,5 +515,5 @@
   function yuan(fen) { return (fen / 100).toFixed(2); }
 
   return { VERSION: VERSION, isAliRefundDescRow: isAliRefundDescRow, stripRefund: stripRefund, ALI_BACK_DAYS: ALI_BACK_DAYS, lookups: lookups, route: route, orderKey: orderKey, groupKey: groupKey, fullRefundKey: fullRefundKey, refundMarkKey: refundMarkKey, refundUsedKey: refundUsedKey, markLookKey: markLookKey, MARK_DAYS: MARK_DAYS, WX_NEUTRAL_RE: WX_NEUTRAL_RE,
-           FX_RATE: FX_RATE, RECEIPT_MONTH_MAX: RECEIPT_MONTH_MAX };
+           FX_RATE: FX_RATE, RECEIPT_MONTH_MAX: RECEIPT_MONTH_MAX, RECEIPT_DAY_MIN: RECEIPT_DAY_MIN, RECEIPT_ITEM_FEN: RECEIPT_ITEM_FEN };
 });
