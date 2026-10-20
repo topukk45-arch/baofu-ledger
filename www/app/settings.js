@@ -82,11 +82,13 @@
                 }, '取消自动同步', { okText:'停止自动同步', cancelText:'继续同步' });
             });
         }
+        // 2 秒内连点 5 次版本号：开 / 关（1019-Z4-M26 起计数定义在设置页模块里，原来在导入入口）
+        let __buildTaps=[];
         $('setBuild').addEventListener('click', () => {
             const now=Date.now();
-            JiwenImportEntry.__buildTaps=JiwenImportEntry.__buildTaps.filter(t=>now-t<2000); JiwenImportEntry.__buildTaps.push(now);
-            if(JiwenImportEntry.__buildTaps.length<5) return;
-            JiwenImportEntry.__buildTaps=[];
+            __buildTaps=__buildTaps.filter(t=>now-t<2000); __buildTaps.push(now);
+            if(__buildTaps.length<5) return;
+            __buildTaps=[];
             const on=!devImportOn();
             try{ if(on) localStorage.setItem(DEV_IMPORT_KEY,'1'); else localStorage.removeItem(DEV_IMPORT_KEY); }catch(_){}
             renderDevImport();

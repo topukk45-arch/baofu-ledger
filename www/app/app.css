@@ -758,7 +758,7 @@
             border-radius:18px 18px 0 0; border-bottom:none; box-shadow:0 -4px 24px rgba(var(--c-shadow-rgb),0.4); }
         /* 拖动条和标题钉在面板顶上：键盘弹起、面板里滑到备注时，标题照样看得见、照样能往下拉 */
         /* 1019-U：首屏快照（上次离开时的首屏，打开 App 时大脚本还没跑完就先画出来；真的画好了就拿掉）。点不动、盖在最上面 */
-        .boot-snap { position:fixed; inset:0; z-index:990; overflow:hidden; background:var(--c-bg); }
+        .boot-snap { position:fixed; inset:0; z-index:990; overflow:hidden; background:var(--c-bg); pointer-events:none; }   /* 1019-Z4-M26：真的点不动（原来快照底栏是克隆的、也绑了切页签，脚本没读完时点了可能报错） */
         .boot-snap > .container { position:relative; }
         .form-mask .sheet-grip { position:sticky; top:-8px; z-index:2; margin:-8px -18px 0; padding:8px 18px 0;
             background:var(--c-sheet); border-radius:18px 18px 0 0; }

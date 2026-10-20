@@ -26,7 +26,7 @@ async function bootWith(ls, phone) {
     // 快照一画出来就记下：那时大脚本跑了没有、快照里写的是什么（早期那一段最后会写 window.__bootSnap，这里拦住那一下，同步记）
     let bs;
     Object.defineProperty(w, '__bootSnap', { configurable: true, get: () => bs, set(v) { bs = v; const s = w.document.getElementById('bootSnap');
-      if (s && !w.__snapSeen) w.__snapSeen = { main: !!w.JiwenPerf, html: s.innerHTML, page: (s.querySelector('.tab-page') || {}).id, text: (s.querySelector('.tab-page') || s).textContent.replace(/\s+/g, '') }; } });
+      if (s && !w.__snapSeen) w.__snapSeen = { pe: w.getComputedStyle(s).pointerEvents, main: !!w.JiwenPerf, html: s.innerHTML, page: (s.querySelector('.tab-page') || {}).id, text: (s.querySelector('.tab-page') || s).textContent.replace(/\s+/g, '') }; } });
     const mo = new w.MutationObserver(() => {
       const m = w.document.getElementById('mainBox');
       if (m && m.style.display === 'block' && !w.__real) { const pl = w.document.getElementById('pageLedger'); w.__real = { text: pl ? pl.textContent.replace(/\s+/g, '') : '' }; }
@@ -65,6 +65,7 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   const seen = t.w.__snapSeen;
   ok(seen && seen.main === false && seen.page === 'pageLedger', '2 重新打开：大脚本还没跑，快照就画出来了');
   ok(t.w.__ready.length >= 1 && t.w.__ready[0].snap === true, '2 快照还在屏幕上时就告诉原生层收启动画面（真浏览器里是快照画出来那一帧，jsdom 的下一帧在大脚本之后）');
+  ok(seen && seen.pe === 'none', '2 快照不接点击（pointer-events:none，1019-Z4-M26）：真的首屏出来之前点它什么都不发生 ' + (seen && seen.pe));
   ok(!t.$('bootSnap'), '2 真的首屏画好以后快照拿掉了');
   ok(seen && t.w.__real && seen.text === t.w.__real.text && seen.text.length > 50, '2 快照和真的首屏一字不差（结余、分类汇总、账单列表）');
   ok(!snap(t), '2 打开以后（进账号写了一次存档）旧快照删了，下次切后台再存');

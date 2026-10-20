@@ -27,8 +27,6 @@
         });
         $('setBuild').textContent=$('loginBuild').textContent;
         renderDevImport();
-        // 2 秒内连点 5 次版本号：开 / 关
-        let __buildTaps=[];
         let __importLoading=null;
         function loadImportModule(){
             if(window.JiwenImport) return Promise.resolve(window.JiwenImport);
@@ -237,5 +235,5 @@
         }
         $('closeCat').addEventListener('click', ()=>{ $('catMask').style.display='none'; });
         window.openDevImportCheck = openDevImportCheck;   // 老入口：原来是顶层的，自己就在 window 上，搬进来以后照旧挂上
-        window.JiwenImportEntry = { DEV_IMPORT_KEY, get __buildTaps(){ return __buildTaps; }, set __buildTaps(v){ __buildTaps=v; }, devImportOn, impOpenFile, loadImportUI, renderDevImport, scrollChipIntoView };   // impentry 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenImportEntry = { DEV_IMPORT_KEY, devImportOn, impOpenFile, loadImportUI, renderDevImport, scrollChipIntoView };   // impentry 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();

@@ -121,7 +121,7 @@
 - 原样切开（1019-Z4-M2）：`index.html` 第二段 `<style>` 剪成 `www/app/app.css`，大脚本按原来的分节剪成 7 个文件（只剪不改，拼回去和 1019-Z4 逐字节一样，只差版本号）：
   - `app-1-base.js`（性能记录、`$`、常量）→ `app-2-core.js`（提示框、数字键盘、存储、账本、云备份、设置、分类、日期选择……最大的一块）→ `app-3-sheet-ledger.js`（底部面板、账单页、批量）→ `app-4-forms.js`（记一笔 / 修改 / 退款 / 模板、切页签、首屏快照、恢复现场）→ `app-5-stats.js`（统计页）→ `app-6-days-sheets.js`（日子、共用面板 `JiwenSheet`、导入入口）→ `app-7-init.js`（`initApp`，最后跑）。
   - 引用：`<link rel="stylesheet" href="app/app.css?v=版本号">`、`<script src="app/….js?v=版本号"></script>` 一行一个、挨着放，先是已经搬好的模块文件（照 `modules-plan.js` 的先后），再是还没搬的 `app-N`（按编号），普通同步脚本（不加 defer / async / module），`?v=` 和登录页版本号一样，每推一版一起改。首屏快照那一小段留在原位（在这几个脚本前面）。
-  - 切的位置：顶层有三处「先调用、后面才定义」（`bindSheetDrag`、`openCatManager`、`gotoDaysPage`），切口保证每对在同一个文件里；顶层没有跨文件用 let / const 的。几个文件之间浏览器会先跑别的任务（真 Chromium 试过：前一个文件的 setTimeout 0 会在后几个文件跑之前触发；Promise.then 在每个文件跑完马上跑），所以：顶层当场跑的代码、顶层登记的计时器 / Promise.then / 观察器都不许用后面文件的名字（`zZzV` 管）；顶层登记的事件监听可以（空档里主界面、登录框都没露出来；切后台那两个开头就看没进账号直接返回）。首屏快照盖着时，快照里的底栏是克隆的、`querySelectorAll('.tab-btn')` 也绑上了，空档里点快照底栏可能报一次错（见还要确认）。
+  - 切的位置：顶层有三处「先调用、后面才定义」（`bindSheetDrag`、`openCatManager`、`gotoDaysPage`），切口保证每对在同一个文件里；顶层没有跨文件用 let / const 的。几个文件之间浏览器会先跑别的任务（真 Chromium 试过：前一个文件的 setTimeout 0 会在后几个文件跑之前触发；Promise.then 在每个文件跑完马上跑），所以：顶层当场跑的代码、顶层登记的计时器 / Promise.then / 观察器都不许用后面文件的名字（`zZzV` 管）；顶层登记的事件监听可以（空档里主界面、登录框都没露出来；切后台那两个开头就看没进账号直接返回）。首屏快照盖着时，快照里的底栏是克隆的、`querySelectorAll('.tab-btn')` 也绑上了，空档里点快照底栏可能报一次错；1019-Z4-M26 起快照 `.boot-snap` 加了 `pointer-events:none`，点不到它，这个问题没了。
   - 测试怎么读：测试进程预先载入 `tests/tools/inline-hook.js`（`run-all.js` 每个都带上；单独跑一个时 `node -r ./tools/inline-hook.js xxx.test.js`），读 `index.html` 时按引用把 `app/*.js`、`app.css` 拼回单文件，老测试一条不改；`regress.js` 自己装这个钩子。要读拆开原样的（`zZzV`）用 `fs.readFileSync(文件)` 读字节再转字（钩子只管读成字的）。
   - 工具：`tests/tools/split-index.js`（一次性的切分脚本，切完自查拼回去逐字节一样）、`tests/tools/inline.js`（拼回去）、`tests/tools/scan.js`（acorn 扫顶层：每条顶层语句当场用到哪些名字、登记了哪些以后才跑的回调；`zZzV` 和以后的依赖检查共用）。`tests/package.json` 多了 acorn、acorn-walk 两个开发依赖。`tests/ui/audit.js` 的小服务器给 `.css` 回 `text/css`（不然 Chromium 不认这个样式表）。
 
@@ -137,7 +137,7 @@
   | 4 页面 | forms（`JiwenForms`）→ ledger（`JiwenLedger`）→ stats（`JiwenStats`）→ days（`JiwenDays`）→ cats（`JiwenCats`） | 记一笔 / 修改 / 退款 / 口径 / 模板；账单页（列表、翻页、搜索筛选、分类汇总、批量）；统计页（预算、预算建议、年月选择、账单详情）；日子；分类管理 |
   | 5 外壳 | settings（`JiwenSettings`）→ tabs（`JiwenTabs`）→ login（`JiwenLogin`）→ back（`JiwenBack`）→ boot（`JiwenBoot`，空的） | 设置页、外观、存储用量；页签切换、进账号、日子管理页进出、刷新所有页面、被杀回来、首屏快照、历史脏数据自检；登录页；返回键层级表和弹窗关闭表（要认得每一种弹窗，所以放最上面）；启动 |
   按节归、个别名字单独挪（比如 `pad`、`escapeHtml` 原来在日期选择、存储那几节，归基础；`getUserData` 原来在分类拖动那节，归存储），全表见 `modules-plan.js`；`node tests/tools/modules-plan.js` 打印每个模块多大、还有哪些往上调用。
-- 往上调用（回调口）：按这张表算下来只剩三种，暂时留着、测试锁住只减不增：数据改了删首屏快照（存储 → `snapDrop`）、存储写不进去弹提示（存储 → `customAlert`）、数据改了刷新所有页面（分类 / 账单页批量 / 记一笔 / 详情 → `refreshAllViews`、`refreshCatSelectors`）。写法：调用的时候才去 `window.JiwenXxx.fn()` 拿（加载时不取）；1019-Z4-M25 起都这样写了（`window.JiwenTabs.refreshAllViews()`、`window.JiwenStats.renderStats()`），本来就挂在 window 上的老入口 `snapDrop`、`customAlert` 照旧按名字调。以后改成「下层留一个口子、上层登记进来」要你定（见还要确认）。
+- 往上调用（回调口）：按这张表算下来只剩三种，暂时留着、测试锁住只减不增：数据改了删首屏快照（存储 → `snapDrop`）、存储写不进去弹提示（存储 → `customAlert`）、数据改了刷新所有页面（分类 / 账单页批量 / 记一笔 / 详情 → `refreshAllViews`、`refreshCatSelectors`）。写法：调用的时候才去 `window.JiwenXxx.fn()` 拿（加载时不取）；1019-Z4-M25 起都这样写了（`window.JiwenTabs.refreshAllViews()`、`window.JiwenStats.renderStats()`），本来就挂在 window 上的老入口 `snapDrop`、`customAlert` 照旧按名字调。「改成下层留一个口子、上层登记进来」1019-Z4-M26 定了：不改，以后改到那块再说。
 - 一个模块的文件长这样：开头 `(function(){`、结尾把入口挂上 `window.JiwenXxx = { … };` 再 `})();`；代码原样剪进去，**不改缩进、不改一个字**（测试里有按原文找的检查，比如 `const SHEET_MS=300;`）。用下层的东西：模块开头一行 `const { a, b, c } = window.JiwenBase;`，取出来的名字和原来一样，调用的地方不用改；只取函数和常量。
 - 会变的状态不能那样取（取出来就是那一刻的值）：
   - 全 App 共用的四个 `currentUser`、`currentArchive`、`currentTab`、`curPage`（1019-Z4-M20 做了）：那四行 `let` 原样挪进 `app/base.js`，`JiwenBase` 入口上给读写口（`get currentUser(){…}, set currentUser(v){…}`），别处 150 处用到的地方按语法树换成 `JiwenBase.currentUser`（原来设计写的 `JiwenBase.state` / `St.` 没用：读写口直接挂在入口上，少一层）。这是唯一成片改写法的一步，单独一个提交，逐字节对比、全部测试；
@@ -161,7 +161,7 @@
   - 1019-Z4-M10 提示框 `app/ask.js`（`JiwenAsk`，22 条、对外 askCancel / askMask / closeAsk / customAlert / customAlertHtml / customChoose / customConfirm / customPrompt）。
   - 1019-Z4-M11 日期选择 `app/date.js`（`JiwenDate`，55 条、对外 DT_YEAR_MAX / DT_YEAR_MIN / attachSwipe / closeDtPicker / getDtInput / openDtPicker / openDtPickerDate / playSlide / setDtInput）。
   - 1019-Z4-M12 AI 导出 `app/ai-export.js`（`JiwenAiExport`，17 条、对外 askImportOtherDays / buildAiText / importDaysSuffix / importFixSuffix / openAiExport）。
-  - 1019-Z4-M13 导入入口 `app/import-entry.js`（`JiwenImportEntry`，34 条、对外 DEV_IMPORT_KEY / __buildTaps / devImportOn / impOpenFile / loadImportUI / renderDevImport / scrollChipIntoView）。
+  - 1019-Z4-M13 导入入口 `app/import-entry.js`（`JiwenImportEntry`，34 条、对外 DEV_IMPORT_KEY / __buildTaps（M26 挪去设置页）/ devImportOn / impOpenFile / loadImportUI / renderDevImport / scrollChipIntoView）。
   - 1019-Z4-M14 记一笔 `app/forms.js`（`JiwenForms`，68 条、对外 billCatSel / billTypeSel / closeEditModal / closeRefund / closeTplEditor / editCatSel / editId / editTypeSel / formSnaps / formState / getModeChips / openAddModal / refreshBillCatChipsIfOpen / refreshEditCatChipsIfOpen / refundLineHtml / renderEditCatChips / renderEditTypeChips / resetBillForm / setModeChips）。
   - 1019-Z4-M15 账单页 `app/ledger.js`（`JiwenLedger`，50 条、对外 applyBatch / clearAllFilters / goPage / openBatchMenu / renderBill / renderFilterChips / resetSearch / undoBatch）。
   - 1019-Z4-M16 分类管理 `app/cats.js`（`JiwenCats`，10 条、对外 deleteCat / editBudget / openCatManager / renameCat）。
@@ -174,6 +174,7 @@
   - 1019-Z4-M23 返回键 `app/back.js`（`JiwenBack`，7 条、对外 ）。
   - 1019-Z4-M24 启动 `app/boot.js`（`JiwenBoot`，1 条、对外 ）。
   - 1019-Z4-M25 收尾：旧文件 `app-1…7.js` 只剩旧代码引用表和空行，删掉、`index.html` 去掉引用；模块里按名字直接调回调口的 20 处改成 `window.JiwenTabs.xxx()` / `window.JiwenStats.renderStats()`（工具 `tests/tools/finish-legacy.js`）。现在 `www/app/` 下 20 个模块文件，每个就是一个 IIFE、对外一个入口，`zZzX-modules-lock` 每个都锁着。
+  - 1019-Z4-M26 合并前收尾：首屏快照不接点击（`.boot-snap` 加 `pointer-events:none`）；版本号连点的计数 `__buildTaps` 挪进设置页模块里定义（`JiwenImportEntry` 上不再有它的读写口）；`build.yml` 删掉「模块测试版」那段。
 
 ## 操作 × 数据表（1017-X 起；以后加功能——新操作、新存储、新备份——都要更新这张表和架构图）
 「会改」= ✓，「不会改」= 空；「新」= 写到另一个新存档里。一行一个存数据的地方，一列一个操作。
