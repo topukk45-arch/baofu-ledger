@@ -1,6 +1,8 @@
 name: 构建安卓 APK
 on:
+  # 1020-J：只在推 main 和手动触发时打包；别的分支（claude/ 开头这些）推上去不打，本地跑测试就够了
   push:
+    branches: [main]
   workflow_dispatch:
 jobs:
   build:
