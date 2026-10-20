@@ -24,6 +24,9 @@
                 if(boot.done) return; boot.done=1;
                 const f=()=>{ boot.paint=Math.round(now()); const e={ kind:'启动', ms:boot.paint };
                     if(window.__bootSnap) boot.snap=window.__bootSnap.at;   // 1019-U：快照先画出来的时间
+                    // 1020-B：快照是怎么存的（停下来时 / 切后台时）、存了多久；没用上的写原因
+                    if(window.__bootSnap){ e.snapSrc=window.__bootSnap.src||''; if(window.__bootSnap.age!=null) e.snapAge=Math.round(window.__bootSnap.age/1000); }
+                    else if(window.__bootSnapMiss) e.snapMiss=window.__bootSnapMiss;
                     ['snap','script','db','read','render','paint'].forEach(k=>{ if(boot[k]!=null) e[k]=boot[k]; });
                     e.n=window.__perfRecs;
                     nativeInto(e, 0).then(()=>add(e), ()=>add(e)); };

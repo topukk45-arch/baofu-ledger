@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1020-A">
+    <link rel="stylesheet" href="app/app.css?v=1020-B">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-A</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-B</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -850,7 +850,7 @@
     </div>
     </div>
 
-    <!-- 1019-U：首屏快照。上次切到后台时把首屏存在这台手机（localStorage 的 app_snap_<账号>，不进备份），
+    <!-- 1019-U：首屏快照。上次切到后台时（1020-B 起页面停下来时也存）把首屏存在这台手机（localStorage 的 app_snap_<账号>，不进备份），
          打开 App 时这一小段先跑：记住的账号有快照、是同一版、同一天、默认进入页面和屏幕宽度都没变，就把它原样画出来
          （大脚本要先读完、编译完才开始跑，CPU 调慢 4 倍时要 400 毫秒以上，这一段在那之前就能出图），
          再告诉原生层首屏已经出来、启动画面可以收了。真的首屏画好以后（initApp 里 snapUnveil()）拿掉。
@@ -858,46 +858,52 @@
     <script>
         (function(){
             try{
-                var u=localStorage.getItem('app_logged_in_user'); if(!u) return;
-                var raw=localStorage.getItem('app_snap_'+u); if(!raw) return;
+                // 1020-B：没画快照的原因记在 __bootSnapMiss，性能记录「启动」那条写出来（手机上看为什么没用上）
+                var miss=function(k){ window.__bootSnapMiss=k; };
+                var u=localStorage.getItem('app_logged_in_user'); if(!u) return miss('nouser');
+                var raw=localStorage.getItem('app_snap_'+u); if(!raw) return miss('none');
                 var o=JSON.parse(raw), b=document.getElementById('loginBuild'), d=new Date();
                 var pref=localStorage.getItem('app_default_tab'); if(['stats','ledger','settings','last'].indexOf(pref)<0) pref='ledger';
-                if(!o || o.v!==1 || !b || o.build!==b.textContent || o.day!==d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate() || o.pref!==pref || o.w!==window.innerWidth) return;
+                if(!o || o.v!==1 || !b) return miss('bad');
+                if(o.build!==b.textContent) return miss('build');
+                if(o.day!==d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()) return miss('day');
+                if(o.pref!==pref) return miss('pref');
+                if(o.w!==window.innerWidth) return miss('width');
                 var y=0;
                 if(o.pref==='last' && Date.now()-o.at<7200000) y=o.y||0;      // 「上次停留」、离开不到 2 小时：照原来滚到的位置
-                else if(o.page>1) return;                                    // 别的情况打开都是第 1 页、顶上
+                else if(o.page>1) return miss('page');                       // 别的情况打开都是第 1 页、顶上
                 if(typeof o.root==='string') document.documentElement.setAttribute('style', o.root);   // 主题色
                 if(typeof o.body==='string') document.body.className=o.body;
                 var el=document.createElement('div'); el.id='bootSnap'; el.className='boot-snap'; el.setAttribute('aria-hidden','true');
                 el.innerHTML=o.html;
                 if(y && el.firstElementChild) el.firstElementChild.style.top=(-y)+'px';
                 document.body.appendChild(el);
-                window.__bootSnap={ at:Math.round(performance.now()), user:u };
+                window.__bootSnap={ at:Math.round(performance.now()), user:u, src:o.src||'', age:o.at ? Date.now()-o.at : null };
                 // 快照画上了：马上告诉原生层收启动画面（1019-X 起不再多等一帧；消息过桥到原生那边时这一帧已经画出来了）
                 try{ var c=window.Capacitor, p=c&&c.Plugins&&c.Plugins.Launch; if(p&&p.ready) p.ready(); }catch(e){}
-            }catch(e){ try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
+            }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1020-A"></script>
-    <script src="app/store.js?v=1020-A"></script>
-    <script src="app/select.js?v=1020-A"></script>
-    <script src="app/keypad.js?v=1020-A"></script>
-    <script src="app/text.js?v=1020-A"></script>
-    <script src="app/sheet.js?v=1020-A"></script>
-    <script src="app/ask.js?v=1020-A"></script>
-    <script src="app/date.js?v=1020-A"></script>
-    <script src="app/ai-export.js?v=1020-A"></script>
-    <script src="app/import-entry.js?v=1020-A"></script>
-    <script src="app/forms.js?v=1020-A"></script>
-    <script src="app/ledger.js?v=1020-A"></script>
-    <script src="app/cats.js?v=1020-A"></script>
-    <script src="app/stats.js?v=1020-A"></script>
-    <script src="app/days.js?v=1020-A"></script>
-    <script src="app/settings.js?v=1020-A"></script>
-    <script src="app/tabs.js?v=1020-A"></script>
-    <script src="app/login.js?v=1020-A"></script>
-    <script src="app/back.js?v=1020-A"></script>
-    <script src="app/boot.js?v=1020-A"></script>
+    <script src="app/base.js?v=1020-B"></script>
+    <script src="app/store.js?v=1020-B"></script>
+    <script src="app/select.js?v=1020-B"></script>
+    <script src="app/keypad.js?v=1020-B"></script>
+    <script src="app/text.js?v=1020-B"></script>
+    <script src="app/sheet.js?v=1020-B"></script>
+    <script src="app/ask.js?v=1020-B"></script>
+    <script src="app/date.js?v=1020-B"></script>
+    <script src="app/ai-export.js?v=1020-B"></script>
+    <script src="app/import-entry.js?v=1020-B"></script>
+    <script src="app/forms.js?v=1020-B"></script>
+    <script src="app/ledger.js?v=1020-B"></script>
+    <script src="app/cats.js?v=1020-B"></script>
+    <script src="app/stats.js?v=1020-B"></script>
+    <script src="app/days.js?v=1020-B"></script>
+    <script src="app/settings.js?v=1020-B"></script>
+    <script src="app/tabs.js?v=1020-B"></script>
+    <script src="app/login.js?v=1020-B"></script>
+    <script src="app/back.js?v=1020-B"></script>
+    <script src="app/boot.js?v=1020-B"></script>
 
 </body>
 </html>

@@ -132,12 +132,18 @@
         // ===== 1019-U：首屏快照 =====
         //   切到后台时（resumeSave）把打开 App 时会看到的那一页原样存一份：只在「现在屏幕上的样子就是下次打开会看到的样子」时存，
         //   对不上（翻到了第 2 页、开着筛选、统计页不在这个月……）就删掉，宁可慢一点也不画错。
-        //   账本一改（saveStore）、换账号 / 存档、恢复、导入、撤销、换主题、改默认页都删（snapDrop），下次切后台再存。
+        //   账本一改（saveStore）、换账号 / 存档、恢复、导入、撤销、换主题、改默认页都删（snapDrop），停下来（1020-B）或切后台再存。
         const SNAP_MAX=400000;
         const SNAP_BODY_SKIP=['kb-open','login-mode','days-selecting'];
-        function snapDrop(){
+        // 1020-B：停下来就先存（见下面 idleKick）
+        const SNAP_IDLE_MS=1500, FORM_IDLE_MS=1000, SNAP_GAP_MS=20000, RESUME_REFRESH_MS=10*60*1000;
+        let snapLast=null, resumeLast=null, formLast=null, idleT=null, formT=null;
+        function snapDropOnly(){
+            snapLast=null;
             try{ Object.keys(localStorage).forEach(k=>{ if(k.indexOf('app_snap_')===0) localStorage.removeItem(k); }); }catch(_){}
         }
+        // 对外（账本改了、换主题、改默认页……）：删掉，停下来以后按新的样子再存一份（1020-B）
+        function snapDrop(){ snapDropOnly(); idleKick(); }
         function snapBootState(tab, pref){
             if($('pageDays') && $('pageDays').style.display!=='none' && $('pageDays').style.display!=='') return false;   // 日子管理页开着
             if(document.getElementById('impPage') && document.getElementById('impPage').offsetParent!==null) return false;
@@ -175,11 +181,12 @@
             }
             drop.forEach(x=>{ if(x.isConnected || x.parentNode) x.remove(); });
         }
-        function snapSave(){
+        function snapSave(how){
+            how=how==='idle' ? 'idle' : 'hide';
             try{
-                if(!JiwenBase.currentUser || $('mainBox').style.display!=='block'){ snapDrop(); return; }
+                if(!JiwenBase.currentUser || $('mainBox').style.display!=='block'){ snapDropOnly(); return; }
                 const pref=getDefaultTabPref(), tab=pref==='last' ? JiwenBase.currentTab : pref;
-                if(!snapBootState(tab, pref)){ snapDrop(); return; }
+                if(!snapBootState(tab, pref)){ snapDropOnly(); return; }
                 const pageId={ ledger:'pageLedger', stats:'pageStats', settings:'pageSettings' }[tab];
                 // 只要主界面（只留要进的那一页）、底栏、记账页的底部操作栏；登录框、各个弹窗（都在 .container 里、都藏着）不要
                 const c=document.querySelector('body > .container').cloneNode(false);
@@ -196,15 +203,22 @@
                 c.appendChild(tb);
                 if(tab==='ledger'){ const ab=$('actionBar').cloneNode(true); ab.style.display='flex'; c.appendChild(ab); }
                 const html=c.outerHTML;
-                if(html.length>SNAP_MAX){ snapDrop(); return; }
+                if(html.length>SNAP_MAX){ snapDropOnly(); return; }
                 const n=new Date();
                 const bodyCls=String(document.body.className||'').split(/\s+/).filter(k=>k && SNAP_BODY_SKIP.indexOf(k)<0)
                     .filter(k=>k!=='tab-ledger' && k!=='tab-stats').concat(tab==='ledger' ? ['tab-ledger'] : tab==='stats' ? ['tab-stats'] : []).join(' ');
-                snapDrop();
-                localStorage.setItem('app_snap_'+JiwenBase.currentUser, JSON.stringify({ v:1, build:$('loginBuild').textContent, day:`${n.getFullYear()}-${n.getMonth()+1}-${n.getDate()}`,
+                const o={ v:1, build:$('loginBuild').textContent, day:`${n.getFullYear()}-${n.getMonth()+1}-${n.getDate()}`,
                     pref, tab, page:JiwenBase.curPage, y:(tab==='ledger' && pref==='last') ? (window.scrollY||document.documentElement.scrollTop||0) : 0,
-                    w:window.innerWidth, at:Date.now(), archive:JiwenBase.currentArchive, root:document.documentElement.getAttribute('style')||'', body:bodyCls, html }));
-            }catch(_){ snapDrop(); }
+                    w:window.innerWidth, archive:JiwenBase.currentArchive, root:document.documentElement.getAttribute('style')||'', body:bodyCls, html };
+                // 1020-B：停下来时存的，和上次写进去的一模一样就不再写；不一样、但离上次写不到 SNAP_GAP_MS 也先不写，等到了再看
+                //   （localStorage 每小时写进磁盘的字数有上限，超了浏览器会把落盘拖得更久，快照几十 KB 一份，不能停一下就写一次）
+                const sig=JSON.stringify(o)+'|'+JiwenBase.currentUser, now=Date.now();
+                if(how==='idle' && snapLast && snapLast.sig===sig) return;
+                if(how==='idle' && snapLast && now-snapLast.at<SNAP_GAP_MS){ idleKick(SNAP_GAP_MS-(now-snapLast.at)); return; }
+                snapDropOnly();
+                localStorage.setItem('app_snap_'+JiwenBase.currentUser, JSON.stringify(Object.assign(o, { at:now, src:how })));
+                snapLast={ sig, at:now };
+            }catch(_){ snapDropOnly(); }
         }
         // 真的首屏画好了：下一帧拿掉快照（这一帧真的那页已经排好，拿掉看不出变化）；没有快照时告诉原生层可以收启动画面了
         function snapUnveil(){
@@ -215,16 +229,51 @@
             if(el && window.requestAnimationFrame) requestAnimationFrame(go); else go();
         }
         window.snapSave=snapSave; window.snapDrop=snapDrop;   // 给测试用
+        // 1020-B：不只在切到后台时存。安卓 WebView 的 localStorage 写进去以后不是马上落盘（Chromium 攒一会儿再一起写，
+        //   最少等 5 秒，写得多了还会拖到一分钟上下），切到后台马上被划掉，切后台那一下存的就丢了。所以：
+        //   页面停下来（SNAP_IDLE_MS 没有操作）先存一份快照和「停在哪」，记一笔 / 修改填过东西、停下来 FORM_IDLE_MS 先存一份填到一半的；
+        //   切到后台时照旧再存一次。停下来存的时候照现在的条件判断（该删的照删），和上次一样的不重写，不是每一帧都写。
+        function resumeWrite(force){
+            saveLedgerScroll();
+            try{
+                const o={ tab:JiwenBase.currentTab, page:JiwenBase.curPage, y:ledgerScrollY, archive:JiwenBase.currentArchive };
+                const sig=JSON.stringify(o)+'|'+JiwenBase.currentUser, now=Date.now();
+                if(!force && resumeLast && resumeLast.sig===sig && now-resumeLast.at<RESUME_REFRESH_MS) return;
+                localStorage.setItem(resumeKey(JiwenBase.currentUser), JSON.stringify(Object.assign(o, { at:now })));
+                resumeLast={ sig, at:now };
+            }catch(_){}
+        }
+        function formDraftWrite(force){
+            try{
+                const f=formDraftNow(), k=formDraftKey(JiwenBase.currentUser);
+                const sig=f ? JSON.stringify(f)+'|'+JiwenBase.currentArchive+'|'+JiwenBase.currentUser : '';
+                if(!force && formLast!=null && formLast===sig && (!f || localStorage.getItem(k)!=null)) return;   // 表单关掉时别处会删它，删了就得重写
+                if(f) localStorage.setItem(k, JSON.stringify(Object.assign(f, { archive:JiwenBase.currentArchive, at:Date.now() })));
+                else localStorage.removeItem(k);
+                formLast=sig;
+            }catch(_){}
+        }
+        const liveNow=()=>JiwenBase.currentUser && $('mainBox').style.display==='block' && document.visibilityState!=='hidden';
+        function idleSave(){
+            idleT=null;
+            if(!liveNow()) return;
+            resumeWrite(false);
+            snapSave('idle');
+        }
+        function idleKick(ms){
+            clearTimeout(idleT); idleT=setTimeout(idleSave, ms!=null ? Math.max(0, ms) : SNAP_IDLE_MS);
+            if(formT || $('addMask').style.display==='flex' || editMask.style.display==='flex'){
+                clearTimeout(formT); formT=setTimeout(()=>{ formT=null; if(liveNow()) formDraftWrite(false); }, FORM_IDLE_MS);
+            }
+        }
+        // 有动作（按、滑、打字、改了什么）就从头计时；只是重设一个计时器，不读不写
+        ['pointerdown','pointerup','keydown','input','change','scroll','wheel'].forEach(ev=>document.addEventListener(ev, ()=>idleKick(), { capture:true, passive:true }));
         function resumeSave(){
             if(!JiwenBase.currentUser || $('mainBox').style.display!=='block') return;
-            saveLedgerScroll();
-            try{ localStorage.setItem(resumeKey(JiwenBase.currentUser), JSON.stringify({ tab:JiwenBase.currentTab, page:JiwenBase.curPage, y:ledgerScrollY, archive:JiwenBase.currentArchive, at:Date.now() })); }catch(_){}
-            try{
-                const f=formDraftNow();
-                if(f) localStorage.setItem(formDraftKey(JiwenBase.currentUser), JSON.stringify(Object.assign(f, { archive:JiwenBase.currentArchive, at:Date.now() })));
-                else localStorage.removeItem(formDraftKey(JiwenBase.currentUser));
-            }catch(_){}
-            snapSave();
+            clearTimeout(idleT); idleT=null; clearTimeout(formT); formT=null;
+            resumeWrite(true);
+            formDraftWrite(true);
+            snapSave('hide');
         }
         function resumeTake(id){
             let r=null;

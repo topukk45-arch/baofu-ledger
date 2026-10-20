@@ -380,11 +380,19 @@
             document.querySelectorAll('.mask').forEach(watchMask);
             new MutationObserver(ms=>ms.forEach(x=>x.addedNodes.forEach(n=>{ if(n.nodeType===1 && n.classList.contains('mask')) watchMask(n); }))).observe(document.body, { childList:true });
             // 「性能记录（开发中）」页：一行一条，能一键复制全部、清空
+            // 1020-B：快照用上没有：用上的写「快照：停下来时存的，3 分钟前」，没用上的写原因
+            const SNAP_MISS={ nouser:'没有记住的账号', none:'没有快照', bad:'快照读不出来', build:'版本不对（快照是别的版本存的）', day:'不是今天存的', pref:'默认进入页面不一样', width:'屏幕宽度不一样', page:'存的时候翻到了第 2 页以后' };
+            function snapNote(e){
+                if(e.snap!=null){ const how=e.snapSrc==='idle' ? '停下来时存的' : e.snapSrc==='hide' ? '切后台时存的' : '';
+                    const age=e.snapAge!=null ? (e.snapAge<60 ? e.snapAge+' 秒前' : e.snapAge<3600 ? Math.round(e.snapAge/60)+' 分钟前' : Math.round(e.snapAge/3600)+' 小时前') : '';
+                    return (how||age) ? `快照：${[how, age].filter(Boolean).join('，')}；` : ''; }
+                return e.snapMiss ? `没用上快照：${SNAP_MISS[e.snapMiss]||e.snapMiss}；` : '';
+            }
             function fmt(e){
                 if(typeof e.ts==='number') e=Object.assign({}, e, { at:P.localAt(e.ts) });   // 1019-Z4：有时间戳的按当地时间重新写（老记录没有，照原样）
                 if(e.kind==='启动' && e.nat){ const n=e.nat, v=x=>x!=null ? x : '-';
-                    return `${e.at} 启动全程（${n.proc ? '从点图标' : '从 Activity 创建'}算）：Activity 创建 ${v(n.act)} · WebView 建好 ${v(n.web)} · 网页开始 ${v(n.page)} · 首屏画好 ${v(n.first)} · 收到画好了 ${v(n.ready)} · 启动画面收起 ${n.wait ? v(n.gone) : '（没等首屏，系统第一帧就收）'}｜网页里：${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}`; }
-                if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}）`;
+                    return `${e.at} 启动全程（${n.proc ? '从点图标' : '从 Activity 创建'}算）：Activity 创建 ${v(n.act)} · WebView 建好 ${v(n.web)} · 网页开始 ${v(n.page)} · 首屏画好 ${v(n.first)} · 收到画好了 ${v(n.ready)} · 启动画面收起 ${n.wait ? v(n.gone) : '（没等首屏，系统第一帧就收）'}｜网页里：${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}${e.n!=null?'；':''}${snapNote(e)}`; }
+                if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}${e.n!=null?'；':''}${snapNote(e)}）`;
                 if(e.kind==='点输入框') return `${e.at} 点输入框到能输入 ${e.ms}ms（${e.what}）`;
                 if(e.kind==='键盘') return `${e.at} 键盘 面板位置变了 ${e.moves} 次${e.blank!=null ? `，露出空白 ${e.blank} 帧` : ''}，最慢一帧 ${e.maxFrame}ms、平均 ${e.avgFrame}ms，可视区 ${e.vv}（${e.what}）`;
                 if(e.kind==='打开面板' || e.kind==='关闭面板') return `${e.at} ${e.kind} ${e.ms}ms（${e.what}）`;
