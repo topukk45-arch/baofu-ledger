@@ -765,6 +765,7 @@
         /* 1017-UI1：共用的底部面板（JiwenSheet）：和筛选浮层同一套 .sheet 外观；最高约 70% 屏幕，内容多时在面板里滚，底部按钮贴底 */
         #uiSheetMask { z-index:1000; }
         .ui-sheet { max-height:72vh; max-height:72dvh; padding-bottom:0; }
+        .ui-sheet.ui-sheet-tall { max-height:88vh; max-height:88dvh; }
         .ui-sheet .sheet-head { margin-bottom:6px; }
         .ui-sheet-sub { font-size:13px; color:var(--c-text-soft); margin:-2px 0 10px; overflow-wrap:anywhere; }
         .ui-sheet-body { padding:2px 0 6px; }
@@ -796,7 +797,9 @@
         .form-mask .form-btns > * { margin:0; flex:none; }
         /* 1020-G：记一笔 / 修改照草图「方案 D」：时间一行 → 金额（大字靠右）→ 收支两个按钮 → 分类 4 个最近常用 → 列表卡（更多 / 统计 / 备注）
            → 保存 →「关闭 | 存为常用」。颜色一律用主题变量。 */
-        .rec-sheet { padding-bottom:0; }
+        /* 1020-J：贴底的按钮排要贴到面板最底边：面板自己的下内边距是 0（原来 .form-mask > .sheet 的 20px + 底部横条那条压过了 .rec-sheet，
+           sticky 的按钮排停在内边距上面，后面滚动的内容从那 20 多 px 里露出来）；底部横条那条由按钮排自己的下内边距（带底色）留 */
+        .form-mask > .sheet.rec-sheet { padding-bottom:0; }
         .rec-form { gap:14px; }
         /* 1020-D：记账时间是一眼看得出能点的一行：日历图标 + 16px 的时间 + 右边 ›，整行 48px 高、带框 */
         .rec-time { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); margin:0; padding:0 12px;
@@ -864,6 +867,20 @@
         .mode-pick-txt b { font-size:16px; font-weight:500; line-height:22px; }
         .mode-pick-txt span { font-size:13px; color:var(--c-text-soft); line-height:18px; }
         .mode-pick-ok { width:20px; height:20px; flex:none; fill:none; stroke:var(--c-primary-dark); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+        /* 1020-J：常用模板列表（记一笔「常用」那一行拉出来）：一行一个，小圆标 + 名字 / 小字 + 金额，一行 60px 左右 */
+        .tpl-pick-row { display:flex; align-items:center; gap:12px; min-height:60px; padding:10px 14px; border:0; margin:0; width:100%;
+            background:transparent; color:var(--c-text); font-family:inherit; text-align:left; cursor:pointer; }
+        .tpl-pick-row + .tpl-pick-row { border-top:1px solid var(--c-border); }
+        .tpl-pick-row:active, .tpl-pick-row.sel { background:var(--c-sel-bg); }
+        .tpl-pick-ic { width:36px; height:36px; flex:none; border-radius:18px; background:var(--c-chip); color:var(--c-primary-deep);
+            font-size:15px; font-weight:bold; display:flex; align-items:center; justify-content:center; }
+        .tpl-pick-txt { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+        .tpl-pick-name { font-size:16px; font-weight:500; line-height:22px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .tpl-pick-sub { font-size:12px; line-height:17px; color:var(--c-text-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .tpl-pick-amt { flex:none; font-size:15px; font-variant-numeric:tabular-nums; }
+        .tpl-pick-empty { padding:16px 4px; font-size:14px; line-height:1.6; color:var(--c-text-soft); text-align:left; }
+        /* 1020-J：列表卡的值是空的时候右边写灰字提示（「全部分类」「选择常用模板」），值本身还是空的 */
+        .rec-row-v:empty::before { content:attr(data-ph); font-size:14px; font-weight:normal; color:var(--c-text-soft); }
         /* 分类抽屉（选分类）：搜索框、最近常用一行 4 个、全部一行 4 个 */
         .cat-drawer-search { display:flex; align-items:center; gap:8px; height:var(--ui-tap); padding:0 12px; margin:0 0 12px;
             border:1px solid var(--c-border-mid); border-radius:12px; background:var(--c-surface); }
@@ -894,11 +911,10 @@
         /* 1019-P：数字键盘：照微信转账，左边三列 1–9、最下一行 0（两列宽）和小数点，最右一列退格 + 占三行高的主色大按钮；按键 56px 高 */
         #kpMask { z-index:1045; background:transparent; pointer-events:none; }
         #kpMask .kp-sheet { pointer-events:auto; padding-left:12px; padding-right:12px; }
-        .kp-show { display:flex; align-items:baseline; justify-content:flex-end; gap:6px; padding:2px 6px 10px; }
-        .kp-cur { font-size:20px; color:var(--c-text-soft); }
-        .kp-val { font-size:34px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; letter-spacing:0.5px; }
-        .kp-val.kp-empty { color:var(--c-text-soft); opacity:0.55; }
-        .kp-grid { display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, 56px); gap:8px; }
+        /* 1020-J：按键高度由 kpFit 按面板里两排之间的空白定（52～76px，--kp-key），放到最高还有多的垫在键盘顶上（--kp-extra） */
+        #kpMask .kp-sheet { padding-top:calc(8px + var(--kp-extra, 0px)); }
+        .kp-grid { display:grid; grid-template-columns:repeat(4, 1fr); grid-template-rows:repeat(4, var(--kp-key, 56px)); gap:8px; }
+        .kp-key.kp-off { background:transparent; box-shadow:none; pointer-events:none; }   /* 整数模式：小数点那一格空着、不能点 */
         .kp-key { border:none; border-radius:10px; background:var(--c-surface); color:var(--c-text); font-size:24px; font-family:inherit;
             box-shadow:0 1px 0 rgba(var(--c-shadow-rgb),0.25); cursor:pointer; -webkit-user-select:none; user-select:none; touch-action:manipulation; }
         .kp-key:active, .kp-key.kp-pressed { filter:brightness(0.92); transform:scale(0.98); }   /* 1019-Z2：长按退格时一直是按下的样子 */
@@ -915,6 +931,8 @@
         @media (prefers-reduced-motion: reduce) { #kpCaret { animation:none; } }
         /* 金额框所在的面板临时在底下垫一块键盘那么高的空白，好把金额框滚到键盘上面 */
         .sheet.kp-lift { padding-bottom:calc(var(--kp-h, 320px) + 12px) !important; }
+        /* 1020-J：垫了空白的面板，贴底的按钮排不再贴底（不然跟着停在键盘上面、把正在输的框盖住），排在内容后面，被数字键盘整个盖住（键盘的大按钮就是「确定」） */
+        .sheet.kp-lift > .ask-btns, .sheet.kp-lift > .ui-sheet-foot { position:static; }
         .sheet-ghost.kp-mask { background:transparent !important; animation:none !important; }
 
         .cat-list { margin:10px 0; max-height:50vh; overflow-y:auto; }
@@ -1666,6 +1684,12 @@
         .filter-list .rec-row:active { background:transparent; }
         /* 1020-I：详情里的值是标签（支出 / 分类）时不裁、不剪（标签有框和内边距） */
         .detail-row .rec-row-v { text-box:none; overflow:visible; }
+        /* 1020-J：「计入」「全部分类」下半截被切掉：上面 1020-H 那条 .rec-row-v 的 overflow:clip + overflow-clip-margin 排在前头，
+           被后面列表卡那条 overflow:hidden（为了长备注省略号）盖掉了，裁掉上下留白以后框只有大写字母高，字的下半截就被剪了。挪到最后再写一次 */
+        @supports (text-box: trim-both cap alphabetic) {
+            .rec-row-v { overflow:clip; overflow-clip-margin:8px; }
+            .detail-row .rec-row-v { overflow:visible; }
+        }
         /* 1020-I：退款金额的提示字（「最多 19.63」）用小字，不和大字金额一样大 */
         #refundMoney::placeholder { font-size:20px; font-weight:normal; }
         #refundMask .refund-sum { margin-bottom:12px; }

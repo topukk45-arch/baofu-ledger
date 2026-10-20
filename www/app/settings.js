@@ -167,12 +167,20 @@
             function _whiteContrast(hex){ const l=_lum(hex); return (1.0+0.05)/(l+0.05); }
             function _contrast(a,b){ const l1=_lum(a),l2=_lum(b); return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05); }
 
+            // 1020-J：主色真正会用的那一段（选色面板的深浅条、鲜艳条两头就是它）：亮度 PAL_L_MIN～PAL_L_MAX、饱和度 PAL_S_MIN～100
+            const PAL_L_MIN=20, PAL_L_MAX=56, PAL_S_MIN=12;
+            // 黑 / 白 / 灰没有色相（rgbToHsl 给 0 = 红，原来再被「饱和度至少 12」提上去，配出来的浅底是粉色）；太黑太白时取整也把色相弄乱了
+            function noHue(hsl){ return hsl.s<1 || hsl.l<2 || hsl.l>98; }
+            const DEFAULT_HUE=175;   // 默认主色 #3f6f6b 的色相：没色相、又没记过上一次的色相时用它
             // 从一个主色推导整套主题变量（保证浅底深字、对比足够）
-            function buildPalette(primaryHex){
+            //   hue：选色面板记着的色相（拖条时用它，不从色值反推）；不给时从色值反推，色值没有色相的用 hueFallback（上一次的色相）
+            function buildPalette(primaryHex, hue, hueFallback){
                 let { h,s,l } = rgbToHsl(hexToRgb(primaryHex));
-                if(s<12) s=12;                       // 太灰会显脏，给个下限
-                // 主色亮度收进可读区间：上限 56
-                let pL=Math.min(l,56);
+                if(hue!=null && isFinite(hue)) h=hue;
+                else if(noHue({ h,s,l })) h=(hueFallback!=null && isFinite(hueFallback)) ? hueFallback : DEFAULT_HUE;
+                if(s<PAL_S_MIN) s=PAL_S_MIN;         // 太灰会显脏，给个下限
+                // 主色亮度收进可读区间：PAL_L_MIN～PAL_L_MAX（1020-J 起也有下限：拉到最黑也是看得出色相的深色）
+                let pL=Math.max(PAL_L_MIN, Math.min(l,PAL_L_MAX));
                 // 关键兜底：黄/青等高亮色相即使压到 56 白字仍可能发虚，
                 // 逐步压暗直到「白字 / 主色」对比≥2.4，保证按钮文字任何选色下都看得清
                 let primary=hslToHex(h,s,pL);
@@ -215,15 +223,17 @@
                     '--c-sel-text':      hslToHex(h,Math.min(s+10,92),Math.max(pL-22,22))
                 };
             }
-            function applyPrimary(primaryHex){
-                const pal=buildPalette(primaryHex);
+            function applyPrimary(primaryHex, hue){
+                const pal=buildPalette(primaryHex, hue, savedHue());
                 const root=document.documentElement;
                 Object.keys(pal).forEach(k=>root.style.setProperty(k, pal[k]));
                 // 同步「键盘弹起兜底底色」：把当前主题背景钉到 html inline 背景 + theme-color，
                 // 否则换肤后键盘弹起会闪一下旧底色。
                 const bg=pal['--c-bg'];
                 if(bg){
-                    root.style.backgroundColor=bg;
+                    // 1020-J：要带 !important：index.html 开头为了防白闪把根底色钉成默认的米黄（!important），不带的话换了主题根底色还是米黄，
+                    //   页面没铺到的地方（日子页最后一条虚线往下）就露出一块偏橙的底
+                    root.style.setProperty('background-color', bg, 'important');
                     let tc=document.querySelector('meta[name="theme-color"]');
                     if(tc) tc.setAttribute('content', bg);
                 }
@@ -233,6 +243,8 @@
             function loadPrefs(){
                 try{ return JSON.parse(localStorage.getItem('app_appearance')||'{}'); }catch(_){ return {}; }
             }
+            // 1020-J：上一次的色相（存在 app_appearance 的 hue 里，和那时存的色值 hueOf 成对；不进备份）
+            function savedHue(){ const p=loadPrefs(); return (typeof p.hue==='number' && isFinite(p.hue)) ? p.hue : null; }
             function savePrefs(p){ localStorage.setItem('app_appearance', JSON.stringify(p)); try{ snapDrop(); }catch(_){} }   // 1019-U：换了主题，快照作废
 
             // —— 弹窗交互 ——
@@ -247,7 +259,7 @@
                     if(activeColor && p.color.toLowerCase()===activeColor.toLowerCase()) sw.classList.add('active');
                     sw.onclick=()=>{
                         applyPrimary(p.color);
-                        const pf=loadPrefs(); pf.primary=p.color; savePrefs(pf);
+                        const pf=loadPrefs(); pf.primary=p.color; pf.hue=Math.round(rgbToHsl(hexToRgb(p.color)).h*10)/10; pf.hueOf=p.color; savePrefs(pf);
                         renderPresets(p.color);
                         $('customColor').value=p.color; paintCustomRow();
                     };
@@ -281,7 +293,11 @@
                 const pf=loadPrefs();
                 const orig=HEX_RE.test(pf.primary||'') ? pf.primary.toLowerCase() : DEFAULT_PRIMARY;
                 let cur=HEX_RE.test($('customColor').value) ? $('customColor').value.toLowerCase() : orig;
+                // 1020-J：面板自己记住色相、深浅、鲜艳三个数，配色用面板里的色相（不从色值反推）；
+                //   从色值输入框 / 色块进来的：有色相就用它的，没有色相（黑白灰）的保留上一次的色相
                 let hsl=rgbToHsl(hexToRgb(cur));
+                if(pf.hueOf===cur && savedHue()!=null) hsl.h=savedHue();
+                else if(noHue(hsl)) hsl.h = savedHue()!=null ? savedHue() : DEFAULT_HUE;
                 let raf=0, els={};
                 // 取消时原样放回：打开时 html 上的样式（主题色都在这里）和 theme-color（没存过主题时 App 用的是样式表里默认的颜色，不能用「再套一次」来恢复）
                 const root=document.documentElement, meta=document.querySelector('meta[name="theme-color"]');
@@ -289,27 +305,31 @@
                 const restore=()=>{ if(raf){ cancelAnimationFrame(raf); raf=0; }
                     if(origStyle==null) root.removeAttribute('style'); else root.setAttribute('style', origStyle);
                     if(meta && origMeta!=null) meta.setAttribute('content', origMeta); };
-                const preview=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; applyPrimary(cur); }); };
+                const preview=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; applyPrimary(cur, hsl.h); }); };
                 const setHex=(hex, fromHsl)=>{
                     cur=hex.toLowerCase();
-                    if(!fromHsl) hsl=rgbToHsl(hexToRgb(cur));
+                    if(!fromHsl){ const n=rgbToHsl(hexToRgb(cur)); if(noHue(n)) n.h=hsl.h; hsl=n; }
                     paint(); preview();
                 };
+                // 1020-J：深浅条、鲜艳条的两头就是 App 真正会用的最深 / 最浅、最灰 / 最艳（和 buildPalette 的上下限一样）；
+                //   条上的颜色按 buildPalette 实际会用的主色画（太亮被加深的那段条上也是加深以后的颜色）
+                const used=(h, s0, l0)=>buildPalette(hslToHex(h, s0, l0), h)['--c-primary'];
                 const bars=[
-                    { k:'h', label:'色相', max:360, grad:()=>`linear-gradient(to right, ${[0,60,120,180,240,300,360].map(h=>hslToHex(h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,35),60))).join(',')})` },
-                    { k:'l', label:'深浅', max:100, grad:()=>`linear-gradient(to right, ${hslToHex(hsl.h,hsl.s,8)}, ${hslToHex(hsl.h,hsl.s,50)}, ${hslToHex(hsl.h,hsl.s,92)})` },
-                    { k:'s', label:'鲜艳', max:100, grad:()=>`linear-gradient(to right, ${hslToHex(hsl.h,0,hsl.l)}, ${hslToHex(hsl.h,100,hsl.l)})` }
+                    { k:'h', label:'色相', min:0, max:360, grad:()=>`linear-gradient(to right, ${[0,30,60,90,120,150,180,210,240,270,300,330,360].map(h=>used(h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,35),PAL_L_MAX))).join(',')})` },
+                    { k:'l', label:'深浅', min:PAL_L_MIN, max:PAL_L_MAX, grad:()=>`linear-gradient(to right, ${[0,0.25,0.5,0.75,1].map(f=>used(hsl.h,hsl.s,PAL_L_MIN+f*(PAL_L_MAX-PAL_L_MIN))).join(',')})` },
+                    { k:'s', label:'鲜艳', min:PAL_S_MIN, max:100, grad:()=>`linear-gradient(to right, ${[0,0.5,1].map(f=>used(hsl.h,PAL_S_MIN+f*(100-PAL_S_MIN),Math.min(Math.max(hsl.l,PAL_L_MIN),PAL_L_MAX))).join(',')})` }
                 ];
+                const frac=b=>Math.max(0, Math.min(1, (hsl[b.k]-b.min)/(b.max-b.min)));
                 function paint(){
-                    bars.forEach(b=>{ const e=els[b.k]; if(!e) return; e.track.style.background=b.grad(); e.thumb.style.left=(Math.max(0,Math.min(1,hsl[b.k]/b.max))*100)+'%';
-                        e.thumb.style.background=b.k==='h' ? hslToHex(hsl.h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,35),60)) : cur; });
+                    bars.forEach(b=>{ const e=els[b.k]; if(!e) return; e.track.style.background=b.grad(); e.thumb.style.left=(frac(b)*100)+'%';
+                        e.thumb.style.background=b.k==='h' ? used(hsl.h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,35),PAL_L_MAX)) : buildPalette(cur, hsl.h)['--c-primary']; });
                     if(els.dot) els.dot.style.background=cur;
                     if(els.hex && document.activeElement!==els.hex){ els.hex.value=cur; els.hex.classList.remove('bad'); }
                     if(els.sw) [...els.sw.children].forEach(x=>x.classList.toggle('on', x.dataset.c===cur));
-                    if(els.note){ const used=buildPalette(cur)['--c-primary'].toLowerCase();
+                    if(els.note){ const used=buildPalette(cur, hsl.h)['--c-primary'].toLowerCase();
                         els.note.textContent = used!==cur ? `这个颜色太浅或太亮，按钮上看不清字，实际会用深一点的 ${used}。` : '整个 App 已经换成这个颜色看看效果，点「应用」才存。'; }
                 }
-                window.JiwenSheet.open({ title:'自定义主色', sub:'点色块，或者拖下面的条；整个 App 跟着变，点「应用」才存',
+                window.JiwenSheet.open({ title:'自定义主色', sub:'点色块，或者拖下面的条；整个 App 跟着变，点「应用」才存', tall:true,   // 1020-J：原来 72% 高装不下，色相 / 深浅条被「应用」挡住半截
                     onDismiss(){ restore(); },
                     body(outer){
                         const box=document.createElement('div'); box.className='cp-wrap'; outer.appendChild(box);   // 面板正文是竖排 flex，装进一个普通的块里，不被拉开
@@ -326,7 +346,10 @@
                             let dragging=false;
                             const at=e=>{ const r=track.getBoundingClientRect(); if(!r.width) return;
                                 const f=Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
-                                hsl[b.k]=Math.round(f*b.max*10)/10; setHex(hslToHex(hsl.h,hsl.s,hsl.l), true); };
+                                hsl[b.k]=Math.round((b.min+f*(b.max-b.min))*10)/10;
+                                // 另外两个数不在范围里的（从色值进来的太浅、太灰）先收进范围，条上看到的就是实际用的
+                                hsl.l=Math.max(PAL_L_MIN, Math.min(PAL_L_MAX, hsl.l)); hsl.s=Math.max(PAL_S_MIN, hsl.s);
+                                setHex(hslToHex(hsl.h,hsl.s,hsl.l), true); };
                             bar.addEventListener('pointerdown', e=>{ dragging=true; try{ bar.setPointerCapture(e.pointerId); }catch(_){} at(e); });
                             bar.addEventListener('pointermove', e=>{ if(dragging) at(e); });
                             ['pointerup','pointercancel'].forEach(ev=>bar.addEventListener(ev, ()=>{ dragging=false; }));
@@ -348,7 +371,7 @@
                     foot(box, done){
                         const st=document.createElement('div'); st.className='ui-stack';
                         const ok=document.createElement('button'); ok.type='button'; ok.className='ui-btn primary block'; ok.id='cpApply'; ok.textContent='应用';
-                        ok.addEventListener('click', ()=>{ done(); if(raf){ cancelAnimationFrame(raf); raf=0; } applyPrimary(cur); const p=loadPrefs(); p.primary=cur; savePrefs(p);
+                        ok.addEventListener('click', ()=>{ done(); if(raf){ cancelAnimationFrame(raf); raf=0; } applyPrimary(cur, hsl.h); const p=loadPrefs(); p.primary=cur; p.hue=Math.round(hsl.h*10)/10; p.hueOf=cur; savePrefs(p);
                             $('customColor').value=cur; paintCustomRow(); renderPresets(cur); });
                         const no=document.createElement('button'); no.type='button'; no.className='ui-btn block'; no.id='cpCancel'; no.textContent='取消';
                         no.addEventListener('click', ()=>{ done(); restore(); });
@@ -358,14 +381,14 @@
             $('customColorBtn').addEventListener('click', openColorPicker);
             $('resetThemeBtn').addEventListener('click', ()=>{
                 applyPrimary(DEFAULT_PRIMARY);
-                const pf=loadPrefs(); pf.primary=DEFAULT_PRIMARY; savePrefs(pf);
+                const pf=loadPrefs(); pf.primary=DEFAULT_PRIMARY; pf.hue=DEFAULT_HUE; pf.hueOf=DEFAULT_PRIMARY; savePrefs(pf);
                 $('customColor').value=DEFAULT_PRIMARY; paintCustomRow();
                 renderPresets(DEFAULT_PRIMARY);
             });
 
             // —— 启动时应用已保存的外观 ——
             const pf=loadPrefs();
-            if(pf.primary) applyPrimary(pf.primary);
+            if(pf.primary) applyPrimary(pf.primary, pf.hueOf===pf.primary ? savedHue() : null);
         })();
 
         // 1016-V：设置里「存储已用 x%」，超过 70% 提醒。按浏览器给这个 App 的配额算（navigator.storage.estimate，账本在 IndexedDB 里）。

@@ -22,15 +22,21 @@ function bootSync(arc, extraArchives){
   const clickChip=(box,txt)=>RC.chip(d, box, txt).click();
   const choose=label=>{ [...$('askChoices').querySelectorAll('.cc')].find(e=>(e.querySelector('.cc-label')||e).textContent.startsWith(label)).click(); $('askOk').click(); };
   const openAdd=()=>$('fabAdd').click();
-  return {w:dom.window,d,$,errs,st,arcOf,chipTxt,clickChip,choose,openAdd};
+  // 1020-J：常用模板收进列表卡「常用」那一行：点了拉出常用模板列表（共用面板），一行一个（名字 + 金额）
+  const tplTxt=()=>{ $('billTplRow').click(); const r=[...d.querySelectorAll('#tplPick .tpl-pick-row')].map(e=>e.querySelector('.tpl-pick-name').textContent+((e.querySelector('.tpl-pick-amt')||{}).textContent||'').replace('¥','')); dom.window.JiwenSheet.back(); return r; };
+  const pickTpl=txt=>{ $('billTplRow').click(); const e=[...d.querySelectorAll('#tplPick .tpl-pick-row')].find(e=>e.querySelector('.tpl-pick-name').textContent+((e.querySelector('.tpl-pick-amt')||{}).textContent||'').replace('¥','')===txt); e.click(); };
+  return {w:dom.window,d,$,errs,st,arcOf,chipTxt,clickChip,choose,openAdd,tplTxt,pickTpl};
 }
 
 (async()=>{
-// ===== 1. 没有模板：记一笔里「常用」整行隐藏 =====
+// ===== 1. 没有模板：1020-J 起「常用」那一行照样有（右边灰字「选择常用模板」），点了列表是空的、写一句怎么存，底部照样有「管理常用」 =====
 {
   const t=await boot();
   t.openAdd();
-  ok(t.$('billTplField').style.display==='none', '无模板时隐藏常用行');
+  ok(t.$('billTplRow') && t.$('billTplVal').textContent==='' && t.$('billTplVal').dataset.ph==='选择常用模板', '无模板时「常用」那一行照样在、右边是灰字提示');
+  t.$('billTplRow').click();
+  ok(t.$('uiSheetTitle').textContent==='常用' && t.$('tplPickEmpty') && t.$('tplPickEmpty').textContent.includes('存为常用') && t.$('tplPickManage'), '列表是空的、写怎么存、有「管理常用」');
+  t.w.JiwenSheet.back();
 }
 
 // ===== 2. 从记一笔存模板：带金额 / 不带金额 =====
@@ -46,7 +52,7 @@ function bootSync(arc, extraArchives){
   let tp=t.arcOf().tpls;
   ok(tp.length===1 && tp[0].money===157 && tp[0].cat==='订阅' && tp[0].type==='expense' && tp[0].remark==='视频会员' && tp[0].mode==='normal', '模板内容正确');
   ok(t.$('addMask').style.display==='flex' && t.$('billMoney').value==='157', '存完记一笔表单还在、内容不丢');
-  ok(t.$('billTplField').style.display==='' && t.chipTxt('billTplChips').join()==='视频会员157', '胶囊立刻出现：'+t.chipTxt('billTplChips').join());
+  ok(t.tplTxt().join()==='视频会员157', '常用列表里立刻有了：'+t.tplTxt().join());
   // 重复存：拦下
   t.$('billSaveTpl').click(); t.choose('带上金额');
   ok(t.$('askMsg').textContent==='这个已经在常用里了。' && t.arcOf().tpls.length===1, '完全相同的不重复存');
@@ -81,28 +87,26 @@ function bootSync(arc, extraArchives){
   ];
   const t=await boot({ tpls });
   t.openAdd();
-  ok(t.chipTxt('billTplChips').join('|')==='视频会员157|信用卡还款|借出还回500', '顺序固定，带金额的显示金额');
+  ok(t.tplTxt().join('|')==='视频会员157|信用卡还款|借出还回500', '顺序固定，带金额的显示金额');
   const before=t.arcOf().records.length;
   const time0=t.$('billTime').dataset.value || t.$('billTime').textContent;
-  // 【1010-I2】常用在金额下面
-  const fields=[...t.$('addMask').querySelectorAll('.form-box > .field')].map(f=>f.querySelector('.field-label').textContent);
-  // 1019-Q 起记账时间、金额不再是带标题的 .field（时间一行小字、金额一行大字在最上面），按页面里的先后比
+  // 【1010-I2】常用在金额下面；1020-J 起是列表卡里「统计」和「备注」之间那一行
   const after=(a,b)=>!!(t.$(a).compareDocumentPosition(t.$(b)) & 4);
-  ok(after('billTimeLine','billMoney') && after('billMoney','billTplField') && fields[0]==='常用', '常用排在金额下面：'+fields.join());
+  ok(after('billTimeLine','billMoney') && after('billMode','billTplRow') && after('billTplRow','billRemarkRow') && !t.$('billTplField') && !t.$('billTplChips'), '常用是列表卡里统计和备注之间那一行，分类上面没有胶囊了');
   t.$('billMoney').focus();
-  t.clickChip('billTplChips','视频会员157');
+  t.pickTpl('视频会员157');
   ok(t.$('billMoney').value==='157' && t.$('billRemark').value==='视频会员', '金额与备注已填');
   ok(t.d.activeElement!==t.$('billMoney'), '带金额：收起键盘（金额框失焦）');
   ok(t.w.JiwenForms.billCatSel==='订阅' && t.$('billTypeChips').querySelector('.sel-out'), '分类、支出已选');
   ok(t.$('billMode').dataset.mode==='normal', '口径计入');
   ok(t.arcOf().records.length===before, '只填表，不入账');
   ok((t.$('billTime').dataset.value || t.$('billTime').textContent)===time0, '时间不动');
-  t.clickChip('billTplChips','信用卡还款');
+  t.pickTpl('信用卡还款');
   ok(t.$('billMoney').value==='' && t.$('billMode').dataset.mode==='normal', '不带金额 → 金额清空；口径以模板为准（不被转账自动改成不计）');
   ok(t.d.activeElement===t.$('billMoney') || (t.$('kpMask').style.display==='flex' && t.$('billMoney').classList.contains('kp-on')), '不带金额：聚焦金额弹键盘（1019-P 起弹的是 App 的数字键盘）');
-  t.clickChip('billTplChips','借出还回500');
+  t.pickTpl('借出还回500');
   ok(t.$('billTypeChips').querySelector('.sel-in') && t.$('billMode').dataset.mode==='flow', '收入 + 往来');
-  ok(t.$('billTplChips').querySelectorAll('.cc.sel').length===1, '只高亮当前模板');
+  ok(t.$('billTplVal').textContent==='借出还回' && (t.$('billTplRow').click(), t.d.querySelectorAll('#tplPick .tpl-pick-row.sel').length===1 && t.d.querySelector('#tplPick .sel').dataset.id==='c'), '只高亮当前模板（那一行写它的名字）'); t.w.JiwenSheet.back();
   t.$('addBill').click();
   const r=t.arcOf().records.at(-1);
   ok(r.money===500 && r.type==='income' && r.cat==='其他' && r.flow===true && r.remark==='借出还回', '点添加后按模板内容入账');
@@ -172,8 +176,8 @@ function bootSync(arc, extraArchives){
   ok(Array.isArray(t2.st().archives['旧备份'].tpls) && t2.st().archives['旧备份'].tpls.length===0, '旧备份没有 tpls → 空数组');
   // XSS：模板名只当文字
   const t3=await boot({ tpls:[{id:'x',type:'expense',cat:'餐饮',remark:'<img src=x onerror="window.__pwn=1">',money:null,mode:'normal'}] });
-  t3.openAdd(); t3.$('manageTplSetting').click();
-  ok(!t3.$('billTplChips').querySelector('img') && !t3.$('tplList').querySelector('img') && !t3.w.__pwn, '模板名里的 HTML 不执行');
+  t3.openAdd(); t3.$('billTplRow').click(); const pk=t3.$('tplPick'); t3.w.JiwenSheet.back(); t3.$('manageTplSetting').click();
+  ok(pk && !pk.querySelector('img') && !t3.$('tplList').querySelector('img') && !t3.w.__pwn, '模板名里的 HTML 不执行');
 }
 
 // ===== 9. 模板跟存档走：切存档后看到的是另一套 =====
@@ -182,7 +186,7 @@ function bootSync(arc, extraArchives){
                { '旅行':{ cats:['未分类','出行'], records:[] } });
   const sel=t.$('archiveSelect'); sel.value='旅行'; sel.dispatchEvent(new t.w.Event('change'));
   t.openAdd();
-  ok(t.$('billTplField').style.display==='none', '另一个存档没有模板');
+  ok(t.tplTxt().length===0, '另一个存档没有模板');
 }
 
 // ===== 10. 上限 12 =====
@@ -238,13 +242,13 @@ function bootSync(arc, extraArchives){
   dlg.getBoundingClientRect=()=>rect(0,600);
   t.$('addBill').getBoundingClientRect=()=>rect(860-dlg.scrollTop, 900-dlg.scrollTop);
   dlg.scrollTop=0;
-  t.clickChip('billTplChips','早餐8');
+  t.pickTpl('早餐8');
   ok(dlg.scrollTop===316, '带金额的模板：弹窗滚到「添加记录」露出来（滚了 '+dlg.scrollTop+'）');
   ok(t.$('billMoney').value==='8', '金额照常填好');
   await new Promise(r=>setTimeout(r,400));
   ok(dlg.scrollTop===316, '键盘收起后再滚一次也不会多滚');
   dlg.scrollTop=0;
-  t.clickChip('billTplChips','午饭');
+  t.pickTpl('午饭');
   ok(dlg.scrollTop===0 && (t.d.activeElement===t.$('billMoney') || t.$('billMoney').classList.contains('kp-on')), '不带金额的模板：不滚，光标在金额框（1019-P 起是数字键盘对着金额框）');
   await new Promise(r=>setTimeout(r,400));
   ok(dlg.scrollTop===0, '不带金额的过一会儿也不滚');

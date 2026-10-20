@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1020-I">
+    <link rel="stylesheet" href="app/app.css?v=1020-J">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-I</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-J</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -405,18 +405,14 @@
                     <option value="expense">支出（花销）</option>
                     <option value="income">收入（存入）</option>
                 </select>
-                <!-- 常用模板（1010-I）：没有模板时整行隐藏 -->
-                <div class="field" id="billTplField" style="display:none">
-                    <label class="field-label">常用</label>
-                    <div class="cat-chips tpl-chips" id="billTplChips"></div>
-                </div>
                 <!-- 1020-G：分类一行 4 个「最近常用」；别的在「更多」里（分类抽屉） -->
                 <div class="cat-chips rec-cats" id="billCatChips" aria-label="最近常用的分类"></div>
                 <select id="billCat" style="display:none"></select>
-                <!-- 1020-G：一张列表卡：更多（分类抽屉）/ 统计（计入 · 不计 · 往来）/ 备注 -->
+                <!-- 1020-J：一张列表卡四行：分类（分类抽屉）/ 统计（计入 · 不计 · 往来）/ 常用（常用模板列表）/ 备注；没值时右边灰字提示（data-ph） -->
                 <div class="rec-list">
-                    <button type="button" class="rec-row" id="billCatMore"><span class="rec-row-k">更多</span><span class="rec-row-v" id="billCatMoreVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="billCatMore"><span class="rec-row-k">分类</span><span class="rec-row-v" id="billCatMoreVal" data-ph="全部分类"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                     <button type="button" class="rec-row" id="billMode" data-mode="normal"><span class="rec-row-k">统计</span><span class="rec-row-v" id="billModeVal">计入</span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="billTplRow"><span class="rec-row-k">常用</span><span class="rec-row-v" id="billTplVal" data-ph="选择常用模板"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                     <button type="button" class="rec-row" id="billRemarkRow"><span class="rec-row-k">备注</span><span class="rec-row-v rec-row-txt" id="billRemarkVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
                 <textarea id="billRemark" class="remark-area rec-remark" maxlength="5000" rows="1" aria-hidden="true" tabindex="-1"></textarea>
@@ -452,9 +448,9 @@
                 <!-- 1020-G：分类一行 4 个「最近常用」；别的在「更多」里（分类抽屉） -->
                 <div class="cat-chips rec-cats lock-on-refund" id="editCatChips" aria-label="最近常用的分类"></div>
                 <select id="editCat" style="display:none"></select>
-                <!-- 1020-G：一张列表卡：更多（分类抽屉）/ 统计（计入 · 不计 · 往来）/ 备注 -->
+                <!-- 1020-J：一张列表卡：分类（分类抽屉）/ 统计（计入 · 不计 · 往来）/ 备注（修改账单没有「常用」） -->
                 <div class="rec-list">
-                    <button type="button" class="rec-row lock-on-refund" id="editCatMore"><span class="rec-row-k">更多</span><span class="rec-row-v" id="editCatMoreVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row lock-on-refund" id="editCatMore"><span class="rec-row-k">分类</span><span class="rec-row-v" id="editCatMoreVal" data-ph="全部分类"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                     <button type="button" class="rec-row lock-on-refund" id="editMode" data-mode="normal"><span class="rec-row-k">统计</span><span class="rec-row-v" id="editModeVal">计入</span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                     <button type="button" class="rec-row" id="editRemarkRow"><span class="rec-row-k">备注</span><span class="rec-row-v rec-row-txt" id="editRemarkVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
@@ -542,11 +538,10 @@
         </div>
     </div>
 
-    <!-- 1019-P：金额用 App 自己的数字键盘（不弹系统输入法）：和日期选择同一套外观，背后不加遮罩，不挡金额框 -->
+    <!-- 1019-P：金额用 App 自己的数字键盘（不弹系统输入法）：和日期选择同一套外观，背后不加遮罩，不挡金额框。1020-J：顶上不再重复写一遍金额，键盘自己定高（keypad.js 的 kpFit） -->
     <div class="mask sheet-mask form-mask kp-mask" id="kpMask">
         <div class="sheet kp-sheet" id="kpSheet">
             <div class="sheet-grip" id="kpGrip"><div class="sheet-handle" aria-hidden="true"></div></div>
-            <div class="kp-show"><span class="kp-cur">¥</span><span id="kpVal" class="kp-val kp-empty">0.00</span></div>
             <div class="kp-grid" id="kpGrid">
                 <button type="button" class="kp-key" data-k="1">1</button><button type="button" class="kp-key" data-k="2">2</button><button type="button" class="kp-key" data-k="3">3</button>
                 <button type="button" class="kp-key kp-del" data-k="del" id="kpDel" aria-label="退格">⌫</button>
@@ -586,7 +581,7 @@
                 <div class="cat-chips io-chips io-pair" id="tplEditTypes" role="radiogroup" aria-label="收支"></div>
                 <div class="cat-chips rec-cats" id="tplEditCats" aria-label="最近常用的分类"></div>
                 <div class="rec-list">
-                    <button type="button" class="rec-row" id="tplEditCatMore"><span class="rec-row-k">更多</span><span class="rec-row-v" id="tplEditCatMoreVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <button type="button" class="rec-row" id="tplEditCatMore"><span class="rec-row-k">分类</span><span class="rec-row-v" id="tplEditCatMoreVal" data-ph="全部分类"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                     <button type="button" class="rec-row" id="tplEditMode" data-mode="normal"><span class="rec-row-k">统计</span><span class="rec-row-v" id="tplEditModeVal">计入</span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                     <button type="button" class="rec-row" id="tplEditRemarkRow"><span class="rec-row-k">备注</span><span class="rec-row-v rec-row-txt" id="tplEditRemarkVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 </div>
@@ -850,26 +845,26 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1020-I"></script>
-    <script src="app/store.js?v=1020-I"></script>
-    <script src="app/select.js?v=1020-I"></script>
-    <script src="app/keypad.js?v=1020-I"></script>
-    <script src="app/text.js?v=1020-I"></script>
-    <script src="app/sheet.js?v=1020-I"></script>
-    <script src="app/ask.js?v=1020-I"></script>
-    <script src="app/date.js?v=1020-I"></script>
-    <script src="app/ai-export.js?v=1020-I"></script>
-    <script src="app/import-entry.js?v=1020-I"></script>
-    <script src="app/forms.js?v=1020-I"></script>
-    <script src="app/ledger.js?v=1020-I"></script>
-    <script src="app/cats.js?v=1020-I"></script>
-    <script src="app/stats.js?v=1020-I"></script>
-    <script src="app/days.js?v=1020-I"></script>
-    <script src="app/settings.js?v=1020-I"></script>
-    <script src="app/tabs.js?v=1020-I"></script>
-    <script src="app/login.js?v=1020-I"></script>
-    <script src="app/back.js?v=1020-I"></script>
-    <script src="app/boot.js?v=1020-I"></script>
+    <script src="app/base.js?v=1020-J"></script>
+    <script src="app/store.js?v=1020-J"></script>
+    <script src="app/select.js?v=1020-J"></script>
+    <script src="app/keypad.js?v=1020-J"></script>
+    <script src="app/text.js?v=1020-J"></script>
+    <script src="app/sheet.js?v=1020-J"></script>
+    <script src="app/ask.js?v=1020-J"></script>
+    <script src="app/date.js?v=1020-J"></script>
+    <script src="app/ai-export.js?v=1020-J"></script>
+    <script src="app/import-entry.js?v=1020-J"></script>
+    <script src="app/forms.js?v=1020-J"></script>
+    <script src="app/ledger.js?v=1020-J"></script>
+    <script src="app/cats.js?v=1020-J"></script>
+    <script src="app/stats.js?v=1020-J"></script>
+    <script src="app/days.js?v=1020-J"></script>
+    <script src="app/settings.js?v=1020-J"></script>
+    <script src="app/tabs.js?v=1020-J"></script>
+    <script src="app/login.js?v=1020-J"></script>
+    <script src="app/back.js?v=1020-J"></script>
+    <script src="app/boot.js?v=1020-J"></script>
 
 </body>
 </html>

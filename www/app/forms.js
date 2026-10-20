@@ -195,41 +195,50 @@
             renderBillTypeChips();
             renderBillCatChips();
             syncRecRows();
-            renderTplChips();
+            billTplSel=null; renderTplChips();
             setDtInput(billTime, nowDtValue());
         }
         function getTpls(){
             const a=curArchive(loadStore());
             return (a && Array.isArray(a.tpls)) ? a.tpls : [];
         }
+        // 1020-J：常用模板收进列表卡「常用」那一行（原来是分类上面两排胶囊）：右边灰字「选择常用模板」，点过一个写它的名字；
+        //   点了拉出常用模板列表（JiwenSheet.tpls）：点一个照模板填好、关掉列表；底部「取消 | 管理常用」，管理常用关了回到这个列表。
+        let billTplSel=null;
         function renderTplChips(){
-            const field=$('billTplField'), box=$('billTplChips');
-            if(!field || !box) return;
-            const cats=getCats();
-            const list=getTpls();
-            box.innerHTML='';
-            field.style.display = list.length ? '' : 'none';
-            list.forEach(t=>{
-                const b=document.createElement('div');
-                b.className='cc';
-                b.dataset.tpl=t.id;
-                const nm=document.createElement('span'); nm.textContent=tplName(t);
-                b.appendChild(nm);
-                if(t.money!=null){
-                    const am=document.createElement('span'); am.className='tpl-amt'; am.textContent=safeNum(t.money).toFixed(2).replace(/\.00$/,'');
-                    b.appendChild(am);
-                }
-                b.onclick=()=>{
-                    applyTpl(t, cats);
-                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
-                    // 【1013-E】带金额的模板点完表单就填全了，直接把弹窗滚到「添加记录」。
-                    //   不带金额的还得填金额，留在原处（applyTpl 已聚焦金额框）。
-                    if(t.money!=null) revealAddBtn();
-                };
-                box.appendChild(b);
-            });
+            const v=$('billTplVal'); if(!v) return;
+            const t=billTplSel && getTpls().find(x=>x.id===billTplSel);
+            if(!t) billTplSel=null;
+            v.textContent = t ? tplName(t) : '';
         }
-        // 把「记一笔」弹窗自己往下滚，露出「添加记录」按钮（只滚弹窗，不动整个页面）。
+        const TPL_MODE_TXT={ flow:'往来', skip:'不计' };
+        function openTplList(){
+            const cats=getCats();
+            const list=getTpls().map(t=>{
+                const sub=[t.cat, t.type==='expense'?'支出':'收入'];
+                if(TPL_MODE_TXT[t.mode]) sub.push(TPL_MODE_TXT[t.mode]);
+                const rm=(t.remark||'').replace(/\s+/g,' ').trim();
+                if(rm && rm!==tplName(t)) sub.push('备注：'+rm);
+                return { id:t.id, c:String(t.cat||'?').slice(0, 1), name:tplName(t), sub:sub.join(' · '),
+                         money: t.money!=null ? '¥'+safeNum(t.money).toFixed(2).replace(/\.00$/,'') : '' };
+            });
+            window.JiwenSheet.tpls({ list, value:billTplSel,
+                onPick:id=>{
+                    const t=getTpls().find(x=>x.id===id); if(!t) return;
+                    applyTpl(t, cats);
+                    billTplSel=t.id; renderTplChips();
+                    // 【1013-E】带金额的模板点完表单就填全了，直接把弹窗滚到「保存」。不带金额的还得填金额，留在原处（applyTpl 已对着金额框）。
+                    if(t.money!=null) revealAddBtn();
+                },
+                onManage:()=>{
+                    openTplManager();
+                    const m=$('tplMask');
+                    const ob=new MutationObserver(()=>{ if(m.style.display==='none' && $('tplEditMask').style.display!=='flex'){ ob.disconnect(); if($('addMask').style.display==='flex') openTplList(); } });
+                    ob.observe(m, { attributes:true, attributeFilter:['style'] });
+                } });
+        }
+        $('billTplRow').addEventListener('click', openTplList);
+        // 把「记一笔」弹窗自己往下滚，露出「保存」按钮（只滚弹窗，不动整个页面）。
         //   键盘刚收起时弹窗会变高，过一会儿再滚一次。
         function revealAddBtn(){
             const go=()=>{

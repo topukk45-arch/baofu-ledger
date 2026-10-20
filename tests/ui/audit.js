@@ -4,6 +4,7 @@
 //   3. 页面内容占了屏幕多高、下面空了多少。
 // 不是自动测试（不进 run-all，打包机上没有浏览器），改界面前后手动跑一遍对比：
 //   NODE_PATH=$(npm root -g) node tests/ui/audit.js 输出目录 [--only 配置名] [--part 段号,段号] [--shots]
+//   1020-J：第 11 段是这一轮新加的几项检查 + 截图总表（--only main --part 11 --shots，总表写到 tests/ui/out/<版本号>/sheet.png）
 //   配置：main（412×970 浅色）、narrow（360×780）、dark（412×970、系统深色）、big（412×970、字号 ×1.15）
 // 结果：输出目录/audit-<配置>.json、summary.md；--shots 时每页一张截图 <配置>-<页面>.png。
 // 数据全是虚构的（tests/helpers/bills.js 生成账单，手记、分类、对方名都是编的）。
@@ -699,6 +700,197 @@ async function run(cfg, port, browser) {
     await measure(page, 'color-picker', { scope: '#uiSheetMask', primary: ['#cpApply'], scrollTop: false });
     await page.close();
   }
+  // ===== 11. 1020-J 这一轮新加的检查（只在 main 那一轮跑，屏幕大小在里面自己换）=====
+  //   a 数字键盘：每个用数字键盘的地方打开一次，在 412×970、360×780、412×915、360×640 下量键盘顶边有没有压在按钮中间、
+  //     正在输的框是不是完整露在键盘上面、按键多高；
+  //   b 贴底按钮排下面不许露出任何滚动内容（内容超过一屏、滚到中间 / 最底）；
+  //   c 字有没有被切（字的上下沿要在会裁东西的框里）；
+  //   d 叠起来的两层面板，顶边差 1～63px 算错；
+  //   e 页面上不许有点了会弹系统数字输入法的框；
+  //   f 换主题以后根底色和页面底色一样（日子页下半截不露别的颜色）；
+  //   截图：改到的页面在 412×915、412×970、360×780 下各一张（平时 / 键盘弹出来 / 叠层打开），拼成一页 sheet.png（--shots 时）。
+  if (want(11) && cfg.name === 'main') {
+    const SIZES = [[412, 970], [360, 780], [412, 915], [360, 640]];
+    const SHEET_SIZES = ['412x915', '412x970', '360x780'];
+    const sheetShots = [];   // [{ file, page, size, state }]
+    const DAYS = [{ name: '虚构的纪念日', date: '2026-12-01', pin: true }, { name: '虚构的生日', date: '2026-11-11' }, { name: '虚构的考试', date: '2026-10-01' }];
+    const TPLS = [{ id: 't1', type: 'expense', cat: '吃饭', remark: '早餐', money: 8, mode: 'normal' }, { id: 't2', type: 'expense', cat: '出行', remark: '地铁', money: 4, mode: 'normal' },
+      { id: 't3', type: 'expense', cat: '吃饭', remark: '午饭', money: null, mode: 'normal' }, { id: 't4', type: 'expense', cat: '其他', remark: '信用卡还款', money: null, mode: 'skip' }];
+    const ls11 = seedOf({ dev: true, recs: oldRecords(60), cats: BASE_CATS.slice(0, 16), tpls: TPLS, extra: id => ({ ['days_' + id]: JSON.stringify(DAYS) }) });
+    async function page11(w, h, extraLs) {
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'zh-CN' });
+      const page = await ctx.newPage(); page.errs = []; page.on('pageerror', e => page.errs.push(e.message));
+      await page.clock.setFixedTime(new Date('2026-10-20T10:00:00'));
+      await page.addInitScript(l => { if (!sessionStorage.getItem('__seeded')) { sessionStorage.setItem('__seeded', '1'); localStorage.clear(); Object.entries(l).forEach(([k, v]) => localStorage.setItem(k, v)); } }, Object.assign({}, ls11, extraLs || {}));
+      await page.goto(`http://localhost:${port}/index.html`); await page.waitForTimeout(700);
+      return page;
+    }
+    const closeAll = page => page.evaluate(() => { window.kpClose && window.kpClose(); window.JiwenSheet && window.JiwenSheet.close(); document.querySelectorAll('.mask').forEach(m => { if (m.style.display === 'flex') m.style.display = 'none'; }); }).then(() => page.waitForTimeout(400));
+    const shot = async (page, size, pg, state) => {
+      if (!SHOTS) return;
+      const file = `j-${size}-${String(sheetShots.length + 1).padStart(3, '0')}-${pg}-${state}.png`;   // 带编号：不会互相盖掉
+      await page.screenshot({ path: path.join(shotsDir, file) });
+      sheetShots.push({ file, page: pg, size, state, inSheet: SHEET_SIZES.includes(size) });
+    };
+    // a. 数字键盘
+    const KP_PLACES = [
+      ['记一笔', 'billMoney', async p => { await tab(p, 'ledger'); await click(p, '.act-add'); await p.waitForTimeout(800); }],
+      ['修改账单', 'editMoney', async p => { await p.evaluate(() => window.openEdit('r3')); await p.waitForTimeout(600); await p.click('#editMoney'); }],
+      ['筛选金额', 'searchMin', async p => { await tab(p, 'ledger'); await click(p, '#filterFab'); await p.waitForTimeout(500); await p.click('#searchMin'); }],
+      ['模板固定金额', 'tplEditMoney', async p => { await tab(p, 'settings'); await click(p, '#manageTplSetting'); await p.waitForTimeout(400); await click(p, '#tplNew'); await p.waitForTimeout(500); await p.click('#tplEditMoney'); }],
+      ['退款金额', 'refundMoney', async p => { await p.evaluate(() => window.openEdit(window.JiwenStore.getUserData().find(r => r.type === 'expense' && !r.refundOf).id)); await p.waitForTimeout(600); await p.evaluate(() => window.kpClose()); await p.click('#editRefundBtn'); await p.waitForTimeout(500);
+        if (await p.evaluate(() => document.getElementById('askMask').style.display === 'flex')) { await p.evaluate(() => document.getElementById('askOk').click()); await p.waitForTimeout(500); }   // 问「修改还没保存，去退款吗」
+        await p.click('#refundKind .cc[data-v="part"]'); }],
+      ['设预算', 'askInput', async p => { await p.evaluate(() => window.customPrompt('给「吃饭」设每月预算（虚构）', '', () => {}, '设预算', null, { inputmode: 'decimal', kpOk: '保存' })); }],
+      ['日子管理条数', 'dmCount', async p => { await tab(p, 'ledger'); await p.evaluate(() => document.getElementById('daysManageBtn').click()); await p.waitForTimeout(500); await click(p, '#daysManage'); await p.waitForTimeout(500); await p.click('#dmCount'); }],
+    ];
+    for (const [w, h] of SIZES) {
+      const size = w + 'x' + h;
+      const page = await page11(w, h);
+      for (const [name, field, go] of KP_PLACES) {
+        try {
+          await go(page); await page.waitForTimeout(800);
+          const r = await page.evaluate(f => {
+            const k = document.getElementById('kpSheet').getBoundingClientRect(), el = document.getElementById(f);
+            if (document.getElementById('kpMask').style.display !== 'flex' || !el) return { err: '数字键盘没打开' };
+            const host = el.closest('.sheet'), hr = host.getBoundingClientRect();
+            const cut = [...host.querySelectorAll('button, input, .cc, .rec-row, .ui-btn, .dt-input, [role="button"]')].filter(e => e.offsetParent && !e.closest('.rec-time-raw'))
+              .map(e => { const b = e.getBoundingClientRect(); return { n: e.id || e.textContent.trim().slice(0, 8) || e.className.split(' ')[0], t: b.top, b: b.bottom }; })
+              .filter(x => x.t < k.top - 1 && x.b > k.top + 1).map(x => x.n);
+            const fr = el.getBoundingClientRect(), row = el.closest('.rec-row, .rec-money-row') || el, rr = row.getBoundingClientRect();
+            const keyH = Math.round(document.querySelector('#kpGrid .kp-key').getBoundingClientRect().height * 10) / 10;
+            return { kTop: Math.round(k.top), keyH, cut: [...new Set(cut)], fieldShown: fr.top >= Math.max(0, hr.top) - 0.5 && rr.bottom <= k.top + 0.5, fit: window.JiwenKeypad.kpFitInfo };
+          }, field);
+          results.push({ name: `kp-${name}`, cfg: size, kp: true, ...r, ok: !r.err && !r.cut.length && r.fieldShown && r.keyH >= 52 - 0.5 && r.keyH <= 76 + 0.5 });
+          await shot(page, size, name, '数字键盘');
+        } catch (e) { results.push({ name: `kp-${name}`, cfg: size, kp: true, err: String(e.message || e).slice(0, 160), ok: false }); if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `j-${size}-${name}-出错.png`) }).catch(() => {}); }
+        await closeAll(page);
+      }
+      await page.close();
+    }
+    // b. 贴底按钮排；c. 字被切；d. 叠层顶边；e. 系统数字输入法；f. 主题底色 —— 412×970、360×780（截图另加 412×915）
+    const FOOT = async (page, label) => results.push(Object.assign({ name: 'foot-' + label, cfg: page.__size, foot: true }, await page.evaluate(() => {
+      const out = [];
+      document.querySelectorAll('.mask').forEach(m => {
+        if (m.id === 'kpMask' || getComputedStyle(m).display === 'none') return;
+        const sh = m.querySelector(':scope > .sheet'); if (!sh) return;
+        const ft = sh.querySelector(':scope > .rec-foot, :scope > .ui-sheet-foot, :scope > .ask-btns, :scope > .form-btns'); if (!ft || getComputedStyle(ft).position !== 'sticky') return;
+        const mb = Math.min(m.getBoundingClientRect().bottom, innerHeight), sb = sh.getBoundingClientRect().bottom;
+        for (const top of [Math.round(sh.scrollHeight / 2), 1e6]) {
+          sh.scrollTop = top;
+          const f = ft.getBoundingClientRect(); const gap = Math.round((Math.min(mb, sb) - f.bottom) * 10) / 10;
+          out.push({ m: m.id, scroll: sh.scrollTop, gap });
+        }
+        sh.scrollTop = 0;
+      });
+      return { rows: out, ok: out.every(x => x.gap < 1) };   // 不到 1px 是滚到底时的小数取整（下面只有面板自己的底色）
+    })));
+    const CLIP = async (page, label, scope) => results.push(Object.assign({ name: 'clip-' + label, cfg: page.__size, clip: true }, await page.evaluate(sc => {
+      const bad = [];
+      const roots = sc ? [...document.querySelectorAll(sc)] : [document.body];
+      roots.forEach(root => root.querySelectorAll('*').forEach(el => {
+        const tn = [...el.childNodes].filter(n => n.nodeType === 3 && n.textContent.trim()); if (!tn.length) return;
+        if (!el.offsetParent && getComputedStyle(el).position !== 'fixed') return;
+        const fs = parseFloat(getComputedStyle(el).fontSize) || 16;
+        const rg = document.createRange(); rg.selectNodeContents(el); const t = rg.getBoundingClientRect(); if (!(t.width > 0)) return;
+        // 字形大约是 em 框上下各收 0.1em；往上找会裁东西的框（overflow 不是 visible），带上 overflow-clip-margin
+        const gTop = t.top + fs * 0.1, gBot = t.bottom - fs * 0.1;
+        for (let a = el; a && a !== document.body; a = a.parentElement) {
+          const cs = getComputedStyle(a); if (cs.overflowY === 'visible' && cs.overflowX === 'visible') continue;
+          if (cs.overflowY !== 'clip' && cs.overflowY !== 'hidden' && a !== el && !(cs.overflowX === 'hidden' || cs.overflowX === 'clip')) break;   // 滚动框：滚出去不算切
+          const r = a.getBoundingClientRect(), cm = cs.overflowY === 'clip' ? (parseFloat(cs.overflowClipMargin) || 0) : 0;
+          if (gTop < r.top - cm - 0.5 || gBot > r.bottom + cm + 0.5) { bad.push(`${(el.textContent || '').trim().slice(0, 8)}（${el.id || el.className.split(' ')[0]}，上 ${Math.round(r.top - cm - gTop)} / 下 ${Math.round(gBot - r.bottom - cm)}px）`); }
+          break;
+        }
+      }));
+      return { bad: [...new Set(bad)].slice(0, 20), ok: !bad.length };
+    }, scope || null)));
+    const STACK = async (page, label) => results.push(Object.assign({ name: 'stack-' + label, cfg: page.__size, stack: true }, await page.evaluate(() => {
+      const all = [...document.querySelectorAll('.mask')];
+      const on = all.filter(m => m.id !== 'kpMask' && getComputedStyle(m).display !== 'none').map(m => ({ m, z: parseInt(getComputedStyle(m).zIndex, 10) || 0, i: all.indexOf(m) })).sort((a, b) => (a.z - b.z) || (a.i - b.i));
+      const tops = on.map(({ m }) => { const sh = m.querySelector(':scope > .sheet'); return sh ? { id: m.id, top: Math.round((m.getBoundingClientRect().bottom - sh.offsetHeight) * 10) / 10 } : null; }).filter(Boolean);
+      const diffs = tops.slice(1).map((x, i) => Math.round((x.top - tops[i].top) * 10) / 10);
+      return { tops, diffs, ok: tops.length >= 2 && diffs.every(d => d <= 0.5 || d >= 64) };
+    })));
+    for (const [w, h] of [[412, 970], [360, 780], [412, 915]]) {
+      const size = w + 'x' + h;
+      const page = await page11(w, h); page.__size = size;
+      const meas = size !== '412x915';
+      // 记一笔：平时 / 常用列表 / 分类抽屉 / 统计面板 / 文字小面板 / 日期选择
+      await tab(page, 'ledger'); await click(page, '.act-add'); await page.waitForTimeout(800); await page.evaluate(() => window.kpClose()); await page.waitForTimeout(400);
+      await shot(page, size, '记一笔', '平时');
+      if (meas) { await FOOT(page, '记一笔'); await CLIP(page, '记一笔', '#addMask'); }
+      for (const [sel, nm] of [['#billTplRow', '常用列表'], ['#billCatMore', '分类抽屉'], ['#billMode', '统计面板'], ['#billRemarkRow', '备注小面板'], ['#billTimeLine', '日期选择']]) {
+        await page.click(sel); await page.waitForTimeout(700);
+        await shot(page, size, '记一笔', nm);
+        if (meas) { await STACK(page, '记一笔→' + nm); await FOOT(page, '记一笔→' + nm); await CLIP(page, '记一笔→' + nm, '.mask'); }
+        await page.evaluate(() => { if (window.JiwenSheet.isOpen()) window.JiwenSheet.back(); ['txtMask', 'dtMask'].forEach(id => { const m = document.getElementById(id); if (m && m.style.display === 'flex') m.style.display = 'none'; }); }); await page.waitForTimeout(500);
+      }
+      await closeAll(page);
+      // 修改账单、账单详情
+      await page.evaluate(() => window.openEdit('r3')); await page.waitForTimeout(700); await page.evaluate(() => window.kpClose()); await page.waitForTimeout(300);
+      await shot(page, size, '修改账单', '平时');
+      if (meas) { await FOOT(page, '修改账单'); await CLIP(page, '修改账单', '#editMask'); }
+      await page.click('#editCatMore'); await page.waitForTimeout(700); await shot(page, size, '修改账单', '分类抽屉'); if (meas) await STACK(page, '修改账单→分类抽屉');
+      await closeAll(page);
+      // 设置：外观 → 选色面板（叠层）；分类管理 → 一个分类的面板
+      await tab(page, 'settings'); await click(page, '#themeBtn'); await page.waitForTimeout(500);
+      await click(page, '#customColorBtn'); await page.waitForTimeout(700);
+      await shot(page, size, '选色面板', '叠层'); if (meas) { await STACK(page, '外观→选色面板'); await FOOT(page, '选色面板'); }
+      // 选色面板：三条都完整露在「应用」那排上面（原来 72% 高装不下，被挡住半截）
+      results.push(Object.assign({ name: 'cp-bars', cfg: size, clip: true }, await page.evaluate(() => {
+        const ft = document.getElementById('uiSheetFoot').getBoundingClientRect().top;
+        const bad = ['H', 'L', 'S'].filter(k => document.getElementById('cpBar' + k).getBoundingClientRect().bottom > ft + 0.5).map(k => '条 ' + k + ' 被按钮挡住');
+        return { bad, ok: !bad.length };
+      })));
+      await closeAll(page);
+      // 日子页
+      await tab(page, 'ledger'); await page.evaluate(() => document.getElementById('daysManageBtn').click()); await page.waitForTimeout(600);
+      await shot(page, size, '日子页', '平时'); if (meas) await CLIP(page, '日子页', '#pageDays');
+      await click(page, '#daysManage'); await page.waitForTimeout(600); await shot(page, size, '日子管理', '平时');
+      await closeAll(page); await page.evaluate(() => document.querySelector('.tab-btn[data-tab="ledger"]').click()); await page.waitForTimeout(300);
+      // 账单页、统计页、设置页：字被切
+      if (meas) { await tab(page, 'ledger'); await CLIP(page, '账单页', '#pageLedger'); await tab(page, 'stats'); await CLIP(page, '统计页', '#pageStats'); await tab(page, 'settings'); await CLIP(page, '设置页', '#pageSettings'); }
+      // e. 系统数字输入法（数字键盘开着的时候；提示框要金额的那种也打开看一眼）
+      if (meas) {
+        await page.evaluate(() => window.customPrompt('虚构的设预算', '', () => {}, '设预算', null, { inputmode: 'decimal' })); await page.waitForTimeout(500);
+        results.push(Object.assign({ name: 'sysnum', cfg: size, sysnum: true }, await page.evaluate(() => {
+          const bad = [...document.querySelectorAll('input, textarea')].filter(e => (/^(numeric|decimal|tel)$/.test(e.getAttribute('inputmode') || '') || e.type === 'number' || e.type === 'tel') && !e.readOnly && e.getAttribute('inputmode') !== 'none').map(e => e.id || e.className);
+          return { bad, ok: !bad.length };
+        })));
+        await closeAll(page);
+      }
+      await page.close();
+      // f. 主题：几种预设 + 黑 / 白（没有色相的）：根底色和页面底色一样，日子页截图
+      if (meas) for (const col of ['#3f6f6b', '#6b7245', '#a8553f', '#000000', '#ffffff']) {
+        const pg = await page11(w, h, { app_appearance: JSON.stringify({ primary: col }) });
+        await tab(pg, 'ledger'); await pg.evaluate(() => document.getElementById('daysManageBtn').click()); await pg.waitForTimeout(600);
+        results.push(Object.assign({ name: 'theme-' + col, cfg: size, theme: true }, await pg.evaluate(() => {
+          const c = getComputedStyle(document.documentElement).backgroundColor, b = getComputedStyle(document.body).backgroundColor;
+          return { html: c, body: b, ok: c === b };
+        })));
+        if (SHOTS) await pg.screenshot({ path: path.join(shotsDir, `j-${size}-日子页-主题${col.slice(1)}.png`) });
+        await pg.close();
+      }
+    }
+    // 截图总表：一页，按页面 × 状态排，每张标上页面名、屏幕、状态
+    if (SHOTS && sheetShots.length) {
+      const inSheet = sheetShots.filter(x => x.inSheet);
+      const ver = (fs.readFileSync(path.join(WWW, 'index.html'), 'utf8').match(/build (\d{4}-[A-Z0-9]+)/) || [])[1] || 'dev';
+      const dir = path.join(__dirname, 'out', ver); fs.mkdirSync(dir, { recursive: true });
+      const keyOf = x => x.page + '｜' + x.state;
+      const groups = [...new Set(inSheet.map(keyOf))];
+      const cell = x => `<figure><img src="data:image/png;base64,${fs.readFileSync(path.join(shotsDir, x.file)).toString('base64')}"><figcaption>${x.page} · ${x.size} · ${x.state}</figcaption></figure>`;
+      const htmlSheet = `<!doctype html><meta charset="utf-8"><style>body{margin:0;padding:16px;font:14px sans-serif;background:#fff}h2{margin:18px 0 8px;font-size:16px}
+        .row{display:flex;gap:12px;align-items:flex-start}figure{margin:0}img{width:206px;display:block;border:1px solid #ccc}figcaption{font-size:12px;margin-top:4px}</style>
+        <h1 style="font-size:18px">${ver} 截图总表（412×915、412×970、360×780）</h1>` + groups.map(g => `<h2>${g}</h2><div class="row">${SHEET_SIZES.map(sz => inSheet.find(x => keyOf(x) === g && x.size === sz)).filter(Boolean).map(cell).join('')}</div>`).join('');
+      const sp = await browser.newPage({ viewport: { width: 720, height: 800 } });
+      await sp.setContent(htmlSheet); await sp.waitForTimeout(300);
+      await sp.screenshot({ path: path.join(dir, 'sheet.png'), fullPage: true });
+      await sp.close();
+      console.log('截图总表：' + path.join(dir, 'sheet.png'));
+    }
+  }
   return results;
 }
 
@@ -724,6 +916,12 @@ async function run(cfg, port, browser) {
       if (m.cat) { const bad = m.rows.filter(x => x.cut || x.gap < 8 || x.h < 48); md.push(`| ${m.name} | ${m.rows.length} 行 | 分类名被截 ${m.rows.filter(x => x.cut).length} 行 | 离 › 不到 8px ${m.rows.filter(x => x.gap < 8).length} 行 | 行高 ${Math.min(...m.rows.map(x => x.h))}px 起 | ${bad.length ? '有问题' : ''} | | |`); return; }
       if (m.center) { const bad = m.rows.filter(x => Math.abs(x.d) > 1); md.push(`| ${m.name} | ${m.rows.length} 个 | 差超过 1px 的 ${bad.length} 个 | ${bad.slice(0, 8).map(x => `${x.text}(${x.cls}) ${x.d > 0 ? '偏下' : '偏上'} ${Math.abs(x.d)}`).join('；')} | | ${bad.length ? '有问题' : ''} | | |`); return; }
       if (m.swipe) { md.push(`| ${m.name} | ${m.what} 能滚 ${m.max}px | ${m.err || ''}滑到底 ${m.bottom ? '✓' : '✗'} | 滑回顶 ${m.top ? '✓' : '✗'}${m.openAfterDown === false ? '（面板被关掉了）' : ''} | 顶上往下拉关面板 ${m.closed ? '✓' : '✗'} | ${m.ok === false ? '有问题' : ''} | | |`); return; }
+      if (m.kp) { md.push(`| ${m.name}（${m.cfg}） | 键盘顶边 ${m.kTop ?? '-'} | 按键 ${m.keyH ?? '-'}px | 压到 ${m.cut ? m.cut.join('、') || '无' : '-'} | 正在输的露在上面 ${m.fieldShown ? '✓' : '✗'} | ${m.ok ? '' : '有问题 ' + (m.err || '')} | | |`); return; }
+      if (m.foot) { md.push(`| ${m.name}（${m.cfg}） | 贴底按钮排 | ${m.rows.map(x => `${x.m} 滚到 ${x.scroll}：下面露 ${x.gap}px`).join('；') || '没有贴底的'} | | | ${m.ok ? '' : '有问题'} | | |`); return; }
+      if (m.clip) { md.push(`| ${m.name}（${m.cfg}） | 字被切 | ${m.bad.length} 处 | ${m.bad.join('；')} | | ${m.ok ? '' : '有问题'} | | |`); return; }
+      if (m.stack) { md.push(`| ${m.name}（${m.cfg}） | 叠层顶边 | ${m.tops.map(x => x.id + ' ' + x.top).join(' → ')} | 差 ${m.diffs.join(' / ')} | | ${m.ok ? '' : '有问题'} | | |`); return; }
+      if (m.sysnum) { md.push(`| 系统数字输入法（${m.cfg}） | | ${m.bad.length} 个 | ${m.bad.join('、')} | | ${m.ok ? '' : '有问题'} | | |`); return; }
+      if (m.theme) { md.push(`| ${m.name}（${m.cfg}） | 根底色 ${m.html} | 页面底色 ${m.body} | | | ${m.ok ? '' : '有问题'} | | |`); return; }
       if (m.kb) { md.push(`| ${m.name} | 键盘弹起：${m.kbOpen ? '认出来了' : '没认出来'} | 小面板下沿离键盘 ${m.gap}px | 标题离顶 ${m.gripTop}px | 下面那层动了 ${m.lowerMoved == null ? '-' : m.lowerMoved}px | ${m.gap > 1 || m.gripTop < 0 || m.lowerMoved ? '有问题' : ''} | ${m.H} | |`); return; }
       const pr = m.prim.slice(0, 3).map(p => `${p.name.split(' ')[0]} ${p.offscreen ? '要往下滑' : p.fromBottom}`).join('；') || '—';
       md.push(`| ${m.name} | ${m.n} | ${m.small.length} | ${m.tight.length} | ${pr} | ${m.prim.some(p => p.upper) ? '是' : ''} | ${m.contentBottom} / ${m.H} | ${m.blank} |`);

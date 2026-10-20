@@ -25,7 +25,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   const m = $('billMoney');
   ok(m.readOnly && m.getAttribute('inputmode') === 'none', '1 金额框不弹系统输入法（readonly、inputmode=none）');
   ok(shown('kpMask') && m.classList.contains('kp-on') && $('kpOk').textContent === '确定', '1 打开记一笔：弹数字键盘，对着金额框，大按钮写「确定」');
-  ok($('kpVal').textContent === '0.00' && $('kpVal').classList.contains('kp-empty'), '1 没输入时灰色 0.00');
+  ok(!$('kpVal') && !d.querySelector('#kpSheet .kp-show') && m.placeholder === '0.00', '1 1020-J：键盘顶上不再重复写一遍金额（没输入时金额框自己是灰色 0.00）');
   const kpOnCss = (([...d.querySelectorAll('style')].map(x => x.textContent).join('\n').match(/\.kp-field\.kp-on \{([^}]*)\}/) || [])[1] || '');
   // 1020-G：不再靠下划线变粗表示正在输（1019-Z1 那条去掉了）：不加方框、不加线，数字后面一根闪动的竖线光标
   ok(!/0 0 0 2px/.test(kpOnCss) && !/inset 0 -2px/.test(kpOnCss) && !/border-bottom-color/.test(kpOnCss), '1 1020-G：正在输的金额框不加方框、不靠下划线 ' + kpOnCss);
@@ -38,10 +38,10 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   // 2. 实时同步 + 输入规则
   let n = 0; m.addEventListener('input', () => n++);
   keys('12.505');
-  ok(m.value === '12.50' && $('kpVal').textContent === '12.50' && !$('kpVal').classList.contains('kp-empty'), '2 实时写进金额框，第三位小数不收：' + m.value);
+  ok(m.value === '12.50', '2 实时写进金额框，第三位小数不收：' + m.value);
   ok(n === 5, '2 每按一个有效键发一次 input（' + n + '）');
   keys('<<<<<');
-  ok(m.value === '' && $('kpVal').textContent === '0.00', '2 退格到空');
+  ok(m.value === '', '2 退格到空');
   keys('005'); ok(m.value === '5', '2 开头不能多个 0：0 0 5 → 5');
   keys('<.5'); ok(m.value === '0.5', '2 先按小数点 → 0.');
   keys('..'); ok(m.value === '0.5', '2 小数点只能一个');
@@ -52,7 +52,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   $('kpOk').click(); await Promise.resolve();
   ok(!shown('kpMask') && m.value === '36.8' && shown('addMask'), '3 点「确定」：收起，数字留着，记一笔还在');
   m.click();
-  ok(shown('kpMask') && $('kpVal').textContent === '36.8', '3 再点金额框：从现在的金额接着来');
+  ok(shown('kpMask') && m.value === '36.8' && m.classList.contains('kp-on'), '3 再点金额框：从现在的金额接着来');
   keys('8'); ok(m.value === '36.88', '3 接着输（不整个替换）');
   // 键盘外面点一下：收起，这一下照常交给页面（没被拦）
   const ev = new w.Event('pointerdown', { bubbles: true, cancelable: true });
@@ -71,7 +71,7 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
 
   // 4. 别的金额框：修改、模板固定金额、筛选金额区间
   w.openEdit('r1'); await t.idle();
-  $('editMoney').click(); ok(shown('kpMask') && $('kpVal').textContent === '18', '4 修改的金额：数字键盘，带着原来的 18');
+  $('editMoney').click(); ok(shown('kpMask') && $('editMoney').classList.contains('kp-on') && $('editMoney').value === '18', '4 修改的金额：数字键盘，带着原来的 18');
   keys('<5'); ok($('editMoney').value === '15', '4 改成 15'); $('kpOk').click(); $('cancelEdit').click(); if (t.ask()) await t.askOk();
   $('filterFab').click(); $('searchMin').click();
   ok(shown('kpMask') && $('searchMin').classList.contains('kp-on'), '4 筛选最低金额：数字键盘');
@@ -82,7 +82,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   $('manageTplSetting').click(); $('tplNew').click(); await t.idle();
   $('tplEditMoney').click(); ok(shown('kpMask'), '4 模板固定金额：数字键盘');
   await new Promise(r => w.requestAnimationFrame(r));
-  ok($('tplEditSheet').classList.contains('kp-lift'), '4 模板面板（没有贴底的保存那排）照旧垫一块键盘高的空白再滚'); keys('25'); w.kpClose();
+  // 1020-J：只在放不下、要滚的时候才垫（原来每次都垫，底朝下的面板一垫整个往上挪）；jsdom 不排版、量不出高，不垫。放得下 / 放不下在 zZzZg 里拿假的位置算
+  ok(!$('tplEditSheet').classList.contains('kp-lift') && w.JiwenKeypad.kpFitInfo === null, '4 模板面板：jsdom 量不出位置时不垫空白、不定高'); keys('25'); w.kpClose();
   ok($('tplEditMoney').value === '25', '4 模板金额 25'); $('tplEditCancel').click(); if (t.ask()) await t.askOk(); $('closeTpl').click();
 
   // 5. 预算（要金额的提示框）：滑上来以后自动弹数字键盘，大按钮写「保存」、直接提交

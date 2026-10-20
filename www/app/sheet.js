@@ -172,6 +172,7 @@
                 build();
                 if(cur) close();
                 cur=o||{};
+                sheet.classList.toggle('ui-sheet-tall', !!cur.tall);   // 1020-J：内容多的（选色面板）能到 88% 屏幕高，和记一笔这类表单一样
                 titleEl.textContent=cur.title||'';
                 subEl.textContent=cur.sub||''; subEl.style.display=cur.sub?'':'none';
                 bodyEl.textContent=''; footEl.textContent='';
@@ -295,7 +296,44 @@
                         box.appendChild(c);
                     } });
             }
-            return { open, pick, cats, modes, close, isOpen, back:dismiss, _sheet:()=>sheet };
+            // 1020-J：常用模板列表（记一笔里点「常用」那一行）：标题「常用」+ 小字「点一个，金额、分类、备注一起填好」；
+            //   一行一个：左边小圆标（分类第一个字）、中间名字 + 一行小字（分类 · 收支 · 统计 · 备注）、右边固定金额（没有不写）；
+            //   点一个就选好、关掉；没有模板时写一句怎么存。底部「取消 | 管理常用」（左退右进）。
+            //   o: { list:[{ id, c, name, sub, money }], value, onPick(id), onManage, onCancel }
+            function tpls(o){
+                open({ title:'常用', sub:'点一个，金额、分类、备注一起填好', onDismiss:o.onCancel,
+                    body(box, done){
+                        const list=o.list||[];
+                        if(!list.length){
+                            const e=document.createElement('div'); e.className='tpl-pick-empty'; e.id='tplPickEmpty';
+                            e.textContent='还没有常用模板。记一笔填好以后，点底部的「存为常用」，就会出现在这里。';
+                            box.appendChild(e); return;
+                        }
+                        const wrap=document.createElement('div'); wrap.className='rec-list tpl-pick'; wrap.id='tplPick';
+                        list.forEach(x=>{
+                            const b=document.createElement('button'); b.type='button'; b.className='tpl-pick-row'+(x.id===o.value?' sel':''); b.dataset.id=x.id;
+                            const ic=document.createElement('span'); ic.className='tpl-pick-ic'; ic.setAttribute('aria-hidden','true'); ic.textContent=x.c||'';
+                            const tx=document.createElement('span'); tx.className='tpl-pick-txt';
+                            const nm=document.createElement('span'); nm.className='tpl-pick-name'; nm.textContent=x.name;
+                            const sb=document.createElement('span'); sb.className='tpl-pick-sub'; sb.textContent=x.sub||'';
+                            tx.appendChild(nm); tx.appendChild(sb);
+                            b.appendChild(ic); b.appendChild(tx);
+                            if(x.money){ const m=document.createElement('span'); m.className='tpl-pick-amt'; m.textContent=x.money; b.appendChild(m); }
+                            b.addEventListener('click', ()=>{ done(); if(o.onPick) o.onPick(x.id); });
+                            wrap.appendChild(b);
+                        });
+                        box.appendChild(wrap);
+                    },
+                    foot(box){
+                        const row=document.createElement('div'); row.className='ui-pair';
+                        const c=document.createElement('button'); c.type='button'; c.className='ui-btn'; c.id='uiSheetCancel'; c.textContent='取消';
+                        c.addEventListener('click', ()=>dismiss());
+                        const m=document.createElement('button'); m.type='button'; m.className='ui-btn'; m.id='tplPickManage'; m.textContent='管理常用';
+                        m.addEventListener('click', ()=>{ close(); if(o.onManage) o.onManage(); });
+                        row.appendChild(c); row.appendChild(m); box.appendChild(row);
+                    } });
+            }
+            return { open, pick, cats, modes, tpls, close, isOpen, back:dismiss, _sheet:()=>sheet };
         })();
 
         // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====
@@ -426,6 +464,31 @@
             const on=all.filter(maskShown).map(m=>({ m, z:parseInt(getComputedStyle(m).zIndex, 10)||0, i:all.indexOf(m) }));
             on.sort((a, b)=>(a.z-b.z) || (a.i-b.i));
             all.forEach(m=>{ const over = on.length>1 && on[0].m!==m && on.some(x=>x.m===m); if(m.classList.contains('stack-over')!==over) m.classList.toggle('stack-over', over); });
+            stackAlign(on);
+        }
+        // ===== 1020-J：叠起来的两层面板，顶边不许「差一点」 =====
+        //   上面那层的顶边要么和下面那层对齐（一样高、整个盖住），要么至少比它低 STACK_ALIGN_MIN（64px）；
+        //   差不到 64px 的（外观设置上开选色面板：只矮 20px，下面那层的顶边和圆角在上面露一窄条，像重影），把上面那层拉高到和下面那层顶边对齐。
+        //   面板都是贴着屏幕底的，所以「顶边」= 遮罩下沿 − 面板自己的高（不受滑入动画的位移影响）；每次先放回原来的高再量，同一拍里量完设好，不闪。
+        //   面板里的内容变了（换一页、搜分类）也重新对一次（ResizeObserver）。
+        const STACK_ALIGN_MIN=64;
+        let stackRO=null;
+        function stackAlign(on){
+            if(!stackRO && window.ResizeObserver) stackRO=new ResizeObserver(stackKick);
+            let below=null;
+            on.forEach(({ m })=>{
+                const sh=m.querySelector(':scope > .sheet'); if(!sh) return;
+                if(sh.dataset.stackAlign){ sh.style.minHeight=''; delete sh.dataset.stackAlign; }
+                if(stackRO && !sh.__stackRO){ sh.__stackRO=1; stackRO.observe(sh); }
+                const mb=m.getBoundingClientRect().bottom, h=sh.offsetHeight;
+                if(!(h>0) || !(mb>0)) return;
+                let top=mb-h;
+                if(below!==null){
+                    const d=top-below;
+                    if(d>0.5 && d<STACK_ALIGN_MIN){ sh.style.minHeight=Math.ceil(mb-below)+'px'; sh.dataset.stackAlign='1'; top=below; }
+                }
+                below=top;
+            });
         }
         function stackKick(){ if(stackQueued) return; stackQueued=true; Promise.resolve().then(stackPaint); }
         function sheetGhostWatch(m){
