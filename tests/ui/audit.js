@@ -190,6 +190,47 @@ function measureInPage(arg) {
 }
 
 // ---------- 页面驱动 ----------
+// 1021-T12 后：两条通用几何检查（每次 measure 都跑）：
+//   a. 被盖住：正在输的框和每个主按钮，四个角（往里缩 2px）和中点上 elementFromPoint，拿到的不是它自己 / 它里面的 / 它外面包着的，
+//      就报「被 X 盖住」；pointer-events:none 的层 elementFromPoint 本来就穿过去，透明遮罩和 .stack-over 这类装饰层跳过
+//   b. 半截露：最上面那个开着的面板（.sheet），刚打开没滚动时，里面每个能点的东西要么整个在贴底按钮排上沿以上、要么整个在能滚的区域外面；
+//      被按钮排或滚动区下沿切成半截的报出来
+function geoCheck(arg) {
+  const out = { cover: [], half: [] };
+  const vis = e => { const r = e.getBoundingClientRect(); const cs = getComputedStyle(e); return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none'; };
+  const nm = e => (e.id ? '#' + e.id : '') || (e.className && typeof e.className === 'string' ? '.' + e.className.trim().split(/\s+/)[0] : e.tagName.toLowerCase()) + (e.textContent ? '「' + e.textContent.trim().slice(0, 8) + '」' : '');
+  const decor = e => { for (let x = e; x && x !== document.body; x = x.parentElement) { if (x.classList && x.classList.contains('stack-over')) return true; }
+    const cs = getComputedStyle(e); const bg = cs.backgroundColor; return e.classList && e.classList.contains('mask') && (bg === 'transparent' || /rgba\(.*,\s*0\)$/.test(bg)) && !e.textContent.trim(); };
+  const targets = [];
+  (arg.primary || []).forEach(sel => document.querySelectorAll(sel).forEach(e => targets.push(e)));
+  const act = document.activeElement; if (act && /^(INPUT|TEXTAREA)$/.test(act.tagName)) targets.push(act);
+  const kp = document.querySelector('.kp-on'); if (kp) targets.push(kp);
+  targets.filter(vis).forEach(el => {
+    const r = el.getBoundingClientRect();
+    const pts = [[r.left + 2, r.top + 2], [r.right - 2, r.top + 2], [r.left + 2, r.bottom - 2], [r.right - 2, r.bottom - 2], [(r.left + r.right) / 2, (r.top + r.bottom) / 2]]
+      .filter(([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight);
+    const hits = new Set();
+    pts.forEach(([x, y]) => { const h = document.elementFromPoint(x, y); if (!h || h === el || el.contains(h) || h.contains(el) || decor(h)) return; hits.add(nm(h)); });
+    if (hits.size) out.cover.push(nm(el) + ' 被 ' + [...hits].join('、') + ' 盖住');
+  });
+  const sheets = [...document.querySelectorAll('.mask')].filter(m => getComputedStyle(m).display !== 'none' && !m.classList.contains('sheet-ghost'))
+    .map(m => ({ m, z: +getComputedStyle(m).zIndex || 0, s: m.querySelector('.sheet') })).filter(x => x.s && vis(x.s)).sort((a, b) => a.z - b.z);
+  const top = sheets.length ? sheets[sheets.length - 1].s : null;
+  if (top) {
+    const foot = top.querySelector('.ui-sheet-foot, .rec-foot, .ask-btns, .form-btns.ui-stack');
+    const fr = foot && vis(foot) ? foot.getBoundingClientRect() : null;
+    const scr = [top].concat([...top.querySelectorAll('*')]).filter(e => { const cs = getComputedStyle(e); return /(auto|scroll)/.test(cs.overflowY) && e.scrollHeight > e.clientHeight + 1; })[0];
+    const sr = scr ? scr.getBoundingClientRect() : top.getBoundingClientRect();
+    [...top.querySelectorAll('button, a, input, select, textarea, [role="button"], .cc, .rec-row, .imp-tap, label')].filter(vis).forEach(e => {
+      if (foot && foot.contains(e)) return;
+      const r = e.getBoundingClientRect();
+      if (fr && r.top < fr.top - 1 && r.bottom > fr.top + 1) out.half.push(nm(e) + ' 被贴底按钮排切成半截');
+      else if (r.top < sr.bottom - 1 && r.bottom > sr.bottom + 1) out.half.push(nm(e) + ' 被滚动区下沿切成半截');
+    });
+  }
+  return out;
+}
+
 function serve() {
   return new Promise(res => {
     const srv = http.createServer((q, r) => {
@@ -241,6 +282,7 @@ async function run(cfg, port, browser) {
     await page.waitForTimeout(150);
     const m = await page.evaluate(measureInPage, { scope: o.scope || null, primary: o.primary || [], MIN, GAP });
     m.name = name; m.cfg = cfg.name; m.note = o.note || '';
+    try { m.geo = await page.evaluate(geoCheck, { primary: o.primary || [] }); } catch (e) { m.geo = { cover: [], half: [], err: String(e && e.message || e) }; }
     results.push(m);
     if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-${name}.png`) });
     if (o.more && SHOTS) {          // 往下滑一屏再截一张
@@ -926,6 +968,10 @@ async function run(cfg, port, browser) {
       const pr = m.prim.slice(0, 3).map(p => `${p.name.split(' ')[0]} ${p.offscreen ? '要往下滑' : p.fromBottom}`).join('；') || '—';
       md.push(`| ${m.name} | ${m.n} | ${m.small.length} | ${m.tight.length} | ${pr} | ${m.prim.some(p => p.upper) ? '是' : ''} | ${m.contentBottom} / ${m.H} | ${m.blank} |`);
     });
+    // 第 3 轮开工前：被盖住 / 半截露
+    const geo = all[c].filter(m => m.geo && (m.geo.cover.length || m.geo.half.length));
+    md.push('', `被盖住 / 半截露：${geo.length ? geo.length + ' 页有问题' : '没有'}`);
+    geo.forEach(m => md.push(`- ${m.name}：${m.geo.cover.concat(m.geo.half).slice(0, 8).join('；')}`));
     const lk = all[c].find(m => m.name === 'devoff-leaks');
     if (lk) md.push('', `开关关着：露出来的 ${lk.leaks.length} 处${lk.leaks.length ? '（' + lk.leaks.join('；') + '）' : ''}；请求 import/ 下的文件 ${lk.importRequests.length} 个；页面报错 ${lk.errs.length} 个`);
     md.push('');
