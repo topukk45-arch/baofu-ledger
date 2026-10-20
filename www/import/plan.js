@@ -217,6 +217,9 @@
       if (d.splitFrom) { var sm = manualById[d.splitFrom]; d.cat = sm ? sm.cat : '未分类'; d.catFrom = 'split'; return; }
       d.cat = recCat(it.rec); d.catFrom = 'rec'; d.rec = it.rec || null;
       if (it.rec && it.rec.layer === 'rule' && it.rec.kw && ruleFixE[it.rec.kw]) { d.cat = ruleFixE[it.rec.kw]; d.catFrom = 'rulefix'; }
+      // 1021-T12（实测 10-20）：不计的行（余额宝、花呗还款、提现……）推不出分类时，存档里有「转账」就落「转账」，账单页能按分类筛出来；
+      //   确认页照旧不显示分类（1017-UI11）
+      if (d.mode === 'skip' && d.cat === '未分类' && cats.indexOf('转账') >= 0) { d.cat = '转账'; d.catFrom = 'skipcat'; }
     });
     // 合并记录（分分捐、收款按天、勾上的零碎扣款）：分分捐默认落公益类 / 其他；都不进「按对方选分类」
     var inGroup = {}, sumList = [];
