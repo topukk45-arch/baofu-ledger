@@ -155,8 +155,8 @@ function measureInPage(arg) {
     });
     r.width = r.right - r.left; r.height = r.bottom - r.top; return r;
   };
-  // 分段按钮（.seg、底栏）几个挨着是一组，组内不算间距
-  const groupOf = e => e.closest('.seg, .tab-bar, .ui-seg');
+  // 分段按钮（.seg、底栏、1020-D 起记一笔的收支 .io-mini）几个挨着是一组，组内不算间距
+  const groupOf = e => e.closest('.seg, .tab-bar, .ui-seg, .io-mini');
   const items = els.map(e => { const r = hitRect(e); return { e, r, layer: layerOf(e), name: label(e), grp: groupOf(e) }; });
   const small = [], tight = [];
   items.forEach(x => { if (x.r.height < MIN - 0.5 || x.r.width < MIN - 0.5) small.push({ name: x.name, w: Math.round(x.r.width), h: Math.round(x.r.height), top: Math.round(x.r.top) }); });
@@ -583,6 +583,72 @@ async function run(cfg, port, browser) {
     }
     await page.close();
   }
+  // ===== 9. 字上下居中（1020-D）：按钮、分段按钮、分类块、底栏里的字，字的上下中心和框的上下中心差多少，超过 1px 的列出来 =====
+  //   字的中心按「字形」算（canvas measureText 的 actualBoundingBox），不按行高：中文字体的上下留白不一样，行高居中了字形不一定居中。
+  //   框带图标的（底栏）按「图标 + 字」一起算。机器上要有和手机一样的中文字体（思源黑体 / Noto Sans SC，fontconfig 排第一）才准。
+  if (want(9)) {
+    const page = await newPage({ ls: seedOf({ dev: true, recs: oldRecords(40), cats: BASE_CATS.slice(0, 10), extra: id => ({ ['days_' + id]: JSON.stringify([{ id: 'd1', name: '虚构纪念日', date: '2026-11-01' }, { id: 'd2', name: '虚构生日', date: '2027-03-08' }]) }) }) });
+    const centerIn = scopeSel => page.evaluate(scopeSel => {
+      const SEL = 'button, .seg > *, .cc, .chip, .tab-btn, .ui-btn, .io-chips > *, .mode-chips > *, .cat-chip, [role="button"], .days-manage, .days-back';
+      const cv = document.createElement('canvas').getContext('2d');
+      const vis = el => { const r = el.getBoundingClientRect(); if (!r.width || !r.height) return false; const cs = getComputedStyle(el); return cs.visibility !== 'hidden' && cs.display !== 'none' && r.bottom > 0 && r.top < innerHeight; };
+      const out = [];
+      const scope = scopeSel ? [...document.querySelectorAll(scopeSel)] : [document.body];
+      const seen = new Set();
+      scope.forEach(sc => sc.querySelectorAll(SEL).forEach(el => {
+        if (seen.has(el) || !vis(el)) return; seen.add(el);
+        if (el.closest('.sheet-ghost')) return;
+        // 字：所有看得见的文字节点（一行的才量；两行以上的大卡片按钮不量）
+        const tw = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, { acceptNode: n => n.nodeValue.trim() && vis(n.parentElement) ? 1 : 2 });
+        let top = Infinity, bot = -Infinity, lines = new Set(), txt = '', n;
+        while ((n = tw.nextNode())) {
+          const r = document.createRange(); r.selectNodeContents(n);
+          const rs = [...r.getClientRects()].filter(x => x.width > 0); if (!rs.length) continue;
+          rs.forEach(x => lines.add(Math.round(x.top)));
+          const cs = getComputedStyle(n.parentElement); cv.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          const t = n.nodeValue.trim(), m = cv.measureText(t);
+          const fa = m.fontBoundingBoxAscent, fd = m.fontBoundingBoxDescent, rect = rs[0];
+          const base = rect.top + (rect.height - (fa + fd)) / 2 + fa;   // 文字盒子里的基线
+          top = Math.min(top, base - m.actualBoundingBoxAscent); bot = Math.max(bot, base + m.actualBoundingBoxDescent); txt += t;
+        }
+        if (!txt || lines.size > 1) return;
+        el.querySelectorAll('svg').forEach(sv => { if (!vis(sv)) return; const r = sv.getBoundingClientRect(); top = Math.min(top, r.top); bot = Math.max(bot, r.bottom); });
+        const b = el.getBoundingClientRect(), bs = getComputedStyle(el);
+        // 框的上下中心：去掉上下边框（看着的框是边框以内）
+        const bt = b.top + parseFloat(bs.borderTopWidth), bb = b.bottom - parseFloat(bs.borderBottomWidth);
+        const d = Math.round(((top + bot) / 2 - (bt + bb) / 2) * 10) / 10;
+        out.push({ text: txt.slice(0, 12), d, h: Math.round(b.height), cls: (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : el.tagName.toLowerCase()) });
+      }));
+      return out;
+    }, scopeSel || null);
+    const C = async (name, scopeSel) => { const rows = await centerIn(scopeSel); results.push({ name: 'center-' + name, cfg: cfg.name, center: true, rows }); if (SHOTS) await page.screenshot({ path: path.join(shotsDir, `${cfg.name}-center-${name}.png`) }); };
+    await tab(page, 'ledger');
+    await C('ledger', '#pageLedger, #tabBar, #actionBar');
+    await click(page, '.act-add'); await page.waitForTimeout(500); await page.evaluate(() => window.kpClose && window.kpClose()); await page.waitForTimeout(400);
+    await C('add-record', '#addMask');
+    await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400);
+    await page.evaluate(() => { const r = document.querySelector('#billList [data-act="edit"]'); if (r) window.openEdit(r.dataset.id); }); await page.waitForTimeout(600);
+    await page.evaluate(() => window.kpClose && window.kpClose()); await page.waitForTimeout(300);
+    await C('edit-record', '#editMask');
+    await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400);
+    await tab(page, 'stats');
+    await C('stats', '#pageStats');
+    await tab(page, 'settings');
+    await C('settings', '#pageSettings');
+    await tab(page, 'ledger');
+    await page.evaluate(() => { const b = document.getElementById('daysManageBtn'); if (b) b.click(); }); await page.waitForTimeout(500);
+    await C('days', '#pageDays');
+    await page.evaluate(() => window.customConfirm('虚构的确认框', () => {}, '确认一下')); await page.waitForTimeout(500);
+    await C('ask', '#askMask');
+    await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400);
+    await page.evaluate(() => window.JiwenSheet.pick({ title: '选分类', chips: true, options: ['未分类', '吃饭', '购物', '出行', '水电燃气'].map(v => ({ value: v, label: v })), value: '吃饭', onPick() {} })); await page.waitForTimeout(500);
+    await C('sheet-cat-pick', '.mask.sheet-mask');
+    await page.evaluate(() => window.JiwenSheet.close && window.JiwenSheet.close()); await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400);
+    await tab(page, 'ledger');
+    await page.evaluate(() => document.getElementById('filterFab').click()); await page.waitForTimeout(600);
+    await C('filter', '#filterSheetMask');
+    await page.close();
+  }
   return results;
 }
 
@@ -606,6 +672,7 @@ async function run(cfg, port, browser) {
     all[c].forEach(m => {
       if (m.name === 'devoff-leaks') return;
       if (m.cat) { const bad = m.rows.filter(x => x.cut || x.gap < 8 || x.h < 48); md.push(`| ${m.name} | ${m.rows.length} 行 | 分类名被截 ${m.rows.filter(x => x.cut).length} 行 | 离 › 不到 8px ${m.rows.filter(x => x.gap < 8).length} 行 | 行高 ${Math.min(...m.rows.map(x => x.h))}px 起 | ${bad.length ? '有问题' : ''} | | |`); return; }
+      if (m.center) { const bad = m.rows.filter(x => Math.abs(x.d) > 1); md.push(`| ${m.name} | ${m.rows.length} 个 | 差超过 1px 的 ${bad.length} 个 | ${bad.slice(0, 8).map(x => `${x.text}(${x.cls}) ${x.d > 0 ? '偏下' : '偏上'} ${Math.abs(x.d)}`).join('；')} | | ${bad.length ? '有问题' : ''} | | |`); return; }
       if (m.swipe) { md.push(`| ${m.name} | ${m.what} 能滚 ${m.max}px | ${m.err || ''}滑到底 ${m.bottom ? '✓' : '✗'} | 滑回顶 ${m.top ? '✓' : '✗'}${m.openAfterDown === false ? '（面板被关掉了）' : ''} | 顶上往下拉关面板 ${m.closed ? '✓' : '✗'} | ${m.ok === false ? '有问题' : ''} | | |`); return; }
       if (m.kb) { md.push(`| ${m.name} | 键盘弹起：${m.kbOpen ? '认出来了' : '没认出来'} | 小面板下沿离键盘 ${m.gap}px | 标题离顶 ${m.gripTop}px | 下面那层动了 ${m.lowerMoved == null ? '-' : m.lowerMoved}px | ${m.gap > 1 || m.gripTop < 0 || m.lowerMoved ? '有问题' : ''} | ${m.H} | |`); return; }
       const pr = m.prim.slice(0, 3).map(p => `${p.name.split(' ')[0]} ${p.offscreen ? '要往下滑' : p.fromBottom}`).join('；') || '—';

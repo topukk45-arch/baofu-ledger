@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1020-C">
+    <link rel="stylesheet" href="app/app.css?v=1020-D">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-C</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1020-D</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -286,11 +286,11 @@
                  理由：倒数日与账单无数据关联，频次也远低于记账；提到 tab 级会挤掉
                  「记账」的居中位置（拇指最易触达处），为辅助功能牺牲核心功能不划算。 -->
             <div class="tab-page" id="pageDays" style="display:none">
+                <!-- 1020-D：顶上一行「‹ 返回」+ 标题 +「管理」（文字按钮，48px 高）；「添加日子」是主按钮，在底部操作栏 -->
                 <div class="days-head" id="daysHeadNormal">
                     <button class="days-back" id="daysBack">‹ 返回</button>
                     <span class="days-title">日子</span>
                     <button class="days-manage" id="daysManage">管理</button>
-                    <button class="days-add" id="daysAdd">＋ 添加</button>
                 </div>
                 <!-- 选择模式下顶替上面那条：取消 / 已选N项 / 全选 -->
                 <div class="days-sel-head" id="daysHeadSelect" style="display:none">
@@ -300,10 +300,12 @@
                 </div>
                 <div id="daysList"></div>
                 <div class="days-empty" id="daysEmpty" style="display:none">
-                    还没有记录任何日子<br>点右上角「＋ 添加」记下第一个吧
+                    还没有记录任何日子<br>点下面的「添加日子」记下第一个吧
                 </div>
-                <div class="days-del-bar" id="daysDelBar">
-                    <button class="days-del-btn" id="daysDelBtn" disabled>删除选中的 0 项</button>
+                <!-- 底部操作栏（.ui-bar，在底栏上面）：平时是「＋ 添加日子」，选择模式下换成「删除选中的 N 项」 -->
+                <div class="ui-bar days-bar" id="daysBar">
+                    <button class="ui-btn primary days-add" id="daysAdd">＋ 添加日子</button>
+                    <button class="ui-btn warn days-del-btn" id="daysDelBtn" disabled>删除选中的 0 项</button>
                 </div>
             </div>
         </div>
@@ -391,7 +393,7 @@
         <div class="sheet edit-dialog rec-sheet" id="addSheet">
             <div class="sheet-grip" id="addGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>记一笔</h3></div></div>
             <div class="form-box rec-form">
-                <button type="button" class="rec-time" id="billTimeLine" aria-label="改记账时间"><span class="rec-time-txt" id="billTimeTxt"></span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
+                <button type="button" class="rec-time" id="billTimeLine" aria-label="改记账时间"><svg class="rec-time-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span class="rec-time-txt" id="billTimeTxt"></span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
                 <div id="billTime" class="dt-input rec-time-raw" data-placeholder="选择记账时间"></div>
                 <div class="rec-money-row">
                     <span class="rec-cur" aria-hidden="true">¥</span>
@@ -439,7 +441,7 @@
             <div class="form-box rec-form">
                 <!-- 1010-J：退款记录 / 有退款的原账单，在这里说明关联关系 -->
                 <div class="refund-note" id="editRefundNote" style="display:none"></div>
-                <button type="button" class="rec-time" id="editTimeLine" aria-label="改记账时间"><span class="rec-time-txt" id="editTimeTxt"></span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
+                <button type="button" class="rec-time" id="editTimeLine" aria-label="改记账时间"><svg class="rec-time-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg><span class="rec-time-txt" id="editTimeTxt"></span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
                 <div id="editTime" class="dt-input rec-time-raw" data-placeholder="选择记账时间"></div>
                 <div class="rec-money-row">
                     <span class="rec-cur" aria-hidden="true">¥</span>
@@ -884,26 +886,26 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1020-C"></script>
-    <script src="app/store.js?v=1020-C"></script>
-    <script src="app/select.js?v=1020-C"></script>
-    <script src="app/keypad.js?v=1020-C"></script>
-    <script src="app/text.js?v=1020-C"></script>
-    <script src="app/sheet.js?v=1020-C"></script>
-    <script src="app/ask.js?v=1020-C"></script>
-    <script src="app/date.js?v=1020-C"></script>
-    <script src="app/ai-export.js?v=1020-C"></script>
-    <script src="app/import-entry.js?v=1020-C"></script>
-    <script src="app/forms.js?v=1020-C"></script>
-    <script src="app/ledger.js?v=1020-C"></script>
-    <script src="app/cats.js?v=1020-C"></script>
-    <script src="app/stats.js?v=1020-C"></script>
-    <script src="app/days.js?v=1020-C"></script>
-    <script src="app/settings.js?v=1020-C"></script>
-    <script src="app/tabs.js?v=1020-C"></script>
-    <script src="app/login.js?v=1020-C"></script>
-    <script src="app/back.js?v=1020-C"></script>
-    <script src="app/boot.js?v=1020-C"></script>
+    <script src="app/base.js?v=1020-D"></script>
+    <script src="app/store.js?v=1020-D"></script>
+    <script src="app/select.js?v=1020-D"></script>
+    <script src="app/keypad.js?v=1020-D"></script>
+    <script src="app/text.js?v=1020-D"></script>
+    <script src="app/sheet.js?v=1020-D"></script>
+    <script src="app/ask.js?v=1020-D"></script>
+    <script src="app/date.js?v=1020-D"></script>
+    <script src="app/ai-export.js?v=1020-D"></script>
+    <script src="app/import-entry.js?v=1020-D"></script>
+    <script src="app/forms.js?v=1020-D"></script>
+    <script src="app/ledger.js?v=1020-D"></script>
+    <script src="app/cats.js?v=1020-D"></script>
+    <script src="app/stats.js?v=1020-D"></script>
+    <script src="app/days.js?v=1020-D"></script>
+    <script src="app/settings.js?v=1020-D"></script>
+    <script src="app/tabs.js?v=1020-D"></script>
+    <script src="app/login.js?v=1020-D"></script>
+    <script src="app/back.js?v=1020-D"></script>
+    <script src="app/boot.js?v=1020-D"></script>
 
 </body>
 </html>

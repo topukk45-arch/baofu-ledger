@@ -309,7 +309,7 @@
         .ui-bar > * { flex:1 1 0; min-width:0; }
         .ui-bar > .ui-full { flex-basis:100%; }          /* 主按钮单独占一行，放在最下面 */
         @media (min-width:761px){ .ui-bar { padding-left:calc(50% - 366px); padding-right:calc(50% - 366px); } }
-        .ui-btn { min-height:var(--ui-tap); padding:11px 16px; border-radius:12px; border:1px solid var(--c-border-mid);
+        .ui-btn { min-height:var(--ui-tap); padding:max(11px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) 16px; border-radius:12px; border:1px solid var(--c-border-mid);
             background:var(--c-surface); color:var(--c-text); font-size:16px; line-height:1.3; cursor:pointer;
             font-family:inherit; text-align:center; transition:transform .1s, filter .1s; }
         .ui-btn.primary { background:linear-gradient(135deg,var(--c-primary-mid),var(--c-primary-dark)); color:var(--c-on-primary);
@@ -324,7 +324,15 @@
         .ui-msg li { margin:2px 0; }
         .ui-msg .ui-msg-soft { font-size:13px; color:var(--c-text-soft); }
         .ui-msg .ui-msg-warn { color:var(--c-neg); font-weight:bold; }
-        .ui-btn.small { font-size:14px; padding:8px 14px; }
+        /* 1020-D：按钮里的字上下居中。中文是从思源黑体借来的字，行高却按西文字体（安卓上是 Roboto）算，字形整体比行的中线高一点
+           （16px 粗体约 1.4px，按钮越大越明显）；text-box 把字体上下的留白裁掉、按大写字母顶到基线居中（<button> 自己会把内容上下居中），
+           不管手机字体留白多大都一样。不支持的旧 WebView 就是原来的样子。只用在 <button> 上：div 做的分类块、口径不会自己居中，裁了反而偏上。 */
+        @supports (text-box: trim-both cap alphabetic) {
+            button.ui-btn, button.days-back, button.days-manage, .pager button, button.ds-btn, .seg > button { text-box: trim-both cap alphabetic; }
+            /* 只有一个箭头的（翻月 ‹ ›、分类汇总的 ↓ ↑）：箭头落在小写字母高度的中间，按小写字母顶到基线裁 */
+            button.dt-nav, button.cs-hint { text-box: trim-both ex alphabetic; }
+        }
+        .ui-btn.small { font-size:14px; padding:max(8px, calc((var(--ui-tap) - 1.3em - 2px) / 2)) 14px; }
         .ui-btn.block { display:block; width:100%; }
         .ui-btn[disabled] { opacity:.45; cursor:not-allowed; box-shadow:none; }
         .ui-btn:active:not([disabled]) { transform:scale(0.97); filter:brightness(0.96); }
@@ -769,17 +777,27 @@
         /* 1019-Q：记一笔 / 修改排紧：金额一行在最上（大字 + 小的收支切换），时间一行小字，口径收进「更多」，保存贴在面板底边 */
         .rec-sheet { padding-bottom:0; }
         .rec-form .field { margin-bottom:10px; }
-        .rec-time { display:inline-flex; align-items:center; gap:4px; min-height:var(--ui-tap); margin:-4px 0 0 -6px; padding:0 6px;
-            background:none; border:none; color:var(--c-text-soft); font-size:14px; font-family:inherit; cursor:pointer; border-radius:8px; }
+        /* 1020-D：记账时间是一眼看得出能点的一行：日历图标 + 16px 的时间 + 右边 ›，整行 48px 高、带框 */
+        .rec-time { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); margin:0 0 10px; padding:0 12px;
+            background:var(--c-surface); border:1px solid var(--c-border-mid); border-radius:12px;
+            color:var(--c-text); font-size:16px; line-height:1.2; font-family:inherit; text-align:left; cursor:pointer; }
         .rec-time:active { background:var(--c-chip); }
-        .rec-time-arrow { font-size:16px; }
+        .rec-time-ico { width:20px; height:20px; flex:none; fill:none; stroke:var(--c-primary-dark); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+        .rec-time-txt { flex:1 1 auto; min-width:0; }
+        .rec-time-arrow { font-size:20px; line-height:1; color:var(--c-text-soft); flex:none; }
         .rec-time-raw { display:none !important; }
         .rec-money-row { display:flex; align-items:center; gap:8px; margin:0 0 10px; }
         .rec-cur { font-size:26px; color:var(--c-text-soft); flex:none; }
         .edit-dialog input.rec-money { flex:1 1 auto; min-width:0; width:auto; margin:0; padding:4px 2px; height:56px;
             font-size:32px; line-height:48px; border:none; border-bottom:2px solid var(--c-border-mid); border-radius:0; background:transparent; outline:none; }
-        .io-chips.io-mini { flex:none; gap:8px; margin:0; }
-        .io-chips.io-mini .cc { flex:none; min-width:56px; height:var(--ui-tap); padding:0 12px; line-height:46px; font-size:14px; margin:0; }
+        /* 1020-D：收入 / 支出是一组分段按钮（两格连在一起、外面一个框，中间一道细线），还是必选、不默认选中；
+           选中的支出用支出色、收入用收入色（下面 .sel-out / .sel-in） */
+        .io-chips.io-mini { flex:none; gap:1px; margin:0; height:calc(var(--ui-tap) + 2px); padding:0; border:1px solid var(--c-border-mid); border-radius:12px;
+            background:var(--c-border-mid); overflow:hidden; }
+        .io-chips.io-mini .cc { flex:none; min-width:64px; height:100%; padding:0 14px; margin:0; border:none; border-radius:0;
+            line-height:48px; font-size:16px; font-weight:bold; background:var(--c-surface); color:var(--c-text); box-shadow:none; transform:none; }
+        .io-chips.io-mini .cc.sel-out { background:var(--c-neg); color:#fff; }
+        .io-chips.io-mini .cc.sel-in { background:var(--c-pos); color:#fff; }
         /* 1019-Z：统计口径一行三个小按钮（计入 / 只算结余 / 不计入），说明只在不是「计入」时显示 */
         .mode-chips.mode-mini { display:flex; gap:8px; flex-wrap:nowrap; margin:0; }
         .mode-chips.mode-mini .cc { flex:1 1 0; min-width:0; margin:0; padding:0 6px; height:var(--ui-tap); line-height:46px; font-size:14px; text-align:center; white-space:nowrap; }
@@ -1040,20 +1058,26 @@
             color:var(--c-text-soft); cursor:pointer; }
 
         /* 管理页 */
-        .days-head { display:flex; align-items:center; gap:10px; margin-bottom:16px;
-            padding-bottom:15px; border-bottom:1px solid var(--c-border); }
-        .days-back { border:1px solid var(--c-border-mid); background:var(--c-surface);
-            color:var(--c-text-soft); border-radius:8px; padding:6px 12px; font-size:14px; cursor:pointer; }
-        .days-title { font-size:17px; font-weight:bold; color:var(--c-primary-dark);
-            letter-spacing:1px; flex:1; }
-        .days-add { border:none; border-radius:8px; padding:8px 16px; font-size:14px; cursor:pointer;
-            background:linear-gradient(135deg,var(--c-primary),var(--c-primary-dark));
-            color:var(--c-on-primary); box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),.35); }
-        /* 「管理」按钮：跟「＋添加」并排在右侧。头部原本三格已铺满，
-           所以它做成弱化的次级按钮（无填充、字号小），两个加起来才占一格的视觉重量。 */
-        .days-manage { border:1px solid var(--c-border-mid); background:var(--c-surface);
-            color:var(--c-text-soft); border-radius:8px; padding:6px 10px; font-size:13px; cursor:pointer; }
-        .days-manage:active { background:var(--c-chip); }
+        /* 1020-D：顶上一行照 App 别的页面：左「‹ 返回」、中间标题、右「管理」，返回和管理都是文字按钮（没有框、48px 高、字上下居中）；
+           「添加日子」是主按钮，放进底部操作栏 .days-bar */
+        .days-head { display:flex; align-items:center; gap:8px; margin:-8px 0 12px; padding-bottom:4px; border-bottom:1px solid var(--c-border); }
+        .days-back, .days-manage { display:inline-block; text-align:center; min-height:var(--ui-tap); min-width:var(--ui-tap);
+            padding:0 12px; border:none; background:none; border-radius:10px; font-size:16px; line-height:1; font-family:inherit;
+            color:var(--c-primary-dark); cursor:pointer; }
+        .days-back { margin-left:-12px; }
+        .days-manage { margin-right:-12px; }
+        .days-back:active, .days-manage:active { background:var(--c-chip); }
+        .days-title { font-size:18px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; flex:1; line-height:var(--ui-tap); }
+        /* 底部操作栏：在底栏（60px）上面，和账单页「筛选 / 记一笔」那排同一个高度；平时只有「添加日子」，选择模式只有「删除」 */
+        .ui-bar.days-bar { bottom:calc(60px + env(safe-area-inset-bottom)); z-index:900; padding:10px 12px;
+            background:linear-gradient(to top, var(--c-bg) 75%, transparent); border-top:none; box-shadow:none; }
+        @media (min-width:761px){ .ui-bar.days-bar { padding-left:calc(50% - 366px); padding-right:calc(50% - 366px); } }
+        .days-bar .days-del-btn { display:none; }
+        body.days-selecting .days-bar .days-add { display:none; }
+        body.days-selecting .days-bar .days-del-btn { display:block; }
+        body.kb-open .days-bar { display:none; }
+        /* 日子管理页开着时：卡片跟着内容高度走（不再把底栏留白算进卡片里），卡片外面让出底部操作栏 + 底栏 */
+        body.days-page:not(.login-mode) .container { padding-bottom:18px; margin-bottom:calc(138px + env(safe-area-inset-bottom)); }
 
         /* ===== 选择模式（批量删除）=====
            不新开弹窗，而是把同一个列表就地切成可勾选状态：
@@ -1062,7 +1086,7 @@
             gap:10px; margin-bottom:16px; padding:10px 12px; border-radius:10px;
             background:var(--c-chip); border:1px solid var(--c-border-mid); }
         .days-sel-head .ds-btn { border:none; background:none; color:var(--c-text);
-            font-size:14px; cursor:pointer; padding:4px 6px; }
+            font-size:15px; cursor:pointer; padding:0 8px; min-height:var(--ui-tap); display:inline-flex; align-items:center; font-family:inherit; }
         .days-sel-head .ds-count { font-size:15px; font-weight:bold; color:var(--c-primary-dark); }
         /* 勾选圈：未选是空心描边，选中填主色 */
         .day-item .di-check { width:22px; height:22px; border-radius:50%; flex-shrink:0;
@@ -1074,13 +1098,8 @@
             background:var(--c-chip); }
         body.days-selecting .day-item.sel .di-check {
             background:var(--c-primary); border-color:var(--c-primary); }
-        /* 底部删除条：选择模式下常驻页面底部 */
-        .days-del-bar { display:none; position:sticky; bottom:0; padding:10px 0 4px;
-            background:linear-gradient(to top, var(--c-bg) 70%, transparent); }
-        body.days-selecting .days-del-bar { display:block; }
-        .days-del-btn { width:100%; padding:12px; border:none; border-radius:10px;
-            font-size:15px; cursor:pointer; background:var(--c-neg); color:#fff; }
-        .days-del-btn:disabled { background:var(--c-border); color:var(--c-text-soft); cursor:default; }
+        /* 删除按钮在底部操作栏里（1020-D 起，原来是页面底部的一条） */
+        .days-del-btn:disabled { background:var(--c-border); color:var(--c-text-soft); cursor:default; box-shadow:none; }
 
         /* ===== 日子管理弹窗：入口卡条数 ===== */
         .dm-label { font-size:13px; color:var(--c-primary-deep); font-weight:500; }
@@ -1455,7 +1474,7 @@
            用 ::after 叠一块看不见的点击区域（和 .ui-hit 同一个做法），外观一点不变。 */
         .login-btn, .login-import-btn, .user-chip, .recent-users .hidden-toggle { min-height:var(--ui-tap); }
         .save, .cancel, .add-btn, .edit-del-btn, .mini-btn, .ask-extra-btn, .pager button,
-        .days-back, .days-add, .days-manage, .bg-detail-head .bg-edit, .bgu-set, .bgu-head, .tpl-save-btn { min-height:var(--ui-tap); }
+        .bg-detail-head .bg-edit, .bgu-set, .bgu-head, .tpl-save-btn { min-height:var(--ui-tap); }
         .days-card-head { margin-bottom:16px; }
         @media (max-width: 600px) { tbody td.ops-cell { padding-top:12px; } }
         #askInput, .search-input, .form-box input, .form-box select, .edit-dialog input, .edit-dialog select, .remark-area { min-height:var(--ui-tap); }

@@ -134,7 +134,7 @@
         //   对不上（翻到了第 2 页、开着筛选、统计页不在这个月……）就删掉，宁可慢一点也不画错。
         //   账本一改（saveStore）、换账号 / 存档、恢复、导入、撤销、换主题、改默认页都删（snapDrop），停下来（1020-B）或切后台再存。
         const SNAP_MAX=400000;
-        const SNAP_BODY_SKIP=['kb-open','login-mode','days-selecting'];
+        const SNAP_BODY_SKIP=['kb-open','login-mode','days-selecting','days-page'];
         // 1020-B：停下来就先存（见下面 idleKick）
         const SNAP_IDLE_MS=1500, FORM_IDLE_MS=1000, SNAP_GAP_MS=20000, RESUME_REFRESH_MS=10*60*1000;
         let snapLast=null, resumeLast=null, formLast=null, idleT=null, formT=null;
@@ -344,6 +344,7 @@
             // 「日子」管理页是记账页的子页，不属于任何 tab。切 tab 时必须把它关掉，
             // 否则从子页点底栏会出现「子页与目标页同时显示」。
             const pd=$('pageDays'); if(pd) pd.style.display='none';
+            document.body.classList.remove('days-page');   // 1020-D：日子管理页的卡片高度 / 底部操作栏跟着这个类
             $('pageLedger').style.display   = tab==='ledger'   ? 'block':'none';
             $('pageStats').style.display    = tab==='stats'    ? 'block':'none';
             $('pageSettings').style.display = tab==='settings' ? 'block':'none';
@@ -537,6 +538,7 @@
             const tt=$('toTopBtn');        if(tt) tt.classList.remove('show');
             const cf=$('clearFilterFab');  if(cf) cf.classList.remove('show');
             document.body.classList.remove('tab-ledger');   // 去掉为记账页底部常驻条留的内边距
+            document.body.classList.add('days-page');       // 1020-D：卡片跟着内容高度走，外面让出底部操作栏
             renderDaysList();
             window.scrollTo(0,0);
         }

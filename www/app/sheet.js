@@ -414,11 +414,43 @@
                 if(e.kind==='打开面板' || e.kind==='关闭面板') return `${e.at} ${e.kind} ${e.ms}ms（${e.what}）`;
                 return e.at+' '+JSON.stringify(e);
             }
+            // 1020-D：按钮里的字上下居中没有（这台手机的字体当场量）：照分类块、统计口径、收支、主按钮的样子各摆一个看不见的，
+            //   量「字形」的上下中心（canvas 的 actualBoundingBox）和框（边框以内）的上下中心差多少，正数偏下、负数偏上；
+            //   再写字体的上下留白（fontBoundingBox）和中文字形高低（em），手机上字看着偏上时把这一行复制给开发者
+            function fontCenterLine(){
+                try{
+                    const box=document.createElement('div');
+                    box.style.cssText='position:fixed;left:0;top:0;width:360px;visibility:hidden;pointer-events:none;z-index:-1';
+                    box.innerHTML='<div class="edit-dialog"><div class="cat-chips"><div class="cc">吃饭</div></div>'
+                        +'<div class="mode-chips mode-mini"><div class="cc">只算结余</div></div>'
+                        +'<div class="cat-chips io-chips io-mini"><div class="cc">支出</div></div>'
+                        +'<button class="ui-btn primary block">保存</button></div>';
+                    document.body.appendChild(box);
+                    const cv=document.createElement('canvas').getContext('2d');
+                    let em='';
+                    const one=el=>{
+                        const n=el.firstChild, rg=document.createRange(); rg.selectNodeContents(n);
+                        const rc=rg.getClientRects()[0], cs=getComputedStyle(el);
+                        cv.font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+                        const m=cv.measureText(n.nodeValue), fs=parseFloat(cs.fontSize)||16;
+                        const base=rc.top+(rc.height-(m.fontBoundingBoxAscent+m.fontBoundingBoxDescent))/2+m.fontBoundingBoxAscent;
+                        const ink=base+(m.actualBoundingBoxDescent-m.actualBoundingBoxAscent)/2;
+                        const b=el.getBoundingClientRect(), t=b.top+parseFloat(cs.borderTopWidth), bt=b.bottom-parseFloat(cs.borderBottomWidth);
+                        if(!em) em=`字体上下留白 ${(m.fontBoundingBoxAscent/fs).toFixed(2)}/${(m.fontBoundingBoxDescent/fs).toFixed(2)}em、中文字形 ${(m.actualBoundingBoxAscent/fs).toFixed(2)}/${(m.actualBoundingBoxDescent/fs).toFixed(2)}em`;
+                        const d=Math.round((ink-(t+bt)/2)*10)/10; return (d>0?'+':'')+d;
+                    };
+                    const q=sel=>box.querySelector(sel);
+                    const out=`按钮里的字上下差多少（这台手机当场量，正数偏下、负数偏上，单位 px）：分类块 ${one(q('.cat-chips:not(.io-chips) .cc'))} · 统计口径 ${one(q('.mode-mini .cc'))} · 收支 ${one(q('.io-mini .cc'))} · 主按钮 ${one(q('.ui-btn'))}｜${em}｜${getComputedStyle(q('.cc')).fontFamily}`;
+                    box.remove();
+                    return out;
+                }catch(_){ return ''; }
+            }
             function openPerfPage(){
                 const rows=P.list().slice().reverse();
-                const text=['记问性能记录（'+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1')+'）'].concat(rows.map(fmt)).join('\n');
+                const fc=fontCenterLine();
+                const text=['记问性能记录（'+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1')+'）'].concat(fc ? [fc] : []).concat(rows.map(fmt)).join('\n');
                 window.JiwenSheet.open({ title:'性能记录（开发中）', sub:rows.length ? `最近 ${rows.length} 条，新的在上（最多留 50 条，只在这台手机）` : '还没有记录：关掉 App 再打开、点几个输入框、开关几个面板，这里就有了。',
-                    body(box){ const pre=document.createElement('pre'); pre.id='perfList'; pre.className='perf-list'; pre.textContent=rows.map(fmt).join('\n'); box.appendChild(pre); },
+                    body(box){ const pre=document.createElement('pre'); pre.id='perfList'; pre.className='perf-list'; pre.textContent=(fc ? [fc] : []).concat(rows.map(fmt)).join('\n'); box.appendChild(pre); },
                     foot(box, done){
                         const st=document.createElement('div'); st.className='ui-stack';
                         const cp=document.createElement('button'); cp.type='button'; cp.className='ui-btn primary block'; cp.id='perfCopy'; cp.textContent='复制全部';
