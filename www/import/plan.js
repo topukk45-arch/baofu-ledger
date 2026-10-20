@@ -493,11 +493,13 @@
 
     // ---- 要新建几条记录（分分捐、收款按天合并、勾上的零碎扣款合成一条）----
     var records = sec.fees.length, seenG = {};
+    var grouped = { units: 0, lines: 0, appended: 0 };   // 1021-T6：第 1 步的等式用：几笔合成几条（往已有汇总里追加的不算新条）
     rows.forEach(function (d) {
       if (d.src !== 'row' || (d.group !== 'add' && d.group !== 'neutral' && d.group !== 'refund')) return;
       var g = inGroup[d.file + ':' + d.row];
       if (!g) { records++; return; }
-      if (!seenG[g.id]) { seenG[g.id] = true; if (!g.appendTo) records++; }
+      grouped.units += d.units; if (g.appendTo) grouped.appended += d.units;
+      if (!seenG[g.id]) { seenG[g.id] = true; if (!g.appendTo) { records++; grouped.lines++; } }
     });
     // 要登记的单号：新增、不计、退款、合并，加上按净额并进手记的退款行
     var orders = 0;
@@ -539,7 +541,7 @@
     });
     GROUPS.forEach(function (g) { groups[g].sort(function (a, b) { return (b.time || '') < (a.time || '') ? -1 : (b.time || '') > (a.time || '') ? 1 : 0; }); });
 
-    return { version: VERSION, summaries: sumList, files: files, counts: counts, sums: sums, importN: importN, mergeM: mergeM, records: records, orders: orders,
+    return { version: VERSION, summaries: sumList, files: files, counts: counts, sums: sums, importN: importN, mergeM: mergeM, records: records, grouped: grouped, orders: orders,
              ignoreOrders: ignoreOrders, canImport: canImport, blocking: blocking.map(function (f) { return f.name; }), sections: sec, groups: groups,
              groupNames: GROUP_NAME, rows: rows };
   }

@@ -1117,14 +1117,29 @@
     dom.body.appendChild(c);
   }
   function left(list) { return list.filter(function (x) { return !x.done; }).length; }
+  // 1021-T6（实测 10-20）：第 1 步写成一条能加起来的等式（都按笔数，和总览四格同一个来源），不写「约」
+  //   「893 笔 = 新建 830 笔（其中 10 笔合成 1 条，共 821 条记录）+ 和手记合并 0 + 待处理 N + 跳过 64」
+  function checkEquation(p, tot) {
+    var c = p.counts, g = p.grouped || { units: 0, lines: 0, appended: 0 };
+    var nw = '新建 ' + p.importN + ' 笔';
+    var notes = [];
+    if (g.units) notes.push('其中 ' + g.units + ' 笔合成 ' + g.lines + ' 条' + (g.appended ? '（' + g.appended + ' 笔追加到已有的汇总里）' : ''));
+    if (g.units || p.records !== p.importN) notes.push('共 ' + p.records + ' 条记录' + (p.sec && p.sec.fees && p.sec.fees.length ? '，含 ' + p.sec.fees.length + ' 笔服务费' : ''));
+    if (notes.length) nw += '（' + notes.join('，') + '）';
+    var parts = [nw, '和手记合并 ' + c.merge, '待处理 ' + c.pending, '跳过 ' + c.skip];
+    if (c.error) parts.push('读不出 ' + c.error);
+    if (c.excluded) parts.push('你勾掉的 ' + c.excluded);
+    return tot + ' 笔 = ' + parts.join(' + ');
+  }
   // 第 1 步：核对
   function renderCheck(p, info) {
     var b = dom.body;
     b.appendChild(renderFiles(p, 'check'));
     var c = el('div', 'imp-card'); c.id = 'impCheckSum';
-    c.appendChild(el('h4', null, '这次大概'));
+    c.appendChild(el('h4', null, '这次'));
     var tot = p.files.reduce(function (s0, f) { return s0 + (f.fatal ? 0 : f.parsedTotal); }, 0);
-    c.appendChild(el('div', 'imp-line', tot + ' 笔账单：新建约 ' + p.records + ' 条、和你记的合并 ' + p.mergeM + ' 笔' + (p.counts.skip ? '、跳过 ' + p.counts.skip + ' 笔' : '') + '。'));
+    c.appendChild(el('div', 'imp-line imp-check-eq', checkEquation(p, tot)));
+    c.appendChild(el('div', 'imp-soft', '后面几步的选择会改变这几个数。'));
     if (p.blocking.length) {
       c.appendChild(el('div', 'imp-line imp-bad', '有账单笔数对不上，先不能往下。换一份完整的账单再导，或者把有问题的那份去掉。'));
     } else {
@@ -2065,6 +2080,8 @@
       var db = btn('不要了', dr.pick === 'drop' ? 'imp-btn gold' : 'imp-btn', function () { setDraft({ pick: 'drop' }); }); db.id = 'impPickDrop';
       var cb2 = btn('还是待确认', !dr.pick && SH.keep ? 'imp-btn gold' : 'imp-btn', function () { SH.keep = true; setDraft({ pick: null }); }); cb2.id = 'impPickClear';     // 明确点了也算定了
       a2.appendChild(nb); a2.appendChild(db); a2.appendChild(cb2); sh.appendChild(a2);
+      // 1021-T6：退款选了「不要了」：写清楚少记一笔收入
+      if (dr.pick === 'drop' && refundishRow(d)) { var dw = el('div', 'imp-soft imp-bad imp-drop-refund', '这是一笔退款，不要了账本就少记 ' + yuan(d.fen) + ' 元收入；多半应该挂到原单上。'); sh.appendChild(dw); }
     }
     // 1016-G：为什么没配上（默认收起）；不计的行同样收起
     if (d.item && d.item.trace && d.group !== 'merge') {
@@ -3004,7 +3021,8 @@
       pcards.push({ node: c, fen: it.amt, texts: [it.cp, cpShow(it.cp), it.d, it.rm, x.why].concat(x.cands.map(function (cd) { return cd.rec && cd.rec.remark; })) });
       // 1017-UI10：点上面这两行看详情（和筛选同一套底部面板，只看，底部只有「关闭」）
       var info = el('div', 'imp-tap imp-pend-info'); info.style.cursor = 'pointer';
-      info.appendChild(el('div', 'imp-line', fmtTime(it.t) + ' · ' + (APP[it.app] || it.app) + ' · ' + (cpShow(it.cp) || '—') + ' · ' + (it.io === 'income' ? '+' : '−') + yuan(it.amt)));
+      // 1021-T6：退款写「退款 +0.31」（钱是退回来的，不是一笔支出）
+      info.appendChild(el('div', 'imp-line', fmtTime(it.t) + ' · ' + (APP[it.app] || it.app) + ' · ' + (cpShow(it.cp) || '—') + ' · ' + (x.refund ? '退款 +' : it.io === 'income' ? '+' : '−') + yuan(it.amt)));
       info.appendChild(el('div', 'imp-soft', x.why + (it.d ? ' · ' + it.d : '') + ' · 详情 ›'));
       info.addEventListener('click', function () { viewSheet('待处理的这一笔', [['时间', String(it.t || '').replace('T', ' ')], ['来源', APP[it.app] || it.app], ['交易对方', it.cp], ['金额', (it.io === 'income' ? '收入 ' : '支出 ') + yuan(it.amt)],
         ['商品', it.d], ['为什么在这里', x.why], ['候选', x.cands.length ? x.cands.length + ' 条' + (x.lostAll ? '（都已经不在了）' : '') : ''], ['单号', it.no]], 'impPendDetailClose'); });
@@ -3034,7 +3052,13 @@
       var nb = btn(x.refund ? '作为新增（往来）' : '作为新增', 'imp-btn imp-pend-new', function () {
         act([{ key: x.key, do: 'new', cat: se ? se.value : '未分类' }], '已作为新增记进账本');
       });
-      var db = btn('不要了', 'imp-btn imp-pend-drop', function () { act([{ key: x.key, do: 'drop' }], '这笔不要了'); });
+      // 1021-T6：退款「不要了」先问（不要了账本就少记一笔收入）；按钮用警示色
+      var db = btn('不要了', 'imp-btn imp-pend-drop' + (x.refund ? ' warn' : ''), function () {
+        if (!x.refund) { act([{ key: x.key, do: 'drop' }], '这笔不要了'); return; }
+        window.customConfirm('这是一笔退款，不要了账本就少记 ' + yuan(it.amt) + ' 元收入，以后再导同一份账单也不再出现。\n\n多半应该「挂到原单」上。', function () {
+          act([{ key: x.key, do: 'drop' }], '这笔不要了');
+        }, '这笔退款不要了？', { okText: '不要了，少记 ' + yuan(it.amt) + ' 元', danger: true });
+      });
       nb.style.flex = db.style.flex = '1 1 0';
       acts.appendChild(nb); acts.appendChild(db);
       c.appendChild(acts);

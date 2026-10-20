@@ -51,7 +51,10 @@ const MANY = () => [
     ok(steps.every((k, i) => i === 0 || order.indexOf(k) > order.indexOf(steps[i - 1])) && steps.includes('match') && steps.includes('refund') && steps.includes('cat') && steps.includes('amount'), '1 要你定的几步按顺序：和手记对不上的 → 退款和转账 → 分类 → 金额要你看一眼');
     ok(raw('impStepTitle').textContent === `第 1 步 / 共 ${steps.length} 步 · 核对` && raw('impSteps').querySelectorAll('.imp-steps-bar i').length === steps.length, '1 顶上写「第 1 步 / 共 N 步 · 核对」，进度条按实际步数');
     ok(raw('impCancel') && raw('impNext') && !raw('impPrev') && !raw('impGo'), '1 第 1 步底部「取消 / 下一步」，没有导入按钮');
-    ok(/笔数和账单统计一致/.test(raw('impBody').textContent) && /这次大概/.test(raw('impBody').textContent), '1 第 1 步：笔数核对、这次大概');
+    // 1021-T6：「这次大概 … 新建约」改成一条能加起来的等式（不写「约」），等号两边相等
+    const eq = (raw('impBody').querySelector('.imp-check-eq') || {}).textContent || '';
+    const em = eq.match(/^(\d+) 笔 = (.*)$/), nums = em ? em[2].replace(/（[^）]*）/g, '').match(/\d+/g).map(Number) : [];
+    ok(/笔数和账单统计一致/.test(raw('impBody').textContent) && em && !/约/.test(eq) && nums.reduce((a, b) => a + b, 0) === +em[1], '1 第 1 步：笔数核对、等式加起来等于文件笔数：' + eq);
     raw('impNext').click();
     ok(t.S().view.step === steps[1] && raw('impPrev') && raw('impNext') && raw('impStepTitle').textContent.startsWith('第 2 步'), '1 下一步：到第 2 步，底部「上一步 / 下一步」');
     ok(/还剩 \d+ 件没定/.test(raw('impIntro').textContent) && raw('impBody').querySelectorAll('.imp-mark').length > 0, '1 每步顶上一句话写有几件、还剩几件，每件标「待选 / 已选」');
