@@ -2433,7 +2433,9 @@
     var n1 = btn('去看统计 ›', 'ui-btn block', goNext('stats')); n1.id = 'impNextStats';
     var n2 = btn('按过去几个月设预算 ›', 'ui-btn block', goNext('budget')); n2.id = 'impNextBudget';
     var n3 = btn('补一笔期初余额 ›', 'ui-btn block', goNext('opening')); n3.id = 'impNextOpening';
-    nr.appendChild(n1); nr.appendChild(n2); nr.appendChild(n3); nx.appendChild(nr);
+    // 1021-T4：按新规则重新推荐分类（规则改过、或者 1021-T3 以前导进「工资」的收款）
+    var n4 = btn('按新规则重新推荐分类 ›', 'ui-btn block', function () { openReclass(res.ws.batch); }); n4.id = 'impNextReclass';
+    nr.appendChild(n1); nr.appendChild(n2); nr.appendChild(n3); nr.appendChild(n4); nx.appendChild(nr);
     nx.appendChild(el('div', 'imp-soft', '导进来的只是这段时间的收支差额，不等于钱包里的实际余额。想让结余对上，补一笔「往来」的期初余额（不算收入）。'));
     b.appendChild(nx);
     var bk = el('div', 'imp-card');
@@ -2491,7 +2493,10 @@
       var ofL = l.kind === 'ai' ? logs.filter(function (x) { return x.b === l.of && x.kind !== 'ai'; })[0] : null;
       var aiWhat = function () { var f = { cat: 0, remark: 0, mode: 0, aiFlag: 0 }; (l.chg || []).forEach(function (c) { var w = c.was || {}; if ('cat' in w) f.cat++; if ('remark' in w) f.remark++; if ('skip' in w || 'flow' in w) f.mode++; if ('aiFlag' in w) f.aiFlag++; });
         return [['cat', '分类'], ['remark', '备注'], ['mode', '统计'], ['aiFlag', '标记']].filter(function (x) { return f[x[0]]; }).map(function (x) { return x[1] + ' ' + f[x[0]] + ' 条'; }).join('、'); };
-      if (l.kind === 'ai') {
+      if (l.kind === 'ai' && l.by === 'rec') {
+        g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · 重新分类'));
+        g.appendChild(el('div', 'imp-soft', '按新规则重新分类了 ' + nChg + ' 条记录' + (ofL ? ' · 是 ' + String(ofL.at || '').replace('T', ' ').slice(5) + ' 那次导入的' : '')));
+      } else if (l.kind === 'ai') {
         g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · AI 修改'));
         g.appendChild(el('div', 'imp-soft', '按 AI 的建议改了 ' + nChg + ' 条记录（' + aiWhat() + '）' + (ofL ? ' · 是 ' + String(ofL.at || '').replace('T', ' ').slice(5) + ' 那次导入的' : '')));
       } else {
@@ -2514,6 +2519,7 @@
       // 1017-H：「AI 检查」（这时只导写进账本的那几笔）
       var acts = el('div', 'imp-log-acts');
       if (l.kind !== 'ai') { var ab = btn('AI 检查', 'imp-btn imp-log-ai', function () { openAiExport(l.b, { from: 'logs' }); }); ab.style.minWidth = '64px'; acts.appendChild(ab); }
+      if (l.kind !== 'ai' && !l.only) { var rb = btn('重新分类', 'imp-btn imp-log-reclass', function () { openReclass(l.b); }); rb.style.minWidth = '64px'; acts.appendChild(rb); }
       acts.appendChild(u);
       r.appendChild(acts);
       c.appendChild(r);
@@ -2526,6 +2532,42 @@
       var pb = btn('待处理 ' + pend.length + ' 笔，去处理 ›', 'ui-btn block', function () { openPending(); }); pb.id = 'impLogsPending'; pb.style.marginTop = '6px';
       pc.appendChild(pb); dom.body.appendChild(pc);
     }
+  }
+  // ---------- 1021-T4：按新规则重新推荐分类 ----------
+  //   这一次导入新建的、导入后你没改过的记录（不含退款、有退款挂着的、不计的），按现在的规则（你的规则、分类对照、内置词表、支付宝分类）
+  //   再推荐一遍：推得出已有分类、和现在不一样的改过去；推不出的只把原来落在「工资」的改回未分类（1021-T3 以前收款会落工资）。
+  //   先列出来确认；写法、自动备份、撤销都和 AI 修改一样（导入记录里多一次「重新分类」，能撤销）
+  function reclassPlan(d, info) {
+    var C = window.JiwenImportClassify, cats = d.cats || [];
+    var rows = (d.rows || []).filter(function (r) { return !r.gone && !r.edited && !r.refund && !r.hasRefunds && r.mode !== 'skip' && /^新建/.test(r.dest || '') && r.app; });
+    if (!rows.length) return [];
+    var recs = C.classify(rows.map(function (r) { return { app: r.app, cp: r.cp, desc: String(r.remark || '').split('\n')[0], kind: r.oc, io: r.type }; }),
+      { cats: cats, rules: info.catRules, maps: info.catMaps, merchants: window.JiwenImportMerchants, isNewUser: false }).recs;
+    var out = [];
+    rows.forEach(function (r, i) {
+      var x = recs[i], to = x && !x.newCat && x.cat && cats.indexOf(x.cat) >= 0 ? x.cat : '未分类';
+      if (to === r.cat) return;
+      if (to === '未分类' && r.cat !== '工资') return;
+      out.push({ r: r, to: to, reason: x ? x.reason : '' });
+    });
+    return out;
+  }
+  function openReclass(batch) {
+    var info = null; try { info = store().archiveInfo(); } catch (_) {}
+    if (!info) return;
+    Promise.all([ensureClassify(), store().aiExportRows(batch)]).then(function (r) {
+      if (!r[0]) { window.customAlert('分类推荐没载入上，稍后再试一次。'); return; }
+      var ch = reclassPlan(r[1], info);
+      if (!ch.length) { window.customAlert('按现在的规则重新推荐了一遍，没有要改的分类。\n\n导入后你改过的记录、退款、不计的都不动。', '重新分类'); return; }
+      var lines = ch.slice(0, 8).map(function (c) { return fmtTime(c.r.time) + ' · ' + cut(cpShow(c.r.cp) || '—', 10) + ' · ' + yuan(c.r.fen) + '：' + (c.r.cat || '未分类') + ' → ' + c.to; });
+      if (ch.length > 8) lines.push('……还有 ' + (ch.length - 8) + ' 条');
+      window.customConfirm('按现在的规则重新推荐了一遍，这次导入的记录里有 ' + ch.length + ' 条分类会变：\n\n' + lines.join('\n')
+        + '\n\n只改导入后你没动过的记录。改之前自动备份，改错了能在导入记录里「撤销」。', function () {
+        store().aiApply({ of: batch, by: 'rec', changes: ch.map(function (c) { return { id: c.r.id, set: { cat: c.to } }; }) }).then(function (w) {
+          openLogs('已按新规则重新分类了 ' + w.changed + ' 条记录。改错了可以在下面「重新分类」那一次点「撤销」（你后来又改过的不会动）。');
+        }, function (e) { window.customAlert('没改成：' + (e && (e.code || e.message) || e) + '。账本没有动。'); });
+      }, '重新分类', { okText: '改这 ' + ch.length + ' 条的分类', danger: true });
+    }, function (e) { window.customAlert('读不出这次导入：' + (e && (e.code || e.message) || e)); });
   }
   // ---------- 1017-H：交给 AI 检查（导出）----------
   function stamp(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }

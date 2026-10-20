@@ -1040,7 +1040,7 @@
                 o.rulesAdded=ra;
                 if(x.only===true) o.only=true;      // 1016-Q：只对账（只补了勾选的几笔）
                 // 1017-G：AI 修改（不是导入）：改的是哪一次导入的记录
-                if(x.kind==='ai'){ o.kind='ai'; if(typeof x.of==='string' && IMP_BATCH_RE.test(x.of)) o.of=x.of; }
+                if(x.kind==='ai'){ o.kind='ai'; if(typeof x.of==='string' && IMP_BATCH_RE.test(x.of)) o.of=x.of; if(x.by==='rec') o.by='rec'; }   // 1021-T4：by rec = 按新规则重新分类（照 AI 修改那套记、那套撤）
                 // 1017-H：这次导入交给 AI 检查时的导出时间（最近 5 次），AI 回复里的导出时间要是其中之一才认
                 if(Array.isArray(x.aiAt)){ const aa=x.aiAt.filter(v=>typeof v==='string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v)).slice(-5); if(aa.length) o.aiAt=aa; }
                 // 1016-Y：这次改了你已有的哪几条规则（关键词、原来的分类、改成的分类），撤销时改回去
@@ -1679,7 +1679,7 @@
                     if(kind[id].add){ const k=(lg.add||[]).indexOf(id), h=Array.isArray(lg.h) ? lg.h[k] : ''; edited=!!h && impRecHash(r)!==h; }
                     else if(c && c.now) edited=Object.keys(c.now).some(f=>{ const v=(f in r && r[f]!==undefined) ? (r[f]!==null && typeof r[f]==='object' ? JSON.stringify(r[f]) : r[f]) : null; return v!==c.now[f]; });
                     return { n, id, time:r.time||'', fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', mode:recMode(r), dest,
-                             cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', desc:'', remark:r.remark||'', oc:r.oc||'', edited, aiFlag:r.aiFlag||null, refund:!!r.refundOf, hasRefunds:refunded.has(id) };
+                             cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', desc:'', remark:r.remark||'', oc:r.oc||'', app:(r.src && r.src.app)||'', edited, aiFlag:r.aiFlag||null, refund:!!r.refundOf, hasRefunds:refunded.has(id) };
                 });
                 return { batch, at:lg.at||'', cats:(a.cats||[]).slice(), rows, aiAt:(lg.aiAt||[]).slice() };
             },
@@ -1734,10 +1734,12 @@
                 if(!chg.length) throw impErr('nothing');
                 const b='a'+Date.now().toString(36);
                 const ofLog=logs.filter(l=>l.kind!=='ai' && l.b===o.of)[0];
-                const saved=await impBkSave(t, 'ai', b, { b, what:'按 AI 的建议改 ' + chg.length + ' 条记录' + (ofLog ? '（' + String(ofLog.at||'').replace('T', ' ') + ' 那次导入的）' : '') });
+                const byRec=o.by==='rec';   // 1021-T4：按新规则重新推荐分类，写法、备份、撤销都和 AI 修改一样，只是说法不同
+                const saved=await impBkSave(t, 'ai', b, { b, what:(byRec ? '按新规则重新分类 ' : '按 AI 的建议改 ') + chg.length + ' 条记录' + (ofLog ? '（' + String(ofLog.at||'').replace('T', ' ') + ' 那次导入的）' : '') });
                 const d=new Date(), cl=(a.cps||[]).length, pl=(a.pms||[]).length;
                 logs.push({ kind:'ai', of:o.of, b, at:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`, apps:[], from:'', to:'',
                             add:[], h:[], chg, cpLen:cl, pmLen:pl, cpEnd:cl, pmEnd:pl, catsAdded:[], rulesAdded:{ cat:[], type:[] } });
+                if(byRec) logs[logs.length-1].by='rec';
                 const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, cl, pl);
                 try{
                     if(window.__impFailAt==='aiSave') throw impErr('test');
