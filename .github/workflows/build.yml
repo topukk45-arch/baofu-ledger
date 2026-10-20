@@ -1,8 +1,9 @@
 name: 构建安卓 APK
 on:
   # 1020-J：只在推 main 和手动触发时打包；别的分支（claude/ 开头这些）推上去不打，本地跑测试就够了
+  # 1021-T1：体验版分支（实测 10-20 的方案）推上去也打，发到单独的「体验版」，和「最新测试版」分开
   push:
-    branches: [main]
+    branches: [main, claude/relaxed-turing-1v8wg9]
   workflow_dispatch:
 jobs:
   build:
@@ -102,4 +103,28 @@ jobs:
             gh release upload latest-build "$APK" --clobber
           else
             gh release create latest-build "$APK" --title "最新测试版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
+          fi
+
+      # 1021-T1：体验版分支（实测 10-20 的方案）打包成功，发到单独的预发行「体验版」（标签 trial-build、文件 jiwen-trial.apk），
+      # 不碰「最新测试版」和正式版；分支合进 main 前删掉这一段
+      - name: 发布到「体验版」
+        if: github.ref == 'refs/heads/claude/relaxed-turing-1v8wg9'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          VER=$(grep -oE 'build [0-9]{4}-[A-Z0-9]+' www/index.html | head -1 | cut -d' ' -f2)
+          APK="$RUNNER_TEMP/jiwen-trial.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          WHEN=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')
+          NOTES="体验版 $VER（实测 10-20 的方案，还没合进 main），打包于 $WHEN（北京时间），对应提交 ${GITHUB_SHA::7}：$(git log -1 --format=%s)
+
+          直接下载下面的 jiwen-trial.apk 安装即可，签名和正式版一样，可以覆盖升级（也能装回最新测试版）。
+          建议在新存档里试导入。"
+          git push -f origin "$GITHUB_SHA:refs/tags/trial-build"
+          if gh release view trial-build >/dev/null 2>&1; then
+            gh release edit trial-build --title "体验版 $VER" --notes "$NOTES" --prerelease
+            gh release upload trial-build "$APK" --clobber
+          else
+            gh release create trial-build "$APK" --title "体验版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
           fi
