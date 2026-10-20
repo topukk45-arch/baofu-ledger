@@ -1936,8 +1936,12 @@
                 (st ? st.recs : []).forEach(r=>{ if(r.type!=='expense' || r.refundOf || recMode(r)!=='normal') return; const f=Math.round(safeNum(r.money)*100); if(!(f>0)) return; let x=byCat.get(r.cat||'未分类'); if(!x) byCat.set(r.cat||'未分类', x=[]); x.push(f); });
                 const catStats={};
                 byCat.forEach((xs, c)=>{ xs.sort((p, q)=>p-q); catStats[c]={ n:xs.length, p80:xs[Math.min(xs.length-1, Math.floor(xs.length*0.8))] }; });
+                // 1021-T8：从账本历史里学：每个对方（名单原文）以前的记录各落在哪个分类、几次（只是计数，不存新东西）；退款、未分类的不算
+                const cpHist={}, cpsA=a.cps||[];
+                (st ? st.recs : []).forEach(r=>{ if(!Number.isInteger(r.cp) || r.refundOf || !r.cat || r.cat==='未分类') return; const nm=cpsA[r.cp]; if(!nm) return;
+                    const io=r.type==='income' ? 'i' : 'e', h=cpHist[nm]||(cpHist[nm]={ e:{}, i:{} }); h[io][r.cat]=(h[io][r.cat]||0)+1; });
                 return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(),
-                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats };
+                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）
             async knownFor(lk, archive){

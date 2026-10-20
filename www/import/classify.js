@@ -24,7 +24,8 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1021-T7';
+  var VERSION = '1021-T8';
+  var HIST_MIN = 3, HIST_SHARE = 0.8;   // 1021-T8 从账本历史里学：同一个对方以前至少 3 条、八成以上同一类
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -115,6 +116,20 @@
       .filter(function (r) { return r && typeof r.kw === 'string' && r.kw && cats.indexOf(r.cat) >= 0; })
       .slice().sort(function (a, b) { return b.kw.length - a.kw.length; });
     var learned = ctx.learned instanceof Map ? ctx.learned : new Map();
+    // 1021-T8：账本历史（主页面按名单原文数好的 { 对方: { e:{分类:次数}, i:{…} } }），按清洗后的对方合起来
+    var hist = new Map();
+    Object.keys(ctx.history && typeof ctx.history === 'object' ? ctx.history : {}).forEach(function (nm) {
+      var k = cleanCp(nm), h = ctx.history[nm]; if (!k || !h) return;
+      var m = hist.get(k); if (!m) hist.set(k, m = { e: {}, i: {} });
+      ['e', 'i'].forEach(function (io) { Object.keys(h[io] || {}).forEach(function (c) { var v = +h[io][c]; if (v > 0) m[io][c] = (m[io][c] || 0) + v; }); });
+    });
+    function fromHist(cc, io) {
+      var m = hist.get(cc); if (!m || (io !== 'income' && io !== 'expense')) return null;
+      var x = m[io === 'income' ? 'i' : 'e'], tot = 0, best = null, bn = 0;
+      Object.keys(x).forEach(function (c) { tot += x[c]; if (x[c] > bn) { bn = x[c]; best = c; } });
+      if (tot < HIST_MIN || bn < tot * HIST_SHARE || cats.indexOf(best) < 0) return null;
+      return { cat: best, layer: 'history', conf: 'mid', reason: '你以前 ' + tot + ' 次' + (bn === tot ? '都' : '里 ' + bn + ' 次') + '记成「' + best + '」' };
+    }
     var mapOf = {};
     (Array.isArray(ctx.maps) ? ctx.maps : []).forEach(function (m) {
       if (m && typeof m.from === 'string' && m.from && cats.indexOf(m.cat) >= 0 && !(m.from in mapOf)) mapOf[m.from] = m.cat;
@@ -148,6 +163,9 @@
       }
       // 2. 从本批合并里学
       if (cc && learned.has(cc)) { var lc = learned.get(cc); return { cat: lc, layer: 'learned', conf: 'high', reason: '从合并里学：「' + cc + '」你记成' + lc }; }
+      // 2.5（1021-T8）从账本历史里学：同一个对方以前导进账本的（同收支）至少 3 条、八成以上同一类 → 把握中
+      var hx = cc ? fromHist(cc, r.io) : null;
+      if (hx) return hx;
       // 3. 两家互借（只给微信借；支付宝自己有分类，走第 5 层）
       if (r.app === 'wechat' && cc && borrow.has(cc)) {
         var bw = majority(borrow.get(cc));

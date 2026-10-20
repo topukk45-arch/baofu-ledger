@@ -626,7 +626,7 @@
       S.ledger = store().ledgerFor(r.result);
       progress('和手记配对、推荐分类…', 0, 1);
       return J().run('match', { routed: S.routed, parsed: S.parsed, manual: S.ledger.manual, refundCands: S.ledger.refundCands,
-                                cats: S.info.cats, rules: S.info.catRules, maps: S.info.catMaps || [], isNewUser: S.info.isNewUser, trace: true });
+                                cats: S.info.cats, rules: S.info.catRules, maps: S.info.catMaps || [], isNewUser: S.info.isNewUser, trace: true, hist: S.info.cpHist || null });
     }).then(function (r) {
       if (!alive() || !r) return;
       S.matched = r.result;

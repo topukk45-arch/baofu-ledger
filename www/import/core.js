@@ -79,7 +79,7 @@
       if (!ctx || !ctx.match) throw new Error('配对模块没有载入');
       data = data || {};
       var r = ctx.match.match(data.routed, data.parsed, { manual: data.manual, refundCands: data.refundCands, cats: data.cats,
-        rules: data.rules, maps: data.maps, isNewUser: data.isNewUser, merchants: ctx.merchants, trace: !!data.trace });
+        rules: data.rules, maps: data.maps, isNewUser: data.isNewUser, merchants: ctx.merchants, trace: !!data.trace, hist: data.hist || null });   // hist：1021-T8 账本历史
       if (onProgress) onProgress(1, 1);
       return r;
     },
