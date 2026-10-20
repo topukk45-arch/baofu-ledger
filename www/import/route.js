@@ -33,7 +33,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-O';
+  var VERSION = '1021-T2';
   var FX_RATE = 0.05;            // 跨境退款汇率差：差 5% 以内算汇率差
   var RECEIPT_MONTH_MAX = 300;   // 一个月收款超过这么多条，建议按天合并
   var PETTY_MIN = 5, PETTY_FEN = 100;   // 疑似零碎扣款：同一对方一个月 5 次以上，且这个对方所有交易都不超过 1 元
@@ -54,6 +54,10 @@
   var WX_NEUTRAL_RE = /信用卡还款|零钱提现|零钱充值|零钱通|理财通/;
   var PETTY_TYPES = { wechat: ['分分捐'] };            // 已知的零碎扣款：按月合并
   var RECEIPT_TYPES = { wechat: ['二维码收款'] };       // 收款：一个月太多时建议按天合并（支付宝的收款名称还没核对，先不认）
+  // 1021-T2（实测 10-20）：支付宝退款先定性、再清洗。商品说明原文以「退款」开头的（「退款-盒马工坊 xx」「退款」），不管状态写交易成功还是退款成功、
+  //   收 / 支写收入还是不计收支，都是退款（单号不带「_后缀」的那种）；方向一律收入。去掉「退款-」只在显示、归组、写备注时用
+  var REFUND_DESC_RE = /^\s*退款/;
+  var ALI_BACK_DAYS = 60;        // 支付宝退款在同一份文件里兜底找原单：退款之前 60 天内
 
   function fenOf(s) { var t = String(s).replace(/[,，]/g, ''); var x = Math.round(Number(t) * 100); return isFinite(x) ? x : null; }
   function wxRefunded(status) {
@@ -86,7 +90,7 @@
     var f = function (t) { t = String(t).replace(/-/g, ''); return Date.UTC(+t.slice(0, 4), +t.slice(4, 6) - 1, +t.slice(6, 8)) / 86400000; };
     return Math.round(f(b) - f(a));
   }
-  function isFullStatus(it) { return it.app === 'wechat' ? WX_FULL.indexOf(it.r.status) >= 0 : (it.app === 'alipay' && !it.r.noRest && it.r.status === '退款成功'); }
+  function isFullStatus(it) { return it.app === 'wechat' ? WX_FULL.indexOf(it.r.status) >= 0 : (it.app === 'alipay' && !it.r.noRest && it.r.status === '退款成功' && !isAliRefundDescRow(it.app, it.r)); }
 
   // 全部行展开成一张表（含 ③ 的出错和重复），每项记下在哪个文件第几行
   function flatten(parsed) {
@@ -109,6 +113,10 @@
     return { items: items, rows: rows };
   }
   function isAliRefundRow(it) { return it.app === 'alipay' && it.r.noRest && it.r.noRest[0] === '_' && it.r.status === '退款成功'; }
+  // 1021-T2：单号不带后缀、商品说明以「退款」开头、收 / 支不是支出的支付宝行（盒马、12306 退票、票务这类）
+  function isAliRefundDescRow(app, r) { return app === 'alipay' && !(r.noRest && r.noRest[0] === '_') && r.io !== 'expense' && REFUND_DESC_RE.test(r.desc || ''); }
+  function stripRefund(desc) { return String(desc || '').replace(/^\s*退款[\s\-－—_:：]*/, '').trim(); }
+  function plainCp(cp) { var t = String(cp || ''), prev; do { prev = t; t = t.replace(/[（(【\[][^（()）【】\[\]]*[)）】\]]/g, ''); } while (t !== prev); return t.replace(/\s+/g, ''); }
   function monthOf(it) { return it.r.time.slice(0, 7); }
   function dayOf(it) { return it.r.time.slice(0, 10); }
   function inList(map, app, kind) { return !!(map[app] && map[app].indexOf(kind) >= 0); }
@@ -161,7 +169,7 @@
 
     // 支付宝原单索引：单号（不带后缀）→ 这一行（整批全部行，含跳过的）
     var aliOrig = {};
-    rows.forEach(function (it) { if (it.app === 'alipay' && it.r.no && !it.r.noRest) aliOrig[it.r.no] = it; });
+    rows.forEach(function (it) { if (it.app === 'alipay' && it.r.no && !it.r.noRest && !isAliRefundDescRow(it.app, it.r)) aliOrig[it.r.no] = it; });
 
     // ---- 第一遍：状态 → 去重 → 类型规则 → 认出退款 → 不计收支 → 没见过的类型 ----
     rows.forEach(function (it) {
@@ -190,6 +198,7 @@
       if (it.app === 'wechat' && tr !== 'normal' && WX_NEUTRAL_RE.test(r.kind || '')) { put(it, 'neutral', 'ownmove', '「' + r.kind + '」是自己账户之间挪钱，不计'); it.mode = 'skip'; return; }
       // 退款
       if (isAliRefundRow(it) || (it.app === 'wechat' && (tr === 'refund' || isWxRefundType(r.kind)))) { it.isRefund = true; return; }
+      if (isAliRefundDescRow(it.app, r)) { it.isRefund = true; it.descRefund = true; return; }
       // 支付宝原单本身是「退款成功」：钱退回来了（有没有单独的退款行都跳过）
       //   本批有退款行 → 两条都跳过；没有 → 后面看以前导入过退款没有（见 1016-C「全额退款」）
       if (it.app === 'alipay' && st === '退款成功') { put(it, 'skip', 'refunded', '这笔已经全额退款'); it.aliFull = true; return; }
@@ -234,6 +243,7 @@
     rows.forEach(function (rf) {
       if (!rf.isRefund || rf.app !== 'alipay') return;
       rf.io = 'income';
+      if (rf.descRefund) return;   // 1021-T2：不带后缀的退款另外配（见下面）
       var o = aliOrig[rf.r.no];
       if (o) {
         if (o.why === 'status' || o.why === 'statusrule') { put(rf, 'skip', 'closedpair', '原单「' + o.r.status + '」，钱付了又全退回，两条都跳过'); return; }
@@ -248,6 +258,62 @@
       if (k && k.st === 0 && k.rec && k.rec.type === 'expense') { attachRec(rf, k.id, k.rec); return; }
       if (k && k.st === 1) { put(rf, 'skip', 'origignored', '原单以前跳过 / 忽略了，退款也跳过'); rf.regIgnore = [rf.key]; return; }
       noOrig(rf, 'noorig', '没找到原单，按「往来」导入');
+    });
+
+    // ---- 1021-T2：支付宝不带后缀的退款（商品说明以「退款」开头）配原单，命中一步就停 ----
+    //   ① 单号一样或原单单号是它的开头 ② 商家订单号一样或一个是另一个的开头 ③ 同一份文件里兜底：在它之前 60 天内的支出、剩下能退的够，
+    //   而且去掉「退款-」的商品说明是原单商品说明的开头 / 包含在里面，或清洗后的对方一样；只有一笔就挂，几笔一模一样（同对方、同金额、
+    //   同商品说明、同一天）挂最早那笔，其余几笔进待处理让你选 ④ 都没有：去账本里找以前导入的（match.js，同微信 1016-E）⑤ 还没有：往来
+    var aliPool = rows.filter(function (o) { return o.app === 'alipay' && !o.isRefund && o.r.io === 'expense'; });
+    var pairedFull = new Set();
+    function aliLeft(o) { return o.r.fen - (refundedRow.get(o) || 0); }
+    function usable(o) { return o.bucket === 'add' || o.why === 'imported' || o.aliFull; }
+    function attachAli(rf, o, note) {
+      if (o.aliFull) {   // 原单自己是「退款成功」：退款正好等于原单 → 两条都跳过（同「原单已经是退款成功」）
+        if (rf.r.fen === o.r.fen && !pairedFull.has(o)) { pairedFull.add(o); put(rf, 'skip', 'refundedpair', '原单已经是「退款成功」，两条都跳过'); o.regIgnore = [o.key]; rf.regIgnore = [rf.key]; return true; }
+        return false;
+      }
+      if (o.why === 'imported') { var kk = known[o.key]; attachRec(rf, kk.id, kk.rec); if (note && rf.bucket === 'refund') rf.msg += note; return true; }
+      attachRow(rf, o);
+      if (note && rf.bucket === 'refund') rf.msg += note;
+      return true;
+    }
+    function hm(it) { return (+it.r.time.slice(5, 7)) + '-' + it.r.time.slice(8, 10) + ' ' + it.r.time.slice(11, 16); }
+    rows.filter(function (rf) { return rf.descRefund; }).sort(function (a, b) { return tkey(a.r) < tkey(b.r) ? -1 : 1; }).forEach(function (rf) {
+      var t = tkey(rf.r), rno = rf.r.no || '', rmno = rf.r.mno || '';
+      var before = aliPool.filter(function (o) { return tkey(o.r) < t && usable(o); });
+      // ① 单号
+      var byNo = rno ? before.filter(function (o) { return o.r.no && (o.r.no === rno || (o.r.no.length >= 16 && rno.indexOf(o.r.no) === 0)); }) : [];
+      if (byNo.length === 1 && attachAli(rf, byNo[0], '（按单号）')) return;
+      // ② 商家订单号
+      var byM = rmno.length >= 6 ? before.filter(function (o) { var m = o.r.mno || ''; return m.length >= 6 && (m === rmno || m.indexOf(rmno) === 0 || rmno.indexOf(m) === 0); }) : [];
+      if (byM.length === 1 && attachAli(rf, byM[0], '（按商家订单号）')) return;
+      // ③ 同一份文件里兜底
+      var d0 = stripRefund(rf.r.desc), cp0 = plainCp(rf.r.cp), rday = rf.r.time.slice(0, 10);
+      var fb = before.filter(function (o) {
+        if (o.file !== rf.file) return false;
+        if (o.aliFull && (o.r.fen !== rf.r.fen || pairedFull.has(o))) return false;   // 原单自己「退款成功」：只认退得一样多的（两条都跳过）
+        var dd = daysBetween(o.r.time.slice(0, 10), rday);
+        if (dd < 0 || dd > ALI_BACK_DAYS || aliLeft(o) < rf.r.fen) return false;
+        var od = String(o.r.desc || '');
+        var descOk = d0.length >= 2 && (od.indexOf(d0) >= 0 || (od.length >= 2 && d0.indexOf(od) === 0));
+        return descOk || (cp0 && plainCp(o.r.cp) === cp0);
+      });
+      if (fb.length === 1) { attachAli(rf, fb[0], ''); return; }
+      if (fb.length > 1) {
+        var f0 = fb[0], same = fb.every(function (o) { return o.r.cp === f0.r.cp && o.r.fen === f0.r.fen && o.r.desc === f0.r.desc && o.r.time.slice(0, 10) === f0.r.time.slice(0, 10); });
+        if (same) {
+          var first = fb.slice().sort(function (a, b) { return tkey(a.r) < tkey(b.r) ? -1 : 1; })[0];
+          attachAli(rf, first, '（' + fb.length + ' 笔一模一样，挂到了 ' + hm(first) + ' 那笔）'); if (rf.bucket === 'refund') rf.sameOrigs = fb.length;
+          return;
+        }
+        rf.cands = fb.map(function (o) { return { row: ref(o) }; });
+        put(rf, 'pending', 'ambiguous', '这一批里有 ' + fb.length + ' 笔可能是这笔退款的原单，请你选');
+        return;
+      }
+      // ④ 账本里以前导入的（交给 match.js）⑤ 往来
+      noOrig(rf, 'unmatched', '这一批里没找到原单（下一步去账本里找）');
+      rf.flags.push('needLedger');
     });
 
     // ---- 微信退款：时间在前、同对方、金额对得上 ----
@@ -339,7 +405,7 @@
     // 原单状态已全额退款、本批却没有退款行：以前导入过退款 → 跳过；找不到 → 待处理（永远不自动合并到手记）
     var aliRefundNos = new Set(); rows.forEach(function (rf) { if (rf.isRefund && rf.app === 'alipay') aliRefundNos.add(rf.r.no); });
     rows.forEach(function (o) {
-      var aliNoRefund = o.aliFull && !aliRefundNos.has(o.r.no);
+      var aliNoRefund = o.aliFull && !aliRefundNos.has(o.r.no) && !pairedFull.has(o);
       var wxNoRefund = o.app === 'wechat' && o.bucket === 'add' && o.r.io === 'expense' && WX_FULL.indexOf(o.r.status) >= 0 && !byRef.has(o);
       if (!aliNoRefund && !wxNoRefund) return;
       var f = known[fullRefundKey(o.key)];
@@ -417,6 +483,8 @@
         if (it.noMerge) o.noMerge = true;
         if (it.regIgnore) o.regIgnore = it.regIgnore;
         if (it.markerCands) o.markerCands = it.markerCands;
+        if (it.descRefund) o.descRefund = true;
+        if (it.sameOrigs) o.sameOrigs = it.sameOrigs;
         if (it.wasPend) o.wasPend = true;
       } else if (it.src === 'error') o.err = it.err; else o.dup = it.dup;
       return o;
@@ -428,6 +496,6 @@
   function ref(it) { return { file: it.file, row: it.row }; }
   function yuan(fen) { return (fen / 100).toFixed(2); }
 
-  return { VERSION: VERSION, lookups: lookups, route: route, orderKey: orderKey, groupKey: groupKey, fullRefundKey: fullRefundKey, refundMarkKey: refundMarkKey, refundUsedKey: refundUsedKey, markLookKey: markLookKey, MARK_DAYS: MARK_DAYS, WX_NEUTRAL_RE: WX_NEUTRAL_RE,
+  return { VERSION: VERSION, isAliRefundDescRow: isAliRefundDescRow, stripRefund: stripRefund, ALI_BACK_DAYS: ALI_BACK_DAYS, lookups: lookups, route: route, orderKey: orderKey, groupKey: groupKey, fullRefundKey: fullRefundKey, refundMarkKey: refundMarkKey, refundUsedKey: refundUsedKey, markLookKey: markLookKey, MARK_DAYS: MARK_DAYS, WX_NEUTRAL_RE: WX_NEUTRAL_RE,
            FX_RATE: FX_RATE, RECEIPT_MONTH_MAX: RECEIPT_MONTH_MAX };
 });

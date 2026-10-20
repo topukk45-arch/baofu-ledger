@@ -431,7 +431,7 @@
       var remark = [noneIfSlash(g('remark')), sn.note].filter(Boolean).join(' ');
       return { row: { line: rec.line, time: tm.date + 'T' + tm.hm, sec: tm.sec, fen: fen, io: io,
         status: noneIfSlash(g('status')), kind: noneIfSlash(g('kind')), cp: noneIfSlash(g('cp')), desc: noneIfSlash(g('desc')),
-        pm: noneIfSlash(g('pm')), no: sn.no, noRest: sn.noRest, noNote: sn.note, remark: remark, merged: 1 } };   // noNote：单号后面挪进备注的附加信息（1016-B，确认页标出来）
+        pm: noneIfSlash(g('pm')), no: sn.no, noRest: sn.noRest, noNote: sn.note, remark: remark, merged: 1, mno: noneIfSlash(g('mno')) } };   // 1021-T2：商家订单号只留在内存里配退款的原单，照旧不存   // noNote：单号后面挪进备注的附加信息（1016-B，确认页标出来）
     }
     // 不带引号的换行把一行拆成了两行：相邻两行列数加起来（减去断开的那一格）正好等于表头列数，拼起来能读通，就拼回去
     function join(a, b) {

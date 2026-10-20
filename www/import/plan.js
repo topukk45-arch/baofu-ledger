@@ -33,7 +33,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1016-Z4';
+  var VERSION = '1021-T2';
+  // 1021-T2：支付宝不带后缀的退款（商品说明以「退款」开头、收 / 支不是支出），和 route.js 的 isAliRefundDescRow 同一条（测试比对）
+  function isAliRefundDesc(r) { return !(r.noRest && r.noRest[0] === '_') && r.io !== 'expense' && /^\s*退款/.test(r.desc || ''); }
   // 1.1（1016-Z）异常金额提醒的参考值。都是先拍的数，标「待真实数据调」：用真实账单跑过以后再定（目标是每次导入只提醒几笔）
   var AMOUNT = {
     RATIO: 5,              // 比这个分类平时大多数单笔（第 80 百分位）高 5 倍以上……（待真实数据调）
@@ -316,14 +318,34 @@
           parts[k].n += d.units; parts[k].fen += d.fen;
         });
         // 支付宝：这份文件里所有退款行（状态退款成功、单号带后缀）的金额，支付宝已经从「支出」合计里扣掉了
-        if (f.app === 'alipay' && io === 'expense') f.rows.forEach(function (r) {
-          if (r.status === '退款成功' && r.noRest && r.noRest[0] === '_') { parts.aliRefund.n += r.merged || 1; parts.aliRefund.fen -= r.fen; }
-        });
+        //   1021-T2：商品说明以「退款」开头、单号不带后缀的退款，头部扣不扣还没核对：几种算法都试，哪种对得上用哪种（aliMode），确认页写一句
+        //     all = 带后缀的 + 不带后缀的全部；neutral = 带后缀的 + 不带后缀里收 / 支写不计收支的；suffix = 只有带后缀的（原来的算法）
+        var aliMode = null;
+        if (f.app === 'alipay' && io === 'expense') {
+          var h0 = f.stats.header[io], base = 0;
+          PARTS.forEach(function (p) { base += parts[p[0]].fen; });
+          var A = { suffix: { n: 0, fen: 0 }, neutral: { n: 0, fen: 0 }, all: { n: 0, fen: 0 } }, anyDesc = false;
+          f.rows.forEach(function (r) {
+            var sfx = r.status === '退款成功' && r.noRest && r.noRest[0] === '_', dsc = !sfx && isAliRefundDesc(r);
+            if (dsc) anyDesc = true;
+            ['suffix', 'neutral', 'all'].forEach(function (m) {
+              if (sfx || (dsc && (m === 'all' || (m === 'neutral' && r.io === 'neutral')))) { A[m].n += r.merged || 1; A[m].fen -= r.fen; }
+            });
+          });
+          var order = anyDesc ? ['all', 'neutral', 'suffix'] : ['suffix'], pick = order[0];
+          if (h0 && anyDesc) {
+            var hit = order.filter(function (m) { return h0.fen - base - A[m].fen === 0; })[0];
+            pick = hit || order.slice().sort(function (a, b) { return Math.abs(h0.fen - base - A[a].fen) - Math.abs(h0.fen - base - A[b].fen); })[0];
+          }
+          parts.aliRefund.n = A[pick].n; parts.aliRefund.fen = A[pick].fen;
+          if (anyDesc) aliMode = pick;
+        }
         var h = f.stats.header[io], sum = 0;
         PARTS.forEach(function (p) { sum += parts[p[0]].fen; });
         var unreadable = h ? h.fen - sum : null;
         o.diff[io] = { title: IO_NAME[io], header: h, parts: PARTS.map(function (p) { return { key: p[0], label: p[1], n: parts[p[0]].n, fen: parts[p[0]].fen }; }),
                        sum: sum, unreadable: unreadable, ok: h ? (unreadable === 0 || (o.errors > 0 && unreadable >= 0)) : null, mergeDelta: mergeDelta };
+        if (aliMode) o.diff[io].aliMode = aliMode;
       });
       return o;
     });
@@ -568,6 +590,6 @@
     return out.join('\n');
   }
 
-  return { VERSION: VERSION, AMOUNT: AMOUNT, patternHint: patternHint, plan: plan, devText: devText, missed: missed, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
+  return { VERSION: VERSION, isAliRefundDesc: isAliRefundDesc, AMOUNT: AMOUNT, patternHint: patternHint, plan: plan, devText: devText, missed: missed, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
            GROUPS: GROUPS, GROUP_NAME: GROUP_NAME };
 });

@@ -1369,6 +1369,9 @@
         var line = el('div', 'imp-soft imp-diff-' + io, head + ' = ' + (parts.join(' + ') || '0.00') + minus + tail);
         if (d.header && d.ok === false) line.className += ' imp-bad';
         box.appendChild(line);
+        // 1021-T2：支付宝头部扣不扣商品说明写「退款」的那几笔，几种算法试过、用了哪一种
+        if (d.aliMode) box.appendChild(el('div', 'imp-soft imp-ali-mode', { all: '支付宝统计里的支出按「已扣掉全部退款」核对（含商品说明写「退款」的）',
+          neutral: '支付宝统计里的支出按「只扣掉不计收支的退款」核对（收入那几笔退款没扣）', suffix: '支付宝统计里的支出没扣商品说明写「退款」的那几笔，按原来的算法核对' }[d.aliMode]));
         if (d.mergeDelta) box.appendChild(el('div', 'imp-soft', '其中合并的手记比账单' + (d.mergeDelta > 0 ? '多记 ' : '少记 ') + yuan(Math.abs(d.mergeDelta)) + '（金额按手记的算）'));
       });
       c.appendChild(tg); c.appendChild(box);

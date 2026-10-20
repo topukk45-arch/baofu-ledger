@@ -10,7 +10,7 @@ const files = fs.readdirSync(__dirname).filter(f => f.endsWith('.test.js')).sort
 const SERIAL = new Set([
   'k-remark-reveal.test.js', 'zZr3-fab-idle.test.js', 'zZzG-cat-hint.test.js', 'zZzJ-perf-log.test.js',
   'zZzK-sheet-close.test.js', 'zZzL-text-panel.test.js', 'zZzM-keypad.test.js', 'zZzO-three-layer.test.js',
-  'zZzS-launch-native.test.js', 'zZzT-kp-del-hold.test.js', 'zZzY-idle-save.test.js', 'zZzZ-kp-hold-sheet-scroll.test.js',
+  'zZzS-launch-native.test.js', 'zZzT-kp-del-hold.test.js', 'zV-import-steps.test.js', 'zZzY-idle-save.test.js', 'zZzZ-kp-hold-sheet-scroll.test.js',
 ]);
 const isSerial = f => SERIAL.has(f) || /^\/\/ @serial\b/m.test(fs.readFileSync(path.join(__dirname, f), 'utf8'));
 const JOBS = Math.max(1, Math.min(4, +process.env.JOBS || (os.availableParallelism ? os.availableParallelism() : os.cpus().length)));
