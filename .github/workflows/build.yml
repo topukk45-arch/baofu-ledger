@@ -1,9 +1,9 @@
 name: 构建安卓 APK
 on:
   # 1020-J：只在推 main 和手动触发时打包；别的分支（claude/ 开头这些）推上去不打，本地跑测试就够了
-  # 1021-T1：体验版分支（实测 10-20 的方案）推上去也打，发到单独的「体验版」，和「最新测试版」分开
+  # 1021-T1 的体验版分支 10-21 已快进合进 main，那一段「发布到体验版」删掉了
   push:
-    branches: [main, claude/relaxed-turing-1v8wg9]
+    branches: [main]
   workflow_dispatch:
 jobs:
   build:
@@ -105,35 +105,11 @@ jobs:
             gh release create latest-build "$APK" --title "最新测试版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
           fi
 
-      # 1021-T1：体验版分支（实测 10-20 的方案）打包成功，发到单独的预发行「体验版」（标签 trial-build、文件 jiwen-trial.apk），
-      # 不碰「最新测试版」和正式版；分支合进 main 前删掉这一段
-      - name: 发布到「体验版」
-        if: github.ref == 'refs/heads/claude/relaxed-turing-1v8wg9'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          VER=$(grep -oE 'build [0-9]{4}-[A-Z0-9]+' www/index.html | head -1 | cut -d' ' -f2)
-          APK="$RUNNER_TEMP/jiwen-trial.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
-          WHEN=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')
-          NOTES="体验版 $VER（实测 10-20 的方案，还没合进 main），打包于 $WHEN（北京时间），对应提交 ${GITHUB_SHA::7}：$(git log -1 --format=%s)
-
-          直接下载下面的 jiwen-trial.apk 安装即可，签名和正式版一样，可以覆盖升级（也能装回最新测试版）。
-          建议在新存档里试导入。"
-          git push -f origin "$GITHUB_SHA:refs/tags/trial-build"
-          if gh release view trial-build >/dev/null 2>&1; then
-            gh release edit trial-build --title "体验版 $VER" --notes "$NOTES" --prerelease
-            gh release upload trial-build "$APK" --clobber
-          else
-            gh release create trial-build "$APK" --title "体验版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
-          fi
-
       # 1021-β：发正式版。docs/release/publish 里写着要发的标签（比如 v1021-beta），这个发行版还没有就发（标为 Latest），
       #   有了就跳过（以后照常推也不会重复发）。标题读 docs/release/<标签>.title、说明读 docs/release/<标签>.md，
-      #   安装包叫 jiwen-<标签去掉 v>.apk，标签打在这次提交上。只在 main 和体验版分支上跑
+      #   安装包叫 jiwen-<标签去掉 v>.apk，标签打在这次提交上。只在 main 上跑
       - name: 发布正式版（docs/release/publish 里写的、还没发过的）
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/relaxed-turing-1v8wg9')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
