@@ -608,7 +608,10 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     // 全额退款的原单永远不会合并到手记（包括本批没有退款行的）
     if (fullOrig.some(t => ['merge'].includes(r.item(t).bucket) || r.item(t).bucket === 'add')) why.push('全额退款原单合并 / 新增了');
     // 个人转账只做精确：不会因为金额相近、部分付款、多笔合一进待处理
-    if (r.matched.items.some(it => it.src === 'row' && ['near', 'partial', 'multisum', 'mixed'].includes(it.why) && M.isPersonal('wechat', r.parsed.files[0].rows[it.row], C.cleanCp))) why.push('个人转账做了非精确配对');
+    //   1021-T18：「mixed」是几种拿不准混在一起，个人转账的只会是几种金额一样的（手记早几天 + 差 4–7 天），按候选手记的金额判断
+    const mById = {}; manual.forEach(m => { mById[m.id] = m; });
+    const inexact = it => ['near', 'partial', 'multisum'].includes(it.why) || (it.why === 'mixed' && (it.cands || []).some(c => !mById[c.record] || mById[c.record].fen !== r.parsed.files[0].rows[it.row].fen));
+    if (r.matched.items.some(it => it.src === 'row' && inexact(it) && M.isPersonal('wechat', r.parsed.files[0].rows[it.row], C.cleanCp))) why.push('个人转账做了非精确配对');
     // 多笔合一的每组：几笔之和 = 手记金额，而且同一天
     (r.matched.multiSums || []).forEach(g => g.options.forEach(o => {
       const sum = o.bills.reduce((x, b) => x + r.parsed.files[b.file].rows[b.row].fen, 0);

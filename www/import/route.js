@@ -33,7 +33,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1021-T9';
+  var VERSION = '1021-T17';
   var FX_RATE = 0.05;            // 跨境退款汇率差：差 5% 以内算汇率差
   var RECEIPT_MONTH_MAX = 300;   // 一个月收款超过这么多条，建议按天合并
   var PETTY_MIN = 5, PETTY_FEN = 100;   // 疑似零碎扣款：同一对方一个月 5 次以上，且这个对方所有交易都不超过 1 元
@@ -119,6 +119,16 @@
   // 1021-T2：单号不带后缀、商品说明以「退款」开头、收 / 支不是支出的支付宝行（盒马、12306 退票、票务这类）
   function isAliRefundDescRow(app, r) { return app === 'alipay' && !(r.noRest && r.noRest[0] === '_') && r.io !== 'expense' && REFUND_DESC_RE.test(r.desc || ''); }
   function stripRefund(desc) { return String(desc || '').replace(/^\s*退款[\s\-－—_:：]*/, '').trim(); }
+  // 1021-T17：付给个人（转账、红包、扫码付给个人，或对方名带 * 的短名字）；和 match.js 的 isPersonal 同一个认法（这里没有清洗对方名，只去括号）
+  var PERSON_BACK_DAYS = 3;
+  function isPersonRow(app, r) {
+    var kind = r.kind || '';
+    if (app === 'wechat' && (kind === '转账' || kind === '扫二维码付款' || /^微信红包/.test(kind))) return true;
+    if (app === 'alipay' && kind === '转账红包') return true;
+    var c = plainCp(r.cp);
+    return c.indexOf('*') >= 0 && c.length <= 5 && /^[\u4e00-\u9fa5*]+$/.test(c);
+  }
+  function isTransferKindRow(app, r) { var kind = r.kind || ''; return app === 'wechat' ? (kind === '转账' || /微信红包/.test(kind)) : app === 'alipay' && kind === '转账红包'; }
   function plainCp(cp) { var t = String(cp || ''), prev; do { prev = t; t = t.replace(/[（(【\[][^（()）【】\[\]]*[)）】\]]/g, ''); } while (t !== prev); return t.replace(/\s+/g, ''); }
   function monthOf(it) { return it.r.time.slice(0, 7); }
   function dayOf(it) { return it.r.time.slice(0, 10); }
@@ -297,7 +307,14 @@
       return true;
     }
     function hm(it) { return (+it.r.time.slice(5, 7)) + '-' + it.r.time.slice(8, 10) + ' ' + it.r.time.slice(11, 16); }
-    rows.filter(function (rf) { return rf.descRefund; }).sort(function (a, b) { return tkey(a.r) < tkey(b.r) ? -1 : 1; }).forEach(function (rf) {
+    // 1021-T17（实测 10-21）：先配金额正好等于某笔原单的（全额退款），再配部分退款；各自按时间。原来一律按时间，
+    //   一笔部分退款先到会把全额退款那张票占掉，一对全额退款就被拆开了
+    var exactAli = function (rf) {
+      var t = tkey(rf.r), cp0 = plainCp(rf.r.cp);
+      return aliPool.some(function (o) { return tkey(o.r) < t && usable(o) && o.r.fen === rf.r.fen && (o.r.no === rf.r.no || (cp0 && plainCp(o.r.cp) === cp0)); }) ? 0 : 1;
+    };
+    rows.filter(function (rf) { return rf.descRefund; }).map(function (rf) { return { rf: rf, ex: exactAli(rf) }; })
+      .sort(function (a, b) { return a.ex - b.ex || (tkey(a.rf.r) < tkey(b.rf.r) ? -1 : 1); }).map(function (x) { return x.rf; }).forEach(function (rf) {
       var t = tkey(rf.r), rno = rf.r.no || '', rmno = rf.r.mno || '';
       var before = aliPool.filter(function (o) { return tkey(o.r) < t && usable(o); });
       // ① 单号
@@ -404,6 +421,27 @@
       if (mc.length) rf.markerCands = mc;
       rf.flags.push('needLedger');
     });
+
+    // ---- 1021-T17（实测 10-21，364 那笔）：付给个人 / 转账付出去的钱，对方 3 天内转回来一部分：当作这笔的退款 ----
+    //   收入（不是退款行）、同一个对方（清洗后一样）、在原单之后 3 天内、比原单少、原单剩下没退的够；只有一笔原单够 → 挂上（明细写挂到哪笔），
+    //   几笔都够 → 进待处理让你选。放在别的退款都配完之后（全额退款那一对先占好），所以已经全额退掉的那张不会再被选上
+    var personOrigs = rows.filter(function (o) { return o.bucket === 'add' && o.r.io === 'expense' && o.r.cp; });
+    rows.filter(function (x) { return x.bucket === 'add' && x.r.io === 'income' && !x.isRefund && x.r.cp; })
+      .sort(function (a, b) { return tkey(a.r) < tkey(b.r) ? -1 : 1; }).forEach(function (x) {
+        var t = tkey(x.r), cp0 = plainCp(x.r.cp), xday = x.r.time.slice(0, 10), xPerson = isPersonRow(x.app, x.r);
+        var cs = personOrigs.filter(function (o) {
+          if (plainCp(o.r.cp) !== cp0 || tkey(o.r) >= t || o.bucket !== 'add') return false;
+          if (!xPerson && !isPersonRow(o.app, o.r) && !isTransferKindRow(o.app, o.r)) return false;
+          var dd = daysBetween(o.r.time.slice(0, 10), xday);
+          return dd >= 0 && dd <= PERSON_BACK_DAYS && x.r.fen < o.r.fen && o.r.fen - (refundedRow.get(o) || 0) >= x.r.fen;
+        });
+        if (!cs.length) return;
+        x.io = 'income';
+        if (cs.length === 1) { attachRow(x, cs[0]); x.msg = '同一个对方 ' + daysBetween(cs[0].r.time.slice(0, 10), xday) + ' 天内转回来的钱，当作 ' + hm(cs[0]) + ' 那笔 ' + yuan(cs[0].r.fen) + ' 元的退款'; x.personBack = true; return; }
+        x.cands = cs.map(function (o) { return { row: ref(o) }; });
+        put(x, 'pending', 'ambiguous', '同一个对方 3 天内转回来的钱，可能是这 ' + cs.length + ' 笔里哪一笔的退款，请你选');
+        x.personBack = true;
+      });
 
     // ---- 全额退款（1016-C）：本批里退款加起来正好等于原单的一对，两条都跳过，不参与配对 ----
     var byRef = new Map();
