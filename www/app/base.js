@@ -45,7 +45,7 @@
                     const T0=(performance.timeOrigin || (Date.now()-performance.now())) + off;   // 网页开始加载那一刻
                     const rel=x=>x ? Math.round(x-base) : null;
                     const first=e.snap!=null ? e.snap : e.paint;
-                    e.nat={ proc:!!t.procStart, act:rel(t.actCreate), web:rel(t.webReady), page:rel(T0), first:rel(T0+first), ready:rel(t.readyAt), gone:rel(t.splashGone), wait:!!t.wait };
+                    e.nat={ proc:!!t.procStart, act:rel(t.actCreate), web:rel(t.webReady), page:rel(T0), first:rel(T0+first), ready:rel(t.readyAt), ask:rel(t.askAt), gone:rel(t.splashGone), wait:!!t.wait };
                 });
             }
             return { now, add, list, on, bootMark, bootDone, nativeInto, localAt:perfLocalAt, clear(){ try{ localStorage.removeItem(KEY); }catch(_){} }, T0 };

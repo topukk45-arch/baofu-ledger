@@ -150,6 +150,15 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   ok(exp.length > 0 && !/app_snap_|boot-snap|bootSnap/.test(exp), '8 导出的备份里没有快照');
   ok(!/app_snap_|boot-snap/.test(JSON.stringify(t.w.JiwenStore.odBuildPayload())), '8 云备份内容里没有快照');
 
+  // 9. 1021-T26：快照和真页面同一个位置（真 Chromium 量过：412 / 360 / 800 宽、账单 / 统计 / 设置，外层卡片、标题、底栏、操作栏一样）
+  //   快照盖在 fixed 的 #bootSnap 里，body 的外边距管不到，要照 body 留（jsdom 不排版，这里查样式表写着）
+  const css = fs.readFileSync(path.join(WWW, 'app', 'app.css'), 'utf8');
+  ok(/\.boot-snap\s*\{\s*padding:inherit;\s*\}/.test(css), '9 快照外壳照 body 留外边距（padding:inherit），外层卡片不贴边、接管时不挪');
+  //   原生收启动画面等「这时的页面内容进了下一次绘制」再放行（不然收起后先露一帧底色）
+  const lp = fs.readFileSync(path.join(WWW, '..', 'android', 'app', 'src', 'main', 'java', 'com', 'baofu', 'ledger', 'LaunchPlugin.java'), 'utf8');
+  const rd = lp.slice(lp.indexOf('public void ready('), lp.indexOf('public void timings('));
+  ok(/postVisualStateCallback/.test(rd) && !/ready\s*=\s*true/.test(rd), '9 原生 ready() 等 postVisualStateCallback 再放行，不是收到就放');
+
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`\n${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

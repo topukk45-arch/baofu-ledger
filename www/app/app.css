@@ -792,6 +792,9 @@
         /* 1019-U：首屏快照（上次离开时的首屏，打开 App 时大脚本还没跑完就先画出来；真的画好了就拿掉）。点不动、盖在最上面 */
         .boot-snap { position:fixed; inset:0; z-index:990; overflow:hidden; background:var(--c-bg); pointer-events:none; }   /* 1019-Z4-M26：真的点不动（原来快照底栏是克隆的、也绑了切页签，脚本没读完时点了可能报错） */
         .boot-snap > .container { position:relative; }
+        /* 1021-T26：快照盖在 fixed 的 #bootSnap 里，body 的外边距（手机上 10px、宽屏 20px）管不到它，外层卡片原来贴着屏幕边、
+           真页面接管时整页往里缩、往下挪。照 body 的外边距留出来（inherit：body 是它的父元素，以后 body 的外边距改了跟着变） */
+        .boot-snap { padding:inherit; }
         .form-mask .sheet-grip { position:sticky; top:-8px; z-index:2; margin:-8px -18px 0; padding:8px 18px 0;
             background:var(--c-sheet); border-radius:18px 18px 0 0; }
         .form-mask .sheet-head h3 { text-align:left; margin:0; }

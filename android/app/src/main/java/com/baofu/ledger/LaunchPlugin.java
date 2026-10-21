@@ -2,7 +2,9 @@ package com.baofu.ledger;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.SystemClock;
+import android.webkit.WebView;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -34,17 +36,38 @@ public class LaunchPlugin extends Plugin {
     public static boolean isReady() { return ready; }
 
     // 每次 Activity 重新建（重新打开 App）都从「没好」开始
-    public static void reset() { ready = false; readyAt = 0; splashGone = 0; webReady = 0; }
+    public static void reset() { ready = false; readyAt = 0; askAt = 0; splashGone = 0; webReady = 0; }
 
     static boolean readWait(Context c) {
         try { return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_WAIT, true); }
         catch (Exception e) { return true; }
     }
 
+    // 1021-T26：网页调 ready() 的那一刻，快照刚塞进页面、还没排版和画（原来马上放行，启动画面一收，
+    //   WebView 画出来的只有底色，录屏里多一帧空白）。现在等 WebView 说「这时的页面内容会进下一次绘制」
+    //   （postVisualStateCallback，安卓 6 起有）再放行；老系统、拿不到 WebView 照旧马上放行；一直没等到还有 MainActivity 的 1 秒兜底。
+    static volatile long askAt = 0;
+
+    private static void markReady() {
+        if (!ready) { ready = true; readyAt = SystemClock.uptimeMillis(); }
+    }
+
     @PluginMethod
     public void ready(PluginCall call) {
-        if (!ready) { ready = true; readyAt = SystemClock.uptimeMillis(); }
+        if (askAt == 0) askAt = SystemClock.uptimeMillis();
         call.resolve();
+        if (ready) return;
+        final WebView wv = (Build.VERSION.SDK_INT >= 23 && getBridge() != null) ? getBridge().getWebView() : null;
+        if (wv == null) { markReady(); return; }
+        try {
+            wv.post(() -> {
+                try {
+                    wv.postVisualStateCallback(0, new WebView.VisualStateCallback() {
+                        @Override public void onComplete(long requestId) { markReady(); }
+                    });
+                } catch (Exception e) { markReady(); }
+            });
+        } catch (Exception e) { markReady(); }
     }
 
     @PluginMethod
@@ -54,6 +77,7 @@ public class LaunchPlugin extends Plugin {
         r.put("actCreate", actCreate);
         r.put("webReady", webReady);
         r.put("readyAt", readyAt);
+        r.put("askAt", askAt);
         r.put("splashGone", splashGone);
         r.put("wait", waitOn);
         r.put("nowUptime", SystemClock.uptimeMillis());
