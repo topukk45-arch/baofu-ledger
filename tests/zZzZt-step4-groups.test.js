@@ -52,7 +52,9 @@ ok(ws0.records.filter(r => r.rv).length === 6, '2 什么都不选：6 笔都照�
   t.d.querySelector('.imp-cp-more').click();
   ok(rows().length === 23, '3 点了全显示出来');
   t.d.querySelector('.imp-cp-toggle').click();
-  ok(t.d.querySelectorAll('.imp-cp-item').length === 2 && /收起这 2 笔/.test(t.d.querySelector('.imp-cp-toggle').textContent), '4 「看这 2 笔」展开逐笔');
+  // 1021-T17：「看这 2 笔」打开共用的「这几笔」面板（不再在卡片里展开）；卡片只写名字、笔数、金额、推荐，理由在面板顶上
+  ok(t.d.querySelectorAll('#impRows .imp-rs').length === 2 && /看这 2 笔/.test(t.d.querySelector('.imp-cp-toggle').textContent) && !/→ 选个分类/.test(rows()[0].textContent), '4 「看这 2 笔」打开面板逐笔');
+  t.d.getElementById('impRowsClose').click();
   ok(!t.d.getElementById('impLowConf'), '4 「推荐要你看一眼」单笔那一块没有了');
   console.log(`\n${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

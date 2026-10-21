@@ -160,6 +160,7 @@ GitHub Actions 每次打包前都会先跑 `npm test`，不通过就不出包（
 | `zZzZt-step4-groups.test.js` | 1021-T14 第 4 步只列组（纯计算 + jsdom）：按对方 / 按商品说明（品：果切）归组、1 笔的不列算进其余、对方组存规则商品说明组不存、选了的不带 rv、什么都不选全带 rv；23 组先显示 20、展开逐笔、没有「推荐要你看一眼」。另外 w-import-plan、x-import-confirm、y-import-fixes、zZz-import-display、zV-import-steps、zZk-import-keep、zZzZp 跟着「1 笔的不成组」改了 |
 | `zZzZu-ai-newcats.test.js` | 1021-T15 AI 导出（jsdom、真导真改真撤）：回复第一行 v2、v1 不认；导出写「也可以用的新分类：交通出行」、按时间编号、多两列账单收支和状态；回复用新分类认（newCat），不给名单照旧不认；aiApply 先建分类、导入记录 catsAdded；撤销这次 AI 修改没人用的新分类一起删。另外 zZu、zZv、zZv2、zZw、zZx、zZz4、zZzZc 写死的回复 v1 → v2，zZu 编号按时间 |
 | `zZzZv-confirm-ui-t16.test.js` | 1021-T16 确认页界面（jsdom）：「已全额退款」放第 3 步；新建分类写「现在：不建 / 新建」；已处理不划线、前面 ✓；选分类面板副标题「可选的分类 N 个」。另外 zZzZf 第六段副标题跟着改 |
+| `zZzZw-rows-panel.test.js` | 1021-T17（实测 10-21 第 1～4 条，jsdom）：共用的「这几笔」面板（按时间排、每页 50、点一笔开详情、返回键回到面板）用在零碎扣款、新建分类（含每个对方）、按对方选分类的组、总览四格、结果页四格（只看）；推荐理由一句人话（没有「内置」「落到你的」「品：」、不嵌套括号）；组卡片只写名字、笔数、金额、推荐和把握；导入页回到顶部 ↑。另外 x-import-confirm 第 6 段（明细一组超过 20 笔按分类一类一行、组内翻页；总览分组点开是面板）、zZzZt（「看这 2 笔」是面板）、zL（规律写在面板顶上）、zZz3（理由人话）跟着改 |
 | `zz-import-golden.test.js` | 1016-F「导入以后的账本」逐字节对比：固定的虚构手记 + 账单真导一遍（多笔合一确认、转账往来标不计入），账单列表、分类汇总、统计、当日明细、备份文件和 `fixtures/import-golden.json` 一致；同一版本跑两次一样。有意改了导入行为时 `UPDATE_GOLDEN=1` 重新生成。1016-U 起导入记录多了 `rng`（每个来源的账单起止）；1016-K 起导入记录多了 `h`（指纹含批次号，跟时区走，换成「<指纹 N 个>」占位）、`now`、`cpEnd` / `pmEnd` |
 
 ## 界面量尺寸（手动跑，不进 npm test）

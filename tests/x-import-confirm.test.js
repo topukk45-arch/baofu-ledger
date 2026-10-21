@@ -255,7 +255,7 @@ const before = await t.snapshot();
   H.clickCancel(t.w);
 }
 
-// ===== 6. 明细分页 =====
+// ===== 6. 明细分页（1021-T17：一组超过 20 笔按分类再分一层，一类一行默认收起，点开组内每页 50 笔、翻页）=====
 {
   const many = []; for (let i = 0; i < 120; i++) many.push(wx({ time: T(3, 1 + i % 28, 9 + i % 12, i % 60), cp: '某商户' + (i % 7), fen: 100 + i }));
   await t.openImport();
@@ -263,11 +263,30 @@ const before = await t.snapshot();
   t.$('impDetailsToggle').click(); t.$('impG-add').click();
   const rows = () => t.d.querySelectorAll('.imp-list[data-group="add"] .al-row').length;
   const total = t.S().plan.counts.add;
-  ok(total > 100 && rows() === 50, '6 「新增」' + total + ' 笔，先只显示 50 行');
-  t.d.querySelector('.imp-more[data-group="add"]').click();
-  ok(rows() === 100, '6 点「再显示」：100 行');
-  t.d.querySelector('.imp-more[data-group="add"]').click();
-  ok(rows() === total && !t.d.querySelector('.imp-more[data-group="add"]'), '6 再点：全部显示，按钮没了');
+  const cgs = () => [...t.d.querySelectorAll('.imp-cgs[data-list="det-add"] .imp-cg')];
+  ok(total > 100 && rows() === 0 && cgs().length >= 1 && /笔 · 共 .* 元/.test(cgs()[0].textContent), '6 「新增」' + total + ' 笔：先只列分类一行一组，不铺开：' + (cgs()[0] && cgs()[0].textContent));
+  const big = cgs().find(h => +((/ (\d+) 笔/.exec(h.textContent) || [])[1]) > 50);
+  ok(!!big, '6 有一类超过 50 笔');
+  const nm = big.dataset.cg, n = +(/ (\d+) 笔/.exec(big.textContent))[1];
+  big.click();
+  ok(rows() === 50 && t.d.querySelector('.imp-pager .imp-pg-next') && !t.d.querySelector('.imp-pager .imp-pg-next').disabled && t.d.querySelector('.imp-pager .imp-pg-prev').disabled, '6 点开这一类：50 行一页、能翻下一页');
+  t.d.querySelector('.imp-pager .imp-pg-next').click();
+  ok(rows() === Math.min(50, n - 50) && /2 \/ /.test(t.d.querySelector('.imp-pg-n').textContent), '6 翻到第 2 页');
+  cgs().find(h => h.dataset.cg === nm).click();
+  ok(rows() === 0, '6 再点这一类收起来');
+  // 1021-T17：总览「分组明细」点一个打开「这几笔」面板：按时间排、每页 50、能翻页、点一笔开详情、关了详情回到面板
+  t.d.querySelector('#impSummary .imp-chip[data-group="add"]').click();
+  const rs = () => [...t.d.querySelectorAll('#impRows .imp-rs')];
+  ok(t.$('uiSheetMask').classList.contains('open') && rs().length === 50 && t.$('impRowsPager') && /共 .* 元 · 按时间排/.test(t.$('uiSheetSub').textContent), '6 「这几笔」面板：50 笔一页：' + t.$('uiSheetSub').textContent);
+  const ts = rs().map(r => r.querySelector('small').textContent);
+  ok(ts.every((x, i) => !i || ts[i - 1] <= x), '6 面板里按时间排');
+  t.$('impRowsPager').querySelector('.imp-pg-next').click();
+  ok(rs().length === 50 && /第 2 \/ 3 页/.test(t.$('uiSheetSub').textContent), '6 面板翻到第 2 页');
+  rs()[0].click();
+  ok(t.$('impSheet') && t.$('impSheetClose'), '6 点一笔打开详情');
+  t.$('impSheetClose').click();
+  ok(t.$('impRows') && /第 2 \/ 3 页/.test(t.$('uiSheetSub').textContent), '6 关了详情回到面板同一页');
+  t.$('impRowsClose').click();
   H.clickCancel(t.w);
   ok(!t.errs.length && !t.jsErr.length, '5-6 无报错 ' + t.errs.concat(t.jsErr).join('|'));
 }

@@ -93,6 +93,7 @@
     '.imp-list .imp-why{font-size:12px;color:var(--c-text-soft);padding:0 10px 8px;}',
     '.imp-tag{display:inline-block;font-size:11px;border:1px solid var(--c-border-mid);border-radius:8px;padding:0 5px;margin-left:4px;}',
     '#impBar.ui-bar{z-index:991;}',
+    '#impToTop.to-top{z-index:992;bottom:calc(var(--imp-bar,0px) + 16px);}',
     '#impSheetMask{position:fixed;inset:0;z-index:995;background:rgba(0,0,0,.3);display:none;align-items:flex-end;justify-content:center;}',
     '#impSheetPanel{background:var(--c-surface-2);width:100%;max-width:520px;max-height:88vh;max-height:88dvh;overflow-y:auto;border-radius:16px 16px 0 0;padding:16px 16px 0;}',
     '#impSheet h4{font-size:16px;margin-bottom:8px;color:var(--c-primary-deep);}',
@@ -185,6 +186,13 @@
     '.imp-sr-d{font-size:12px;color:var(--c-text-soft);}.imp-sr-to{font-size:12.5px;margin-top:2px;}',
     '.imp-sr-to.pend{color:var(--st-pend);}.imp-sr-to.ok{color:var(--st-ok);}.imp-sr-to.skip{color:var(--st-skip);}',
     '.imp-sr-amt{font-variant-numeric:tabular-nums;white-space:nowrap;}',
+    // 1021-T17：「这几笔」面板、明细按分类一组一行、翻页、能点的四格
+    '.imp-sr-amt.neg{color:var(--c-neg);}.imp-sr-amt.pos{color:var(--c-pos);}.imp-rows-note{margin-bottom:8px;line-height:1.5;}',
+    '.imp-cg{display:flex;align-items:center;gap:10px;min-height:52px;padding:4px 12px;margin-bottom:8px;border:1px solid var(--c-border);border-radius:10px;background:var(--c-bg);cursor:pointer;}',
+    '.imp-cg .grow{flex:1 1 auto;min-width:0;}.imp-cg-go{color:var(--c-text-soft);font-size:16px;}',
+    '.imp-cg-cb{display:flex;align-items:center;justify-content:center;min-width:48px;min-height:48px;margin-left:-8px;}.imp-cg-cb input{width:20px;height:20px;}',
+    '.imp-pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 12px;}.imp-pager .ui-btn{flex:0 0 auto;min-width:112px;}.imp-pg-n{color:var(--c-text-soft);font-variant-numeric:tabular-nums;}',
+    '.imp-tile-go{cursor:pointer;}.imp-nc-links{display:flex;flex-wrap:wrap;gap:0 12px;margin:-4px 0 8px;}.imp-nc-links .imp-link,.imp-petty-rows{min-height:48px;}',
     '.imp-search-none{padding:12px 4px;color:var(--c-text-soft);font-size:14px;}',
     '.imp-near-item{position:relative;}.imp-near-item .pc{padding-left:52px;}',
     '.imp-near-ck{position:absolute;left:2px;top:10px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:1;}',
@@ -243,7 +251,13 @@
     var pc = btn('取消', 'ui-btn block', function () { close(); }); pc.id = 'impProgCancel';
     box.appendChild(pt); box.appendChild(pb); box.appendChild(pc);
     pg.appendChild(box);
-    [page, bar, file, sm, pg].forEach(function (x) { document.body.appendChild(x); });
+    // 1021-T17：回到顶部 ↑：和统计页同一个圆钮（.to-top、fabWake：往下滑过 400 才出现，停下 1.5 秒淡出），在操作栏上面
+    var top = btn('↑', 'to-top imp-to-top', function () { try { page.scrollTo({ top: 0, behavior: 'smooth' }); } catch (_) { page.scrollTop = 0; } }); top.id = 'impToTop';
+    top.setAttribute('aria-label', '回到顶部'); top.title = '回到顶部';
+    var JB = window.JiwenBase;
+    if (JB && JB.fabHold) JB.fabHold(top);
+    page.addEventListener('scroll', function () { var on = page.scrollTop > 400; if (JB && JB.fabWake) JB.fabWake(top, on); else top.classList.toggle('show', on); }, { passive: true });
+    [page, bar, top, file, sm, pg].forEach(function (x) { document.body.appendChild(x); });
     dom = { search: sb, page: page, body: body, bar: bar, go: go, recon: rc, cancel: cancel, file: file, sheetMask: sm, sheet: sh, prog: pg, progText: pt, progBar: pi, title: tt, archive: sub, back: back, steps: steps };
     if (window.ResizeObserver) try { new ResizeObserver(syncBar).observe(bar); } catch (_) {}
     return dom;
@@ -259,6 +273,7 @@
     if (!dom) return;
     var h = dom.bar.style.display === 'none' ? 0 : dom.bar.offsetHeight;
     dom.page.style.setProperty('--imp-bar', h + 'px');
+    var tp = document.getElementById('impToTop'); if (tp) tp.style.setProperty('--imp-bar', h + 'px');
   }
   // 顶上的「‹ 取消 / ‹ 返回」：和返回键一样一层一层退（教程 → 选文件、只对账 → 确认页，其余关掉整页）
   // 1017-UI2：顶上「‹ 取消」= 退出这次导入（有方案时先问一句）；只对账清单里是「‹ 返回」回总览；教程里回选文件
@@ -387,6 +402,7 @@
     if (!dom) return;
     dom.page.style.display = 'none'; dom.bar.style.display = 'none'; hideSteps();
     dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none'; closePicker();
+    var tp = document.getElementById('impToTop'); if (tp) tp.classList.remove('show');
     dom.body.innerHTML = '';
     S = null;
   }
@@ -716,7 +732,7 @@
   // 1017-UI11：对方名、标题显示前去掉多余空格（含全角空格）和空括号（「某某　　(　　　　)」→「某某」）；存的原文不动
   function cpShow(cp) {
     if (cp === null || cp === undefined) return cp;
-    var t = String(cp).replace(/[\s\u3000]+/g, ' ');
+    var t = String(cp).replace(/^品：/, '').replace(/[\s\u3000]+/g, ' ');   // 1021-T17：按商品说明归的组键「品：果切」只显示「果切」
     for (var i = 0; i < 3; i++) t = t.replace(/[(（][\s\u3000]*[)）]/g, '').replace(/[［\[][\s\u3000]*[\]］]/g, '');
     return t.replace(/\s+/g, ' ').trim();
   }
@@ -1240,7 +1256,7 @@
       if (i >= MORE_N && !more) return;
       var r = el('div', 'imp-row-opt imp-tap imp-lowconf-row'); r.dataset.key = d.key; r.dataset.item = 'lc:' + d.key;
       var g = el('div', 'grow'); g.appendChild(el('div', null, fmtTime(d.time) + ' · ' + (d.title || d.cp || '—') + ' · ' + yuan(d.fen) + ' 元'));
-      g.appendChild(el('div', 'imp-soft', '推荐「' + (d.item.rec.cat || d.item.rec.want || '未分类') + '」：' + d.item.rec.reason)); r.appendChild(g);
+      g.appendChild(el('div', 'imp-soft', '推荐 ' + recLine(d.item.rec))); r.appendChild(g);
       r.appendChild(el('span', 'imp-val', (d.cat || '未分类') + ' ›'));
       var done = !!(S.edits.rows[d.key] && S.edits.rows[d.key].cat) || !!S.view.seen['lc:' + d.key];
       r.appendChild(mk(done));
@@ -1414,7 +1430,8 @@
     var c = el('div', 'imp-card'); c.id = 'impSummary';
     // 1017-UI2：四格：新建、和手记合并、留在待处理、跳过；没定的待你确认写明留在待处理（不进账本）
     c.appendChild(el('h4', null, '这次会'));
-    c.appendChild(tiles([['新建', p.records + ' 条'], ['和手记合并', p.mergeM + ' 笔'], ['留在待处理', (p.counts.pending || 0) + ' 笔'], ['跳过', (p.counts.skip || 0) + ' 笔']], 'impTiles'));
+    c.appendChild(tiles([['新建', p.records + ' 条', rowsOpener('要新建的', ['add', 'refund', 'neutral'])], ['和手记合并', p.mergeM + ' 笔', rowsOpener('和手记合并的', ['merge'])],
+      ['留在待处理', (p.counts.pending || 0) + ' 笔', rowsOpener('留在待处理的', ['pending'])], ['跳过', (p.counts.skip || 0) + ' 笔', rowsOpener('跳过的', ['skip'])]], 'impTiles'));
     if (p.counts.pending) { var pn = el('div', 'imp-pend-note', p.counts.pending + ' 笔拿不准的（待你确认里没定的）留在待处理、不进账本，以后在待处理页处理。'); pn.id = 'impPendNote'; c.appendChild(pn); }
     c.appendChild(el('div', 'imp-sec-t', '分组明细（点一个看是哪几笔）'));
     var chips = el('div', 'imp-chips');
@@ -1422,7 +1439,11 @@
       if (!p.counts[g] && (g === 'excluded' || g === 'error' || g === 'refund')) return;
       var ch = el('button', 'imp-chip'); ch.type = 'button'; ch.dataset.group = g;
       ch.appendChild(document.createTextNode(p.groupNames[g] + ' ')); ch.appendChild(el('b', null, String(p.counts[g])));
-      ch.addEventListener('click', function () { S.view.details = true; S.view.open[g] = true; S.view.tag = null; render(); var h = document.getElementById('impG-' + g); if (h && h.scrollIntoView) h.scrollIntoView(); });
+      // 1021-T17：点了打开「这几笔」面板（按时间排、分页、点一笔看详情改分类）；读不出来的、重复的行没有详情，照旧跳到明细
+      ch.addEventListener('click', function () {
+        if (keysOfGroups([g]).length) { rowsOpener(p.groupNames[g], [g])(); return; }
+        S.view.details = true; S.view.open[g] = true; S.view.tag = null; render(); var h = document.getElementById('impG-' + g); if (h && h.scrollIntoView) h.scrollIntoView();
+      });
       chips.appendChild(ch);
     });
     c.appendChild(chips);
@@ -1440,11 +1461,20 @@
     return c;
   }
 
+  // x = [名字, 数, 点了干什么（可选，1021-T17：打开「这几笔」面板）]
   function tiles(list, id) {
     var g = el('div', 'imp-tiles'); if (id) g.id = id;
-    list.forEach(function (x) { var t = el('div', 'imp-tile'); t.appendChild(el('div', 'imp-soft', x[0])); t.appendChild(el('b', null, x[1])); g.appendChild(t); });
+    list.forEach(function (x) {
+      var t = el('div', 'imp-tile' + (x[2] ? ' imp-tap imp-tile-go' : '')); t.appendChild(el('div', 'imp-soft', x[0])); t.appendChild(el('b', null, x[1])); if (x[2]) t.appendChild(el('span', 'imp-tile-more', ' ›'));
+      if (x[2]) { t.addEventListener('click', x[2]); t.setAttribute('role', 'button'); }
+      g.appendChild(t);
+    });
     return g;
   }
+  // 这一组 / 这几组里的账单（「这几笔」面板用）
+  function keysOfGroups(gs) { return S.plan.rows.filter(function (d) { return d.src === 'row' && gs.indexOf(d.group) >= 0; }).map(function (d) { return d.key; }); }
+  function keysOfRefs(refs) { var m = {}; (refs || []).forEach(function (r) { m[r.file + ':' + r.row] = true; }); return S.plan.rows.filter(function (d) { return d.src === 'row' && m[d.file + ':' + d.row]; }).map(function (d) { return d.key; }); }
+  function rowsOpener(title, gs, view) { return function () { var ks = keysOfGroups(gs); if (ks.length) openRows({ title: title, keys: ks, view: view, id: 'g:' + gs.join('+') }); }; }
 
   // 要你定的几块，哪块没内容就不出现
   function renderDecide(p) {
@@ -1585,6 +1615,9 @@
         r.appendChild(cb); r.appendChild(el('span', 'grow', x.cp + ' · ' + x.month + ' · ' + x.n + ' 笔 · 共 ' + yuan(x.fen) + ' 元 · 勾上 = 合成一条'));
         r.appendChild(mk(x.key in S.edits.petty));
         pc.appendChild(r);
+        var sx = (S.matched.suspects || []).filter(function (y) { return y.app + '|' + y.cp + '|' + y.month === x.key; })[0];
+        var pl = btn('看这 ' + x.n + ' 笔 ›', 'imp-link imp-petty-rows', function () { openRows({ title: cpShow(x.cp) + ' · ' + x.month, keys: keysOfRefs(sx && sx.items), id: 'petty:' + x.key }); });
+        pc.appendChild(pl);
       });
       out.petty = pc;
     }
@@ -1602,12 +1635,21 @@
         var lbt = el('span', null, '建「' + x.name + '」 ' + x.count + ' 笔'); var iw = Object.keys(into);
         var lbw = el('span'); lbw.appendChild(lbt); if (iw.length) lbw.appendChild(el('div', 'imp-soft imp-nc-into', (x.on ? '归进去的：' : '勾上会归进去：') + iw.slice(0, 4).map(function (k) { return k + '（' + into[k] + ' 笔）'; }).join('、') + (iw.length > 4 ? ' 等 ' + iw.length + ' 组' : '')));
         lb.appendChild(lbw); r.appendChild(lb);
+        // 1021-T17：「看这 N 笔」打开「这几笔」面板；归进去的每个对方也能单独点开
+        var ncKeys = newCatKeys(p, x.name), byCp = {};
+        ncKeys.forEach(function (k) { var d = rowByKey(k); if (!d) return; var c0 = cpShow(d.cp) || '—'; (byCp[c0] = byCp[c0] || []).push(k); });
+        var ncLinks = el('div', 'imp-nc-links');
+        ncLinks.appendChild(btn('看这 ' + x.count + ' 笔 ›', 'imp-link imp-nc-rows', function () { openRows({ title: '建「' + x.name + '」的', keys: ncKeys, id: 'nc:' + x.name }); }));
+        Object.keys(byCp).sort(function (a, b) { return byCp[b].length - byCp[a].length; }).slice(0, NC_CP_N).forEach(function (c0) {
+          var b0 = btn(cut(c0, 10) + ' ' + byCp[c0].length + ' 笔 ›', 'imp-link imp-nc-cp', function () { openRows({ title: c0 + ' · 归到「' + x.name + '」', keys: byCp[c0], id: 'nc:' + x.name + ':' + c0 }); });
+          b0.dataset.cp = c0; ncLinks.appendChild(b0);
+        });
         var opts = [['', '并到已有…']].concat(S.info.cats.map(function (c) { return [c, '并到「' + c + '」']; }));
         r.appendChild(select(opts, x.into || '', function (v) { setNewCat(x, v ? { on: false, into: v, picked: true } : { on: x.defaultOn, into: null, picked: false }); replan(); }, 'imp-into', '推荐的「' + x.name + '」你的存档里没有（' + x.count + ' 笔）'));
         // 1021-T16：勾选框和「并到」下拉同时在，写一句现在到底是哪种
         lbw.appendChild(el('div', 'imp-soft imp-nc-state', '现在：' + (x.on ? '新建「' + x.name + '」' : x.into ? '并到「' + x.into + '」' : '不建，这 ' + x.count + ' 笔落未分类')));
         r.appendChild(mk(x.name in S.edits.newCats));
-        nc.appendChild(r);
+        nc.appendChild(r); nc.appendChild(ncLinks);
       });
       out.newCats = nc;
     }
@@ -1617,21 +1659,25 @@
       var gc = el('div', 'imp-card'); gc.id = 'impCpGroups';
       gc.appendChild(el('h4', null, '拿不准分类的，按对方一组选一次（' + s.cpGroups.length + ' 组）'));
       // 1021-T14：一组一行写全（笔数、合计、每笔多少、规律、商品说明、推荐和理由，有疑点才多一句）；「看这 N 笔」展开逐笔，点一笔单独改；先显示 20 组
-      var showN = S.view.cpShowN || CP_SHOW_N, byKey = {};
-      p.rows.forEach(function (d) { if (d.key) byKey[d.key] = d; });
+      var showN = S.view.cpShowN || CP_SHOW_N;
       s.cpGroups.forEach(function (g, gi) {
         if (gi >= showN) return;
         var r = el('div', 'imp-row-opt imp-tap imp-cp-row'); r.dataset.cp = g.cp; r.dataset.item = 'cp:' + g.cp;
         // 1016-Z1：规律说明「工作日中午 12 点左右」放在前面，帮你认出是谁（只是提示，不自动分类）
-        var desc = cpShow(g.cp) + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元' + (g.hint ? ' · ' + g.hint : '') + (g.n > 1 ? ' · 每笔 ' + (g.min === g.max ? yuan(g.min) : yuan(g.min) + '–' + yuan(g.max)) + ' 元' : '') + ' → 选个分类';
+        // 1021-T17：组卡片只写名字、笔数、金额、推荐分类和「有把握 / 拿不准」；规律、每笔多少、商品说明、理由、疑点都收进「看这 N 笔」面板顶上
+        var desc = cpShow(g.cp) + ' · ' + g.n + ' 笔 · 共 ' + yuan(g.fen) + ' 元';
         var gw = el('span', 'grow'); gw.appendChild(document.createTextNode(desc));
-        if (g.by === 'cp' && g.descs && g.descs.length) gw.appendChild(el('div', 'imp-soft imp-cp-desc', '商品：' + g.descs.map(function (x) { return cut(x, 14); }).join('、')));
-        if (g.rec) gw.appendChild(el('div', 'imp-soft imp-cp-rec', '推荐：' + g.rec.cat + '（' + cut(g.rec.reason, 30) + '）'));
-        // 1021-T10：同一对方别的几笔已经归了哪类、组里有几笔退款，写在下面一行（同一对方不再裂成「已处理」和「待选」两半）
+        if (g.by === 'desc') gw.appendChild(el('div', 'imp-soft imp-cp-by', '按商品说明归在一起'));
+        if (g.rec) gw.appendChild(el('div', 'imp-soft imp-cp-rec', '推荐「' + g.rec.cat + '」' + (confWord(g.rec) ? ' · ' + confWord(g.rec) : '')));
+        // 1021-T10：同一对方别的几笔已经归了哪类、组里有几笔退款（同一对方不再裂成「已处理」和「待选」两半）
         var oth = g.others ? Object.keys(g.others).map(function (c) { return g.others[c] + ' 笔已归到「' + c + '」'; }) : [];
         if (g.refundN) oth.push('其中 ' + g.refundN + ' 笔是退款 +' + yuan(g.refundFen));
-        if (oth.length) gw.appendChild(el('div', 'imp-soft imp-cp-others', '同一个对方：' + oth.join(' · ')));
-        if (g.doubts && g.doubts.length) gw.appendChild(el('div', 'imp-soft imp-cp-doubt', '留意：' + g.doubts.join('；')));
+        var notes = [];
+        if (g.rec) notes.push('推荐「' + g.rec.cat + '」' + (confWord(g.rec) ? '，' + confWord(g.rec) : '') + '：' + plainReason(g.rec) + '。');
+        if (g.hint || g.n > 1) notes.push([g.hint, g.n > 1 ? '每笔 ' + (g.min === g.max ? yuan(g.min) : yuan(g.min) + '–' + yuan(g.max)) + ' 元' : ''].filter(Boolean).join('，') + '。');
+        if (g.by === 'cp' && g.descs && g.descs.length) notes.push('商品说明：' + g.descs.map(function (x) { return cut(x, 14); }).join('、') + '。');
+        if (oth.length) notes.push('同一个对方：' + oth.join('，') + '。');
+        if (g.doubts && g.doubts.length) notes.push('留意：' + g.doubts.join('；') + '。');
         r.appendChild(gw);
         // 1017-UI2：整行都能点，点了弹选分类面板（选了同一个也算定过）；下拉框留在行里（藏着），照旧也能用它改
         var setCp = function (v) { S.view.seen['cp:' + g.cp] = true; if (v === '未分类') delete S.edits.cpCats[g.cp]; else S.edits.cpCats[g.cp] = v; replan(); };
@@ -1644,24 +1690,11 @@
           if (window.JiwenSheet) window.JiwenSheet.pick({ title: SEL_TITLE['imp-cp-sel'], sub: sub0, options: catOpts().map(function (c) { return { value: c, label: c }; }), value: g.cat || '未分类', chips: true, onPick: setCp });
         });
         gc.appendChild(r);
-        // 展开看逐笔（时间、金额、商品说明），点一笔打开它的详情单独改（单独改了就不跟着这一组）
-        var open = !!(S.view.cpOpen && S.view.cpOpen[g.cp]);
-        var tg = btn((open ? '收起这 ' : '看这 ') + g.keys.length + ' 笔' + (open ? ' ▾' : ' ▸'), 'imp-link imp-cp-toggle', function (ev) {
-          ev.stopPropagation(); S.view.cpOpen = S.view.cpOpen || {}; S.view.cpOpen[g.cp] = !open; render();
+        // 1021-T17：「看这 N 笔」打开共用的「这几笔」面板（顶上写推荐理由和规律），点一笔打开它的详情单独改（单独改了就不跟着这一组）
+        var tg = btn('看这 ' + g.keys.length + ' 笔 ›', 'imp-link imp-cp-toggle', function (ev) {
+          ev.stopPropagation(); openRows({ title: cpShow(g.cp), keys: g.keys, notes: notes, id: 'cp:' + g.cp });
         });
         gc.appendChild(tg);
-        if (open) {
-          var box = el('div', 'imp-cp-items');
-          g.keys.forEach(function (k) {
-            var d = byKey[k]; if (!d) return;
-            var it = el('div', 'imp-row-opt imp-tap imp-cp-item'); it.dataset.key = k;
-            it.appendChild(el('span', 'grow', fmtTime(d.time) + ' · ' + yuan(d.fen) + ' 元 · ' + cut(d.title || d.cp || '—', 16)));
-            it.appendChild(el('span', 'imp-val', (d.cat || '未分类') + ' ›'));
-            it.addEventListener('click', function () { openSheet(k); });
-            box.appendChild(it);
-          });
-          gc.appendChild(box);
-        }
       });
       if (s.cpGroups.length > showN) {
         var mb = btn('再显示 ' + Math.min(CP_SHOW_N, s.cpGroups.length - showN) + ' 组（还有 ' + (s.cpGroups.length - showN) + ' 组）', 'ui-btn block imp-cp-more', function () { S.view.cpShowN = showN + CP_SHOW_N; render(); });
@@ -1852,17 +1885,21 @@
       h.addEventListener('click', function () { S.view.open[g] = !S.view.open[g]; render(); });
       wrap.appendChild(h);
       if (!S.view.open[g]) return;
-      var box = el('div', 'imp-list'); box.dataset.group = g;
-      var shown = S.view.shown[g] || PAGE;
-      list.slice(0, shown).forEach(function (d) { renderRow(box, d); });
-      wrap.appendChild(box);
-      if (list.length > shown) {
-        var more = btn('再显示 ' + Math.min(PAGE, list.length - shown) + ' 行（还有 ' + (list.length - shown) + ' 行）', 'imp-btn', function () { S.view.shown[g] = shown + PAGE; render(); });
-        more.className += ' imp-more'; more.dataset.group = g; more.style.width = '100%';
-        wrap.appendChild(more);
-      }
+      // 1021-T17：一组超过 20 笔就按分类（不计、跳过这类按原因）再分一层，一类一行、默认收起，点开组内分页；原来几百笔一次铺开，页面卡
+      if (list.length <= DET_FLAT) {
+        var box = el('div', 'imp-list'); box.dataset.group = g;
+        list.forEach(function (d) { renderRow(box, d); });
+        wrap.appendChild(box);
+      } else wrap.appendChild(groupedList({ id: 'det-' + g + (S.view.tag ? '-' + S.view.tag : ''), list: list, group: g, nameOf: function (d) { return detName(g, d); }, row: renderRow }));
     });
     return wrap;
+  }
+  var DET_FLAT = 20;
+  // 明细里第二层按什么分：要记进账本的按分类，不计、跳过、待处理这类按原因（取第一句）
+  function detName(g, d) {
+    if (['add', 'merge', 'refund', 'excluded'].indexOf(g) >= 0 && d.src !== 'dup' && d.src !== 'error' && !(g === 'excluded' && !d.cat)) return d.cat || '未分类';
+    var r = String(d.reason || '').split(/[，。；（(]/)[0].trim();
+    return cut(r || '其他', 16);
   }
   function renderRow(box, d) {
     if (d.summary) { renderSumRow(box, d); return; }
@@ -1986,7 +2023,12 @@
     if (onView) { var v = btn('查看', 'imp-toast-view', function () { t.style.display = 'none'; onView(); }); v.id = 'impToastView'; t.appendChild(v); }
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.style.display = 'none'; }, 4000);
   }
-  function rowByKey(key) { var r = null; S.plan.rows.forEach(function (d) { if (d.key === key) r = d; }); return r; }
+  // 1021-T17：按键查一行用一张表（每次重算换一张；原来一行一行找，几百笔时点开一组要找几十万次）
+  var kmPlan = null, kmMap = null;
+  function rowByKey(key) {
+    if (kmPlan !== S.plan) { kmPlan = S.plan; kmMap = {}; S.plan.rows.forEach(function (d) { if (d.key) kmMap[d.key] = d; }); }
+    return kmMap[key] || null;
+  }
   function setEdit(key, patch) {
     if (patch.pick) delete S.view.seen['keep:' + key];
     var e = S.edits.rows[key] || {};
@@ -2000,12 +2042,13 @@
   var SH = null;      // 正开着的行详情 { key, draft, keep, ruleFix, mode: '' | 'refundpick', catOpen }
   function sheetHost() { return window.JiwenSheet || null; }
   function sheetBox() { return document.getElementById('impSheet'); }
-  function openSheet(key) {
+  // opt.back：从「这几笔」面板点进来的，关掉（确定、取消、往下拉、返回键）以后回到那个面板（1021-T17）
+  function openSheet(key, opt) {
     var d = rowByKey(key); if (!d) return;
-    SH = { key: key, draft: JSON.parse(JSON.stringify(S.edits.rows[key] || {})), keep: !!S.view.seen['keep:' + key], ruleFix: null, mode: '', catOpen: false };
+    SH = { key: key, draft: JSON.parse(JSON.stringify(S.edits.rows[key] || {})), keep: !!S.view.seen['keep:' + key], ruleFix: null, mode: '', catOpen: false, back: (opt && opt.back) || null };
     var J = sheetHost();
     if (J) {
-      J.open({ title: '这笔账单', onDismiss: function () { SH = null; },
+      J.open({ title: '这笔账单', onDismiss: function () { var bk = SH && SH.back; SH = null; if (bk) bk(); },
         body: function (box) { var c = el('div', 'imp-sheet-box'); c.id = 'impSheet'; box.appendChild(c); paintSheet(); },
         foot: function (box) { paintFoot(box); } });
     } else {      // 主程序是老版本（没有共用面板）：用导入页自己的面板
@@ -2024,7 +2067,7 @@
       var ok = btn(sheetOkText(), 'ui-btn primary block', function () { applySheet(); }); ok.id = 'impSheetOk';
       col.appendChild(ok);
     }
-    var cl = btn(d && sheetEditable(d) ? '取消' : '关闭', 'ui-btn block', function () { closeSheet(); }); cl.id = 'impSheetClose';
+    var cl = btn(d && sheetEditable(d) ? '取消' : '关闭', 'ui-btn block', function () { var bk = SH && SH.back; closeSheet(); if (bk) bk(); }); cl.id = 'impSheetClose';
     col.appendChild(cl); box.appendChild(col);
   }
   function sheetOkText() {
@@ -2054,7 +2097,7 @@
     kv('时间', d.time.replace('T', ' ')); kv('交易对方', cpShow(d.cp)); kv('商品', d.desc); kv('备注', d.remark);
     kv('支付方式', (S.parsed.files[d.file].rows[d.row] || {}).pm); kv(d.app === 'alipay' ? '交易分类' : '交易类型', d.kind); kv('状态', d.status);
     kv('来源', APP[d.app]); kv('去向', d.reason);
-    if (d.rec && !skipRow) kv('分类推荐', d.rec.cat + '（' + d.rec.reason + (d.rec.conf ? '，把握' + { high: '高', mid: '中', low: '低' }[d.rec.conf] : '') + '）');
+    if (d.rec && !skipRow) kv('分类推荐', recLine(d.rec));   // 1021-T17：一句人话
     if (d.into && S.manualById[d.into]) { var m = S.manualById[d.into]; kv('合并到', '手记 ' + fmtTime(m.time) + ' · ' + m.cat + ' · ' + yuan(m.fen)); }
     var acts = el('div', 'acts');
     if (d.canCat && !skipRow) {
@@ -2165,7 +2208,7 @@
   // 点「确定」：把暂存的改动写进 S.edits（要从别处让出手记的先问一句），重算，那一行闪一下
   function applySheet() {
     if (!SH) return;
-    var key = SH.key, dr = SH.draft, keep = SH.keep, rf = SH.ruleFix, d = rowByKey(key);
+    var key = SH.key, dr = SH.draft, keep = SH.keep, rf = SH.ruleFix, d = rowByKey(key), bk = SH.back;
     var cur = S.edits.rows[key] || {};
     var go = function () {
       if (rf) { S.edits.ruleFix = S.edits.ruleFix || {}; S.edits.ruleFix[rf.kw] = rf.cat; }
@@ -2173,6 +2216,7 @@
       if (keep && !dr.pick) S.view.seen['keep:' + key] = true; else delete S.view.seen['keep:' + key];
       replan();
       flashKey(key);
+      if (bk) bk();
     };
     closeSheet();
     var rec = dr.pick && dr.pick.record, isRefund = d && (d.why === 'refundcands' || refundishRow(d));
@@ -2231,8 +2275,13 @@
       goStep(ds.step);
     } else {
       S.view.details = true; S.view.tag = null; S.view.open[d.group] = true;
-      var list = S.plan.groups[d.group] || [], i = list.indexOf(d);
-      if (i >= (S.view.shown[d.group] || PAGE)) S.view.shown[d.group] = i + 1;
+      // 1021-T17：明细按分类分了一层：展开它在的那一类、翻到它在的那一页
+      var list = S.plan.groups[d.group] || [];
+      if (list.length > DET_FLAT) {
+        var nm = detName(d.group, d), same = list.filter(function (x) { return detName(d.group, x) === nm; }), ck = 'det-' + d.group + '|' + nm;
+        S.view.cg = S.view.cg || {}; S.view.cgPage = S.view.cgPage || {};
+        S.view.cg[ck] = true; S.view.cgPage[ck] = Math.floor(same.indexOf(d) / PAGE);
+      }
       goStep('overview');
     }
     var n = Array.prototype.filter.call(dom.body.querySelectorAll('[data-key],[data-item]'), function (y) { return y.dataset.key === d.key || (y.dataset.item && y.dataset.item.slice(y.dataset.item.indexOf(':') + 1) === d.key); })[0];
@@ -2297,12 +2346,131 @@
   }
   function sheetIsOpen() { return !!SH; }
   // 只看的详情：一行一项，底部只有「关闭」
-  function viewSheet(title, kvs, closeId) {
+  function viewSheet(title, kvs, closeId, back) {
     if (!window.JiwenSheet) return;
-    window.JiwenSheet.open({ title: title,
+    window.JiwenSheet.open({ title: title, onDismiss: back || null,
       body: function (box) { kvs.forEach(function (x) { if (!x[1]) return; var r = el('div', 'kv'); r.appendChild(el('span', null, x[0])); r.appendChild(el('span', null, x[1])); box.appendChild(r); }); },
-      foot: function (box, done) { var b = btn('关闭', 'ui-btn block', function () { done(); }); b.id = closeId || 'impViewClose'; box.appendChild(b); } });
+      foot: function (box, done) { var b = btn('关闭', 'ui-btn block', function () { done(); if (back) back(); }); b.id = closeId || 'impViewClose'; box.appendChild(b); } });
   }
+  // ---------- 1021-T17：共用的「这几笔」面板 ----------
+  //   凡是写了「N 笔 / 共 x 元」的地方都能点开它：按时间排、每页 50 笔、点一笔开完整详情（确认页能单独改分类，结果页只看），
+  //   关了详情回到这一页。o = { title, keys, page, view（只看）, id }
+  var ROWS_PAGE = 50, NC_CP_N = 6;
+  function rowsList(keys) {
+    var seen = {};
+    return (keys || []).map(rowByKey).filter(function (d) { if (!d || d.src !== 'row' || seen[d.key]) return false; seen[d.key] = true; return true; })
+      .sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; });
+  }
+  function rowsSum(list) { return list.reduce(function (s0, d) { return s0 + (d.fen || 0); }, 0); }
+  function openRows(o) {
+    var J = window.JiwenSheet; if (!J || !S || !S.plan) return;
+    var list = rowsList(o.keys), pages = Math.max(1, Math.ceil(list.length / ROWS_PAGE)), page = Math.min(Math.max(o.page || 0, 0), pages - 1);
+    var units = list.reduce(function (s0, d) { return s0 + (d.units || 1); }, 0);
+    var again = function (pg) { return function () { openRows(Object.assign({}, o, { page: pg })); }; };
+    J.open({ title: o.title, tall: true, sub: units + ' 笔 · 共 ' + yuan(rowsSum(list)) + ' 元 · 按时间排' + (pages > 1 ? ' · 第 ' + (page + 1) + ' / ' + pages + ' 页' : ''),
+      body: function (box) {
+        (o.notes || []).forEach(function (t) { box.appendChild(el('div', 'imp-soft imp-rows-note', t)); });
+        var w = el('div', 'imp-rows'); w.id = 'impRows'; if (o.id) w.dataset.list = o.id;
+        if (!list.length) w.appendChild(el('div', 'imp-soft', '这里现在一笔都没有了（可能刚挪去了别处）。'));
+        list.slice(page * ROWS_PAGE, (page + 1) * ROWS_PAGE).forEach(function (d) {
+          var r = el('div', 'imp-sr imp-rs'); r.dataset.key = d.key;
+          var g = el('div', 'grow'), t = el('div', 'imp-sr-t'), nm0 = cpShow(d.title || d.cp) || '—';
+          t.appendChild(el('small', null, fmtTime(d.time))); t.appendChild(document.createTextNode(nm0)); g.appendChild(t);
+          var skipRow = d.group === 'neutral' || d.mode === 'skip', pm = ((S.parsed.files[d.file] || { rows: [] }).rows[d.row] || {}).pm;
+          var sub = [skipRow ? '不计' : (d.cat || '未分类'), pm, APP[d.app]].filter(function (v) { return v && v !== '/'; });
+          g.appendChild(el('div', 'imp-sr-d', sub.join(' · ')));
+          r.appendChild(g);
+          r.appendChild(el('div', 'imp-sr-amt ' + (skipRow ? '' : d.type === 'expense' ? 'neg' : 'pos'), (skipRow ? '' : d.type === 'expense' ? '−' : '+') + yuan(d.fen)));
+          r.appendChild(el('div', 'imp-soft', '›'));
+          r.addEventListener('click', function () { if (o.view) viewRow(d, again(page)); else openSheet(d.key, { back: again(page) }); });
+          w.appendChild(r);
+        });
+        box.appendChild(w);
+        if (pages > 1) box.appendChild(pager(page, pages, function (pg) { again(pg)(); }, 'impRowsPager'));
+      },
+      foot: function (box, done) { var cl = btn('关闭', 'ui-btn block', function () { done(); }); cl.id = 'impRowsClose'; box.appendChild(cl); } });
+  }
+  // 翻页那一排：「‹ 上一页 · 第 i / n 页 · 下一页 ›」
+  function pager(page, pages, go, id) {
+    var pg = el('div', 'imp-pager'); if (id) pg.id = id;
+    var pv = btn('‹ 上一页', 'ui-btn imp-pg-prev', function (ev) { ev.stopPropagation(); go(page - 1); }); pv.disabled = page <= 0;
+    var nx = btn('下一页 ›', 'ui-btn imp-pg-next', function (ev) { ev.stopPropagation(); go(page + 1); }); nx.disabled = page >= pages - 1;
+    pg.appendChild(pv); pg.appendChild(el('span', 'imp-pg-n', (page + 1) + ' / ' + pages)); pg.appendChild(nx);
+    return pg;
+  }
+  // 结果页（已经写进账本，不能再改）：只看这一笔
+  function viewRow(d, back) {
+    var row = (S.parsed.files[d.file] || { rows: [] }).rows[d.row] || {}, skipRow = d.group === 'neutral' || d.mode === 'skip';
+    viewSheet('这笔账单', [['时间', d.time.replace('T', ' ')], ['金额', (skipRow ? '' : d.type === 'expense' ? '−' : '+') + yuan(d.fen)], ['去向', searchDest(d).t],
+      ['分类', skipRow ? '' : d.cat], ['交易对方', cpShow(d.cp)], ['商品', d.desc], ['支付方式', row.pm], ['来源', APP[d.app]], ['状态', d.status],
+      ['分类推荐', d.rec && !skipRow ? recLine(d.rec) : '']], 'impViewClose', back);
+  }
+  // ---------- 1021-T17：一组一行「名字 · N 笔 · 共 x 元 ›」，默认收起，点开组内分页（每页 50） ----------
+  //   总览明细、只对账清单共用（以后账单页改版也用这一套）。o = { id, list, nameOf(d), row(box, d), sel: { on(d), set(list, on) }（可选，组上全选），
+  //   cls（组内那块的 class）, group（组内那块的 data-group） }；开合、页码记在 S.view.cg / S.view.cgPage
+  function groupedList(o) {
+    var wrap = el('div', 'imp-cgs'); wrap.dataset.list = o.id;
+    S.view.cg = S.view.cg || {}; S.view.cgPage = S.view.cgPage || {};
+    var groups = {}, order = [];
+    o.list.forEach(function (d) { var n = o.nameOf(d) || '其他'; if (!groups[n]) { groups[n] = []; order.push(n); } groups[n].push(d); });
+    var unitsOf = function (ds) { return ds.reduce(function (s0, d) { return s0 + (d.units || 1); }, 0); };
+    order.sort(function (a, b) { return unitsOf(groups[b]) - unitsOf(groups[a]) || (a < b ? -1 : 1); });
+    order.forEach(function (n) {
+      var ds = groups[n], k = o.id + '|' + n, open = !!S.view.cg[k];
+      var h = el('div', 'imp-cg imp-tap'); h.dataset.cg = n; h.dataset.list = o.id;
+      if (o.sel) {
+        var onN = ds.filter(o.sel.on).length, cb = el('input'); cb.type = 'checkbox'; cb.className = 'imp-cg-all';
+        cb.checked = onN === ds.length; cb.indeterminate = onN > 0 && onN < ds.length;
+        cb.addEventListener('click', function (ev) { ev.stopPropagation(); });
+        cb.addEventListener('change', function () { o.sel.set(ds, cb.checked); });
+        var cw = el('label', 'imp-cg-cb'); cw.appendChild(cb); cw.addEventListener('click', function (ev) { ev.stopPropagation(); }); h.appendChild(cw);
+      }
+      var fen = ds.reduce(function (s0, d) { return s0 + (d.fen || 0); }, 0);
+      h.appendChild(el('span', 'grow', n + ' · ' + unitsOf(ds) + ' 笔' + (o.noSum ? '' : ' · 共 ' + yuan(fen) + ' 元') + (o.sel && onN ? ' · 勾了 ' + onN + ' 笔' : '')));
+      h.appendChild(el('span', 'imp-cg-go', open ? '▾' : '›'));
+      h.addEventListener('click', function () { S.view.cg[k] = !open; render(); });
+      wrap.appendChild(h);
+      if (!open) return;
+      var pages = Math.ceil(ds.length / PAGE), pg = Math.min(S.view.cgPage[k] || 0, pages - 1);
+      var box = el('div', o.cls || 'imp-list'); box.dataset.cg = n; if (o.group) box.dataset.group = o.group;
+      ds.slice(pg * PAGE, (pg + 1) * PAGE).forEach(function (d) { o.row(box, d); });
+      wrap.appendChild(box);
+      // 翻页以后回到这一组的标题（新的一页从头看）
+      if (pages > 1) wrap.appendChild(pager(pg, pages, function (x) {
+        S.view.cgPage[k] = x; render();
+        var h2 = Array.prototype.filter.call(dom.body.querySelectorAll('.imp-cg'), function (y) { return y.dataset.list === o.id && y.dataset.cg === n; })[0];
+        if (h2 && h2.scrollIntoView) h2.scrollIntoView();
+      }));
+    });
+    return wrap;
+  }
+  // ---------- 1021-T17：推荐理由写成一句人话（不嵌套括号，不出现「内置」「落到你的」这类内部词） ----------
+  function plainReason(rec) {
+    if (!rec || !rec.reason) return '';
+    var r = String(rec.reason), m, tail = '';
+    var land = /（落到你的「([^」]+)」）$/.exec(r);
+    if (land) { r = r.slice(0, land.index); tail = '，你这里叫「' + land[1] + '」'; }
+    var my = /^你的对照：([^（]+?) → ([^（]+)（([\s\S]*)）$/.exec(r);
+    if (my) { r = my[3]; tail = '，你以前把「' + my[1].trim() + '」并到了「' + my[2].trim() + '」'; }
+    var say = r;
+    if ((m = /^你的规则：(.+) → (.+)$/.exec(r))) say = '你定过规则，对方含「' + m[1] + '」的归「' + m[2] + '」';
+    else if ((m = /^从合并里学：「(.+)」你记成(.+)$/.exec(r))) say = '「' + m[1] + '」的账单以前和你的手记合并过，你记成「' + m[2] + '」';
+    else if ((m = /^支付宝里「(.+)」是(.+)$/.exec(r))) say = '支付宝里「' + m[1] + '」的账单是「' + m[2] + '」';
+    else if ((m = /^对方是运营商「(.+)」→ (.+)$/.exec(r))) say = '「' + m[1] + '」是运营商，多半是「' + m[2] + '」';
+    else if ((m = /^内置（商品说明里的「(.+)」）和支付宝分类一致 → (.+)$/.exec(r))) say = '商品说明里有「' + m[1] + '」，支付宝也这么分，多半是「' + m[2] + '」';
+    else if ((m = /^内置（商品说明里的「(.+)」）→ (.+)$/.exec(r))) say = '商品说明里有「' + m[1] + '」，可能是「' + m[2] + '」';
+    else if ((m = /^内置（「礼包」多半是游戏）→ (.+)$/.exec(r))) say = '商品说明里有「礼包」，可能是「' + m[1] + '」';
+    else if ((m = /^内置（(平台|综合商超)「(.+)」，卖什么的都有）→ (.+)$/.exec(r))) say = '「' + m[2] + '」什么都卖，只能先猜「' + m[3] + '」';
+    else if ((m = /^内置（「(.+)」其他几笔的商品说明）→ (.+)$/.exec(r))) say = '「' + cpShow(m[1]) + '」别的几笔看着像「' + m[2] + '」';
+    else if ((m = /^内置：(.+) → (.+)$/.exec(r))) say = '名字里有「' + m[1] + '」，多半是「' + m[2] + '」';
+    else if ((m = /^支付宝分类：收入（收钱码 \/ 转账收款）→ (.+)$/.exec(r))) say = '收钱码或转账收进来的钱，归「' + m[1] + '」';
+    else if ((m = /^支付宝分类：(.+)$/.exec(r))) say = '支付宝把它分在「' + m[1] + '」';
+    else if ((m = /^「(.+)」几笔的商品说明各指向不同分类，不推荐$/.exec(r))) say = '「' + cpShow(m[1]) + '」几笔的商品说明各说各的，没法推荐';
+    else if (r === '没找到依据') say = '没找到能判断分类的依据';
+    return say + tail;
+  }
+  function confWord(rec) { return !rec || !rec.cat || rec.cat === '未分类' ? '' : rec.conf === 'high' || rec.conf === 'mid' ? '有把握' : '拿不准'; }
+  function recLine(rec) { var w = confWord(rec); return (rec.cat || rec.want || '未分类') + (w ? ' · ' + w : '') + (rec.reason ? '：' + plainReason(rec) : ''); }
   // 1016-Z2：挑一笔支出把这笔收入挂上去（在同一个面板里换一页；挑好了回到详情，点「确定」才生效）
   function paintRefundPick(sh, d) {
     var key = SH.key;
@@ -2482,7 +2650,9 @@
     if (only) {
       card.appendChild(el('div', 'imp-line imp-res-only', '只写了你勾选的 ' + c.add + ' 笔，其余什么都没改。'));
     } else {
-      card.appendChild(tiles([['新建', (res.r.added !== undefined ? res.r.added : c.add) + ' 条'], ['和手记合并', (c.merge || 0) + ' 笔'], ['留在待处理', (c.pending || 0) + ' 笔'], ['跳过', (c.skip || 0) + ' 笔']], 'impResTiles'));
+      var rv = !!(S.plan && S.plan.rows);   // 1021-T17：四格都能点开看是哪几笔（已经写进账本了，只看不改）
+      card.appendChild(tiles([['新建', (res.r.added !== undefined ? res.r.added : c.add) + ' 条', rv && rowsOpener('新建的', ['add', 'refund', 'neutral'], true)], ['和手记合并', (c.merge || 0) + ' 笔', rv && rowsOpener('和手记合并的', ['merge'], true)],
+        ['留在待处理', (c.pending || 0) + ' 笔', rv && rowsOpener('留在待处理的', ['pending'], true)], ['跳过', (c.skip || 0) + ' 笔', rv && rowsOpener('跳过的', ['skip'], true)]], 'impResTiles'));
       var sum = 0, parts = [];
       BUCKET_LINE.forEach(function (x) { var n = c[x[0]] || 0; sum += n; if (n) parts.push(x[1] + ' ' + n); });
       var tl = el('div', 'imp-line imp-res-total' + (sum === res.ws.total ? '' : ' imp-bad'),
@@ -3122,7 +3292,7 @@
         cats.forEach(function (n) { var o = el('option', null, n); o.value = n; se.appendChild(o); });
         if (sug[x.key]) se.value = sug[x.key].cat;
         var lb = el('div', 'imp-soft', '分类 '); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '6px'; lb.style.flex = '1 1 100%'; var sw = wrapSel(se, (it.cp || '—') + ' · ' + yuan(it.amt) + ' 元'); sw.style.flex = '1'; lb.appendChild(sw); acts.appendChild(lb);
-        if (sug[x.key]) { var sh0 = el('div', 'imp-soft imp-pend-sug', '按推荐先选了「' + sug[x.key].cat + '」（' + sug[x.key].reason + '），不对就改'); sh0.style.flex = '1 1 100%'; acts.appendChild(sh0); }
+        if (sug[x.key]) { var sh0 = el('div', 'imp-soft imp-pend-sug', '按推荐先选了「' + sug[x.key].cat + '」：' + plainReason(sug[x.key]) + '。不对就改'); sh0.style.flex = '1 1 100%'; acts.appendChild(sh0); }
       }
       var nb = btn(x.refund ? '作为新增（往来）' : '作为新增', 'imp-btn imp-pend-new', function () {
         act([{ key: x.key, do: 'new', cat: se ? se.value : '未分类' }], '已作为新增记进账本');
@@ -3204,6 +3374,6 @@
   }
 
   var UI = { open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
-             _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _lastCopy: null };
+             _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _plainReason: function (r) { return plainReason(r); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

@@ -28,7 +28,7 @@ const man = (id, d, money, cat) => ({ id, time: `2026-10-${String(d).padStart(2,
   await t.until(() => d.querySelectorAll('.imp-pend').length === 2);
   const card = no => d.querySelector('.imp-pend[data-key="wechat|' + no + '"]');
   const c1 = card(a1.no), c2 = card(a2.no);
-  ok(c1.querySelector('.imp-pend-cat').value === '吃饭' && /按推荐先选了「吃饭」（你的规则：某虚构饭店 → 吃饭）/.test(c1.querySelector('.imp-pend-sug').textContent), '1 按你的规则推得出：预选「吃饭」、写明按什么选的');
+  ok(c1.querySelector('.imp-pend-cat').value === '吃饭' && /按推荐先选了「吃饭」：你定过规则，对方含「某虚构饭店」的归「吃饭」/.test(c1.querySelector('.imp-pend-sug').textContent), '1 按你的规则推得出：预选「吃饭」、写明按什么选的');
   ok(c2.querySelector('.imp-pend-cat').value === '未分类' && !c2.querySelector('.imp-pend-sug'), '1 推不出的：照旧未分类，不写推荐');
   ok(t.log.filter(p => /import\/(classify|merchants)\.js/.test(p)).length === 2, '1 分类推荐在打开待处理页时才载入主页面');
   c1.querySelector('.imp-pend-new').click();

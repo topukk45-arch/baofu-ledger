@@ -282,7 +282,7 @@
       var g = cpg[k] || (cpg[k] = { cp: k, n: 0, fen: 0, min: Infinity, max: -Infinity, hours: {}, keys: [], wd: 0, we: 0, descs: {}, recs: {}, fens: [] });
       g.n += d.units; g.fen += d.fen; g.min = Math.min(g.min, d.fen); g.max = Math.max(g.max, d.fen); g.keys.push(d.key); g.fens.push(d.fen);
       var dk0 = descKey(d.desc || ''); if (dk0) g.descs[dk0] = (g.descs[dk0] || 0) + 1;
-      var rc0 = d.cat || '未分类'; (g.recs[rc0] = g.recs[rc0] || { n: 0, reason: d.rec ? d.rec.reason : '' }).n++;
+      var rc0 = d.cat || '未分类'; (g.recs[rc0] = g.recs[rc0] || { n: 0, reason: d.rec ? d.rec.reason : '', conf: d.rec ? d.rec.conf : null }).n++;
       var h = +d.time.slice(11, 13); g.hours[h] = (g.hours[h] || 0) + 1;
       var wk = new Date(Date.UTC(+d.time.slice(0, 4), +d.time.slice(5, 7) - 1, +d.time.slice(8, 10))).getUTCDay();
       if (wk === 0 || wk === 6) g.we++; else g.wd++;
@@ -423,7 +423,7 @@
       if (descs.length > 1) doubts.push('商品说明不止一种');
       return { cp: g.cp, n: g.n, fen: g.fen, min: g.min, max: g.max, hour: hour, cat: cpCats[k] || null, keys: g.keys,
                hint: patternHint(g.keys.length, g.wd, g.we, g.hours), others: g.others || null, refundN: g.refundN || 0, refundFen: g.refundFen || 0,
-               by: g.cp.indexOf('品：') === 0 ? 'desc' : 'cp', descs: descs.slice(0, 2), rec: recCat && recCat !== '未分类' ? { cat: recCat, reason: g.recs[recCat].reason } : null, doubts: doubts };
+               by: g.cp.indexOf('品：') === 0 ? 'desc' : 'cp', descs: descs.slice(0, 2), rec: recCat && recCat !== '未分类' ? { cat: recCat, reason: g.recs[recCat].reason, conf: g.recs[recCat].conf || null } : null, doubts: doubts };
     }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; });
     var notes = { neutralVsNormal: [], joined: [], noNote: [], overlap: [] };
     rows.forEach(function (d) { d.tags.forEach(function (t) { if (notes[t] && d.key) notes[t].push(d.key); }); });

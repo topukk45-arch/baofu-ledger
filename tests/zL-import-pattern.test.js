@@ -26,8 +26,12 @@ const wx = (d, h, mi, fen, cp) => B.txn({ time: { y: 2026, mo: 10, d, h, mi, s: 
     .concat([wx(17, 20, 0, 3000, '某虚构夜宵摊'), wx(18, 20, 30, 2600, '某虚构夜宵摊')]);
   await t.importFiles([['微信.csv', B.bill('wechat', BL, { range: RANGE }).bytes]], S => {
     const tx = t.$('impCpGroups') ? t.$('impCpGroups').textContent : '';
-    ok(/小\*\* · 5 笔 · 共 63\.00 元 · 工作日中午 12 点左右 · 每笔 10\.70–14\.00 元 → 选个分类/.test(tx), '2 「小** · 5 笔 · 共 63.00 元 · 工作日中午 12 点左右 · 每笔 10.70–14.00 元 → 选个分类」：' + tx);
-    ok(/某虚构夜宵摊 · 2 笔 · 共 56\.00 元 · 周末晚上 20 点左右/.test(tx), '2 两笔都在周末晚上 8 点：写周末晚上');
+    // 1021-T17：卡片上只写名字、笔数、金额（不写「→ 选个分类」）；规律、每笔多少收进「看这 N 笔」面板顶上
+    ok(/小\*\* · 5 笔 · 共 63\.00 元/.test(tx) && !/→ 选个分类/.test(tx), '2 卡片「小** · 5 笔 · 共 63.00 元」：' + tx);
+    const notesOf = cp => { [...t.d.querySelectorAll('.imp-cp-row')].find(r => r.dataset.cp === cp).nextElementSibling.click(); const n = [...t.d.querySelectorAll('.imp-rows-note')].map(x => x.textContent).join(' '); t.$('impRowsClose').click(); return n; };
+    const n1 = notesOf('小**');
+    ok(/工作日中午 12 点左右，每笔 10\.70–14\.00 元/.test(n1), '2 面板顶上写规律：「工作日中午 12 点左右，每笔 10.70–14.00 元」：' + n1);
+    ok(/周末晚上 20 点左右/.test(notesOf('某虚构夜宵摊')), '2 两笔都在周末晚上 8 点：写周末晚上');
     ok(S.plan.sections.cpGroups.every(g => !g.cat), '2 只是提示，不自动分类');
   }, { noGo: true });
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
