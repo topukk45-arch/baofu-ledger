@@ -1699,3 +1699,8 @@
         /* 1020-I：退款金额的提示字（「最多 19.63」）用小字，不和大字金额一样大 */
         #refundMoney::placeholder { font-size:20px; font-weight:normal; }
         #refundMask .refund-sum { margin-bottom:12px; }
+
+        /* 1021-T27：切页签时新页面淡入（switchTab 里加 .tab-in，放完去掉）；系统「减少动画」时不做 */
+        @keyframes tabIn { from { opacity:0; } to { opacity:1; } }
+        .tab-page.tab-in { animation:tabIn 160ms ease-out; }
+        @media (prefers-reduced-motion: reduce) { .tab-page.tab-in { animation:none; } }

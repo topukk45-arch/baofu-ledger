@@ -340,6 +340,7 @@
             closeAllCs();   // 收起可能展开的下拉：其面板已传送到 body，切页隐藏容器不会带走它
             saveLedgerScroll();
             tabShownOnce=true;
+            const tabFrom=JiwenBase.currentTab;
             JiwenBase.currentTab=tab;
             // 「日子」管理页是记账页的子页，不属于任何 tab。切 tab 时必须把它关掉，
             // 否则从子页点底栏会出现「子页与目标页同时显示」。
@@ -348,6 +349,12 @@
             $('pageLedger').style.display   = tab==='ledger'   ? 'block':'none';
             $('pageStats').style.display    = tab==='stats'    ? 'block':'none';
             $('pageSettings').style.display = tab==='settings' ? 'block':'none';
+            // 1021-T27：真的换了页签才让新页面淡入（只动透明度，不动布局；放完就把类去掉，快照里不带）
+            if(tabFrom && tabFrom!==tab){
+                const pg=$({ ledger:'pageLedger', stats:'pageStats', settings:'pageSettings' }[tab]);
+                if(pg){ pg.classList.remove('tab-in'); void pg.offsetWidth; pg.classList.add('tab-in');
+                    pg.addEventListener('animationend', function done(e){ if(e.target!==pg) return; pg.classList.remove('tab-in'); pg.removeEventListener('animationend', done); }); }
+            }
             // 底部操作栏（筛选 + 记一笔）只在记账页显示
             $('actionBar').style.display = tab==='ledger' ? 'flex':'none';
             if(tab!=='ledger'){
