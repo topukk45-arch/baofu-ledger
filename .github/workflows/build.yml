@@ -4,18 +4,9 @@ on:
   # 1021-T1：体验版分支（实测 10-20 的方案）推上去也打，发到单独的「体验版」，和「最新测试版」分开
   push:
     branches: [main, claude/relaxed-turing-1v8wg9]
+    # 1021-β：推 v 开头的标签（比如 v1021-beta）= 打包并发成正式版（见最后一步）
+    tags: ['v*']
   workflow_dispatch:
-    # 1021-β：手动触发时填了 release（标签，比如 v1021-beta）和 title（比如「记问 1021 β」），打完包就发成正式版（Latest），
-    #   说明读 docs/release/<标签>.md，安装包叫 jiwen-<标签去掉 v>.apk；不填就和原来一样只打包
-    inputs:
-      release:
-        description: '发成正式版的标签（不填就只打包）'
-        required: false
-        default: ''
-      title:
-        description: '正式版的标题'
-        required: false
-        default: ''
 jobs:
   build:
     # 1017：固定 Ubuntu 24.04。ubuntu-latest 10 月 19 日起换成 Ubuntu 26，打包机自带的安卓 SDK、JDK 可能跟着变；
@@ -140,18 +131,19 @@ jobs:
             gh release create trial-build "$APK" --title "体验版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
           fi
 
-      # 1021-β：手动触发、填了 release 才跑：把这次打的包发成正式版（标为 Latest），标签已经有了就停下、不覆盖
-      - name: 发布正式版（手动触发、填了 release 才跑）
-        if: github.event_name == 'workflow_dispatch' && inputs.release != ''
+      # 1021-β：推了 v 开头的标签才跑：把这次打的包发成正式版（标为 Latest）。标题读 docs/release/<标签>.title，
+      #   说明读 docs/release/<标签>.md，安装包叫 jiwen-<标签去掉 v>.apk；这个标签已经有发行版了就停下、不覆盖
+      - name: 发布正式版（推了 v 开头的标签才跑）
+        if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-          REL: ${{ inputs.release }}
-          TITLE: ${{ inputs.title }}
+          REL: ${{ github.ref_name }}
         run: |
           set -e
-          NOTES_FILE="docs/release/$REL.md"
+          NOTES_FILE="docs/release/$REL.md"; TITLE_FILE="docs/release/$REL.title"
           test -f "$NOTES_FILE" || { echo "没有说明文件 $NOTES_FILE"; exit 1; }
           if gh release view "$REL" >/dev/null 2>&1; then echo "已经有 $REL 了，不覆盖"; exit 1; fi
+          TITLE=$(cat "$TITLE_FILE" 2>/dev/null || echo "$REL")
           APK="$RUNNER_TEMP/jiwen-${REL#v}.apk"
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
-          gh release create "$REL" "$APK" --title "${TITLE:-$REL}" --notes-file "$NOTES_FILE" --latest --target "$GITHUB_SHA"
+          gh release create "$REL" "$APK" --title "$TITLE" --notes-file "$NOTES_FILE" --latest --verify-tag
