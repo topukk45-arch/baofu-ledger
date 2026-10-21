@@ -1321,9 +1321,23 @@
     render();
   }
   function reconKeys() {
-    var m = Plan.missed(S.plan), out = [];
-    m.items.forEach(function (x) { if (S.view.reconPick[x.id]) out = out.concat(x.keys); });
+    var out = [];
+    reconItems().forEach(function (x) { if (S.view.reconPick[x.id]) out = out.concat(x.keys); });
     return out;
+  }
+  // 1021-T22：清单里的每一项：漏记的（「新增」组）+ 不计的（单独一组、默认不勾）；挂在这一项上的退款写「含退款 x 元」（勾了原单，退款一起补进）
+  function reconItems() {
+    var m = Plan.missed(S.plan), back = {};
+    S.plan.rows.forEach(function (d) { if (d.src === 'row' && d.group === 'refund' && d.refundTo && d.refundTo.row) { var k = d.refundTo.row.file + ':' + d.refundTo.row.row; back[k] = (back[k] || 0) + d.fen; } });
+    var items = m.items.map(function (x) {
+      var rf = 0; x.keys.forEach(function (k) { var d = rowByKey(k); if (d) rf += back[d.file + ':' + d.row] || 0; });
+      return Object.assign({ kind: 'add', refundFen: rf }, x);
+    });
+    (S.plan.groups.neutral || []).forEach(function (d) {
+      if (d.src !== 'row' || d.summary) return;
+      items.push({ id: 'N:' + d.key, keys: [d.key], title: d.title || d.cp || '', time: d.time, fen: d.fen, type: d.type, cat: null, units: d.units, kind: 'neutral', refundFen: 0 });
+    });
+    return items;
   }
   function renderRecon() {
     hideSteps();
@@ -1343,14 +1357,17 @@
       b.appendChild(ra);
     }
     var list = el('div'); list.id = 'impReconList';
-    var picked = 0, pickedFen = 0;
-    m.items.forEach(function (x) {
+    var picked = 0, pickedFen = 0, its = reconItems(), nN = 0;
+    its.forEach(function (x) {
+      if (x.kind === 'neutral' && !nN++) list.appendChild(el('div', 'imp-sec-t imp-recon-neutral-t', '不计的（不算收支，默认不勾）'));
       var r = el('label', 'imp-row-opt imp-tap imp-recon-row'); r.dataset.id = x.id;
       var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!S.view.reconPick[x.id];
       cb.addEventListener('change', function () { if (cb.checked) S.view.reconPick[x.id] = true; else delete S.view.reconPick[x.id]; render(); });
       r.appendChild(cb);
-      r.appendChild(el('span', 'grow', fmtTime(x.time) + ' · ' + (x.cat || '未分类') + ' · ' + (x.title || '—')));
-      r.appendChild(el('span', null, (x.type === 'income' ? '+' : '−') + yuan(x.fen)));
+      var g = el('span', 'grow', fmtTime(x.time) + ' · ' + (x.kind === 'neutral' ? '不计' : (x.cat || '未分类')) + ' · ' + (cpShow(x.title) || '—'));
+      if (x.refundFen) g.appendChild(el('div', 'imp-soft imp-recon-ref', '含退款 ' + yuan(x.refundFen) + ' 元（勾上一起补进）'));
+      r.appendChild(g);
+      r.appendChild(el('span', null, (x.kind === 'neutral' ? '' : x.type === 'income' ? '+' : '−') + yuan(x.fen)));
       list.appendChild(r);
       if (S.view.reconPick[x.id]) { picked += x.units; pickedFen += x.fen; }
     });

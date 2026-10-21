@@ -300,11 +300,16 @@
     var want = {}; (keys || []).forEach(function (k) { want[k] = true; });
     var orders = ws.orders.filter(function (o) { return want[o.app + '|' + o.no] && o.st === 0 && o.ref && o.ref.tmp; });
     var tmps = {}; orders.forEach(function (o) { tmps[o.ref.tmp] = true; });
+    // 1021-T22（实测 10-21 第 13 条）：勾了原单，这一批里挂在它上面的退款一起补进（不然支出多算）；退款自己的单号也登记上
+    var refTmp = {}, nRef = 0;
+    ws.records.forEach(function (r) { if (r.refundOf && r.refundOf.tmp && tmps[r.refundOf.tmp] && !tmps[r.tmp]) { refTmp[r.tmp] = true; nRef++; } });
+    ws.orders.forEach(function (o) { if (o.st === 0 && o.ref && o.ref.tmp && refTmp[o.ref.tmp] && orders.indexOf(o) < 0) orders.push(o); });
+    Object.keys(refTmp).forEach(function (t) { tmps[t] = true; });
     var cps = (info.cps || []).slice(), pms = (info.pms || []).slice(), cpAt = {}, pmAt = {};
     cps.forEach(function (n, i) { if (!(n in cpAt)) cpAt[n] = i; });
     pms.forEach(function (n, i) { if (!(n in pmAt)) pmAt[n] = i; });
     var idx = function (list, at, name) { if (!(name in at)) { at[name] = list.length; list.push(name); } return at[name]; };
-    var recs = ws.records.filter(function (r) { return tmps[r.tmp] && !r.refundOf; }).map(function (r) {
+    var recs = ws.records.filter(function (r) { return tmps[r.tmp] && (!r.refundOf || refTmp[r.tmp]); }).map(function (r) {
       var o = {}; Object.keys(r).forEach(function (k) { o[k] = r[k]; });
       if (Number.isInteger(r.cp)) o.cp = idx(cps, cpAt, ws.cps[r.cp]);
       if (Number.isInteger(r.pm)) o.pm = idx(pms, pmAt, ws.pms[r.pm]);
@@ -314,7 +319,7 @@
     orders = orders.filter(function (o) { return keep[o.ref.tmp]; });
     var catsAdded = ws.catsAdded.filter(function (c) { return recs.some(function (r) { return r.cat === c; }); });
     var counts = {}; Object.keys(ws.counts).forEach(function (k) { counts[k] = 0; });
-    counts.add = orders.length;
+    counts.add = orders.length - nRef; if (nRef) counts.refund = nRef;
     var log = {}; Object.keys(ws.log).forEach(function (k) { log[k] = ws.log[k]; });
     log.catsAdded = catsAdded; log.rulesAdded = { cat: [], type: [] }; log.only = true;
     // 1017-X：补进去的这几笔原来在待处理池里的（以前导入时留下的），从池子里拿掉（不然待处理里还有一份，再作为新增就记了两遍）；
