@@ -4,8 +4,6 @@ on:
   # 1021-T1：体验版分支（实测 10-20 的方案）推上去也打，发到单独的「体验版」，和「最新测试版」分开
   push:
     branches: [main, claude/relaxed-turing-1v8wg9]
-    # 1021-β：推 v 开头的标签（比如 v1021-beta）= 打包并发成正式版（见最后一步）
-    tags: ['v*']
   workflow_dispatch:
 jobs:
   build:
@@ -131,19 +129,22 @@ jobs:
             gh release create trial-build "$APK" --title "体验版 $VER" --notes "$NOTES" --prerelease --target "$GITHUB_SHA"
           fi
 
-      # 1021-β：推了 v 开头的标签才跑：把这次打的包发成正式版（标为 Latest）。标题读 docs/release/<标签>.title，
-      #   说明读 docs/release/<标签>.md，安装包叫 jiwen-<标签去掉 v>.apk；这个标签已经有发行版了就停下、不覆盖
-      - name: 发布正式版（推了 v 开头的标签才跑）
-        if: startsWith(github.ref, 'refs/tags/v')
+      # 1021-β：发正式版。docs/release/publish 里写着要发的标签（比如 v1021-beta），这个发行版还没有就发（标为 Latest），
+      #   有了就跳过（以后照常推也不会重复发）。标题读 docs/release/<标签>.title、说明读 docs/release/<标签>.md，
+      #   安装包叫 jiwen-<标签去掉 v>.apk，标签打在这次提交上。只在 main 和体验版分支上跑
+      - name: 发布正式版（docs/release/publish 里写的、还没发过的）
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/relaxed-turing-1v8wg9')
         env:
           GH_TOKEN: ${{ github.token }}
-          REL: ${{ github.ref_name }}
         run: |
           set -e
+          [ -f docs/release/publish ] || { echo "没有要发的正式版"; exit 0; }
+          REL=$(head -1 docs/release/publish | tr -d '[:space:]')
+          [ -n "$REL" ] || { echo "没有要发的正式版"; exit 0; }
+          if gh release view "$REL" >/dev/null 2>&1; then echo "$REL 已经发过了，跳过"; exit 0; fi
           NOTES_FILE="docs/release/$REL.md"; TITLE_FILE="docs/release/$REL.title"
           test -f "$NOTES_FILE" || { echo "没有说明文件 $NOTES_FILE"; exit 1; }
-          if gh release view "$REL" >/dev/null 2>&1; then echo "已经有 $REL 了，不覆盖"; exit 1; fi
           TITLE=$(cat "$TITLE_FILE" 2>/dev/null || echo "$REL")
           APK="$RUNNER_TEMP/jiwen-${REL#v}.apk"
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
-          gh release create "$REL" "$APK" --title "$TITLE" --notes-file "$NOTES_FILE" --latest --verify-tag
+          gh release create "$REL" "$APK" --title "$TITLE" --notes-file "$NOTES_FILE" --latest --target "$GITHUB_SHA"
