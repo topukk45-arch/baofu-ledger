@@ -24,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1021-T19';
+  var VERSION = '1021-T21';
   var HIST_MIN = 3, HIST_SHARE = 0.8;   // 1021-T8 从账本历史里学：同一个对方以前至少 3 条、八成以上同一类
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
@@ -62,6 +62,8 @@
     '美容美发': ['美容', '美发', '个护', '购物'],
     '转账红包': ['转账', '红包'],
     '文化休闲': ['娱乐', '休闲', '文娱', '游戏'],
+    '游戏': ['游戏', '娱乐', '休闲', '文娱'],            // 1021-T21：从文化休闲拆出来的两类，没有同名的就落进原来那几个娱乐分类
+    '会员订阅': ['会员订阅', '会员', '订阅', '娱乐', '休闲', '文娱'],
     '交通出行': ['出行', '交通', '通勤'],
     '充值缴费': ['缴费', '生活缴费', '日常缴费', '话费', '通讯', '通信', '手机', '充值', '水电', '水电煤'],
     '医疗健康': ['医疗', '健康', '看病', '医药'],
@@ -210,6 +212,18 @@
       if (x.layer === 'none' || x.want !== w) raw[i] = { want: w, layer: 'builtin', conf: 'low', reason: '内置（「' + cc + '」其他几笔的商品说明）→ ' + w };
     });
 
+    // 1021-T21（实测 10-21）：推出来是「文化休闲」的再拆成「游戏」「会员订阅」（词表在 merchants.js 的 funSplit），剩下的才算文化休闲
+    var FS = (ctx.merchants && ctx.merchants.funSplit) || null;
+    if (FS) raw.forEach(function (x, i) {
+      if (x.cat || x.want !== '文化休闲') return;
+      var r = rows[i], text = (cleanCp(r.cp || '') + ' ' + (r.cp || '') + ' ' + (r.desc || '')).toLowerCase();
+      var has = function (list) { for (var j = 0; j < list.length; j++) if (text.indexOf(String(list[j]).toLowerCase()) >= 0) return list[j]; return null; };
+      var kw = has(G.strong || []), to = kw ? '游戏' : null;
+      if (!to && (kw = has(FS.sub))) to = '会员订阅';
+      if (!to && (kw = has(FS.game))) to = '游戏';
+      if (!to) return;
+      x.want = to; x.reason = '拆开文化休闲：「' + kw + '」→ ' + to;
+    });
     // 落到存档的分类；落不下的数一数，决定建不建
     var need = {};
     raw.forEach(function (x) {
