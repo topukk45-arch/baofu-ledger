@@ -24,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1021-T8';
+  var VERSION = '1021-T19';
   var HIST_MIN = 3, HIST_SHARE = 0.8;   // 1021-T8 从账本历史里学：同一个对方以前至少 3 条、八成以上同一类
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
@@ -197,8 +197,10 @@
     });
 
     // 只在商品说明里找到的：同一个对方投票，唯一最多的给这个对方所有这种行（还有没推出来的行），打平都不推荐
+    //   1021-T19（实测 10-21）：对方是平台（淘宝、美团……）或「什么都卖」名单里的不投票：同一平台下是不同的店，
+    //   惠宜选超市不该因为闪购别的几笔是外卖就被带成餐饮
     var votes = new Map();
-    raw.forEach(function (x) { if (x.descOnly && x.cc) { var v = votes.get(x.cc); if (!v) votes.set(x.cc, v = {}); v[x.want] = (v[x.want] || 0) + 1; } });
+    raw.forEach(function (x) { if (x.descOnly && x.cc && !weakWord(x.cc) && SELLS.every(function (w) { return x.cc.indexOf(w) < 0; })) { var v = votes.get(x.cc); if (!v) votes.set(x.cc, v = {}); v[x.want] = (v[x.want] || 0) + 1; } });
     var winner = new Map(); votes.forEach(function (v, k) { winner.set(k, majority(v)); });
     raw.forEach(function (x, i) {
       var cc = x.descOnly ? x.cc : (x.layer === 'none' ? cleanCp(rows[i].cp || '') : null);
