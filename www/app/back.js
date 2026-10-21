@@ -140,6 +140,8 @@
                 // 最后才是子页：前面全关完了，返回键才把日子页收回记账页
                 { can:()=>{ const p=$('pageDays'); return !!p && p.style.display==='block'; },
                   close:()=>backFromDaysPage() },
+                // 1021-T23：从导入结果页「接下来可以」跳到统计 / 预算 / 记一笔的：都关完了再按返回，回到导入结果页（15 分钟内）
+                { can:()=>!!(window.JiwenImportUI && window.JiwenImportUI.canReturn && window.JiwenImportUI.canReturn()), close:()=>window.JiwenImportUI.returnToResult() },
             ];
 
             function topLayer(){ return LAYERS.find(l=>{ try{ return l.can(); }catch(_){ return false; } }); }

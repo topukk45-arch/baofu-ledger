@@ -80,7 +80,7 @@ async function boot(o) {
     const list = files.map(([name, bytes]) => new w.File([bytes], name));
     Object.defineProperty(input, 'files', { value: list, configurable: true });
     input.dispatchEvent(new w.Event('change'));
-    if (wait) await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 15000);
+    if (wait) await until(() => $('impGo') && /^(导入 \d+ 条|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 15000);
     if (wait) t.w.JiwenImportUI._goStep('check');   // 1017-UI2：从第 1 步开始看（等按钮时走到了总览）
   };
   t.go = () => $('impGo').textContent;
@@ -120,7 +120,7 @@ const before = await t.snapshot();
   const S = t.S(), want = direct(FILES);
   ok(S && S.phase === 'confirm' && t.$('impProg').style.display === 'none', '1 跑完进度，打开确认页');
   ok(JSON.stringify(S.plan.counts) === JSON.stringify(want.counts) && S.plan.importN === want.importN && S.plan.mergeM === want.mergeM, '1 页面上的方案和直接算的一样：' + JSON.stringify(S.plan.counts));
-  ok(t.go() === `新建 ${want.records} 条记录，合并 ${want.mergeM} 笔` && !t.$('impGo').disabled, '1 底部按钮：' + t.go());
+  ok(t.go() === `导入 ${want.records} 条` + (want.mergeM ? `，合并 ${want.mergeM} 笔` : '') && !t.$('impGo').disabled, '1 底部按钮：' + t.go());
   ok(['add', 'merge', 'pending', 'neutral', 'skip'].every(g => t.chip(g) === want.counts[g]) && t.chip('refund') === want.counts.refund, '1 汇总一行的数字对得上');
   t.UI()._goStep('check');   // 1017-UI2：文件卡（来源、时间范围、笔数核对）在第 1 步「核对」
   let cards = [...t.d.querySelectorAll('#impFiles .imp-card')];
@@ -159,7 +159,7 @@ const before = await t.snapshot();
   const reopen = () => { const S0 = t.S(); Object.keys(S0.plan.groups).forEach(g => { S0.view.open[g] = true; }); t.w.JiwenImportUI._goStep('overview'); [...t.d.querySelectorAll('.imp-list[data-group] .al-row')].find(x => x.textContent.includes('某某')).click(); };
   ok(t.S().plan.groups.add.find(d => d.cp === '某某').cat === '购物' && ![...t.$('impCpGroups') ? t.$('impCpGroups').querySelectorAll('.imp-row-opt') : []].some(r => r.dataset.cp === '某某'), '2 详情里改分类：这行变成购物，不再出现在按对方选分类里');
   reopen(); t.$('impExclude').click(); t.$('impSheetOk').click();
-  ok(t.S().plan.importN === N0 - 1 && t.go() === `新建 ${t.S().plan.records} 条记录，合并 ${M0} 笔` && t.chip('excluded') === 1, '2 勾掉一笔：按钮变成 ' + t.go());
+  ok(t.S().plan.importN === N0 - 1 && t.go() === `导入 ${t.S().plan.records} 条` + (M0 ? `，合并 ${M0} 笔` : '') && t.chip('excluded') === 1, '2 勾掉一笔：按钮变成 ' + t.go());
   ok(t.d.querySelector('#impFiles .imp-diff-expense').textContent.includes('你勾掉的 50.00') && t.d.querySelector('#impFiles .imp-diff-expense').textContent.endsWith('合计差 0.00'), '2 差额里多出「你勾掉的」，合计照样差 0');
   reopen(); t.$('impRestore').click(); t.$('impSheetOk').click();
   ok(t.S().plan.importN === N0, '2 恢复：按钮回到 ' + t.go());
@@ -236,7 +236,7 @@ const before = await t.snapshot();
   // 取消以后再导一次：正常
   await new Promise(r => setTimeout(r, 150));
   await t.openImport(); await t.pick(FILES);
-  ok(t.S().phase === 'confirm' && t.go().startsWith('新建 '), '4 取消以后再导一次：正常');
+  ok(t.S().phase === 'confirm' && t.go().startsWith('导入 '), '4 取消以后再导一次：正常');
   t.$('impBack').click();
   ok(t.$('impPage').style.display === 'block' && t.$('uiSheetMask').classList.contains('open'), '4 顶上「‹ 取消」：有方案时先问一句（1017-UI2）');
   t.$('impExitOk').click();

@@ -82,7 +82,7 @@ async function boot(o) {
     const input = $('impFile');
     Object.defineProperty(input, 'files', { value: files.map(([name, bytes]) => new w.File([bytes], name)), configurable: true });
     input.dispatchEvent(new w.Event('change'));
-    await until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
+    await until(() => $('impGo') && /^(导入 \d+ 条|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex');
     w.JiwenImportUI._goStep('check');   // 1017-UI2：从第 1 步开始看（等按钮时走到了总览）
     const S = t.S();
     if (edit) { edit(S); w.JiwenImportUI._replan(); }

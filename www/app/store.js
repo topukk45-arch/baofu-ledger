@@ -1951,8 +1951,10 @@
                 const cpHist={}, cpsA=a.cps||[];
                 (st ? st.recs : []).forEach(r=>{ if(!Number.isInteger(r.cp) || r.refundOf || !r.cat || r.cat==='未分类') return; const nm=cpsA[r.cp]; if(!nm) return;
                     const io=r.type==='income' ? 'i' : 'e', h=cpHist[nm]||(cpHist[nm]={ e:{}, i:{} }); h[io][r.cat]=(h[io][r.cat]||0)+1; });
+                // 1021-T23：存档里有几条手记（没有导入来源的；合并过账单的手记也算），没有手记时确认页不提「只对账」「漏记」
+                const manualN=(st ? st.recs : []).filter(r=>!r.src || r.src.merged).length;
                 return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(),
-                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist };
+                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, manualN, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）
             async knownFor(lk, archive){

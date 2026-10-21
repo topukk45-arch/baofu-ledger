@@ -16,7 +16,7 @@ const RANGE = mo => ({ from: `2026-${String(mo).padStart(2, '0')}-01 00:00:00`, 
 const lastTo = t => [...t.d.querySelectorAll('.imp-last-to')].map(x => x.textContent);
 
 (async () => {
-  const t = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
+  const t = await A.boot({ html, www: WWW, seed: A.seedOf([{ id: 'mFar', time: '2025-01-02T08:00', money: 1, type: 'expense', cat: '其他', remark: '虚构的一条老手记（1021-T23：存档里有手记才有只对账）' }]) });
   const OCT = [['微信10月.csv', B.bill('wechat', [tx('wechat', 10, 3, 1200)], { range: RANGE(10) }).bytes]];
   const NOV = [['微信11月.csv', B.bill('wechat', [tx('wechat', 11, 3, 1300)], { range: RANGE(11) }).bytes], ['支付宝11月.csv', B.bill('alipay', [tx('alipay', 11, 4, 1400)], { range: RANGE(11) }).bytes]];
   let txt = null;

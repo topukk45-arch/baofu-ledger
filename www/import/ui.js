@@ -94,6 +94,8 @@
     '.imp-tag{display:inline-block;font-size:11px;border:1px solid var(--c-border-mid);border-radius:8px;padding:0 5px;margin-left:4px;}',
     '#impBar.ui-bar{z-index:991;}',
     '#impToTop.to-top{z-index:992;bottom:calc(var(--imp-bar,0px) + 16px);}',
+    // 1021-T23：从结果页跳走以后左上角的「‹ 回到导入结果」（盖在页面上，弹窗在它上面）
+    '.imp-return{position:fixed;left:8px;top:calc(env(safe-area-inset-top) + 8px);z-index:960;min-height:48px;padding:0 16px;border-radius:24px;border:1px solid var(--c-border-mid);background:var(--c-surface);color:var(--c-primary-dark);font-size:15px;box-shadow:0 3px 12px rgba(var(--c-shadow-rgb),0.3);}',
     '#impSheetMask{position:fixed;inset:0;z-index:995;background:rgba(0,0,0,.3);display:none;align-items:flex-end;justify-content:center;}',
     '#impSheetPanel{background:var(--c-surface-2);width:100%;max-width:520px;max-height:88vh;max-height:88dvh;overflow-y:auto;border-radius:16px 16px 0 0;padding:16px 16px 0;}',
     '#impSheet h4{font-size:16px;margin-bottom:8px;color:var(--c-primary-deep);}',
@@ -192,6 +194,8 @@
     '.imp-cg .grow{flex:1 1 auto;min-width:0;}.imp-cg-go{color:var(--c-text-soft);font-size:16px;}',
     '.imp-cg-cb{display:flex;align-items:center;justify-content:center;min-width:48px;min-height:48px;margin-left:-8px;}.imp-cg-cb input{width:20px;height:20px;}',
     '.imp-pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 12px;}.imp-pager .ui-btn{flex:0 0 auto;min-width:112px;}.imp-pg-n{color:var(--c-text-soft);font-variant-numeric:tabular-nums;}',
+    // 1021-T23（实测 10-21 第 8 条）：明细里的分类标签跟着字宽走（原来定死 4.6em，「交通出行」「文化休闲」四个字就被切成「交通…」）
+    '#impPage .al-cat .cat-tag{width:auto;min-width:4.6em;max-width:7.5em;}',
     '.imp-tile-go{cursor:pointer;}.imp-nc-links{display:flex;flex-wrap:wrap;gap:0 12px;margin:-4px 0 8px;}.imp-nc-links .imp-link,.imp-petty-rows{min-height:48px;}',
     '.imp-search-none{padding:12px 4px;color:var(--c-text-soft);font-size:14px;}',
     '.imp-near-item{position:relative;}.imp-near-item .pc{padding-left:52px;}',
@@ -318,7 +322,7 @@
 
   // ---------- 打开 / 关掉 ----------
   function open() {
-    build(); setTokens();
+    build(); setTokens(); stashResult(null);   // 1021-T23：开始新的一次导入，「回到导入结果」就不要了
     S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {}, seen: {}, more: {}, step: null } };
     try { dom.archive.textContent = '导入到存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
@@ -734,7 +738,10 @@
     if (cp === null || cp === undefined) return cp;
     var t = String(cp).replace(/^品：/, '').replace(/[\s\u3000]+/g, ' ');   // 1021-T17：按商品说明归的组键「品：果切」只显示「果切」
     for (var i = 0; i < 3; i++) t = t.replace(/[(（][\s\u3000]*[)）]/g, '').replace(/[［\[][\s\u3000]*[\]］]/g, '');
-    return t.replace(/\s+/g, ' ').trim();
+    t = t.replace(/\s+/g, ' ').trim();
+    // 1021-T23（实测 10-21 第 7 条）：「在 宇洁麻辣拌店 消费扫码付款」这类套话只留店名
+    var bp = /^在\s*(.+?)\s*消费(扫码付款|付款|支付)?$/.exec(t);
+    return bp ? bp[1] : t;
   }
   // 结论：[{ t, ok: true 对上 / false 有出入 / null 说不上 }]
   function verdict(m, ds) {
@@ -886,7 +893,7 @@
     s.refundHints.forEach(function (h) { add('refund', 'rh:' + h.key, !!V['rh:' + h.key], '全额退款提醒：' + rl(h.key), [h.key], { look: true }); });
     if (s.receipt) add('refund', 'receipt', !!V.receipt, '收款按天合并', [], {});
     s.petty.forEach(function (x) { add('refund', 'petty:' + x.key, x.key in E.petty, '零碎扣款：' + x.cp + ' · ' + x.month, []); });
-    s.newCats.forEach(function (x) { add('cat', 'nc:' + x.name, x.name in E.newCats, '新建分类「' + x.name + '」', newCatKeys(p, x.name)); });
+    s.newCats.forEach(function (x) { add('cat', 'nc:' + x.name, x.name in E.newCats || !!S.view.seen['nc:' + x.name], '新建分类「' + x.name + '」', newCatKeys(p, x.name)); });   // 1021-T23：面板里选了和原来一样的也算定过
     s.cpGroups.forEach(function (g) { add('cat', 'cp:' + g.cp, g.cp in E.cpCats || !!V['cp:' + g.cp], cpShow(g.cp) + ' · ' + g.n + ' 笔 · ' + yuan(g.fen), g.keys); });
     // 1021-T14：「推荐要你看一眼」的单笔不再一件一件列（并进按组选；零散的照推荐入账、标待确认分类）
     var tk = typeKeys(s);
@@ -942,7 +949,7 @@
     var E = S.edits, k = id.slice(id.indexOf(':') + 1), kind = id.slice(0, id.indexOf(':'));
     if (kind === 'sum' && E.sums[k] !== undefined) return function () { delete E.sums[k]; };
     if (kind === 'cp' && E.cpCats[k]) return function () { delete E.cpCats[k]; delete S.view.seen['cp:' + k]; };
-    if (kind === 'nc' && E.newCats[k]) return function () { delete E.newCats[k]; };
+    if (kind === 'nc' && (E.newCats[k] || S.view.seen['nc:' + k])) return function () { delete E.newCats[k]; delete S.view.seen['nc:' + k]; };
     if (kind === 'petty' && E.petty[k]) return function () { delete E.petty[k]; };
     if (kind === 'near' && E.rows[k] && (E.rows[k].split || E.rows[k].pay !== undefined)) return function () { var e = E.rows[k]; delete e.split; delete e.pay; if (!Object.keys(e).length) delete E.rows[k]; };
     if ((kind === 'ps' || kind === 'lc') && E.rows[k] && (E.rows[k].pick || E.rows[k].cat)) return function () { var e = E.rows[k]; delete e.pick; if (kind === 'lc') delete e.cat; if (!Object.keys(e).length) delete E.rows[k]; delete S.view.seen['keep:' + k]; };
@@ -1123,17 +1130,28 @@
     dom.recon.textContent = '只对账';
     if (step === 'overview') {
       dom.go.classList.add('ui-full');
+      // 1021-T23（实测 10-21 第 6 条）：按钮写「导入 827 条」（和上面「新建 827 条」同一个数）；有手记、合并了才写「，合并 Y 笔」
       dom.go.textContent = (p.records + p.mergeM === 0 && p.counts.pending) ? '存下待处理 ' + p.counts.pending + ' 笔'
-        : '新建 ' + p.records + ' 条记录，合并 ' + p.mergeM + ' 笔';      // 1016-G：写实际新建几条记录（分分捐、收款合并以后）
+        : '导入 ' + p.records + ' 条' + (hasManual() && p.mergeM ? '，合并 ' + p.mergeM + ' 笔' : '');      // 1016-G：写实际新建几条记录（分分捐、收款合并以后）
       dom.go.disabled = !p.canImport;
       dom.recon.disabled = !p.canImport || !Plan.missed(p).items.length;
-      barSet(i > 0 ? [dom.go, prevB, dom.recon] : [dom.go, cancel, dom.recon]);
+      // 1021-T23（第 14 条）：这段时间没有手记就没有「只对账」（谈不上漏记）
+      var bb = i > 0 ? [dom.go, prevB] : [dom.go, cancel]; if (hasManual()) bb.push(dom.recon);
+      barSet(bb);
     } else {
       if (step === 'check' && p.blocking.length) next.disabled = true;
       barSet(i > 0 ? [prevB, next] : [cancel, next]);
     }
     dom.page.scrollTop = y;
   }
+  // 存档里有没有手记（没有就不提「只对账」「漏记」「和手记合并」）；老主程序没有 manualN 时看这段时间配对用的手记和记录条数
+  function hasManual() {
+    if (!S) return false;
+    if (S.info && typeof S.info.manualN === 'number') return S.info.manualN > 0;
+    return !!((S.manualById && Object.keys(S.manualById).length) || (S.info && S.info.records));
+  }
+  // 分组的叫法：「新增」那组叫「支出和收入」（1021-T23，第 6 条：免得和「新建 827 条」看成两个口径）
+  function gName(g) { return g === 'add' ? '支出和收入' : S.plan.groupNames[g]; }
   function intro(main, sub) {
     var c = el('div', 'imp-intro'); c.id = 'impIntro';
     c.appendChild(el('div', 'imp-intro-t', main)); if (sub) c.appendChild(el('div', 'imp-soft', sub));
@@ -1149,7 +1167,7 @@
     if (g.units) notes.push('其中 ' + g.units + ' 笔合成 ' + g.lines + ' 条' + (g.appended ? '（' + g.appended + ' 笔追加到已有的汇总里）' : ''));
     if (g.units || p.records !== p.importN) notes.push('共 ' + p.records + ' 条记录' + (p.sections && p.sections.fees && p.sections.fees.length ? '，含 ' + p.sections.fees.length + ' 笔服务费' : ''));
     if (notes.length) nw += '（' + notes.join('，') + '）';
-    var parts = [nw, '和手记合并 ' + c.merge, '待处理 ' + c.pending, '跳过 ' + c.skip];
+    var parts = [nw].concat(hasManual() || c.merge ? ['和手记合并 ' + c.merge] : []).concat(['待处理 ' + c.pending, '跳过 ' + c.skip]);
     if (c.error) parts.push('读不出 ' + c.error);
     if (c.excluded) parts.push('你勾掉的 ' + c.excluded);
     return tot + ' 笔 = ' + parts.join(' + ');
@@ -1357,9 +1375,8 @@
       b.appendChild(ra);
     }
     var list = el('div'); list.id = 'impReconList';
-    var picked = 0, pickedFen = 0, its = reconItems(), nN = 0;
-    its.forEach(function (x) {
-      if (x.kind === 'neutral' && !nN++) list.appendChild(el('div', 'imp-sec-t imp-recon-neutral-t', '不计的（不算收支，默认不勾）'));
+    var picked = 0, pickedFen = 0, its = reconItems(), nN = 0, big = its.length > DET_FLAT;
+    var rowOf = function (box, x) {
       var r = el('label', 'imp-row-opt imp-tap imp-recon-row'); r.dataset.id = x.id;
       var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!S.view.reconPick[x.id];
       cb.addEventListener('change', function () { if (cb.checked) S.view.reconPick[x.id] = true; else delete S.view.reconPick[x.id]; render(); });
@@ -1368,8 +1385,16 @@
       if (x.refundFen) g.appendChild(el('div', 'imp-soft imp-recon-ref', '含退款 ' + yuan(x.refundFen) + ' 元（勾上一起补进）'));
       r.appendChild(g);
       r.appendChild(el('span', null, (x.kind === 'neutral' ? '' : x.type === 'income' ? '+' : '−') + yuan(x.fen)));
-      list.appendChild(r);
-      if (S.view.reconPick[x.id]) { picked += x.units; pickedFen += x.fen; }
+      box.appendChild(r);
+    };
+    its.forEach(function (x) { if (S.view.reconPick[x.id]) { picked += x.units; pickedFen += x.fen; } });
+    // 1021-T23（实测 10-21 第 15 条）：超过 20 笔按分类一类一行（不计的单独一类）、默认收起，组上能全选，组内每页 50；少的照旧平铺
+    if (big) list.appendChild(groupedList({ id: 'recon', list: its, cls: 'imp-recon-box', row: rowOf,
+      nameOf: function (x) { return x.kind === 'neutral' ? '不计的（默认不勾）' : (x.cat || '未分类'); },
+      sel: { on: function (x) { return !!S.view.reconPick[x.id]; }, set: function (xs, on) { xs.forEach(function (x) { if (on) S.view.reconPick[x.id] = true; else delete S.view.reconPick[x.id]; }); render(); } } }));
+    else its.forEach(function (x) {
+      if (x.kind === 'neutral' && !nN++) list.appendChild(el('div', 'imp-sec-t imp-recon-neutral-t', '不计的（不算收支，默认不勾）'));
+      rowOf(list, x);
     });
     if (!m.items.length) list.appendChild(el('div', 'imp-soft', '没有漏记的。'));
     b.appendChild(list);
@@ -1447,18 +1472,19 @@
     var c = el('div', 'imp-card'); c.id = 'impSummary';
     // 1017-UI2：四格：新建、和手记合并、留在待处理、跳过；没定的待你确认写明留在待处理（不进账本）
     c.appendChild(el('h4', null, '这次会'));
-    c.appendChild(tiles([['新建', p.records + ' 条', rowsOpener('要新建的', ['add', 'refund', 'neutral'])], ['和手记合并', p.mergeM + ' 笔', rowsOpener('和手记合并的', ['merge'])],
-      ['留在待处理', (p.counts.pending || 0) + ' 笔', rowsOpener('留在待处理的', ['pending'])], ['跳过', (p.counts.skip || 0) + ' 笔', rowsOpener('跳过的', ['skip'])]], 'impTiles'));
+    c.appendChild(tiles([['新建', p.records + ' 条', rowsOpener('要新建的', ['add', 'refund', 'neutral'])]].concat(hasManual() || p.mergeM ? [['和手记合并', p.mergeM + ' 笔', rowsOpener('和手记合并的', ['merge'])]] : [])
+      .concat([['留在待处理', (p.counts.pending || 0) + ' 笔', rowsOpener('留在待处理的', ['pending'])], ['跳过', (p.counts.skip || 0) + ' 笔', rowsOpener('跳过的', ['skip'])]]), 'impTiles'));
     if (p.counts.pending) { var pn = el('div', 'imp-pend-note', p.counts.pending + ' 笔拿不准的（待你确认里没定的）留在待处理、不进账本，以后在待处理页处理。'); pn.id = 'impPendNote'; c.appendChild(pn); }
     c.appendChild(el('div', 'imp-sec-t', '分组明细（点一个看是哪几笔）'));
     var chips = el('div', 'imp-chips');
     ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'].forEach(function (g) {
       if (!p.counts[g] && (g === 'excluded' || g === 'error' || g === 'refund')) return;
       var ch = el('button', 'imp-chip'); ch.type = 'button'; ch.dataset.group = g;
-      ch.appendChild(document.createTextNode(p.groupNames[g] + ' ')); ch.appendChild(el('b', null, String(p.counts[g])));
+      if (g === 'merge' && !hasManual() && !p.counts.merge) return;
+      ch.appendChild(document.createTextNode(gName(g) + ' ')); ch.appendChild(el('b', null, String(p.counts[g])));
       // 1021-T17：点了打开「这几笔」面板（按时间排、分页、点一笔看详情改分类）；读不出来的、重复的行没有详情，照旧跳到明细
       ch.addEventListener('click', function () {
-        if (keysOfGroups([g]).length) { rowsOpener(p.groupNames[g], [g])(); return; }
+        if (keysOfGroups([g]).length) { rowsOpener(gName(g), [g])(); return; }
         S.view.details = true; S.view.open[g] = true; S.view.tag = null; render(); var h = document.getElementById('impG-' + g); if (h && h.scrollIntoView) h.scrollIntoView();
       });
       chips.appendChild(ch);
@@ -1466,7 +1492,7 @@
     c.appendChild(chips);
     if (p.sections.fees && p.sections.fees.length) { var fe = el('div', 'imp-soft', '零钱提现的服务费 ' + p.sections.fees.length + ' 笔，共 ' + yuan(p.sections.fees.reduce(function (s0, x) { return s0 + x.fen; }, 0)) + ' 元，单独记成支出（分类「' + p.sections.feeCat + '」；提现本身照旧不计）'); fe.id = 'impFees'; c.appendChild(fe); }
     var ms = Plan.missed(p);
-    if (ms.n) { var ml = el('div', 'imp-line', '这段时间漏记了 ' + ms.n + ' 笔，共 ' + yuan(ms.out) + ' 元' + (ms.inc ? '（另有收入 ' + yuan(ms.inc) + ' 元）' : '') + '（没和手记配上、要新建的）'); ml.id = 'impMissed'; c.appendChild(ml); }
+    if (ms.n && hasManual()) { var ml = el('div', 'imp-line', '这段时间漏记了 ' + ms.n + ' 笔，共 ' + yuan(ms.out) + ' 元' + (ms.inc ? '（另有收入 ' + yuan(ms.inc) + ' 元）' : '') + '（没和手记配上、要新建的）'); ml.id = 'impMissed'; c.appendChild(ml); }
     if (p.records !== p.importN) c.appendChild(el('div', 'imp-soft', '导入 ' + p.importN + ' 笔，分分捐、收款这类合并以后，实际新建 ' + p.records + ' 条记录'));
     if (p.blocking.length) c.appendChild(el('div', 'imp-line imp-bad', '有账单笔数对不上，先不能导入'));
     if (S.lost) c.appendChild(el('div', 'imp-soft', '有 ' + S.lost + ' 处改动因为重新计算失效了'));
@@ -1642,15 +1668,17 @@
       var nc = el('div', 'imp-card'); nc.id = 'impNewCats';
       nc.appendChild(el('h4', null, '新建分类（' + s.newCats.length + '）'));
       s.newCats.forEach(function (x) {
-        var r = el('div', 'imp-row-opt'); r.dataset.cat = x.name; r.dataset.item = 'nc:' + x.name;
-        var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on;
+        // 1021-T23（实测 10-21 第 12 条）：原来勾选框 +「并到已有…」下拉 +「待选」三样并在一行，看不出是建还是并；
+        //   现在一行只写「现在：新建「X」/ 并到「Y」/ 不建」，整行点开一个面板选（新建 / 不建 / 并到哪个）。勾选框和下拉留着（藏起来），照旧也能用
+        var r = el('div', 'imp-row-opt imp-tap imp-nc-row'); r.dataset.cat = x.name; r.dataset.item = 'nc:' + x.name;
+        var cb = el('input'); cb.type = 'checkbox'; cb.checked = x.on; cb.style.display = 'none';
         cb.addEventListener('change', function () { setNewCat(x, { on: cb.checked, into: cb.checked ? null : (x.into || null), picked: !cb.checked && !!x.picked }); replan(); });
-        var lb = el('label', 'grow imp-newcat-lb'); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '8px'; lb.style.minHeight = '48px'; lb.style.cursor = 'pointer';
+        var lb = el('div', 'grow imp-newcat-lb'); lb.style.display = 'flex'; lb.style.alignItems = 'center'; lb.style.gap = '8px'; lb.style.minHeight = '48px';
         lb.appendChild(cb);
         // 1017-UI9：写清会归进去哪几组（按对方）
         var into = {}; newCatKeys(p, x.name).forEach(function (k) { var d = rowByKey(k); if (!d) return; var cp0 = cpShow(d.cp) || '—'; into[cp0] = (into[cp0] || 0) + 1; });
-        var lbt = el('span', null, '建「' + x.name + '」 ' + x.count + ' 笔'); var iw = Object.keys(into);
-        var lbw = el('span'); lbw.appendChild(lbt); if (iw.length) lbw.appendChild(el('div', 'imp-soft imp-nc-into', (x.on ? '归进去的：' : '勾上会归进去：') + iw.slice(0, 4).map(function (k) { return k + '（' + into[k] + ' 笔）'; }).join('、') + (iw.length > 4 ? ' 等 ' + iw.length + ' 组' : '')));
+        var lbt = el('span', null, '推荐的「' + x.name + '」 · ' + x.count + ' 笔'); var iw = Object.keys(into);
+        var lbw = el('span'); lbw.appendChild(lbt); if (iw.length) lbw.appendChild(el('div', 'imp-soft imp-nc-into', (x.on ? '归进去的：' : '新建会归进去：') + iw.slice(0, 4).map(function (k) { return k + '（' + into[k] + ' 笔）'; }).join('、') + (iw.length > 4 ? ' 等 ' + iw.length + ' 组' : '')));
         lb.appendChild(lbw); r.appendChild(lb);
         // 1021-T17：「看这 N 笔」打开「这几笔」面板；归进去的每个对方也能单独点开
         var ncKeys = newCatKeys(p, x.name), byCp = {};
@@ -1662,10 +1690,24 @@
           b0.dataset.cp = c0; ncLinks.appendChild(b0);
         });
         var opts = [['', '并到已有…']].concat(S.info.cats.map(function (c) { return [c, '并到「' + c + '」']; }));
-        r.appendChild(select(opts, x.into || '', function (v) { setNewCat(x, v ? { on: false, into: v, picked: true } : { on: x.defaultOn, into: null, picked: false }); replan(); }, 'imp-into', '推荐的「' + x.name + '」你的存档里没有（' + x.count + ' 笔）'));
-        // 1021-T16：勾选框和「并到」下拉同时在，写一句现在到底是哪种
-        lbw.appendChild(el('div', 'imp-soft imp-nc-state', '现在：' + (x.on ? '新建「' + x.name + '」' : x.into ? '并到「' + x.into + '」' : '不建，这 ' + x.count + ' 笔落未分类')));
-        r.appendChild(mk(x.name in S.edits.newCats));
+        var sw0 = select(opts, x.into || '', function (v) { setNewCat(x, v ? { on: false, into: v, picked: true } : { on: x.defaultOn, into: null, picked: false }); replan(); }, 'imp-into', '推荐的「' + x.name + '」你的存档里没有（' + x.count + ' 笔）');
+        sw0.style.display = 'none'; r.appendChild(sw0);
+        lbw.appendChild(el('div', 'imp-nc-state', '现在：' + (x.on ? '新建「' + x.name + '」' : x.into ? '并到「' + x.into + '」' : '不建，这 ' + x.count + ' 笔落未分类')));
+        r.appendChild(el('span', 'imp-val imp-nc-go', '改 ›'));
+        r.addEventListener('click', function () {
+          if (!window.JiwenSheet) return;
+          var cur0 = x.on ? '__new' : x.into || '__none';
+          var po = [{ value: '__new', label: '新建「' + x.name + '」' }, { value: '__none', label: '不建，这 ' + x.count + ' 笔落未分类' }]
+            .concat(S.info.cats.filter(function (c) { return c !== '未分类'; }).map(function (c) { return { value: c, label: '并到「' + c + '」' }; }));
+          window.JiwenSheet.pick({ title: '「' + x.name + '」怎么办', sub: x.count + ' 笔推荐成「' + x.name + '」，你的存档里没有这个分类', options: po, value: cur0,
+            onPick: function (v) {
+              if (v === '__new') setNewCat(x, { on: true, into: null, picked: false });
+              else if (v === '__none') setNewCat(x, { on: false, into: null, picked: false });
+              else setNewCat(x, { on: false, into: v, picked: true });
+              S.view.seen['nc:' + x.name] = true; replan();
+            } });
+        });
+        r.appendChild(mk(x.name in S.edits.newCats || !!S.view.seen['nc:' + x.name]));
         nc.appendChild(r); nc.appendChild(ncLinks);
       });
       out.newCats = nc;
@@ -1897,7 +1939,7 @@
       if (!list.length) return;
       var n = list.reduce(function (s, d) { return s + d.units; }, 0), sum = list.reduce(function (s, d) { return s + (d.fen || 0); }, 0);
       var h = el('div', 'imp-gh'); h.id = 'impG-' + g; h.dataset.group = g;
-      h.appendChild(el('span', null, p.groupNames[g] + ' ' + n + ' 笔'));
+      h.appendChild(el('span', null, gName(g) + ' ' + n + ' 笔'));
       h.appendChild(el('span', 'imp-soft', '共 ' + yuan(sum) + ' 元 ' + (S.view.open[g] ? '▾' : '▸')));
       h.addEventListener('click', function () { S.view.open[g] = !S.view.open[g]; render(); });
       wrap.appendChild(h);
@@ -2249,7 +2291,7 @@
   }
   function searchHit(sq, fen, texts) {
     if (!sq) return true;
-    if (sq.fen !== null && fen === sq.fen) return true;
+    if (sq.fen !== null) return fen === sq.fen;   // 1021-T23（实测 10-21 第 17 条）：输入的是金额就只比金额（搜 431 不再冒出商品说明里长串数字带 431 的）
     return texts.some(function (x) { return x && String(x).toLowerCase().indexOf(sq.text) >= 0; });
   }
   // 一笔账单现在的去处：{ t, cls（pend / ok / skip / ''）, step（要你定的在第几步，没有就 null）, group }
@@ -2531,7 +2573,7 @@
   }
 
   // ---------- 底部按钮、复制 ----------
-  var BUCKET_LINE = [['add', '新增'], ['merge', '和手记合并'], ['neutral', '不计'], ['refund', '退款'], ['pending', '待处理'],
+  var BUCKET_LINE = [['add', '支出和收入'], ['merge', '和手记合并'], ['neutral', '不计'], ['refund', '退款'], ['pending', '待处理'],
                      ['skip', '跳过'], ['error', '出错'], ['excluded', '你勾掉的']];
   function onImport(onlyKeys) {
     if (!S || !S.plan || !S.plan.canImport || S.phase !== 'confirm') return;
@@ -2669,8 +2711,9 @@
       card.appendChild(el('div', 'imp-line imp-res-only', '只写了你勾选的 ' + c.add + ' 笔，其余什么都没改。'));
     } else {
       var rv = !!(S.plan && S.plan.rows);   // 1021-T17：四格都能点开看是哪几笔（已经写进账本了，只看不改）
-      card.appendChild(tiles([['新建', (res.r.added !== undefined ? res.r.added : c.add) + ' 条', rv && rowsOpener('新建的', ['add', 'refund', 'neutral'], true)], ['和手记合并', (c.merge || 0) + ' 笔', rv && rowsOpener('和手记合并的', ['merge'], true)],
-        ['留在待处理', (c.pending || 0) + ' 笔', rv && rowsOpener('留在待处理的', ['pending'], true)], ['跳过', (c.skip || 0) + ' 笔', rv && rowsOpener('跳过的', ['skip'], true)]], 'impResTiles'));
+      card.appendChild(tiles([['新建', (res.r.added !== undefined ? res.r.added : c.add) + ' 条', rv && rowsOpener('新建的', ['add', 'refund', 'neutral'], true)]]
+        .concat(hasManual() || c.merge ? [['和手记合并', (c.merge || 0) + ' 笔', rv && rowsOpener('和手记合并的', ['merge'], true)]] : [])
+        .concat([['留在待处理', (c.pending || 0) + ' 笔', rv && rowsOpener('留在待处理的', ['pending'], true)], ['跳过', (c.skip || 0) + ' 笔', rv && rowsOpener('跳过的', ['skip'], true)]]), 'impResTiles'));
       var sum = 0, parts = [];
       BUCKET_LINE.forEach(function (x) { var n = c[x[0]] || 0; sum += n; if (n) parts.push(x[1] + ' ' + n); });
       var tl = el('div', 'imp-line imp-res-total' + (sum === res.ws.total ? '' : ' imp-bad'),
@@ -2696,7 +2739,8 @@
     var nx = el('div', 'imp-card'); nx.id = 'impNext';
     nx.appendChild(el('h4', null, '接下来可以'));
     var nr = el('div', 'ui-stack');
-    var goNext = function (k) { return function () { close(); var N = window.JiwenImportNext; if (N && N[k]) N[k](); }; };
+    // 1021-T23（实测 10-21 第 16 条）：跳走前记住这一页，返回键（别的都关完以后）和左上角「‹ 回到导入结果」都回到这里（15 分钟内）
+    var goNext = function (k) { return function () { var keep = S; close(); stashResult(keep); var N = window.JiwenImportNext; if (N && N[k]) N[k](); }; };
     // 1017-H：交给 AI 再检查一遍（这时还能带上跳过、待处理的那几笔）
     var n0 = btn('交给 AI 再检查一遍 ›', 'ui-btn block', function () { openAiExport(res.ws.batch, { from: 'result', extra: aiExtraRows() }); }); n0.id = 'impNextAi';
     nr.appendChild(n0);
@@ -2722,6 +2766,28 @@
     un.id = 'impUndoThis';
     barSet([go, un]);
     dom.page.scrollTop = 0;
+  }
+
+  // ---------- 1021-T23：从结果页跳走以后回来 ----------
+  var RETURN_MS = 15 * 60000, stash = null, stashT = null;
+  function stashResult(st) {
+    stash = st && st.result ? { S: st, at: Date.now(), batch: st.result.ws.batch } : null;
+    var b = document.getElementById('impReturn');
+    if (!stash) { if (b) b.style.display = 'none'; return; }
+    if (!b) {
+      b = btn('‹ 回到导入结果', 'imp-return', function () { returnToResult(); }); b.id = 'impReturn';
+      b.setAttribute('aria-label', '回到导入结果'); document.body.appendChild(b);
+    }
+    b.style.display = '';
+    clearTimeout(stashT); stashT = setTimeout(function () { stashResult(null); }, RETURN_MS);
+  }
+  function canReturn() { return !!stash && Date.now() - stash.at < RETURN_MS && !isOpen(); }
+  function returnToResult() {
+    if (!stash) return;
+    var st = stash.S; stashResult(null);
+    build(); S = st; S.phase = 'done';
+    dom.page.style.display = 'block';
+    renderResult();
   }
 
   // ---------- 1016-L：导入记录、撤销（⑦b）----------
@@ -2789,6 +2855,8 @@
       // 1017-H：「AI 检查」（这时只导写进账本的那几笔）
       var acts = el('div', 'imp-log-acts');
       if (l.kind !== 'ai') { var ab = btn('AI 检查', 'imp-btn imp-log-ai', function () { openAiExport(l.b, { from: 'logs' }); }); ab.style.minWidth = '64px'; acts.appendChild(ab); }
+      // 1021-T23（第 16 条）：「看结果」：刚导完、结果页还记着的回到结果页（四格能点开看每一笔）；早一些的打开这一次的详情
+      if (l.kind !== 'ai') { var vr = btn('看结果', 'imp-btn imp-log-result', function () { if (stash && stash.batch === l.b) returnToResult(); else g.click(); }); vr.style.minWidth = '64px'; acts.appendChild(vr); }
       if (l.kind !== 'ai' && !l.only) { var rb = btn('重新分类', 'imp-btn imp-log-reclass', function () { openReclass(l.b); }); rb.style.minWidth = '64px'; acts.appendChild(rb); }
       acts.appendChild(u);
       r.appendChild(acts);
@@ -3391,7 +3459,7 @@
     try { var ta = el('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand && document.execCommand('copy'); ta.remove(); } catch (_) {}
   }
 
-  var UI = { open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  var UI = { canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _plainReason: function (r) { return plainReason(r); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

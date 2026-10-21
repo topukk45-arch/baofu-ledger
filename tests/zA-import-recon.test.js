@@ -55,7 +55,7 @@ const snapRows = p => p.rows.filter(d => d.src === 'row').map(d => [d.key, d.gro
   row(new1.no).click();
   ok($('impGo').textContent === '补进 1 笔' && !$('impGo').disabled, '1 勾一笔：「补进 1 笔」');
   $('impRecon').click();
-  ok($('impTitle').textContent === '导入确认' && /^新建/.test($('impGo').textContent), '1 「‹ 返回」回到确认页，按钮恢复');
+  ok($('impTitle').textContent === '导入确认' && /^导入/.test($('impGo').textContent), '1 「‹ 返回」回到确认页，按钮恢复');
   $('impRecon').click();
   ok(row(new1.no).checked, '1 再进来勾选还在');
   A.clickGo(t.w);

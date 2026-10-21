@@ -36,7 +36,7 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   const input = $('impFile');
   Object.defineProperty(input, 'files', { value: [new t.w.File([B.bill('wechat', [wx(5, 2300), wx(6, 1500)], { range: RANGE }).bytes], '微信.csv')], configurable: true });
   input.dispatchEvent(new t.w.Event('change'));
-  await t.until(() => $('impGo') && /^(新建 \d+ 条记录|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 30000);
+  await t.until(() => $('impGo') && /^(导入 \d+ 条|存下待处理)/.test($('impGo').textContent) && $('impBar').style.display === 'flex', 30000);
   // 1017-UI2：确认页分步了；第 1 步底部「取消 / 下一步」；总览主按钮单独一行在上，「上一步 / 只对账」在最下面（返回类放最下面）
   ok(inBar('impCancel') && inBar('impNext') && !$('impBar').contains(t.d.getElementById('impGo')), '4 第 1 步：底部「取消 / 下一步」');
   t.w.JiwenImportUI._goStep('overview');

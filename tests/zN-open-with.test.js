@@ -31,7 +31,7 @@ function plugin(first) {
   {
     const P = plugin({ name: '微信账单.csv', data: b64, size: csv.length });
     const t = await A.boot({ html, www: WWW, seed: A.seedOf([]), before: w => { w.Capacitor.Plugins.OpenFile = P.api; } });
-    await t.until(() => t.$('impGo') && /新建 1 条记录/.test(t.$('impGo').textContent), 20000);
+    await t.until(() => t.$('impGo') && /导入 1 条/.test(t.$('impGo').textContent), 20000);
     ok(t.$('impPage') && t.$('impPage').style.display === 'block' && t.S().parsed.files[0].name === '微信账单.csv', '1 打开 App 时带着的账单文件：直接进导入页、算好了方案');
     await t.back(); await t.back();
     // App 开着时又来一个

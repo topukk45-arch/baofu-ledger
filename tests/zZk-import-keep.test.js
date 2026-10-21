@@ -61,7 +61,7 @@ const MID = ['match', 'refund', 'cat', 'amount'];
   // ===== 1. 新建分类写会归进去哪几组；勾上以后那一组不消失，留一行去处 =====
   UI._goStep('cat');
   const ncRow = () => q('#impNewCats [data-item="nc:充值缴费"]');
-  ok(ncRow() && /勾上会归进去：某省联通（2 笔）/.test(ncRow().textContent), '1 新建分类写清勾上会归进去哪几组：' + (ncRow() || {}).textContent);
+  ok(ncRow() && /新建会归进去：某省联通（2 笔）/.test(ncRow().textContent), '1 新建分类写清勾上会归进去哪几组：' + (ncRow() || {}).textContent);
   ok(q('#impCpGroups .imp-cp-row[data-cp="某省联通"]'), '1 没勾的时候，某省联通在「按对方选分类」里');
   const h0 = q('#impCpGroups .imp-count');
   ok(h0 && /^待选 \d+ \/ 共 \d+$/.test(h0.textContent), '1 块标题写「待选 x / 共 y」：' + (h0 || {}).textContent);

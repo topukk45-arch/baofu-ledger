@@ -161,7 +161,7 @@ const MANY = () => [
 
   // ===== 5. 只对账也弹确认 =====
   {
-    const t = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
+    const t = await A.boot({ html, www: WWW, seed: A.seedOf([{ id: 'mFar', time: '2025-01-02T08:00', money: 1, type: 'expense', cat: '其他', remark: '虚构的一条老手记（1021-T23：存档里有手记才有只对账）' }]) });
     const raw = id => t.d.getElementById(id);
     await pick(t, bill([wx({ time: T(3, 9), cp: '某虚构书店', fen: 3600 }), wx({ time: T(4, 9), cp: '某虚构花店', fen: 1200 })]));
     t.w.JiwenImportUI._goStep('overview');
@@ -174,7 +174,7 @@ const MANY = () => [
     ok(!sheetOpen(t) && t.S().view.recon && JSON.stringify(await t.dump()) === JSON.stringify(D0), '5 「再看看」：回勾选清单，什么都没写');
     raw('impGo').click(); raw('impConfirmOk').click();
     await t.until(() => raw('impResult'), 30000);
-    ok(t.recs().length === 1, '5 确认以后只补进勾的那 1 笔');
+    ok(t.recs().filter(r => r.batch).length === 1, '5 确认以后只补进勾的那 1 笔');
     ok(!t.errs.length, '5 无报错 ' + t.errs.join('|'));
   }
 

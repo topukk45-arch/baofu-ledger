@@ -77,7 +77,8 @@ const bill = tx => [['微信' + (++seq) + '.csv', B.bill('wechat', tx, { range: 
   }
   // ===== 4 =====
   {
-    const MAN = [{ id: 'm2', time: '2026-10-01T08:30', money: 50, type: 'expense', cat: '吃饭', remark: '聚餐' }];
+    // 1021-T23：多一条很早的虚构手记（存档里有手记才有只对账；m2 后面会被删掉）
+    const MAN = [{ id: 'm2', time: '2026-10-01T08:30', money: 50, type: 'expense', cat: '吃饭', remark: '聚餐' }, { id: 'mFar', time: '2025-01-02T08:00', money: 1, type: 'expense', cat: '其他', remark: '虚构老手记' }];
     const t = await A.boot({ html, www: WWW, seed: A.seedOf(MAN, ['未分类', '吃饭', '其他']), now: '2026-10-20T10:00:00' });
     await t.w.eval('JiwenImportEntry.loadImportUI')();
     const F = bill([wx({ time: T(6, 12), cp: '某虚构饭店', fen: 5000 }), wx({ time: T(7, 12), cp: '某虚构茶馆', fen: 900 })]);
