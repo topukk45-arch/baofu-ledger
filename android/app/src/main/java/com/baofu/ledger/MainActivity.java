@@ -22,6 +22,9 @@ public class MainActivity extends BridgeActivity {
     // 1019-U：启动画面最多留这么久（毫秒）。网页层首屏画出来就调 Launch.ready()，通常用不到这么久
     private static final long SPLASH_MAX_MS = 1000;
 
+    // 1021-T28：启动画面淡出用多久（毫秒）
+    private static final long SPLASH_FADE_MS = 200;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         // 1019-U：启动画面等网页首屏画好再收（原来系统画出第一帧就收，那时网页还是一片底色），最多 1 秒。
@@ -39,9 +42,17 @@ public class MainActivity extends BridgeActivity {
             try {
                 SplashScreen splash = SplashScreen.installSplashScreen(this);
                 splash.setKeepOnScreenCondition(() -> !LaunchPlugin.isReady() && SystemClock.uptimeMillis() - t0 < SPLASH_MAX_MS);
+                // 1021-T28：启动画面淡出（SPLASH_FADE_MS），不再一下消失；淡出时下面的首屏已经画好，边淡边露出来。
+                //   性能记录里的「启动画面收起」记开始淡出的时刻；淡出出错就照原来直接拿掉
                 splash.setOnExitAnimationListener(view -> {
-                    try { view.remove(); } catch (Exception ignored) {}
                     LaunchPlugin.splashGone = SystemClock.uptimeMillis();
+                    try {
+                        view.getView().animate().alpha(0f).setDuration(SPLASH_FADE_MS)
+                            .withEndAction(() -> { try { view.remove(); } catch (Exception ignored) {} })
+                            .start();
+                    } catch (Exception e) {
+                        try { view.remove(); } catch (Exception ignored) {}
+                    }
                 });
             } catch (Exception ignored) {}
         }
