@@ -196,6 +196,7 @@
     '.imp-pager{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 12px;}.imp-pager .ui-btn{flex:0 0 auto;min-width:112px;}.imp-pg-n{color:var(--c-text-soft);font-variant-numeric:tabular-nums;}',
     // 1021-T23（实测 10-21 第 8 条）：明细里的分类标签跟着字宽走（原来定死 4.6em，「交通出行」「文化休闲」四个字就被切成「交通…」）
     '#impPage .al-cat .cat-tag{width:auto;min-width:4.6em;max-width:7.5em;}',
+    '.imp-recon-cb{display:flex;align-items:center;justify-content:center;min-width:48px;min-height:48px;margin:-8px 0 -8px -8px;flex:0 0 auto;}.imp-recon-cb input{width:20px;height:20px;}',
     '.imp-tile-go{cursor:pointer;}.imp-nc-links{display:flex;flex-wrap:wrap;gap:0 12px;margin:-4px 0 8px;}.imp-nc-links .imp-link,.imp-petty-rows{min-height:48px;}',
     '.imp-search-none{padding:12px 4px;color:var(--c-text-soft);font-size:14px;}',
     '.imp-near-item{position:relative;}.imp-near-item .pc{padding-left:52px;}',
@@ -994,6 +995,8 @@
         fb.appendChild(dr);
       }
       else if (node) fb.appendChild(node); else fb.appendChild(doneRow(x, false));
+      // 1021-T25（实测 10-21）：这一行下面的「看这 N 笔 / 某某 N 笔」跟着挪进「已处理」（原来留在原地，错位到下一项头上）
+      Array.prototype.filter.call(c.querySelectorAll('[data-of]'), function (n) { return n.dataset.of === x.id; }).forEach(function (n) { fb.appendChild(n); });
     });
     gs.forEach(function (x) { fb.appendChild(doneRow(x, true)); });
     var tg = btn('', 'imp-fold', function () { S.view.fold = S.view.fold || {}; S.view.fold[c.id] = !open0; render(); });
@@ -1377,14 +1380,21 @@
     var list = el('div'); list.id = 'impReconList';
     var picked = 0, pickedFen = 0, its = reconItems(), nN = 0, big = its.length > DET_FLAT;
     var rowOf = function (box, x) {
-      var r = el('label', 'imp-row-opt imp-tap imp-recon-row'); r.dataset.id = x.id;
-      var cb = el('input'); cb.type = 'checkbox'; cb.checked = !!S.view.reconPick[x.id];
+      // 1021-T25（实测 10-21）：左边勾选框（单独一块 48px）管勾不勾，点这一行别的地方看这笔账单的详情（和确认页一样，能改分类）；
+      //   几笔合成一条的打开「这几笔」面板
+      var r = el('div', 'imp-row-opt imp-tap imp-recon-row'); r.dataset.id = x.id;
+      var cbw = el('label', 'imp-recon-cb'), cb = el('input'); cb.type = 'checkbox'; cb.checked = !!S.view.reconPick[x.id];
       cb.addEventListener('change', function () { if (cb.checked) S.view.reconPick[x.id] = true; else delete S.view.reconPick[x.id]; render(); });
-      r.appendChild(cb);
+      cbw.appendChild(cb); cbw.addEventListener('click', function (ev) { ev.stopPropagation(); }); r.appendChild(cbw);
+      r.addEventListener('click', function () {
+        if (x.keys.length === 1 && rowByKey(x.keys[0])) openSheet(x.keys[0]);
+        else openRows({ title: cpShow(x.title) || '这几笔', keys: x.keys, id: 'recon:' + x.id });
+      });
       var g = el('span', 'grow', fmtTime(x.time) + ' · ' + (x.kind === 'neutral' ? '不计' : (x.cat || '未分类')) + ' · ' + (cpShow(x.title) || '—'));
       if (x.refundFen) g.appendChild(el('div', 'imp-soft imp-recon-ref', '含退款 ' + yuan(x.refundFen) + ' 元（勾上一起补进）'));
       r.appendChild(g);
       r.appendChild(el('span', null, (x.kind === 'neutral' ? '' : x.type === 'income' ? '+' : '−') + yuan(x.fen)));
+      r.appendChild(el('span', 'imp-soft imp-recon-go', '›'));
       box.appendChild(r);
     };
     its.forEach(function (x) { if (S.view.reconPick[x.id]) { picked += x.units; pickedFen += x.fen; } });
@@ -1660,6 +1670,7 @@
         pc.appendChild(r);
         var sx = (S.matched.suspects || []).filter(function (y) { return y.app + '|' + y.cp + '|' + y.month === x.key; })[0];
         var pl = btn('看这 ' + x.n + ' 笔 ›', 'imp-link imp-petty-rows', function () { openRows({ title: cpShow(x.cp) + ' · ' + x.month, keys: keysOfRefs(sx && sx.items), id: 'petty:' + x.key }); });
+        pl.dataset.of = 'petty:' + x.key;
         pc.appendChild(pl);
       });
       out.petty = pc;
@@ -1683,7 +1694,7 @@
         // 1021-T17：「看这 N 笔」打开「这几笔」面板；归进去的每个对方也能单独点开
         var ncKeys = newCatKeys(p, x.name), byCp = {};
         ncKeys.forEach(function (k) { var d = rowByKey(k); if (!d) return; var c0 = cpShow(d.cp) || '—'; (byCp[c0] = byCp[c0] || []).push(k); });
-        var ncLinks = el('div', 'imp-nc-links');
+        var ncLinks = el('div', 'imp-nc-links'); ncLinks.dataset.of = 'nc:' + x.name;   // 1021-T25：跟着这一行走（挪进「已处理」时一起挪）
         ncLinks.appendChild(btn('看这 ' + x.count + ' 笔 ›', 'imp-link imp-nc-rows', function () { openRows({ title: '建「' + x.name + '」的', keys: ncKeys, id: 'nc:' + x.name }); }));
         Object.keys(byCp).sort(function (a, b) { return byCp[b].length - byCp[a].length; }).slice(0, NC_CP_N).forEach(function (c0) {
           var b0 = btn(cut(c0, 10) + ' ' + byCp[c0].length + ' 笔 ›', 'imp-link imp-nc-cp', function () { openRows({ title: c0 + ' · 归到「' + x.name + '」', keys: byCp[c0], id: 'nc:' + x.name + ':' + c0 }); });
@@ -1753,6 +1764,7 @@
         var tg = btn('看这 ' + g.keys.length + ' 笔 ›', 'imp-link imp-cp-toggle', function (ev) {
           ev.stopPropagation(); openRows({ title: cpShow(g.cp), keys: g.keys, notes: notes, id: 'cp:' + g.cp });
         });
+        tg.dataset.of = 'cp:' + g.cp;
         gc.appendChild(tg);
       });
       if (s.cpGroups.length > showN) {

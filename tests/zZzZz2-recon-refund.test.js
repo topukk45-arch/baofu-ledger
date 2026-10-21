@@ -40,7 +40,12 @@ ok(!only.records.some(r => r.money === 5), '1 没勾的原单，它的退款不�
   ok(r431 && /含退款 100\.00 元/.test(r431.textContent), '2 清单那一行写「含退款 100.00 元」：' + (r431 && r431.textContent));
   const rn = rows.find(r => /99\.00/.test(r.textContent));
   ok(rn && !rn.querySelector('input').checked && t.d.querySelector('.imp-recon-neutral-t'), '2 不计的单独一组、默认不勾');
+  // 1021-T25：点这一行（不是勾选框）看这笔账单的详情；点勾选框只勾、不开详情
+  r431.querySelector('.grow').click();
+  ok(t.$('impSheet') && /431\.00/.test(t.$('impSheet').textContent) && !r431.querySelector('input').checked, '2（T25）点这一行开详情、不勾');
+  t.$('impSheetClose').click();
   r431.querySelector('input').click();
+  ok(!(t.$('uiSheetMask') && t.$('uiSheetMask').classList.contains('open')), '2（T25）点勾选框不开详情');
   t.$('impGo').click(); if (t.$('impConfirmOk')) t.$('impConfirmOk').click();
   await t.until(() => t.$('impResult'), 20000);
   const recs = t.recs().filter(r => r.batch);

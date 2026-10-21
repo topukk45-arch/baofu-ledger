@@ -55,6 +55,10 @@ const file = B.bill('alipay', tx, { range: RANGE }).bytes;
   const into = [...t.d.querySelectorAll('#uiSheet button')].find(b => /^并到「其他」/.test(b.textContent));
   into.click();
   ok(/现在：并到「其他」/.test(t.d.querySelector('#impNewCats [data-cat="' + nr.dataset.cat + '"]').textContent) && t.S().edits.newCats[nr.dataset.cat].into === '其他', '4 选了「并到其他」，那一行写现在是并');
+  // 1021-T25：定了的那一项挪进「已处理」，它下面的「看这 N 笔 / 某某 N 笔」跟着挪，不留在原地
+  const of0 = 'nc:' + nr.dataset.cat, links = [...t.d.querySelectorAll('#impNewCats [data-of]')].filter(n => n.dataset.of === of0);
+  ok(links.length === 1 && links[0].closest('.imp-fold-box'), '4（T25）定了的那一项，「看这 N 笔」跟着进了「已处理」');
+  ok([...t.d.querySelectorAll('#impNewCats [data-of]')].filter(n => !n.closest('.imp-fold-box')).every(n => { const it = t.d.querySelector('#impNewCats [data-item="' + n.dataset.of + '"]'); return it && !it.closest('.imp-fold-box'); }), '4（T25）没定的那几项，链接和它的行都在外面');
   // 导入，结果页跳去统计，返回键回来
   UI()._goStep('overview');
   $('impGo').click(); if ($('impConfirmOk')) $('impConfirmOk').click();
