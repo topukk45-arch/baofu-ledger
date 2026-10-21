@@ -216,6 +216,9 @@
 
 ## 启动画面修复的体验版（1021-T26，分支 `claude/compassionate-fermat-shebn3`）
 - `build.yml` 给这条分支加回「发布到「体验版」」（`trial-build` / `jiwen-trial.apk`），合进 main 前删掉；不碰「最新测试版」和正式版。
+- 1021-T27：切页签（账单 / 统计 / 设置）新页面淡入 160 毫秒（`switchTab()` 给新页面加 `.tab-in`，`animationend` 去掉，快照里不带；只在真的换了页签时；系统「减少动画」不做）。
+- 1021-T28：启动画面淡出 200 毫秒（`MainActivity` 的 `SPLASH_FADE_MS`，`setOnExitAnimationListener` 里 `animate().alpha(0)` 完了再 `remove()`；出错照原来直接拿掉）；性能记录「启动画面收起」记开始淡出的时刻。1019-X 去掉系统退场动画那条以这条为准。
+- T27、T28 按用户说的没在本地跑测试，靠打包机的测试；真机周五看。
 
 ## 体验版分支（1021-T 起，实测 10-20 的方案；10-21 发了 1021 β 以后快进合进 main，这一节留下来查，下面的规则现在就是 main 的规则）
 - 分支 `claude/relaxed-turing-1v8wg9`（从 1020-J 拉出来，PR #3 开着不合并），版本号「1021-T1」「-T2」……每推一版加一（`sh tests/tools/bump.sh 1021-T7` 一次改齐登录页和 `?v=`）。
