@@ -2149,3 +2149,7 @@
         .bgo-total { font-size:13px; color:var(--c-text-soft); white-space:nowrap; }
         .bgo-total .bgo-k { color:var(--c-text); font-weight:bold; }
         .cs-row:has(+ .cs-total), .cs-row:has(+ .cs-more) { border-bottom:none; }
+        /* 1023-P：详情里「这笔是期初余额」开关那一行（能点，不照 .detail-row 的不能点）；列表里的「期初」小标签 */
+        button.detail-row.detail-ob { cursor:pointer; width:100%; border:none; background:transparent; font-family:inherit; text-align:left; }
+        button.detail-row.detail-ob.pressed { background:var(--c-chip); }
+        .io-flow.io-ob { color:var(--c-primary-dark); border-color:var(--c-primary-mid); }

@@ -953,6 +953,18 @@ async function run(cfg, port, browser) {
       await page.evaluate(() => document.querySelector('#billList .bl-row').click()); await page.waitForTimeout(700);
       await shot(page, size, '账单详情', '平时'); if (meas) await CLIP(page, '账单详情', '#detailMask');
       await closeAll(page);
+      // 1023-P：往来的记录详情里「这笔是期初余额」开关（没有往来的记录就跳过）
+      if (await page.evaluate(() => { const r = window.JiwenStore.getUserData().find(x => x.flow === true && !x.refundOf); if (r) window.JiwenDetail.openDetail(r.id); return !!r; })) {
+        await page.waitForTimeout(700);
+        await shot(page, size, '账单详情', '往来（期初余额开关）'); if (meas) await CLIP(page, '账单详情（往来）', '#detailMask');
+        results.push(Object.assign({ name: 'detail-ob-1023p', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], row = document.getElementById('detailObRow');
+          if (!row) bad.push('往来的记录没有「这笔是期初余额」那一行');
+          else { const r = row.getBoundingClientRect(), sw = document.getElementById('detailObSw').getBoundingClientRect(); if (r.height < 48) bad.push('期初余额那一行不到 48 高'); if (sw.right > r.right + 0.5 || sw.left < r.left) bad.push('开关出了那一行'); }
+          return { bad, ok: !bad.length };
+        })));
+        await closeAll(page);
+      }
       await page.evaluate(() => document.getElementById('filterFab').click()); await page.waitForTimeout(700);
       await page.evaluate(() => document.querySelector('#filterDateQuick [data-q="month"]').click()); await page.waitForTimeout(100);
       await shot(page, size, '筛选面板', '平时'); if (meas) { await FOOT(page, '筛选面板'); await CLIP(page, '筛选面板', '#filterSheetMask'); }

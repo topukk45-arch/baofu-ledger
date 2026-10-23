@@ -1,6 +1,6 @@
 (function(){
         const { $, escapeHtml, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
-        const { IMP_APPS, balContrib, getUserData, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { IMP_APPS, balContrib, getUserData, isOpening, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { devImportOn } = window.JiwenImportEntry;   // 用到前面模块的
         const { openAddModal, openRefund, refundLineHtml } = window.JiwenForms;   // 用到前面模块的
@@ -48,6 +48,7 @@
             paintDetailSource(rec);
             paintDetailAiFlag(rec, all);
             paintDetailRv(rec);
+            paintDetailOb(rec, opts, ro);
             const rk=(rec.remark||'').trim();
             $('detailRemark').textContent = rk || (rec.cat||'未分类');
             $('detailRemark').classList.toggle('dtl-nork', !rk);
@@ -155,6 +156,29 @@
                 openDetail(rec.id);
             });
             f.appendChild(b);
+        }
+        // 1023-P：期初余额：只给「往来」的记录（退款不算）一行开关「这笔是期初余额」，记录上 ob:1；可以几笔都标，总结余里期初余额是它们的合计、往来那一行不算它们
+        function paintDetailOb(rec, opts, ro){
+            let f=$('detailObRow');
+            if(ro || recMode(rec)!=='flow' || isRefund(rec)){ if(f) f.remove(); return; }
+            if(!f){
+                f=document.createElement('button'); f.type='button'; f.className='rec-row detail-row detail-ob'; f.id='detailObRow';
+                f.innerHTML='<span class="rec-row-k">期初</span><span class="rec-row-v">这笔是期初余额</span><span class="sf-switch" id="detailObSw" aria-hidden="true"></span>';
+                $('detailList').appendChild(f);
+            }
+            const on=isOpening(rec);
+            f.setAttribute('aria-pressed', on ? 'true' : 'false');
+            $('detailObSw').classList.toggle('on', on);
+            f.onclick=()=>{
+                const data=getUserData(), i=data.findIndex(r=>r.id===rec.id);
+                if(i<0){ customAlert('这条记录不存在了'); return; }
+                const next=Object.assign({}, data[i]);
+                if(on) delete next.ob; else next.ob=1;
+                data[i]=next;
+                if(!saveUserData(data)) return;
+                try{ window.JiwenTabs.refreshAllViews(); }catch(_){}
+                openDetail(rec.id, opts);
+            };
         }
         function paintDetailRefund(rec, data){
             const f=$('detailRefundField'), lab=$('detailRefundLabel'), val=$('detailRefundVal');

@@ -70,7 +70,7 @@
             budget(){ JiwenStats.bgSuggestOpen=true; const b=document.querySelector('.tab-btn[data-tab="stats"]'); if(b) b.click(); setStatTab('budget'); },   // 1016-Z9：直接打开预算建议
             opening(){
                 const b=document.querySelector('.tab-btn[data-tab="ledger"]'); if(b) b.click();
-                openAddModal();
+                openAddModal({ opening:true });   // 1023-P：存下来的这笔带「期初余额」标记
                 const inc=[...$('billTypeChips').children].find(x=>x.textContent==='收入'); if(inc) inc.click();
                 setModeChips($('billMode'), 'flow');
                 billRemark.value='期初余额'; JiwenForms.syncRecRows();

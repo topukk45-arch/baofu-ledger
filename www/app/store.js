@@ -51,10 +51,12 @@
             return r.type==='expense' ? { inc:0, exp:a } : { inc:a, exp:0 };
         }
         // 账单行 / 详情里的口径标签与金额配色（计入时都是空串，输出与旧版逐字节一致）
+        // 1023-P：期初余额（记录上可有可无的 ob:1，只在「往来」的记录上算数；不是往来的有这个字段也当没有）
+        function isOpening(r){ return !!r && r.ob===1 && recMode(r)==='flow'; }
         function modeTag(r, full){
             const m=recMode(r);
             if(m==='skip') return '<span class="io-skip">不计</span>';
-            if(m==='flow') return '<span class="io-flow">往来</span>';
+            if(m==='flow') return isOpening(r) ? '<span class="io-flow io-ob">期初</span>' : '<span class="io-flow">往来</span>';
             return '';
         }
         // ===== 分类月预算（1010-G）=====
@@ -3058,6 +3060,7 @@
                 // 1017-G：AI 标记照搬（ref 等全部记录编好号再换，见下面）
                 const af=impCleanAiFlag(r.aiFlag, null); if(af) rec.aiFlag=af;
                 if(r.rv===1) rec.rv=1;   // 1021-T13：待确认分类标记照搬
+                if(r.ob===1 && rec.flow===true) rec.ob=1;   // 1023-P：期初余额（只在往来的记录上）
                 if(r.id!=null) idMap.set(String(r.id), rec);
                 if(type==='income' && r.refundOf!=null && r.refundOf!=='') pend.push([rec, String(r.refundOf)]);
                 out.push(rec);
@@ -3338,5 +3341,5 @@
             const dt=new Date(y, mo-1, d);
             return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d;
         }
-        window.JiwenStore = { RECENT_DAYS, recentCats, IMPORT_MAX_BYTES, IMP_APPS, MAX_IMPORT_RECORDS, TPL_MAX, TPL_NAME_MAX, __LEDGER_STRICT, __corruptedStores, __ledger, __ledgerKeys, __ledgerMergeNotes, __ledgerPending, accountById, accountNameError, balContrib, budgetPhrase, budgetSpentIn, catSigned, charLen, charSlice, createAccount, curArchive, daysKey, expSigned, genId, getAccounts, getBudgets, getCats, getUserData, idbBatch, idbKeys, impArchFields, impBkPrefix, impBlkDecode, impCleanAiFlag, impDraftExpire, impExportFields, impGetJson, impLogKey, impMakeBackup, impOrdersRestoreFromCloud, impPendKey, impRecHash, impRulesDropCat, impRulesRenameCat, impTarget, importArchiveFromText, isAccountId, isRefund, isValidDay, ledgerAcceptDamage, ledgerDamageNotice, ledgerDropAccount, ledgerEvictExcept, ledgerExists, ledgerGet, ledgerIdle, ledgerLoad, loadDays, loadStore, mergeImportedDays, migrateAccounts, migrateLedgersToBlocks, migrateLedgersToIdb, modeAmtCls, modeTag, nameOf, nameTaken, odBuildPayload, odClearLink, odGetLink, odGetOrdLink, odMoveLink, odOrdersSync, odPlugin, odRefreshStatusUI, odScheduleSync, odSetLink, odSetOrdLink, odSyncNow, recoverAccountsIfBroken, refundedMap, refundedTag, refundedTotal, refundsOf, sanitizeTpls, saveAccounts, saveStore, saveStoreDurable, saveStoreSafe, saveUserData, setAccountHidden, stampAccountName, statContrib, storeKey, syncRefunds, touchAccount, tplName, tplSame, trackBusy };   // store 模块对外只有这一个入口
+        window.JiwenStore = { RECENT_DAYS, recentCats, IMPORT_MAX_BYTES, IMP_APPS, MAX_IMPORT_RECORDS, TPL_MAX, TPL_NAME_MAX, __LEDGER_STRICT, __corruptedStores, __ledger, __ledgerKeys, __ledgerMergeNotes, __ledgerPending, accountById, accountNameError, balContrib, budgetPhrase, budgetSpentIn, catSigned, charLen, charSlice, createAccount, curArchive, daysKey, expSigned, genId, getAccounts, getBudgets, getCats, getUserData, idbBatch, idbKeys, impArchFields, impBkPrefix, impBlkDecode, impCleanAiFlag, impDraftExpire, impExportFields, impGetJson, impLogKey, impMakeBackup, impOrdersRestoreFromCloud, impPendKey, impRecHash, impRulesDropCat, impRulesRenameCat, impTarget, importArchiveFromText, isAccountId, isOpening, isRefund, isValidDay, ledgerAcceptDamage, ledgerDamageNotice, ledgerDropAccount, ledgerEvictExcept, ledgerExists, ledgerGet, ledgerIdle, ledgerLoad, loadDays, loadStore, mergeImportedDays, migrateAccounts, migrateLedgersToBlocks, migrateLedgersToIdb, modeAmtCls, modeTag, nameOf, nameTaken, odBuildPayload, odClearLink, odGetLink, odGetOrdLink, odMoveLink, odOrdersSync, odPlugin, odRefreshStatusUI, odScheduleSync, odSetLink, odSetOrdLink, odSyncNow, recoverAccountsIfBroken, refundedMap, refundedTag, refundedTotal, refundsOf, sanitizeTpls, saveAccounts, saveStore, saveStoreDurable, saveStoreSafe, saveUserData, setAccountHidden, stampAccountName, statContrib, storeKey, syncRefunds, touchAccount, tplName, tplSame, trackBusy };   // store 模块对外只有这一个入口
 })();

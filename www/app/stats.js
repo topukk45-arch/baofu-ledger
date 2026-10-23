@@ -1,6 +1,6 @@
 (function(){
         const { $, escapeHtml, fabHold, fabWake, fitNums, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
-        const { balContrib, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, odScheduleSync, refundedMap, saveStoreSafe, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { balContrib, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isOpening, isRefund, loadStore, modeAmtCls, odScheduleSync, refundedMap, saveStoreSafe, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, playSlide } = window.JiwenDate;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
@@ -707,13 +707,13 @@
 
         // 1023-C：总结余（原来在账单页总览最下面一行，搬过来）；1023-O 起挪到页面底部和分类汇总挨着（这两块是全部记录的，切月份不变）：
         //   一行（总结余 + 数 + ⌄），整行点了展开 / 收起；展开是能对上的算式：期初余额 + 累计收入 − 累计支出 + 往来 = 总结余，下面一句不计、往来怎么算
-        //   期初余额 = 记成「往来」、备注是「期初余额」的那几笔（导入结果页「补一笔期初余额」就是这样记的），其余往来另算（1023-P 再给正式入口）
+        //   期初余额 = 标成期初余额的往来记录（1023-P：详情里「这笔是期初余额」开关，记录上 ob:1，可以几笔），「往来」那一行不算它们；不看备注
         let balSum=null, balOpen=false;
         const BAL_CHEV='<svg class="st-bal-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
         function renderStatBal(dec){
             const card=$('statBal'); if(!card) return;
             let sIn=0, sOut=0, fNet=0, open=0;
-            dec.forEach(x=>{ const c=statContrib(x.r); sIn+=c.inc; sOut+=c.exp; if(isFlow(x.r)){ const b=balContrib(x.r), v=b.inc-b.exp; if((x.r.remark||'').trim()==='期初余额') open+=v; else fNet+=v; } });
+            dec.forEach(x=>{ const c=statContrib(x.r); sIn+=c.inc; sOut+=c.exp; if(isFlow(x.r)){ const b=balContrib(x.r), v=b.inc-b.exp; if(isOpening(x.r)) open+=v; else fNet+=v; } });
             sIn=round2(sIn); sOut=round2(sOut); fNet=round2(fNet); open=round2(open);
             balSum={ sIn, sOut, fNet, open, net:round2(sIn-sOut+fNet+open) };
             card.style.display = dec.length ? '' : 'none';

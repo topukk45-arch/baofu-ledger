@@ -188,7 +188,10 @@
         });
 
         // 把记账表单恢复到「空白初始态」：空金额/空备注、不选收支、不选分类、时间为此刻
+        // 1023-P：这一笔记成期初余额（导入结果页「补一笔期初余额」打开时设上；保存时还是往来才写 ob:1）
+        let billOb=false;
         function resetBillForm(){
+            billOb=false;
             billMoney.value='';
             billRemark.value='';
             setModeChips($('billMode'), 'normal');
@@ -512,6 +515,7 @@
             if(opt && /^\d{4}-\d{2}-\d{2}$/.test(opt.day||'')){ const n=new Date(); setDtInput(billTime, `${opt.day}T${pad(n.getHours())}:${pad(n.getMinutes())}`); }
             // 1023-D：详情里「再记一笔」：收支、分类、统计、备注照这一笔填好，金额空着、时间是现在（照模板那一套填）
             if(opt && opt.from) applyTpl({ type:opt.from.type, cat:opt.from.cat, mode:recMode(opt.from), remark:opt.from.remark||'', money:null });
+            if(opt && opt.opening) billOb=true;
             if(window.__openModalAfterKeyboard){
                 // 键盘先出来，弹窗再淡入（消除被键盘顶起的闪动）
                 window.__openModalAfterKeyboard(addMask, billMoney);
@@ -578,6 +582,7 @@
             const newId=genId();
             const newRec={ id:newId, time, money:m.val, cat, remark, type };
             setRecMode(newRec, getModeChips($('billMode')));
+            if(billOb && recMode(newRec)==='flow') newRec.ob=1;   // 1023-P
             data.push(newRec);
             // 保存失败（如存储配额满）时 saveUserData 已弹出失败提示，这里必须提前返回：
             // 否则会继续弹「记账成功」，造成「提示成功但实际没存上」的丢账假象。
@@ -794,6 +799,7 @@
                 next=Object.assign({}, old, { id:editId, time, money:m.val, cat, remark, type });
                 if(next.rv && cat!==(old.cat||'未分类')) delete next.rv;   // 1021-T13：改了分类就不用再确认
                 setRecMode(next, getModeChips($('editMode')));
+                if(next.ob && recMode(next)!=='flow') delete next.ob;   // 1023-P：改成不是往来了，期初余额的标记也去掉
                 data[idx]=next;
                 syncRefunds(data, next);           // 分类 / 口径变了，退款跟着改
                 // 保存失败时 saveUserData 已弹失败提示；提前返回，保持弹窗打开、不刷新，
