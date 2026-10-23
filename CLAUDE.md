@@ -214,8 +214,8 @@
   - 1019-Z4-M25 收尾：旧文件 `app-1…7.js` 只剩旧代码引用表和空行，删掉、`index.html` 去掉引用；模块里按名字直接调回调口的 20 处改成 `window.JiwenTabs.xxx()` / `window.JiwenStats.renderStats()`（工具 `tests/tools/finish-legacy.js`）。现在 `www/app/` 下 20 个模块文件，每个就是一个 IIFE、对外一个入口，`zZzX-modules-lock` 每个都锁着。
   - 1019-Z4-M26 合并前收尾：首屏快照不接点击（`.boot-snap` 加 `pointer-events:none`）；版本号连点的计数 `__buildTaps` 挪进设置页模块里定义（`JiwenImportEntry` 上不再有它的读写口）；`build.yml` 删掉「模块测试版」那段。
 
-## 启动画面修复的体验版（1021-T26，分支 `claude/compassionate-fermat-shebn3`）
-- `build.yml` 给这条分支加回「发布到「体验版」」（`trial-build` / `jiwen-trial.apk`），合进 main 前删掉；不碰「最新测试版」和正式版。
+## 启动画面修复的体验版（1021-T26～T28，分支 `claude/compassionate-fermat-shebn3`；10-23 快进合进 main，这一节留下来查）
+- `build.yml` 当时给这条分支加回「发布到「体验版」」（`trial-build` / `jiwen-trial.apk`），合进 main 前删掉了；老的「体验版」发行页留着没删。
 - 1021-T27：切页签（账单 / 统计 / 设置）新页面淡入 160 毫秒（`switchTab()` 给新页面加 `.tab-in`，`animationend` 去掉，快照里不带；只在真的换了页签时；系统「减少动画」不做）。
 - 1021-T28：启动画面淡出 200 毫秒（`MainActivity` 的 `SPLASH_FADE_MS`，`setOnExitAnimationListener` 里 `animate().alpha(0)` 完了再 `remove()`；出错照原来直接拿掉）；性能记录「启动画面收起」记开始淡出的时刻。1019-X 去掉系统退场动画那条以这条为准。
 - T27、T28 按用户说的没在本地跑测试，靠打包机的测试；真机周五看。
