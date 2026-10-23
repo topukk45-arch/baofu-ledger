@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1023-C">
+    <link rel="stylesheet" href="app/app.css?v=1023-D">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-C</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-D</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -443,7 +443,6 @@
                 </div>
                 <textarea id="editRemark" class="remark-area rec-remark" maxlength="5000" rows="1" aria-hidden="true" tabindex="-1"></textarea>
                 <div class="rec-extra">
-                    <button class="ui-btn block refund-btn" id="editRefundBtn">退款</button>
                     <button class="ui-btn warn block" id="deleteInEdit">删除这条记录</button>
                 </div>
             </div>
@@ -457,34 +456,36 @@
         </div>
     </div>
 
-    <!-- 账单详情（只读）：从统计页当日明细、预算明细、批量确认清单点条目进入。布局沿用修改弹窗，纯展示。
-         「修改」打开修改弹窗（清单里进来的隐藏此按钮）。 -->
+    <!-- 1023-D：单笔详情（账单页、统计页共用）：上面大金额、标题（备注，没备注写分类）、分类 + 收支 + 日期时间；
+         列表卡：统计、「这一天 · N 笔 · 支出 x ›」、这笔之后结余，有的才显示原账单 / 退款、来源、AI 标记、待确认；
+         底部「修改 | 再记一笔」，再下面一行小字「这笔要退款」（从修改账单里提出来）；批量确认清单里进来的只看不改。往下拉 / 返回键关 -->
     <div class="mask sheet-mask form-mask" id="detailMask">
-        <div class="sheet edit-dialog" id="detailSheet">
-            <div class="sheet-grip" id="detailGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>账单详情</h3></div></div>
-            <!-- 1020-I：照记一笔的列表卡：时间、金额、收支、分类、统计、备注一行一行，有的才显示原账单 / 退款记录、来源、AI 标记 -->
+        <div class="sheet edit-dialog detail-sheet" id="detailSheet">
+            <div class="sheet-grip" id="detailGrip"><div class="sheet-handle" aria-hidden="true"></div></div>
+            <div class="dtl-hero">
+                <div class="dtl-amt" id="detailMoney"></div>
+                <div class="dtl-title" id="detailRemark"></div>
+                <div class="dtl-meta"><span id="detailCat"></span><span id="detailType"></span><span class="dtl-when" id="detailTime"></span></div>
+            </div>
             <div class="form-box">
                 <div class="rec-list detail-list" id="detailList">
-                    <div class="rec-row detail-row"><span class="rec-row-k">时间</span><span class="rec-row-v" id="detailTime"></span></div>
-                    <div class="rec-row detail-row"><span class="rec-row-k">金额</span><span class="rec-row-v detail-money" id="detailMoney"></span></div>
-                    <div class="rec-row detail-row"><span class="rec-row-k">收支</span><span class="rec-row-v" id="detailType"></span></div>
-                    <div class="rec-row detail-row"><span class="rec-row-k">分类</span><span class="rec-row-v" id="detailCat"></span></div>
                     <div class="rec-row detail-row"><span class="rec-row-k">统计</span><span class="rec-row-v" id="detailMode"></span></div>
-                    <div class="rec-row detail-row"><span class="rec-row-k">结余</span><span class="rec-row-v" id="detailBal"></span></div>
-                    <div class="rec-row detail-row detail-block"><span class="rec-row-k">备注</span><div class="detail-remark" id="detailRemark"></div></div>
+                    <button type="button" class="rec-row detail-row" id="detailDayRow"><span class="rec-row-k">这一天</span><span class="rec-row-v" id="detailDay"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <div class="rec-row detail-row"><span class="rec-row-k">这笔之后结余</span><span class="rec-row-v" id="detailBal"></span></div>
                     <!-- 1010-J2：退款 → 原账单是哪笔；原账单 → 退了哪几笔。没有关联时整行隐藏 -->
                     <div class="rec-row detail-row detail-block" id="detailRefundField" style="display:none"><span class="rec-row-k" id="detailRefundLabel">原账单</span><div class="detail-refund" id="detailRefundVal"></div></div>
                 </div>
             </div>
-            <!-- 1020-I：「修改」整宽在上，「关闭」在下 -->
-            <div class="dialog-btn ui-stack form-btns">
-                <button class="ui-btn primary block" id="detailEdit">修改</button>
-                <button class="ui-btn block" id="detailClose">关闭</button>
+            <div class="dialog-btn form-btns detail-btns">
+                <div class="ui-pair"><button class="ui-btn" id="detailEdit">修改</button><button class="ui-btn primary" id="detailAgain">再记一笔</button></div>
+                <button type="button" class="detail-refund-link" id="detailRefund">这笔要退款</button>
+                <!-- 关闭靠往下拉 / 返回键（和别的抽屉一样）；这个按钮不显示，留着给返回键表、老代码走同一个出口 -->
+                <button class="ui-btn block" id="detailClose" hidden>关闭</button>
             </div>
         </div>
     </div>
 
-    <!-- 退款（1010-J）：从修改账单进入 -->
+    <!-- 退款（1010-J）：1023-D 起从账单详情「这笔要退款」进入 -->
     <div class="mask sheet-mask form-mask" id="refundMask">
         <div class="sheet edit-dialog" id="refundSheet">
             <div class="sheet-grip" id="refundGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>退款</h3></div></div>
@@ -833,28 +834,28 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1023-C"></script>
-    <script src="app/store.js?v=1023-C"></script>
-    <script src="app/select.js?v=1023-C"></script>
-    <script src="app/keypad.js?v=1023-C"></script>
-    <script src="app/text.js?v=1023-C"></script>
-    <script src="app/sheet.js?v=1023-C"></script>
-    <script src="app/ask.js?v=1023-C"></script>
-    <script src="app/date.js?v=1023-C"></script>
-    <script src="app/monthstrip.js?v=1023-C"></script>
-    <script src="app/ai-export.js?v=1023-C"></script>
-    <script src="app/import-entry.js?v=1023-C"></script>
-    <script src="app/forms.js?v=1023-C"></script>
-    <script src="app/detail.js?v=1023-C"></script>
-    <script src="app/ledger.js?v=1023-C"></script>
-    <script src="app/cats.js?v=1023-C"></script>
-    <script src="app/stats.js?v=1023-C"></script>
-    <script src="app/days.js?v=1023-C"></script>
-    <script src="app/settings.js?v=1023-C"></script>
-    <script src="app/tabs.js?v=1023-C"></script>
-    <script src="app/login.js?v=1023-C"></script>
-    <script src="app/back.js?v=1023-C"></script>
-    <script src="app/boot.js?v=1023-C"></script>
+    <script src="app/base.js?v=1023-D"></script>
+    <script src="app/store.js?v=1023-D"></script>
+    <script src="app/select.js?v=1023-D"></script>
+    <script src="app/keypad.js?v=1023-D"></script>
+    <script src="app/text.js?v=1023-D"></script>
+    <script src="app/sheet.js?v=1023-D"></script>
+    <script src="app/ask.js?v=1023-D"></script>
+    <script src="app/date.js?v=1023-D"></script>
+    <script src="app/monthstrip.js?v=1023-D"></script>
+    <script src="app/ai-export.js?v=1023-D"></script>
+    <script src="app/import-entry.js?v=1023-D"></script>
+    <script src="app/forms.js?v=1023-D"></script>
+    <script src="app/detail.js?v=1023-D"></script>
+    <script src="app/ledger.js?v=1023-D"></script>
+    <script src="app/cats.js?v=1023-D"></script>
+    <script src="app/stats.js?v=1023-D"></script>
+    <script src="app/days.js?v=1023-D"></script>
+    <script src="app/settings.js?v=1023-D"></script>
+    <script src="app/tabs.js?v=1023-D"></script>
+    <script src="app/login.js?v=1023-D"></script>
+    <script src="app/back.js?v=1023-D"></script>
+    <script src="app/boot.js?v=1023-D"></script>
 
 </body>
 </html>

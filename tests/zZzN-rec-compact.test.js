@@ -88,7 +88,7 @@ const recs = [
   ok($('editMode').dataset.mode === 'flow' && modeTxt('editMode') === '往来', '5 往来的记录：那一行写「往来」');
   const ef = $('saveEdit').parentElement;
   ok(ef.classList.contains('rec-foot') && ef.firstElementChild === $('saveEdit') && ef.lastElementChild.firstElementChild === $('cancelEdit') && ef.lastElementChild.lastElementChild === $('editSaveTpl'), '5 底部「保存」在上、最下面「取消 | 存为常用」');
-  ok(!ef.contains($('deleteInEdit')) && !ef.contains($('editRefundBtn')) && after('editRemarkRow', 'editRefundBtn') && after('editRefundBtn', 'deleteInEdit') && $('deleteInEdit').classList.contains('warn'), '5 退款 / 删除放在列表卡下面，删除用警示色');
+  ok(!ef.contains($('deleteInEdit')) && !$('editRefundBtn') && after('editRemarkRow', 'deleteInEdit') && $('deleteInEdit').classList.contains('warn'), '5 删除放在列表卡下面，删除用警示色（1023-D：退款挪到账单详情里了）');
   $('cancelEdit').click(); await wait(400);
   w.openEdit('r1'); await t.idle();
   ok($('editMode').dataset.mode === 'normal' && modeTxt('editMode') === '计入', '5 计入的记录：写「计入」');

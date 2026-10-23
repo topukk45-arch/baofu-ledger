@@ -27,18 +27,18 @@ const recs = [
   // 一、账单详情：列表卡，统计单独一行；「修改」整宽在上、「关闭」在下
   w.JiwenDetail.openDetail('a3');
   const rows = [...$('detailList').querySelectorAll(':scope > .rec-row')].filter(r => r.style.display !== 'none').map(r => r.querySelector('.rec-row-k').textContent);
-  ok(rows.join() === '时间,金额,收支,分类,统计,结余,备注', '一 详情一行一项：时间、金额、收支、分类、统计、结余（1023-A 从列表挪来）、备注：' + rows.join());
+  ok(rows.join() === '统计,这一天,这笔之后结余' && $('detailMoney').closest('.dtl-hero') && $('detailRemark').closest('.dtl-hero') && $('detailTime').closest('.dtl-hero'), '一 1023-D：金额、标题、分类 + 日期时间在上面；列表卡：统计、这一天、这笔之后结余：' + rows.join());
   ok($('detailMode').textContent === '不计' && $('detailType').textContent === '支出', '一 统计单独一行写「不计」，收支那行只写收支');
   const db = $('detailEdit').parentElement;
-  ok(db.firstElementChild === $('detailEdit') && db.lastElementChild === $('detailClose') && $('detailEdit').classList.contains('primary') && $('detailEdit').classList.contains('block'), '一 「修改」整宽在上，「关闭」在下');
+  ok(db.classList.contains('ui-pair') && db.firstElementChild === $('detailEdit') && db.lastElementChild === $('detailAgain') && $('detailAgain').classList.contains('primary') && $('detailClose').hidden, '一 1023-D：底部「修改 | 再记一笔」（关闭靠往下拉 / 返回键）');
   $('detailEdit').click(); await tick();
   ok(shown('editMask') && !shown('detailMask') && !over('editMask'), '一 详情 → 修改：详情先关，修改账单照常一层（加遮罩，不叠两层灰）');
   $('cancelEdit').click(); await tick();
   if (shown('detailMask')) $('detailClose').click();
 
   // 二、退款：全额 | 部分两个一样大的按钮；部分退款弹数字键盘、全额只读；时间、备注是列表行
-  w.openEdit('a2'); await tick();
-  $('editRefundBtn').click(); await tick();
+  w.JiwenDetail.openDetail('a2'); await tick();
+  $('detailRefund').click(); await tick();   // 1023-D：退款从详情里「这笔要退款」进
   ok(shown('refundMask') && $('refundKind').classList.contains('io-pair') && [...$('refundKind').children].map(c => c.textContent).join() === '全额,部分', '二 退款方式：「全额 | 部分」两个一样大的按钮');
   ok($('refundMoney').value === '100.00' && $('refundMoney').dataset.kpLock === '1' && $('refundMoney').closest('.rec-money-row'), '二 全额：金额只读（数字键盘不弹）、靠右');
   $('refundMoney').click(); await tick();

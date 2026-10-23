@@ -375,17 +375,6 @@
             const left=round2(rem-amt);
             customAlert(left>0 ? `已退款 ${amt.toFixed(2)}，这笔还能再退 ${left.toFixed(2)}。` : `已退款 ${amt.toFixed(2)}，这笔已全额退款。`, '退款完成');
         });
-        // 修改弹窗里点「退款」：有没保存的改动先问一句，避免悄悄丢掉
-        $('editRefundBtn').addEventListener('click', ()=>{
-            const id=editId; if(id==null) return;
-            const item=getUserData().find(r=>r.id===id); if(!item) return;
-            const dirty = getDtInput(editTime)!==item.time || normMoney(editMoney.value).val!==round2(safeNum(item.money))
-                || editRemark.value.trim()!==(item.remark||'') || editCatSel!==(item.cat||'未分类')
-                || editTypeSel!==item.type || getModeChips($('editMode'))!==recMode(item);
-            const go=()=>{ closeEditModal(); openRefund(id); };
-            if(dirty) customConfirm('这笔账单的修改还没保存。去退款的话，这些修改都不要了。', go, '去退款', { okText:'放弃修改去退款', danger:true, cancelText:'回去接着改' });
-            else go();
-        });
         $('editSaveTpl').addEventListener('click', ()=>{
             saveTplFrom({ type:editTypeSel, cat:editCatSel, remark:$('editRemark').value, money:$('editMoney').value,
                           mode:getModeChips($('editMode')) });
@@ -521,6 +510,8 @@
             resetBillForm();
             // 1023-C：账单页「补一笔」：日期设成那天（钟点照现在）
             if(opt && /^\d{4}-\d{2}-\d{2}$/.test(opt.day||'')){ const n=new Date(); setDtInput(billTime, `${opt.day}T${pad(n.getHours())}:${pad(n.getMinutes())}`); }
+            // 1023-D：详情里「再记一笔」：收支、分类、统计、备注照这一笔填好，金额空着、时间是现在（照模板那一套填）
+            if(opt && opt.from) applyTpl({ type:opt.from.type, cat:opt.from.cat, mode:recMode(opt.from), remark:opt.from.remark||'', money:null });
             if(window.__openModalAfterKeyboard){
                 // 键盘先出来，弹窗再淡入（消除被键盘顶起的闪动）
                 window.__openModalAfterKeyboard(addMask, billMoney);
@@ -717,14 +708,7 @@
                     + `<div class="detail-refund">${rs.map(r=>refundLineHtml(r,1)).join('')}</div>`;
                 note.style.display='';
             } else { note.innerHTML=''; note.style.display='none'; }
-            const btn=$('editRefundBtn');
-            $('editSaveTpl').style.display = rf ? 'none' : '';
-            if(item.type!=='expense'){ btn.style.display='none'; return; }
-            btn.style.display='';
-            const done=refundedTotal(data, item.id);
-            const rem=round2(safeNum(item.money)-done);
-            btn.disabled = rem<=0;
-            btn.textContent = rem<=0 ? '已全额退款' : (done>0 ? `退款（已退 ${done.toFixed(2)}，还能退 ${rem.toFixed(2)}）` : '退款');
+            $('editSaveTpl').style.display = rf ? 'none' : '';   // 1023-D：「退款」挪到账单详情里（「这笔要退款」那一行小字）
         }
         // 修改弹窗的唯一退出口。所有关闭路径（保存 / 取消 / 删除 / 记录已不存在）都走这里，
         // 保证复位动作只写一遍、不会漏。
@@ -838,5 +822,5 @@
             m.querySelectorAll('.cc, .day-switch').forEach(e=>parts.push(e.className));
             return JSON.stringify(parts);
         }
-        window.JiwenForms = { get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenForms = { get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, openRefund, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();

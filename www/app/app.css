@@ -1856,3 +1856,59 @@
         @media (prefers-reduced-motion: reduce){ .mstrip, button.ms-item { transition:none; } }
         .lg-dc-noday .lg-dh { display:flex; align-items:center; gap:8px; min-height:50px; padding:0 14px; border-bottom:1px solid var(--c-border);
             background:color-mix(in srgb, var(--c-primary) 8%, var(--c-surface)); font-size:15px; }
+
+        /* ===== 1023-D：单笔 / 当日 / 一周详情抽屉（账单页、统计页共用）===== */
+        .detail-sheet .dtl-hero { display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 8px 14px; text-align:center; }
+        .dtl-amt { font-size:38px; line-height:46px; font-weight:bold; font-variant-numeric:tabular-nums; letter-spacing:.3px; color:var(--c-text); }
+        .dtl-amt .out { color:var(--c-text); }
+        .dtl-amt .pos { color:var(--c-pos); }
+        .dtl-title { max-width:100%; font-size:18px; line-height:26px; font-weight:500; color:var(--c-text); white-space:pre-wrap; overflow-wrap:anywhere;
+            display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; -webkit-user-select:text; user-select:text; }
+        .dtl-title.dtl-nork { color:var(--c-text-soft); }
+        .dtl-meta { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 8px; font-size:13px; line-height:20px; color:var(--c-text-soft); }
+        .dtl-meta .cat-tag { font-size:12px; }
+        .dtl-meta .io-tag, .dtl-meta .io-refunded { margin:0; }
+        .dtl-when { font-variant-numeric:tabular-nums; }
+        .detail-sheet .rec-row-k { flex:none; }
+        button#detailDayRow { width:100%; font-family:inherit; text-align:left; cursor:pointer; }
+        .detail-btns { display:flex; flex-direction:column; gap:4px; }
+        .detail-btns .ui-pair { width:100%; }
+        button.detail-refund-link { align-self:center; min-height:var(--ui-tap); padding:0 20px; border:none; background:transparent; font-family:inherit;
+            color:var(--c-primary-dark); font-size:14px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+        /* 当日 / 一周：上面两格、分类小横条、7 根柱子、每笔 / 每天一行 */
+        .dd-body { display:flex; flex-direction:column; gap:12px; }
+        .dd-cells { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
+        .dd-cell { display:flex; flex-direction:column; gap:2px; min-width:0; padding:12px 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
+        .dd-k { font-size:12px; color:var(--c-text-soft); }
+        .dd-v { font-size:24px; line-height:30px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .dd-v.pos { color:var(--c-pos); }
+        .dd-v small { font-size:14px; font-weight:normal; }
+        .dd-s { font-size:12px; color:var(--c-text-soft); }
+        .dd-cats { display:flex; flex-direction:column; gap:8px; padding:12px 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
+        .dd-cat { display:grid; grid-template-columns:minmax(3em, max-content) minmax(0,1fr) auto; align-items:center; gap:8px; font-size:13px; color:var(--c-text); }
+        .dd-cat-n { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:7em; }
+        .dd-cat-b { height:6px; border-radius:3px; background:var(--c-border); overflow:hidden; }
+        .dd-cat-b i { display:block; height:100%; border-radius:3px; background:var(--c-primary-dark); }
+        .dd-cat-v { text-align:right; font-weight:500; font-variant-numeric:tabular-nums; }
+        .dd-rows.lg-dc { margin-top:0; content-visibility:visible; }
+        .dd-rows .bl-row:first-child { border-top:none; }
+        .dd-empty { padding:24px 0; text-align:center; color:var(--c-text-soft); font-size:14px; }
+        .dw-chart { display:flex; flex-direction:column; gap:6px; padding:12px 14px 10px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
+        .dw-bars { height:84px; display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; align-items:end; }
+        .dw-bar { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; height:100%; min-width:0; }
+        .dw-v { font-size:10px; color:var(--c-text-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .dw-bar i { display:block; width:100%; border-radius:4px 4px 0 0; background:color-mix(in srgb, var(--c-primary) 40%, var(--c-surface)); }
+        .dw-bar.today i { background:var(--c-primary-dark); }
+        .dw-bar.future i { background:transparent; border:1px dashed var(--c-border-mid); border-bottom:0; }
+        .dw-labs { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; text-align:center; font-size:12px; color:var(--c-text-soft); }
+        .dw-labs .today { color:var(--c-text); font-weight:bold; }
+        .dw-days.lg-dc { margin-top:0; content-visibility:visible; }
+        .dw-day { display:flex; align-items:center; gap:10px; width:100%; min-height:50px; padding:0 14px; margin:0; border:none; border-top:1px solid var(--c-border);
+            background:transparent; color:var(--c-text); font-size:14px; font-family:inherit; text-align:left; }
+        .dw-days .dw-day:first-child { border-top:none; }
+        button.dw-day { cursor:pointer; }
+        .dw-day-l { flex:1 1 auto; min-width:0; }
+        .dw-day-n { color:var(--c-text-soft); }
+        .dw-day-v { min-width:64px; text-align:right; font-weight:bold; font-variant-numeric:tabular-nums; }
+        .dw-day-none .dw-day-l { color:var(--c-text-soft); }
+        .dw-day-none button.lg-gap-btn { margin-left:auto; }

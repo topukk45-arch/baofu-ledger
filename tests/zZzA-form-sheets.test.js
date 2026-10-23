@@ -33,6 +33,9 @@ const MASKS = ['addMask', 'editMask', 'detailMask', 'refundMask', 'tplMask', 'ca
     // 1020-G：记一笔 / 修改照方案 D：「保存」整宽在上，最下面一行「关闭 / 取消 | 存为常用」左右并排（左退右进）
     if (box.classList.contains('rec-foot')) { const back = last.firstElementChild;
       ok(box.firstElementChild.classList.contains('primary') && last.classList.contains('ui-pair') && back.classList.contains('ui-btn') && /取消|关闭/.test(back.textContent) && /存为常用/.test(last.lastElementChild.textContent), `1 ${id} 保存在上，最下面「${back.textContent} | 存为常用」并排`); return; }
+    // 1023-D：单笔详情照草图：「修改 | 再记一笔」左右并排（左退右进），下面一行小字「这笔要退款」；关闭靠往下拉 / 返回键（「关闭」按钮藏着，走同一个出口）
+    if (id === 'detailMask') { const pair = box.firstElementChild;
+      ok(pair.classList.contains('ui-pair') && pair.firstElementChild.id === 'detailEdit' && pair.lastElementChild.classList.contains('primary') && $('detailRefund').parentElement === box && $('detailClose').hidden, `1 ${id} 「修改 | 再记一笔」并排、下面「这笔要退款」`); return; }
     ok(box.classList.contains('ui-stack') && last.classList.contains('ui-btn') && /取消|关闭/.test(last.textContent), `1 ${id} 按钮竖排、「${last.textContent}」在最下面`);
   });
   // 日子：保存在上、删除整宽警示色、取消最下面

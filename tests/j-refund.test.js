@@ -25,10 +25,10 @@ function bootSync(records, arcExtra){
   const recs=()=>JSON.parse(dom.window.JiwenStore.ledgerGet(dom.window.JiwenStore.storeKey())).archives['默认存档'].records;
   const refunds=()=>recs().filter(r=>r.refundOf);
   const kind=v=>$('refundKind').querySelector(`[data-v="${v}"]`).click();
-  // 从修改弹窗走一次退款
+  // 走一次退款：1023-D 起从账单详情「这笔要退款」进（原来在修改账单里）
   const refund=(id, opts)=>{
     opts=opts||{};
-    dom.window.openEdit(id); $('editRefundBtn').click();
+    dom.window.JiwenDetail.openDetail(id); $('detailRefund').click();
     if(opts.part!=null){ kind('part'); $('refundMoney').value=String(opts.part); }
     if(opts.time){ $('refundTime').dataset.value=opts.time; }
     if(opts.remark!=null) $('refundRemark').value=opts.remark;
@@ -45,13 +45,13 @@ function bootSync(records, arcExtra){
 // ===== 1. 退款按钮：只有支出有；退款弹窗内容 =====
 {
   const t=await boot();
-  t.w.openEdit('pay');
-  ok(t.$('editRefundBtn').style.display==='none', '收入没有退款按钮');
-  t.$('cancelEdit').click();
-  t.w.openEdit('buy');
-  ok(t.$('editRefundBtn').style.display==='' && t.$('editRefundBtn').textContent==='退款' && !t.$('editRefundBtn').disabled, '支出有退款按钮');
-  t.$('editRefundBtn').click();
-  ok(t.$('editMask').style.display==='none' && t.$('refundMask').style.display==='flex', '修改弹窗关、退款弹窗开');
+  t.w.JiwenDetail.openDetail('pay');
+  ok(t.$('detailRefund').style.display==='none', '收入的详情里没有「这笔要退款」');
+  t.w.JiwenDetail.closeDetail();
+  t.w.JiwenDetail.openDetail('buy');
+  ok(t.$('detailRefund').style.display==='' && t.$('detailRefund').textContent==='这笔要退款' && !t.$('editRefundBtn'), '支出的详情里有「这笔要退款」，修改账单里没有退款按钮了（1023-D）');
+  t.$('detailRefund').click();
+  ok(t.$('detailMask').style.display==='none' && t.$('refundMask').style.display==='flex', '详情关、退款弹窗开');
   const sum=t.$('refundSum').textContent;
   ok(sum.includes('购物 · 鞋子') && sum.includes('原金额 100.00') && sum.includes('已退 0.00') && sum.includes('还能退 100.00'), '退款弹窗写明原账单与可退：'+sum);
   ok(t.$('refundKind').querySelector('.sel').dataset.v==='all' && t.$('refundMoney').value==='100.00' && t.$('refundMoney').readOnly, '默认全额：金额填好且只读');
@@ -109,17 +109,19 @@ function bootSync(records, arcExtra){
   t.refund('buy', { part:'abc' });
   ok(t.refunds().length===1, '金额非法拦下');
   t.$('askOk').click(); t.$('refundCancel').click();
-  t.w.openEdit('buy');
-  ok(t.$('editRefundBtn').textContent==='退款（已退 30.00，还能退 70.00）', '按钮写明已退/可退：'+t.$('editRefundBtn').textContent);
-  t.$('editRefundBtn').click();
+  t.w.JiwenDetail.openDetail('buy');
+  ok(t.$('detailRefund').textContent==='再退一笔（还能退 70.00）', '详情里写明还能退：'+t.$('detailRefund').textContent);
+  t.$('detailRefund').click();
   ok(t.$('refundMoney').value==='70.00', '全额 = 剩下的 70');
   t.$('refundOk').click();
   ok(t.$('askMsg').textContent==='已退款 70.00，这笔已全额退款。' && t.refunds().length===2, '全额退完');
   t.$('askOk').click();
   const bRow=[...t.$('billList').querySelectorAll('.bl-row')].find(r=>r.textContent.includes('鞋子'));
   ok(bRow.querySelector('.io-refunded').textContent==='已全退', '标「已全退」');
+  t.w.JiwenDetail.openDetail('buy');
+  ok(t.$('detailRefund').style.display==='none', '全额退了：详情里不再有「这笔要退款」');
+  t.w.JiwenDetail.closeDetail();
   t.w.openEdit('buy');
-  ok(t.$('editRefundBtn').disabled && t.$('editRefundBtn').textContent==='已全额退款', '按钮置灰');
   ok(t.$('editRefundNote').style.display==='' && t.$('editRefundNote').querySelectorAll('.dr-line').length===2, '修改弹窗顶部列出两笔退款');
   ok(t.q('.ov-out')==='30.00', '全退后购物支出为 0：'+t.q('.ov-out'));
   const cs=t.catRows().map(r=>r.textContent).join('|');
@@ -138,7 +140,7 @@ function bootSync(records, arcExtra){
   ok(t.$('editMask').classList.contains('is-refund'), '退款记录：锁定模式');
   const hidden=[...t.$('editMask').querySelectorAll('.lock-on-refund')].every(f=>t.w.getComputedStyle(f).display==='none');
   ok(hidden, '分类 / 收支 / 口径三栏隐藏');
-  ok(t.$('editRefundBtn').style.display==='none' && t.$('editSaveTpl').style.display==='none', '没有退款、存为常用按钮');
+  ok(!t.$('editRefundBtn') && t.$('editSaveTpl').style.display==='none', '没有退款、存为常用按钮');
   ok(t.$('editRefundNote').textContent.includes('这是一笔退款') && t.$('editRefundNote').textContent.includes('还能退 50.00（含这笔）'), '顶部说明：'+t.$('editRefundNote').textContent);
   t.$('editMoney').value='60'; t.$('saveEdit').click();
   ok(t.$('askMsg').textContent.startsWith('这笔退款最多 50.00') && t.refunds()[0].money===30, '改成超额拦下');
@@ -152,8 +154,9 @@ function bootSync(records, arcExtra){
   ok(t.$('askMsg').textContent.includes('原账单的「还能退」金额会恢复'), '删退款的确认文案');
   t.$('askOk').click();
   ok(t.refunds().length===1, '删掉一笔退款');
-  t.w.openEdit('buy');
-  ok(t.$('editRefundBtn').textContent==='退款（已退 50.00，还能退 50.00）', '可退恢复');
+  t.w.JiwenDetail.openDetail('buy');
+  ok(t.$('detailRefund').textContent==='再退一笔（还能退 50.00）', '可退恢复');
+  t.w.JiwenDetail.closeDetail();
 }
 
 // ===== 5. 修改原账单的约束与联动 =====
@@ -200,11 +203,12 @@ function bootSync(records, arcExtra){
 // ===== 7. 没保存的修改：先问 =====
 {
   const t=await boot();
-  t.w.openEdit('buy'); t.$('editRemark').value='改了没保存';
-  t.$('editRefundBtn').click();
-  ok(t.$('askMsg').textContent.includes('修改还没保存') && t.$('refundMask').style.display!=='flex', '有改动先确认');
-  t.$('askOk').click();
-  ok(t.$('refundMask').style.display==='flex' && t.recs().find(r=>r.id==='buy').remark==='鞋子', '放弃修改去退款，原记录不变');
+  // 1023-D 起退款不从修改账单进了（不会再有「改了没保存就去退款」），从详情进：直接打开退款，原记录不变
+  t.w.openEdit('buy');
+  ok(!t.$('editMask').querySelector('.refund-btn') && !t.$('editRefundBtn'), '修改账单里没有退款按钮');
+  t.$('cancelEdit').click();
+  t.w.JiwenDetail.openDetail('buy'); t.$('detailRefund').click();
+  ok(t.$('refundMask').style.display==='flex' && t.recs().find(r=>r.id==='buy').remark==='鞋子', '从详情去退款，原记录不变');
 }
 
 // ===== 8. 原账单是「不计入」：退款也不计入 =====

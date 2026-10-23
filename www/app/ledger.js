@@ -6,7 +6,7 @@
         const { openDtPickerDate } = window.JiwenDate;   // 用到前面模块的
         const { loadImportUI, scrollChipIntoView } = window.JiwenImportEntry;   // 用到前面模块的
         const { openAddModal } = window.JiwenForms;   // 用到前面模块的
-        const { cal, openDetail } = window.JiwenDetail;   // 用到前面模块的
+        const { CHEV, cal, openDay, openDetail, openWeek, rowHtml, sumFen, sumHtml } = window.JiwenDetail;   // 用到前面模块的
         // 账单表事件委托：备注查看 / 修改。用 data-act + data-id 取代内联 onclick，
         // 既杜绝把记录 id 拼进 HTML 属性的注入隐患，也避免每行绑定监听。
         billList.addEventListener('click', e => {
@@ -365,7 +365,6 @@
         //   有筛选时（1023-G 之前的老筛选浮层）不按月：全部命中的照同样的周 / 天排，不显示没记账的日子。
         //   月份由底栏上方的月份浮条切（JiwenMonthStrip，停 1.5 秒收起，滑列表时出来）。lgYM：null = 这个月，别的是 'YYYY-MM'
         let lgYM=null;
-        const CHEV='<svg class="lg-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
         function ymNow(){ const n=new Date(); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`; }
         function curYM(){ return lgYM || ymNow(); }
         function ymLabel(ym){ const y=+ym.slice(0,4); return (y!==new Date().getFullYear() ? y+'年' : '')+(+ym.slice(5,7))+'月'; }
@@ -382,20 +381,6 @@
         }
         window.addEventListener('scroll', stripWake, { passive:true });
         function ovOff(){ return lgYM!=null; }   // 首屏快照：看的不是这个月就不存（名字是 1023-A 留下来的）
-        function sumFen(list){ let i=0, e=0; list.forEach(r=>{ const c=statContrib(r); i+=Math.round(c.inc*100); e+=Math.round(c.exp*100); }); return { inc:i/100, exp:e/100 }; }
-        function sumHtml(s, emptyText){
-            if(!s.exp && !s.inc) return emptyText ? `<span class="lg-sum-e">${emptyText}</span>` : '';
-            return (s.exp ? `<span>支出 <b>${s.exp.toFixed(2)}</b></span>` : '') + (s.inc ? `<span>收入 <b class="pos">${s.inc.toFixed(2)}</b></span>` : '');
-        }
-        function rowHtml(r, rMap){
-            const isExp=r.type==='expense', amt=safeNum(r.money).toFixed(2);
-            const tags=(isRefund(r) ? '<span class="io-tag io-refund">退款</span>' : '') + modeTag(r) + refundedTag(r, rMap);
-            const remark=(r.remark||'').trim(), cat=r.cat||'未分类';
-            return `<div class="bl-row" data-act="detail" data-id="${escapeHtml(r.id)}" role="button">`
-                + `<div class="bl-main"><div class="bl-t"><span class="bl-t-x">${escapeHtml(remark || cat)}</span>${tags}</div>`
-                + `<div class="bl-sub"><span class="bl-cat-t">${escapeHtml(cat)}</span> · <span class="bl-time">${escapeHtml((r.time||'').slice(11,16))}</span></div></div>`
-                + `<span class="bl-amt ${isExp ? 'out' : 'pos'}${modeAmtCls(r)}">${isExp ? '−' : '+'}${amt}</span></div>`;
-        }
         function gapHtml(a, b, today){
             const C=cal;
             if(a===b && a===today) return `<div class="lg-gap lg-gap-today" data-a="${a}" data-b="${b}"><span class="lg-gap-t">今天 · ${C.mdText(a)} ${C.wdText(a)}，还没记账</span><button type="button" class="lg-gap-btn" data-add="${a}">记一笔</button></div>`;
@@ -457,10 +442,12 @@
             for(let ym=first; ym<=now; ){ out.push({ ym, v:round2(Math.max(0, exp.get(ym)||0)) }); let y=+ym.slice(0,4), m=+ym.slice(5,7)+1; if(m>12){ m=1; y++; } ym=`${y}-${pad(m)}`; }
             return out;
         }
-        // 账单页的点击：周小计 / 日期抬头（1023-D 接详情抽屉）、没记账那条的「记一笔 / 补一笔」
+        // 账单页的点击：周小计 → 一周详情、日期抬头 → 当日详情（1023-D）、没记账那条的「记一笔 / 补一笔」
         billList.addEventListener('click', e=>{
             const add=e.target.closest('[data-add]');
             if(add){ e.stopPropagation(); openAddModal({ day:add.dataset.add }); return; }
+            const wk=e.target.closest('.lg-wk[data-mon]'); if(wk){ openWeek(wk.dataset.mon); return; }
+            const dh=e.target.closest('.lg-dh[data-day]'); if(dh){ openDay(dh.dataset.day); return; }
         });
 
         // 一个月几百上千笔时分批画：先画前 LIST_FIRST 笔左右（整张日卡片为单位，一屏多），剩下的每次 LIST_CHUNK 笔、让浏览器喘口气再接着画；

@@ -1,9 +1,9 @@
 (function(){
         const { $, escapeHtml, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
-        const { IMP_APPS, balContrib, getUserData, isRefund, modeAmtCls, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData } = window.JiwenStore;   // 用到前面模块的
+        const { IMP_APPS, balContrib, getUserData, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { devImportOn } = window.JiwenImportEntry;   // 用到前面模块的
-        const { refundLineHtml } = window.JiwenForms;   // 用到前面模块的
+        const { openAddModal, openRefund, refundLineHtml } = window.JiwenForms;   // 用到前面模块的
 
         // 清单行 → 只读详情。批量确认还没执行，此时允许改记录会让清单和即将执行的范围对不上，
         // 所以从这里进的详情隐藏「修改」按钮，只看不改。
@@ -13,14 +13,19 @@
         });
 
         // 打开账单详情弹窗。opts.readonly 时隐藏「修改」（批量确认清单里进来的）。
+        // 1023-D：单笔详情（账单页、统计页共用）：上面大金额、标题（备注，没备注写分类）、分类 + 收支标签 + 日期时间；
+        //   下面一张列表卡：统计、「这一天 · N 笔 · 支出 x ›」（点了换成当日详情）、这笔之后结余，有的才显示原账单 / 退款、来源、AI 标记、待确认；
+        //   底部「修改 | 再记一笔」，再下面一行小字「这笔要退款」（原来在修改账单里，1023-D 提出来；删除还在修改里）。
+        //   opts.readonly：批量确认清单里进来的，只看不改（三个按钮都藏）
         function openDetail(id, opts){
             const rec=getUserData().find(r=>r.id===id);
-            $('detailEdit').style.display = (opts && opts.readonly) ? 'none' : '';
+            const ro=!!(opts && opts.readonly);
             if(!rec){ customAlert('这条记录不存在了'); return; }
-            $('detailTime').textContent = rec.time.replace('T',' ');
+            const C=cal, day=(rec.time||'').slice(0,10), okDay=/^\d{4}-\d{2}-\d{2}$/.test(day);
+            $('detailTime').textContent = okDay ? `${C.dayTitle(day).replace(/^(今天|昨天) · /, '')} ${(rec.time||'').slice(11,16)}` : (rec.time||'').replace('T',' ');
             const isExp = rec.type==='expense';
             const amt=safeNum(rec.money);
-            $('detailMoney').innerHTML = `<span class="${isExp?'neg':'pos'}${modeAmtCls(rec)}">${isExp?'−':'+'}${amt.toFixed(2)} 元</span>`;
+            $('detailMoney').innerHTML = `<span class="${isExp?'out':'pos'}${modeAmtCls(rec)}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
             $('detailCat').innerHTML = `<span class="cat-tag">${escapeHtml(rec.cat||'未分类')}</span>`;
             const all=getUserData();
             $('detailType').innerHTML = (isExp
@@ -29,6 +34,13 @@
                 + refundedTag(rec, refundedMap(all));
             // 1020-I：统计单独一行（原来是收支后面的小标签）
             $('detailMode').textContent = ({ normal:'计入', skip:'不计', flow:'往来' })[recMode(rec)];
+            // 这一天：几笔、支出多少，点了看当日详情
+            const dayRow=$('detailDayRow');
+            if(okDay){
+                const ds=all.filter(r=>(r.time||'').slice(0,10)===day), s=sumFen(ds);
+                $('detailDay').textContent=`${ds.length} 笔 · 支出 ${s.exp.toFixed(2)}`;
+                dayRow.dataset.day=day; dayRow.style.display='';
+            } else dayRow.style.display='none';
             // 1023-A：原来列表里每行的「结余」挪到这里：记完这一笔以后的结余（全部记录、含期初余额，不计的不算）
             const bal=balanceAfter(rec);
             $('detailBal').textContent = bal==null ? '' : bal.toFixed(2) + (isSkip(rec) ? '（这笔不计，不影响结余）' : '');
@@ -37,12 +49,27 @@
             paintDetailAiFlag(rec, all);
             paintDetailRv(rec);
             const rk=(rec.remark||'').trim();
-            $('detailRemark').textContent = rk || '（无备注）';
+            $('detailRemark').textContent = rk || (rec.cat||'未分类');
+            $('detailRemark').classList.toggle('dtl-nork', !rk);
+            $('detailEdit').style.display = ro ? 'none' : '';
+            $('detailAgain').style.display = (ro || isRefund(rec)) ? 'none' : '';   // 退款的分类跟着原账单走，不给「再记一笔」
+            const rf=$('detailRefund');
+            const rem = isExp ? round2(amt-refundedTotal(all, rec.id)) : 0;
+            if(!ro && isExp && rem>0){ rf.style.display=''; rf.textContent = rem<round2(amt) ? `再退一笔（还能退 ${rem.toFixed(2)}）` : '这笔要退款'; }
+            else rf.style.display='none';
             // 1019-S：从别的列表点进来的，关掉回那个列表；详情里刷新同一条（去掉 AI 标记、拆开）时照旧留着
             detailOnClose=(opts && opts.onClose) || (detailCurId===id && $('detailMask').style.display==='flex' ? detailOnClose : null);
             detailCurId=id;
             $('detailMask').style.display='flex';
         }
+        // 离开详情去别处（修改 / 再记一笔 / 退款 / 这一天）：关掉、不再回原来的列表
+        function leaveDetail(){ const id=detailCurId; $('detailMask').style.display='none'; detailCurId=null; detailOnClose=null; return id; }
+        $('detailDayRow').addEventListener('click', ()=>{ const k=$('detailDayRow').dataset.day; leaveDetail(); if(k) openDay(k); });
+        $('detailAgain').addEventListener('click', ()=>{
+            const rec=getUserData().find(r=>r.id===detailCurId); leaveDetail();
+            if(rec) openAddModal({ from:rec });
+        });
+        $('detailRefund').addEventListener('click', ()=>{ const id=leaveDetail(); if(id) openRefund(id); });
 
         // 第二期（1016-Z6）：详情里一行浅色「来自微信账单」/「已和微信账单合并」；合并过的、开着开发开关时有「拆开」。手记、没来源的不显示
         function paintDetailSource(rec){
@@ -157,9 +184,7 @@
         $('detailClose').addEventListener('click', closeDetail);
         // 详情「修改」→ 关详情、打开修改弹窗。保存/删除后由 closeEditModal 统一刷新视图。
         $('detailEdit').addEventListener('click', ()=>{
-            const id=detailCurId;
-            $('detailMask').style.display='none';
-            detailCurId=null; detailOnClose=null;   // 去修改了，不再回原来的列表
+            const id=leaveDetail();   // 去修改了，不再回原来的列表
             if(id) window.openEdit(id, { fromDetail:true });
         });
 
@@ -202,5 +227,104 @@
         // 本周 / 上周 / 那周（按今天算）
         function weekName(mon){ const tm=monOf(todayKey()); return mon===tm ? '本周' : (mon===addDay(tm, -7) ? '上周' : '那周'); }
         const cal={ dk, kd, addDay, monOf, todayKey, monthEnd, mdText, wdText, dayTitle, rangeText, weekName };
-        window.JiwenDetail = { aiFlagText, balanceAfter, cal, closeDetail, openDetail };   // detail 模块对外只有这一个入口
+
+        // ===== 1023-D：账单页列表、三个详情抽屉共用的小块（每笔两行、合计）=====
+        const CHEV='<svg class="lg-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+        // 统计页同一口径（statContrib）按分加
+        function sumFen(list){ let i=0, e=0; list.forEach(r=>{ const c=statContrib(r); i+=Math.round(c.inc*100); e+=Math.round(c.exp*100); }); return { inc:i/100, exp:e/100 }; }
+        function sumHtml(s, emptyText){
+            if(!s.exp && !s.inc) return emptyText ? `<span class="lg-sum-e">${emptyText}</span>` : '';
+            return (s.exp ? `<span>支出 <b>${s.exp.toFixed(2)}</b></span>` : '') + (s.inc ? `<span>收入 <b class="pos">${s.inc.toFixed(2)}</b></span>` : '');
+        }
+        // 每笔一行：上面备注（没备注写分类）+ 标签，下面小字「分类 · 时间」，右边金额（支出正文色带 −、收入绿色带 +）
+        //   opt.date：时间前面带上日期（预算明细这种跨天的列表用）
+        function rowHtml(r, rMap, opt){
+            const isExp=r.type==='expense', amt=safeNum(r.money).toFixed(2);
+            const tags=(isRefund(r) ? '<span class="io-tag io-refund">退款</span>' : '') + modeTag(r) + refundedTag(r, rMap);
+            const remark=(r.remark||'').trim(), cat=r.cat||'未分类', k=(r.time||'').slice(0,10);
+            const when=(opt && opt.date && /^\d{4}-\d{2}-\d{2}$/.test(k) ? cal.mdText(k)+' ' : '') + (r.time||'').slice(11,16);
+            return `<div class="bl-row" data-act="detail" data-id="${escapeHtml(r.id)}" role="button">`
+                + `<div class="bl-main"><div class="bl-t"><span class="bl-t-x">${escapeHtml(remark || cat)}</span>${tags}</div>`
+                + `<div class="bl-sub"><span class="bl-cat-t">${escapeHtml(cat)}</span> · <span class="bl-time">${escapeHtml(when)}</span></div></div>`
+                + `<span class="bl-amt ${isExp ? 'out' : 'pos'}${modeAmtCls(r)}">${isExp ? '−' : '+'}${amt}</span></div>`;
+        }
+        function recsOfDays(a, b){ return getUserData().filter(r=>{ const k=(r.time||'').slice(0,10); return k>=a && k<=b; }); }
+        function byTimeDesc(list){ return list.map((r, i)=>({ r, i, ts:parseRecTime(r.time).getTime() })).sort((x, y)=>(y.ts-x.ts) || (y.i-x.i)).map(x=>x.r); }
+        function cellHtml(k, v, sub, cls){ return `<div class="dd-cell"><span class="dd-k">${k}</span><span class="dd-v${cls ? ' '+cls : ''}">${v}</span><span class="dd-s">${sub}</span></div>`; }
+        function moreLess(d, what){ return d>=0 ? `比${what}多 ${d.toFixed(2)}` : `比${what}少 ${(-d).toFixed(2)}`; }
+        function btn(id, text, cls){ const b=document.createElement('button'); b.type='button'; b.className='ui-btn'+(cls ? ' '+cls : ''); b.id=id; b.textContent=text; return b; }
+        function pairFoot(box, a, b){ const p=document.createElement('div'); p.className='ui-pair'; p.appendChild(a); if(b) p.appendChild(b); box.appendChild(p); }
+
+        // ===== 1023-D：当日详情（账单页点日期抬头、单笔详情里「这一天」、一周详情里点某一天；统计页 1023-H 也用它）=====
+        //   支出（比本月日均多 / 少）、收入（当天净剩）、当天支出按分类的小横条、当天每一笔（点了进单笔详情，关了回到这里）；底部「关闭 | 给这天补一笔」
+        //   本月日均 = 这个月的支出 ÷ 过去了的天数（这个月按到今天算，过去的月按整月）。opt.onClose：关掉以后回到哪（一周详情点进来的回一周）
+        function openDay(k, opt){
+            if(!window.JiwenSheet || !/^\d{4}-\d{2}-\d{2}$/.test(k||'')) return;
+            const C=cal, list=byTimeDesc(recsOfDays(k, k)), s=sumFen(list), rMap=refundedMap(getUserData());
+            const ym=k.slice(0,7), today=C.todayKey();
+            const dim=+C.monthEnd(ym).slice(8,10), passed = today.slice(0,7)===ym ? +today.slice(8,10) : (today<ym ? 0 : dim);
+            const ms=sumFen(recsOfDays(ym+'-01', C.monthEnd(ym))), avg = passed>0 ? ms.exp/passed : 0;
+            const back=opt && opt.onClose;
+            const reopen=()=>openDay(k, opt);
+            window.JiwenSheet.open({ title:C.dayTitle(k), sub:`${list.length} 笔`, tall:true, onDismiss:back,
+                body(box, done){
+                    box.classList.add('dd-body');
+                    const net=round2(s.inc-s.exp);
+                    let h=`<div class="dd-cells">`
+                        + cellHtml('支出', s.exp.toFixed(2), passed>0 ? moreLess(round2(s.exp-avg), '本月日均') : '')
+                        + cellHtml('收入', s.inc.toFixed(2), `当天净剩 ${net<0 ? '−' : '+'}${Math.abs(net).toFixed(2)}`, 'pos')
+                        + `</div>`;
+                    // 当天支出按分类（退完了的不列）
+                    const byCat=new Map();
+                    list.forEach(r=>{ const e=statContrib(r).exp; if(e) byCat.set(r.cat||'未分类', (byCat.get(r.cat||'未分类')||0)+e); });
+                    const cats=[...byCat].map(([c, v])=>[c, round2(v)]).filter(x=>x[1]>0).sort((a, b)=>b[1]-a[1]);
+                    if(cats.length){
+                        const mx=cats[0][1];
+                        h+=`<div class="dd-cats">` + cats.map(([c, v])=>`<div class="dd-cat"><span class="dd-cat-n">${escapeHtml(c)}</span><span class="dd-cat-b"><i style="width:${(v/mx*100).toFixed(0)}%"></i></span><span class="dd-cat-v">${v.toFixed(2)}</span></div>`).join('') + `</div>`;
+                    }
+                    h+= list.length ? `<div class="lg-dc dd-rows">` + list.map(r=>rowHtml(r, rMap)).join('') + `</div>` : `<div class="dd-empty">这天没记账</div>`;
+                    box.innerHTML=h;
+                    box.addEventListener('click', e=>{ const row=e.target.closest('.bl-row[data-id]'); if(!row) return; done(); openDetail(row.dataset.id, { onClose:reopen }); });
+                },
+                foot(box, done){
+                    const c=btn('dayClose', '关闭'), a=btn('dayAdd', '给这天补一笔', 'primary');
+                    c.addEventListener('click', ()=>{ done(); if(back) back(); });
+                    a.addEventListener('click', ()=>{ done(); openAddModal({ day:k }); });
+                    pairFoot(box, c, a);
+                } });
+        }
+
+        // ===== 1023-D：一周详情（账单页点周小计；统计页 1023-H 也用它）=====
+        //   支出（比上一周多 / 少）、记了几笔（日均按过去了的天数算）、周一到周日 7 根柱子（今天深色、没到的日子虚线框）、
+        //   每天一行（点了进当日详情，关了回到这里；没记的写「没记 · 补一笔」）；底部「关闭」
+        function openWeek(mon, opt){
+            if(!window.JiwenSheet || !/^\d{4}-\d{2}-\d{2}$/.test(mon||'')) return;
+            const C=cal; mon=C.monOf(mon);
+            const sun=C.addDay(mon, 6), today=C.todayKey();
+            const list=recsOfDays(mon, sun), s=sumFen(list), prev=recsOfDays(C.addDay(mon, -7), C.addDay(mon, -1)), ps=sumFen(prev);
+            const days=[]; for(let i=0;i<7;i++){ const k=C.addDay(mon, i), rs=list.filter(r=>(r.time||'').slice(0,10)===k); days.push({ k, rs, exp:sumFen(rs).exp, future:k>today }); }
+            const passed=days.filter(d=>!d.future).length;
+            const back=opt && opt.onClose, reopen=()=>openWeek(mon, opt);
+            window.JiwenSheet.open({ title:`${C.weekName(mon)} · ${C.rangeText(mon, sun)}`, tall:true, onDismiss:back,
+                body(box, done){
+                    box.classList.add('dd-body');
+                    let h=`<div class="dd-cells">`
+                        + cellHtml('支出', s.exp.toFixed(2), prev.length ? moreLess(round2(s.exp-ps.exp), '上一周') : '上一周没有记录可比')
+                        + cellHtml('记了', `${list.length} <small>笔</small>`, passed ? `日均 ${(s.exp/passed).toFixed(2)}（${passed} 天）` : '')
+                        + `</div>`;
+                    const mx=Math.max(1, ...days.map(d=>d.exp));
+                    h+=`<div class="dw-chart"><div class="dw-bars">` + days.map(d=>`<div class="dw-bar${d.k===today ? ' today' : ''}${d.future ? ' future' : ''}"><span class="dw-v">${d.future ? '' : Math.round(d.exp)}</span><i style="height:${d.future ? 6 : Math.max(4, Math.round(d.exp/mx*60))}px"></i></div>`).join('')
+                        + `</div><div class="dw-labs">` + days.map(d=>`<span${d.k===today ? ' class="today"' : ''}>${C.wdText(d.k).slice(1)}</span>`).join('') + `</div></div>`;
+                    h+=`<div class="lg-dc dw-days">` + days.filter(d=>!d.future).reverse().map(d=>d.rs.length
+                        ? `<button type="button" class="dw-day" data-day="${d.k}"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">${d.rs.length} 笔</span><span class="dw-day-v">${d.exp.toFixed(2)}</span>${CHEV}</button>`
+                        : `<div class="dw-day dw-day-none"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">没记</span><button type="button" class="lg-gap-btn" data-add="${d.k}">补一笔</button></div>`).join('') + `</div>`;
+                    box.innerHTML=h;
+                    box.addEventListener('click', e=>{
+                        const add=e.target.closest('[data-add]'); if(add){ done(); openAddModal({ day:add.dataset.add }); return; }
+                        const d=e.target.closest('.dw-day[data-day]'); if(d){ done(); openDay(d.dataset.day, { onClose:reopen }); }
+                    });
+                },
+                foot(box, done){ const c=btn('weekClose', '关闭', 'block'); c.addEventListener('click', ()=>{ done(); if(back) back(); }); box.appendChild(c); } });
+        }
+        window.JiwenDetail = { CHEV, aiFlagText, balanceAfter, cal, closeDetail, openDay, openDetail, openWeek, rowHtml, sumFen, sumHtml };   // detail 模块对外只有这一个入口
 })();
