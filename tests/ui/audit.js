@@ -972,6 +972,10 @@ async function run(cfg, port, browser) {
         if (tops.size > 1) bad.push('条件换了行');
         return { bad, ok: !bad.length };
       })));
+      // 1023-N：没条件时卡片里的「最近搜过」（上面那次收起抽屉已经记了一条）
+      await page.evaluate(() => { window.JiwenSearch.resetSearch(); document.getElementById('filterFab').click(); }); await page.waitForTimeout(700);
+      await page.evaluate(() => window.closeFilterSheet()); await page.waitForTimeout(500);
+      await shot(page, size, '搜一笔', '最近搜过');
       await page.evaluate(() => window.JiwenSearch.closeSearch()); await page.waitForTimeout(500);
       // 1023-E：全部日子页、一条日子的详情
       await page.evaluate(() => window.JiwenTabs.backFromDaysPage && document.getElementById('daysManageBtn').click()); await page.waitForTimeout(500);

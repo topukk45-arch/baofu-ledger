@@ -74,7 +74,7 @@
             if(!o.noSheet) openSheet();
         }
         function closeSearch(){
-            closeSheet();
+            closeSheet({ noHist:true });   // 直接回账单：不算确认条件
             if(!pageOpen) return;
             pageOpen=false;
             document.body.classList.remove('search-open');
@@ -87,6 +87,84 @@
         }
         function hits(){ return getUserData().filter(filterMatch); }
         function dayLabel(k){ const y=+k.slice(0,4); return (y!==new Date().getFullYear() ? y+'年' : '')+cal.mdText(k); }
+        // ===== 1023-N：最近搜过 =====
+        //   存在这台手机（localStorage，按账号 + 存档分开，不进备份、云备份），最多 HIST_MAX 条，新的在前、一样的条件合成一条并挪到最前。
+        //   每条存的是一组条件；「本月 / 上月 / 近 7 天」按相对时间存（下个月点开就是下个月），自己选的日期存日子。
+        //   什么时候记：确认条件的时候——抽屉收起（看这 N 笔、往下拉、点暗处、返回键）且有条件；在结果页点 × 去掉条件那种中间状态不记。
+        const HIST_MAX=10;
+        function histKey(){ return `app_search_hist_${JiwenBase.currentUser}__${JiwenBase.currentArchive}`; }
+        function histLoad(){ try{ const a=JSON.parse(localStorage.getItem(histKey())||'[]'); return Array.isArray(a) ? a.filter(x=>x && typeof x==='object') : []; }catch(_){ return []; } }
+        function histSave(a){ try{ localStorage.setItem(histKey(), JSON.stringify(a.slice(0, HIST_MAX))); }catch(_){} }
+        function histOf(){
+            const s=searchState, h={};
+            if(s.from || s.to){
+                const q=['month', 'last', '7d'].find(x=>{ const [a, z]=quickRange(x); return (s.from||'')===a && (s.to||'')===z; });
+                if(q) h.q=q; else { h.from=s.from||null; h.to=s.to||null; }
+            }
+            if(s.min!=null) h.min=s.min;
+            if(s.max!=null) h.max=s.max;
+            if(s.ios.length===1) h.ios=s.ios.slice();
+            if(s.cats.length) h.cats=s.cats.slice();
+            if(s.modes.length) h.modes=MODE_ORDER.filter(m=>s.modes.includes(m));
+            if(s.keyword) h.keyword=s.keyword;
+            if(s.rv) h.rv=true;
+            return h;
+        }
+        function histSig(h){ return JSON.stringify(['q', 'from', 'to', 'min', 'max', 'ios', 'cats', 'modes', 'keyword', 'rv'].map(k=>h[k]===undefined ? null : h[k])); }
+        function histAdd(){
+            if(!hasFilter()) return;
+            const h=histOf(), sig=histSig(h);
+            histSave([h].concat(histLoad().filter(x=>histSig(x)!==sig)));
+        }
+        const Q_NAME={ month:'本月', last:'上月', '7d':'近 7 天' };
+        function histLabel(h){
+            const out=[];
+            if(h.q) out.push(Q_NAME[h.q]||'');
+            else if(h.from || h.to){
+                const f=h.from, z=h.to;
+                if(f && z && f.slice(8)==='01' && z===cal.monthEnd(f.slice(0,7))) out.push(`${+f.slice(0,4)}年${+f.slice(5,7)}月`);
+                else out.push(f && z ? (f===z ? dayLabel(f) : `${dayLabel(f)}–${dayLabel(z)}`) : (f ? `${dayLabel(f)}起` : `到${dayLabel(z)}`));
+            }
+            if(h.min!=null || h.max!=null) out.push(h.min!=null && h.max!=null ? `¥${h.min}–${h.max}` : (h.min!=null ? `¥${h.min} 起` : `¥${h.max} 以内`));
+            if(h.ios && h.ios.length===1) out.push(h.ios[0]==='expense' ? '支出' : '收入');
+            (h.cats||[]).forEach(c=>out.push(c));
+            (h.modes||[]).forEach(m=>out.push(MODE_NAME[m]));
+            if(h.keyword) out.push('备注：'+h.keyword);
+            if(h.rv) out.push('待确认分类');
+            return out.join(' · ');
+        }
+        // 点一条：整组套用（换掉现在的条件）
+        function histApply(h){
+            clearState();
+            if(h.q){ const [a, z]=quickRange(h.q); searchState.from=a||null; searchState.to=z||null; }
+            else { searchState.from=h.from||null; searchState.to=h.to||null; }
+            searchState.min = h.min!=null ? h.min : null; searchState.max = h.max!=null ? h.max : null;
+            searchState.ios=(h.ios||[]).slice(); searchState.cats=(h.cats||[]).slice(); searchState.modes=(h.modes||[]).slice();
+            searchState.keyword=h.keyword||''; searchState.rv=!!h.rv;
+            kw.value=searchState.keyword;
+            min.value = searchState.min!=null ? String(searchState.min) : ''; max.value = searchState.max!=null ? String(searchState.max) : '';
+            renderFilterChips();   // 分类后来被删了、改名了的去掉
+            histAdd();
+            changed();
+        }
+        function histDrop(i){ const a=histLoad(); a.splice(i, 1); histSave(a); }
+        const CLOCK='<svg class="sp-hist-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+        // 结果页没条件时，条件卡里列最近 3 条
+        function histCardHtml(){
+            const a=histLoad().slice(0, 3);
+            if(!a.length) return `<span class="sp-nocond">还没设条件，下面是全部账单</span>`;
+            return `<div class="sp-hist"><div class="sp-hist-head"><span>最近搜过</span><button type="button" class="sp-hist-clear" data-act="hclear">清空</button></div>`
+                + a.map((h, i)=>`<div class="sp-hist-row"><button type="button" class="sp-hist-go" data-act="happly" data-i="${i}">${CLOCK}<span class="sp-hist-t">${escapeHtml(histLabel(h))}</span></button>`
+                    + `<button type="button" class="sp-hist-x" data-act="hdrop" data-i="${i}" aria-label="删掉这条：${escapeHtml(histLabel(h))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`).join('')
+                + `</div>`;
+        }
+        // 抽屉顶上：最近 5 条，点一下整组套用
+        function paintHistTop(){
+            const box=$('filterHist'); if(!box) return;
+            const a=histLoad().slice(0, 5);
+            box.hidden=!a.length;
+            box.innerHTML = a.length ? `<span class="sf-hist-k">最近搜过</span><div class="sf-hist-list">` + a.map((h, i)=>`<button type="button" class="sf-hist-chip" data-i="${i}">${escapeHtml(histLabel(h))}</button>`).join('') + `</div>` : '';
+        }
         // 生效的条件：一个一个小标签，每个带「去掉」
         function condTags(){
             const s=searchState, out=[];
@@ -109,7 +187,7 @@
             $('searchTags').innerHTML = tagList.length
                 ? tagList.map((x, i)=>`<span class="sp-tag" data-i="${i}"><button type="button" class="sp-tag-t" data-act="edit" aria-label="改条件：${escapeHtml(x.t)}">${escapeHtml(x.t)}</button>`
                     + `<button type="button" class="sp-tag-x" data-act="drop" aria-label="去掉条件：${escapeHtml(x.t)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>`).join('')
-                : `<span class="sp-nocond">还没设条件，下面是全部账单</span>`;
+                : histCardHtml();   // 1023-N：没条件时列最近搜过的 3 条
             $('searchCount').textContent=`${asc.length} 笔`;
             const s=sumFen(asc);
             let nSkip=0, nFlow=0; asc.forEach(r=>{ if(isSkip(r)) nSkip++; else if(isFlow(r)) nFlow++; });
@@ -141,6 +219,14 @@
         }
         function searchFlush(){ painter.flush(); }
         $('searchTags').addEventListener('click', e=>{
+            const ha=e.target.closest('[data-act^="h"]');
+            if(ha){
+                const act=ha.dataset.act, i=+ha.dataset.i;
+                if(act==='happly'){ const h=histLoad()[i]; if(h) histApply(h); }
+                else if(act==='hdrop'){ histDrop(i); render(); }
+                else if(act==='hclear'){ customConfirm('清空最近搜过的条件？只删这台手机上记下的搜索条件，账本不动。', ()=>{ histSave([]); render(); }, '清空最近搜过', { okText:'清空', danger:true }); }
+                return;
+            }
             const b=e.target.closest('.sp-tag'); if(!b) return;
             const x=tagList[+b.dataset.i]; if(!x) return;
             if(e.target.closest('[data-act="drop"]')){ x.drop(); render(); return; }
@@ -178,7 +264,7 @@
             kw.value=searchState.keyword;
             min.value = searchState.min!=null ? String(searchState.min) : '';
             max.value = searchState.max!=null ? String(searchState.max) : '';
-            renderFilterChips(); paintSheet();
+            renderFilterChips(); paintSheet(); paintHistTop();
             mask.style.display='flex';
             sheetDrag.reset();
             requestAnimationFrame(()=>mask.classList.add('open'));
@@ -190,8 +276,9 @@
                 setTimeout(()=>row.classList.remove('sf-flash'), 1200);
             }
         }
-        function closeSheet(){
+        function closeSheet(opt){
             if(!sheetOpen() && !mask.classList.contains('open')) return;
+            if(pageOpen && !(opt && opt.noHist)){ readInputs(); histAdd(); render(); }   // 1023-N：收起抽屉 = 确认了条件，记一条
             if(window.kpClose) window.kpClose();
             mask.classList.remove('open'); sheetDrag.reset();
             mask.style.display='none';   // 1019-N：当场关掉，滑走的动画由共用的「影子」做
@@ -266,6 +353,12 @@
         // 往下拉关闭（和别的面板共用 bindSheetDrag）；点暗处也关（只这一个抽屉）
         const sheetDrag=bindSheetDrag(mask, sheet, $('filterSheetGrip'), ()=>closeSheet());
         mask.addEventListener('click', e=>{ if(e.target===mask) closeSheet(); });
+        // 1023-N：抽屉顶上「最近搜过」：点一条整组套用（抽屉不关，结果跟着变）
+        $('filterHist').addEventListener('click', e=>{
+            const c=e.target.closest('.sf-hist-chip'); if(!c) return;
+            const h=histLoad()[+c.dataset.i]; if(!h) return;
+            histApply(h); paintHistTop();
+        });
 
         // 换账号 / 存档：条件清掉、结果页关掉
         function resetSearch(){

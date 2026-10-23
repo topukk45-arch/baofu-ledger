@@ -75,7 +75,7 @@ const R = (id, time, money, type, cat, remark, extra) => Object.assign({ id, tim
 
   // 6. 清空条件
   $('searchClear').click(); await tick();
-  ok(!tags().length && /还没设条件/.test(txt($('searchTags'))) && txt($('searchEdit')) === '设条件' && w.JiwenSearch.isOpen(), '6 清空条件：条件都没了，结果页还开着');
+  ok(!tags().length && /最近搜过/.test(txt($('searchTags'))) && txt($('searchEdit')) === '设条件' && w.JiwenSearch.isOpen(), '6 清空条件：条件都没了（卡片里换成最近搜过，1023-N），结果页还开着');
   $('searchBack').click(); await new Promise(r => setTimeout(r, 300));
   ok(!w.JiwenSearch.isOpen(), '6 顶上 ‹：回到账单');
 

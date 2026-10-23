@@ -2020,6 +2020,25 @@
         button.sp-batch { flex:none; display:flex; align-items:center; gap:6px; min-height:var(--ui-tap); padding:0 14px; border:1px solid var(--c-primary-dark); border-radius:12px;
             background:transparent; font-family:inherit; font-size:14px; font-weight:bold; color:var(--c-primary-dark); cursor:pointer; }
         button.sp-batch svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        /* 1023-N：最近搜过：结果页没条件时卡片里 3 条（点了套用、× 删一条、清空），抽屉顶上 5 条（点了套用） */
+        .sp-hist { display:flex; flex-direction:column; width:100%; }
+        .sp-hist-head { display:flex; align-items:center; min-height:32px; font-size:14px; font-weight:bold; color:var(--c-text); }
+        button.sp-hist-clear { margin-left:auto; min-height:var(--ui-tap); padding:0 4px 0 12px; border:none; background:transparent; font:inherit; font-size:13px; font-weight:normal; color:var(--c-text-soft); cursor:pointer; }
+        .sp-hist-row { display:flex; align-items:center; border-top:1px solid var(--c-border); }
+        button.sp-hist-go { flex:1 1 auto; min-width:0; display:flex; align-items:center; gap:8px; min-height:var(--ui-tap); padding:0 4px; border:none; background:transparent;
+            font:inherit; font-size:14px; color:var(--c-text); text-align:left; cursor:pointer; }
+        .sp-hist-ico { flex:none; width:16px; height:16px; fill:none; stroke:var(--c-text-soft); stroke-width:2; stroke-linecap:round; }
+        .sp-hist-t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        button.sp-hist-x { flex:none; width:var(--ui-tap); height:var(--ui-tap); border:none; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+        button.sp-hist-x svg { width:12px; height:12px; fill:none; stroke:var(--c-text-soft); stroke-width:2.6; stroke-linecap:round; }
+        .sp-tags:has(.sp-hist) { overflow:visible; flex-wrap:wrap; }
+        .sf-hist { display:flex; flex-direction:column; gap:6px; }
+        .sf-hist[hidden] { display:none; }
+        .sf-hist-k { font-size:13px; color:var(--c-text-soft); }
+        .sf-hist-list { display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; touch-action:pan-x; }
+        .sf-hist-list::-webkit-scrollbar { display:none; }
+        button.sf-hist-chip { flex:none; min-height:var(--ui-tap); padding:0 14px; border:1px solid var(--c-border-mid); border-radius:22px; background:var(--c-surface);
+            font:inherit; font-size:13px; color:var(--c-text); white-space:nowrap; cursor:pointer; }
         /* 点某个条件进抽屉：翻到那一项，闪一下 */
         .sf-flash { animation:sfFlash 1.1s ease-out; }
         @keyframes sfFlash { 0%,40% { background:color-mix(in srgb, var(--c-primary) 22%, transparent); } 100% { background:transparent; } }

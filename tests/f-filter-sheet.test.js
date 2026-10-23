@@ -64,7 +64,7 @@ const tags=t=>[...t.$('searchTags').querySelectorAll('.sp-tag')].map(e=>e.textCo
   ok(sids(t)==='a,b', '只看计入');
   // 清空条件：马上生效，回到全部
   t.$('sheetClear').click();
-  ok(!t.$('filterModeChips').querySelector('.sel') && sids(t)==='a,b,cc,dep,lp' && /还没设条件/.test(t.$('searchTags').textContent), '清空条件：结果页回到全部');
+  ok(!t.$('filterModeChips').querySelector('.sel') && sids(t)==='a,b,cc,dep,lp' && /还没设条件|最近搜过/.test(t.$('searchTags').textContent), '清空条件：结果页回到全部');
   // 结果页的小标签：点 × 去掉那一条
   t.chip('filterModeChips','不计').click(); t.chip('filterChips','其他').click(); t.$('sheetApply').click();
   ok(tags(t)==='其他,不计' && sids(t)==='cc', '两个条件');
