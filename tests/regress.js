@@ -34,6 +34,23 @@ async function snap(file){
   // 有命中的筛选
   $('filterFab').click(); $('searchKeyword').value='游戏充值'; $('sheetApply').click();
   out.filter=$('summaryFilter').innerHTML.replace(/<button class="filter-batch"[^>]*>批量<\/button>/,'')+$('billList').innerHTML;
+  // 1023-F：同样的条件（单选那种，老版本也能点出来）命中的是哪些记录，新老版本必须一模一样（列表怎么画不管，只比记录编号）
+  if(L && L.listFlush){
+    const chip=(box,t)=>{ const e=[...$(box).querySelectorAll('.cc')].find(x=>x.textContent===t); if(e) e.click(); return !!e; };
+    // 打开面板以后等一帧（面板的 open 类是下一帧才加上，老版本的「清除全部」在那之前会把已提交的分类读回去）
+    const frame=()=>new Promise(r=>dom.window.requestAnimationFrame(()=>r()));
+    const hit=async setup=>{ $('filterFab').click(); await frame(); $('sheetClear').click(); setup(); $('sheetApply').click(); L.listFlush(); return [...$('billList').querySelectorAll('.bl-row')].map(r=>r.dataset.id).sort().join(','); };
+    const conds=[
+      ['备注 午饭', ()=>{ $('searchKeyword').value='午饭'; }], ['备注 游戏充值', ()=>{ $('searchKeyword').value='游戏充值'; }],
+      ['支出', ()=>chip('filterIoChips','支出')], ['收入', ()=>chip('filterIoChips','收入')],
+      ['不计', ()=>chip('filterModeChips','不计')], ['往来', ()=>chip('filterModeChips','往来')], ['计入', ()=>chip('filterModeChips','计入')],
+      ['餐饮', ()=>chip('filterChips','餐饮')], ['出行 + 支出', ()=>{ chip('filterChips','出行'); chip('filterIoChips','支出'); }],
+      ['10–50 元', ()=>{ $('searchMin').value='10'; $('searchMax').value='50'; }], ['购物 + 计入 + 20 元起', ()=>{ chip('filterChips','购物'); chip('filterModeChips','计入'); $('searchMin').value='20'; }],
+    ];
+    const hs=[]; for(const [n,f] of conds) hs.push(n+'：'+await hit(f));
+    out.hits=hs.join('\n');
+    L.clearAllFilters();
+  }
   // 统计页
   d.querySelector('.tab-btn[data-tab="stats"]').click();
   if(!out.cats) out.cats=$('catStats').innerHTML;

@@ -1,5 +1,5 @@
 (function(){
-        const { $, MODE_HINT, billList, escapeHtml, fabWake, filterCat, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
+        const { $, MODE_HINT, billList, escapeHtml, fabWake, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
         const { getCats, getUserData, impGetJson, impLogKey, impTarget, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { bindSheetDrag } = window.JiwenPanel;   // 用到前面模块的
         const { askCancel, customAlert, customChoose, customConfirm } = window.JiwenAsk;   // 用到前面模块的
@@ -18,51 +18,46 @@
             else if(el.dataset.act==='detail'){ openDetail(id); }   // 1023-A：一条一行，点整行进详情（修改在详情里）
         });
 
-        // 渲染筛选分类标签：「全部」固定第一个，其后按存档 cats 顺序。
-        // 草稿模式：点击只更新草稿分类 draftCat + 切换高亮，不提交、不刷新列表；
-        //   要点 sheet 的「完成」才会把 draftCat 提交进 filterCat 并筛选。
+        // 渲染筛选分类标签：「全部」固定第一个，其后按存档 cats 顺序。1023-F 起能多选：点一个加上 / 去掉，点「全部」清空
+        // 草稿模式：点击只更新草稿分类 draftCats + 切换高亮，不提交、不刷新列表；要点 sheet 的「完成」才提交进 searchState.cats。
         function renderFilterChips(){
+            // 分类改名 / 删掉以后：已经不在分类表里的不再算筛选条件（和原来「回落到全部」一样）
+            const all=getCats(); searchState.cats=searchState.cats.filter(c=>all.includes(c));
             const box=$('filterChips'); if(!box) return;
-            // 草稿当前值：sheet 打开时用 draftCat；若 sheet 未开（如分类管理触发的重渲染），
-            // 以已提交的 filterCat 为准并同步给 draftCat，避免下次打开时草稿是旧值
+            // sheet 没开（如分类管理触发的重渲染）：以已提交的为准同步草稿，避免下次打开时草稿是旧值
             const sheetOpen = $('filterSheetMask') && $('filterSheetMask').classList.contains('open');
-            let cur;
-            if(sheetOpen && window.getDraftCat){
-                cur = window.getDraftCat();
-            } else {
-                cur = filterCat.value || '__all';
-                if(window.setDraftCat) window.setDraftCat(cur);
-            }
+            if(!sheetOpen) draftCats=new Set(searchState.cats);
             const prevScroll=box.scrollLeft;
             box.innerHTML='';
             const items=[{v:'__all', t:'全部'}].concat(getCats().map(c=>({v:c, t:c})));
             items.forEach(it=>{
                 const b=document.createElement('div');
-                b.className='cc'+(it.v===cur?' sel':'');
+                b.className='cc'; b.dataset.v=it.v;
                 b.textContent=it.t;
                 b.onclick=()=>{
-                    if(window.setDraftCat) window.setDraftCat(it.v);   // 只改草稿
-                    box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el===b));
+                    if(it.v==='__all') draftCats.clear(); else if(draftCats.has(it.v)) draftCats.delete(it.v); else draftCats.add(it.v);   // 只改草稿
+                    paintCatChips();
                     scrollChipIntoView(box, b);
                 };
                 box.appendChild(b);
             });
+            paintCatChips();
             box.scrollLeft=prevScroll;
         }
+        function paintCatChips(){ const box=$('filterChips'); if(box) box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v==='__all' ? !draftCats.size : draftCats.has(el.dataset.v))); }
 
         // ===== 筛选浮层（bottom sheet）控件绑定 =====
         // 草稿模式：sheet 内所有改动只写进控件（草稿），不动列表。
-        //   完成 → 提交草稿到 searchState/filterCat 并刷新列表；
+        //   完成 → 提交草稿到 searchState 并刷新列表；
         //   下滑 / 点遮罩 → 丢弃草稿，列表不变；
         //   清除全部 → 只清草稿，要点完成才生效。
-        // draftCat 暂存分类选择，避免直接改 filterCat（filterCat 是已提交状态，renderBill 读它）。
-        let draftCat='__all';
-        // 统计筛选的草稿值：'' 全部 / 'normal' / 'flow' / 'skip'。与 draftCat 同一套草稿规则：
-        // 面板里点只改草稿，点「完成」才提交进 searchState.mode。
-        let draftMode='';
+        // 1023-F：分类、统计、收支都能多选（草稿是几个 Set）；都不选 = 全部。收支两个都选也等于全部
+        let draftCats=new Set();
+        // 统计筛选的草稿：'normal' / 'flow' / 'skip' 里选几个。面板里点只改草稿，点「完成」才提交进 searchState.modes
+        let draftModes=new Set();
         const FILTER_MODE_OPTS=[ {v:'', t:'全部'}, {v:'normal', t:'计入'}, {v:'skip', t:'不计'}, {v:'flow', t:'往来'} ];
-        // 1023-A：收支筛选（全部 / 支出 / 收入），和统计筛选同一套草稿规则
-        let draftIo='';
+        // 1023-A：收支筛选（全部 / 支出 / 收入），和统计筛选同一套草稿规则（1023-F 起能两个都选）
+        let draftIos=new Set();
         const FILTER_IO_OPTS=[ {v:'', t:'全部'}, {v:'expense', t:'支出'}, {v:'income', t:'收入'} ];
         function renderFilterIoChips(){
             const box=$('filterIoChips'); if(!box) return;
@@ -70,11 +65,11 @@
                 FILTER_IO_OPTS.forEach(o=>{
                     const b=document.createElement('div');
                     b.className='cc'; b.textContent=o.t; b.dataset.v=o.v; b.setAttribute('role', 'radio');
-                    b.onclick=()=>{ draftIo=o.v; renderFilterIoChips(); };
+                    b.onclick=()=>{ toggleDraft(draftIos, o.v); renderFilterIoChips(); };
                     box.appendChild(b);
                 });
             }
-            box.querySelectorAll('.cc').forEach(el=>{ const on=el.dataset.v===draftIo; el.classList.toggle('sel', on); el.setAttribute('aria-checked', on?'true':'false'); });
+            box.querySelectorAll('.cc').forEach(el=>{ const on=el.dataset.v ? draftIos.has(el.dataset.v) : !draftIos.size; el.classList.toggle('sel', on); el.setAttribute('aria-checked', on?'true':'false'); });
         }
         // 1023-A：日期快捷：本月 / 上月 / 近 7 天（只填起止两个框，照旧点「完成」才生效）；起止正好是它时高亮，再点一下清掉
         function quickRange(q){
@@ -94,12 +89,14 @@
                 FILTER_MODE_OPTS.forEach(o=>{
                     const b=document.createElement('div');
                     b.className='cc'; b.textContent=o.t; b.dataset.v=o.v;
-                    b.onclick=()=>{ draftMode=o.v; renderFilterModeChips(); };
+                    b.onclick=()=>{ toggleDraft(draftModes, o.v); renderFilterModeChips(); };
                     box.appendChild(b);
                 });
             }
-            box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v===draftMode));
+            box.querySelectorAll('.cc').forEach(el=>el.classList.toggle('sel', el.dataset.v ? draftModes.has(el.dataset.v) : !draftModes.size));
         }
+        // 点「全部」（v 是空串）清空，点别的加上 / 去掉
+        function toggleDraft(set, v){ if(!v) set.clear(); else if(set.has(v)) set.delete(v); else set.add(v); }
         (function(){
             const kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax'),
                   from=$('searchFrom'), to=$('searchTo'),
@@ -114,10 +111,10 @@
                 max.value = (searchState.max!=null) ? String(searchState.max) : '';
                 from.value = searchState.from || ''; from.dataset.day = searchState.from || '';
                 to.value   = searchState.to   || ''; to.dataset.day   = searchState.to   || '';
-                draftCat = filterCat.value || '__all';
-                draftMode = searchState.mode || '';
+                draftCats = new Set(searchState.cats);
+                draftModes = new Set(searchState.modes);
                 renderFilterModeChips();
-                draftIo = searchState.io || '';
+                draftIos = new Set(searchState.ios);
                 renderFilterIoChips(); paintDateQuick();
             }
             // 完成：把控件草稿提交为正式筛选条件，刷新列表
@@ -128,21 +125,21 @@
                 searchState.max = (max.value!=='' && isFinite(mx)) ? mx : null;
                 searchState.from = from.dataset.day || null;
                 searchState.to   = to.dataset.day || null;
-                searchState.mode = draftMode || null;
-                searchState.io = draftIo || null;
-                filterCat.value = draftCat;
+                searchState.modes = [...draftModes];
+                searchState.ios = [...draftIos];
+                searchState.cats = getCats().filter(c=>draftCats.has(c));   // 按分类管理里的顺序
                 JiwenBase.curPage=1;
                 renderBill();
                 window.syncFilterFab();
             }
-            // 暴露给分类标签点击用：只更新草稿分类，不提交
-            window.setDraftCat = function(v){ draftCat = v; };
-            window.getDraftCat = function(){ return draftCat; };
+            // 老入口（1023-F 起分类能多选）：设成只选这一个 / 拿第一个；只动草稿，不提交
+            window.setDraftCat = function(v){ draftCats = new Set(v && v!=='__all' ? [v] : []); paintCatChips(); };
+            window.getDraftCat = function(){ return draftCats.size ? [...draftCats][0] : '__all'; };
 
             // 筛选图标高亮 + 清除浮钮显隐：搜索条件或分类筛选任一生效都算「正在筛选」（基于已提交状态）
-            window.__filterActive = ()=>!!(hasActiveSearch() || (filterCat.value && filterCat.value!=='__all'));   // 1019-U：首屏快照看要不要存
+            window.__filterActive = ()=>hasFilter();   // 1019-U：首屏快照看要不要存
             window.syncFilterFab = function(){
-                const active = hasActiveSearch() || (filterCat.value && filterCat.value!=='__all');
+                const active = hasFilter();
                 fab.classList.toggle('active-filter', active);
                 // 主页面「清除/重置」浮钮：记账页且「有筛选生效 或 不在第 1 页」时浮现（1017-N 起停下 1.5 秒淡出、滑动时再出来）。
                 // 翻页也是「偏离默认视图」的一种，点 ✕ 一并回到第 1 页 + 清筛选（clearAllFilters 已含 curPage=1）。
@@ -205,10 +202,9 @@
             clearBtn.addEventListener('click', ()=>{
                 kw.value=''; min.value=''; max.value='';
                 from.value=''; from.dataset.day=''; to.value=''; to.dataset.day='';
-                draftCat='__all';
-                draftMode=''; renderFilterModeChips();
-                draftIo=''; renderFilterIoChips(); paintDateQuick();
-                renderFilterChips();   // 重渲染让分类高亮回到「全部」
+                draftCats.clear(); paintCatChips();   // 分类高亮回到「全部」
+                draftModes.clear(); renderFilterModeChips();
+                draftIos.clear(); renderFilterIoChips(); paintDateQuick();
             });
 
             // 往下拉关闭：和导入页的选择面板共用 bindSheetDrag（1017-UI1 抽出去的，逻辑一字未改）
@@ -216,28 +212,33 @@
             function resetSheetDrag(){ sheetDrag.reset(); }
         })();
 
-        // ===== 搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加 =====
-        // 金额存数字（null 表示不限）；日期存 'YYYY-MM-DD'（null 表示不限）；关键词存小写串。
-        // mode：统计筛选，null 表示不限，否则为 'normal' / 'flow' / 'skip'
-        const searchState={ keyword:'', min:null, max:null, from:null, to:null, mode:null, rv:false, io:null };   // io：1023-A 收支筛选（'expense' / 'income'）   // rv：1021-T13 只看待确认分类
+        // ===== 搜索状态：备注 / 金额 / 日期 / 收支 / 统计 / 分类 =====
+        // 金额存数字（null 表示不限）；日期存 'YYYY-MM-DD'（null 表示不限）；关键词存小写串（1023-F 起按空格分成几个词，都要包含）。
+        // 1023-F 起收支、统计、分类都能多选：ios（'expense' / 'income'，两个都选等于全部）、modes（'normal' / 'flow' / 'skip'）、cats（分类名）；空数组 = 不限
+        // rv：1021-T13 只看待确认分类
+        const searchState={ keyword:'', min:null, max:null, from:null, to:null, modes:[], rv:false, ios:[], cats:[] };
         const MODE_NAME={ normal:'计入', skip:'不计', flow:'往来' };
+        function searchWords(){ return (searchState.keyword||'').split(/\s+/).filter(Boolean); }
 
-        // 是否有任意搜索条件生效（用于显示「清除」入口、高亮筛选按钮、空结果提示文案）
+        // 是否有任意搜索条件生效（用于显示「清除」入口、高亮筛选按钮、空结果提示文案）；不含分类
         function hasActiveSearch(){
-            return !!(hasTextSearch() || searchState.mode || searchState.rv || searchState.io);
+            return !!(hasTextSearch() || searchState.modes.length || searchState.rv || searchState.ios.length===1);
         }
         // 只看关键词 / 金额 / 日期（不含口径），用来决定徽标里写不写「搜索」
         function hasTextSearch(){
             return !!(searchState.keyword || searchState.min!=null || searchState.max!=null
                       || searchState.from || searchState.to);
         }
+        // 有没有任何筛选（含分类）
+        function hasFilter(){ return hasActiveSearch() || searchState.cats.length>0; }
 
-        // 重置搜索状态与界面控件（切换存档/登录时调用，避免筛选条件跨存档残留）
+        // 重置搜索状态与界面控件（切换存档/登录时调用，避免筛选条件跨存档残留）。1023-F 起分类也一起清
         function resetSearch(){
             searchState.keyword=''; searchState.min=null; searchState.max=null;
-            searchState.from=null; searchState.to=null; searchState.mode=null; searchState.rv=false; searchState.io=null;
-            draftMode=''; renderFilterModeChips();
-            draftIo=''; renderFilterIoChips();
+            searchState.from=null; searchState.to=null; searchState.modes=[]; searchState.rv=false; searchState.ios=[]; searchState.cats=[];
+            draftModes.clear(); renderFilterModeChips();
+            draftIos.clear(); renderFilterIoChips();
+            draftCats.clear(); paintCatChips();   // 草稿分类也归零，避免跨存档残留
             lgYM=null;   // 1023-C：回到这个月
             const kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax'),
                   from=$('searchFrom'), to=$('searchTo');
@@ -247,30 +248,28 @@
             if(from){ from.value=''; from.dataset.day=''; }
             if(to){ to.value=''; to.dataset.day=''; }
             paintDateQuick();
-            if(window.setDraftCat) window.setDraftCat('__all');   // 草稿分类也归零，避免跨存档残留
             if(window.syncFilterFab) window.syncFilterFab();
         }
 
         // 一键清除全部筛选（主页面浮钮用）：搜索条件 + 分类一并归零，立即刷新列表。
         // 与 sheet 内「清除全部」不同——那个只清草稿、要点完成才生效；这个在浮层外，直接生效。
         function clearAllFilters(){
-            resetSearch();                 // 清搜索条件 + 控件 + 草稿分类
-            filterCat.value='__all';       // 分类筛选也归零（resetSearch 不动分类，这里补上）
+            resetSearch();                 // 清搜索条件 + 分类 + 控件 + 草稿
             JiwenBase.curPage=1;
             if(window.syncFilterFab) window.syncFilterFab();            // 先同步浮钮/图标状态
             if($('filterChips')) renderFilterChips();                  // sheet 若开着，分类高亮回「全部」
             renderBill();                                              // 再刷新列表
-            // ✕ 是「一键回到默认」：数据回退（清筛选+回第 1 页）后，视图也回到账单顶部，
-            // 与翻页/起飞同一落点（billHead），避免只回数据、视口却停在半空。
+            // ✕ 是「一键回到默认」：数据回退后，视图也回到账单顶部（billHead），避免只回数据、视口却停在半空。
             scrollListTop();
         }
 
-        // 单条记录是否命中当前搜索条件（分类筛选不在这里，单独处理）
+        // 单条记录是否命中当前搜索条件（分类不在这里，见 filterMatch）
         function searchMatch(r){
-            // 关键词：匹配备注（不区分大小写）
-            if(searchState.keyword){
+            // 关键词：匹配备注（不区分大小写）；1023-F 起空格隔开的几个词都要包含
+            const ws=searchWords();
+            if(ws.length){
                 const rk=(r.remark||'').toLowerCase();
-                if(!rk.includes(searchState.keyword)) return false;
+                if(!ws.every(w=>rk.includes(w))) return false;
             }
             // 金额区间：按绝对金额比较（与收支无关）
             const amt=safeNum(r.money);
@@ -282,19 +281,21 @@
                 if(searchState.from && day < searchState.from) return false;
                 if(searchState.to && day > searchState.to) return false;
             }
-            // 统计
-            if(searchState.mode && recMode(r)!==searchState.mode) return false;
+            // 统计（多选：命中其中一种就行）
+            if(searchState.modes.length && !searchState.modes.includes(recMode(r))) return false;
             if(searchState.rv && r.rv!==1) return false;
-            if(searchState.io && r.type!==searchState.io) return false;   // 1023-A：收支（退款算收入）
+            if(searchState.ios.length===1 && r.type!==searchState.ios[0]) return false;   // 1023-A：收支（退款算收入）；两个都选 = 全部
             return true;
         }
 
         // 「当前筛选命中」的唯一判定。列表渲染和批量操作都调它——两边各写一套，
-        // 早晚会出现「列表显示 12 条，实际改了 13 条」。filterVal 不传则读已提交的 filterCat。
-        function filterMatch(r, filterVal){
-            const fv = (filterVal===undefined) ? filterCat.value : filterVal;
-            return (fv==='__all' ? true : r.cat===fv) && searchMatch(r);
+        // 早晚会出现「列表显示 12 条，实际改了 13 条」。1023-F 起分类能多选（searchState.cats）
+        function filterMatch(r){
+            const cs=searchState.cats;
+            return (!cs.length || cs.includes(r.cat)) && searchMatch(r);
         }
+        // 给外面（测试、以后的搜一笔结果页）看现在生效的条件，拿的是一份副本
+        function searchNow(){ return JSON.parse(JSON.stringify(searchState)); }
 
         // 1016-R：空账本的小入口「有微信、支付宝账单？可以一次导进来 ›」。只在开发开关开着、账本少于 IMP_EMPTY_MAX 条时出现，
         //   记了几条以后消失；开关关着时不生成任何东西
@@ -376,7 +377,7 @@
             if(window.scrollY > y) window.scrollTo({ top:y, behavior:'instant' });   // 切了月份：停在细条那里，新月份从头看
         }
         function stripWake(){
-            if(hasActiveSearch() || (filterCat.value && filterCat.value!=='__all')){ lgStrip.hide(); return; }   // 筛选时列的是全部月份里命中的，月份浮条不出
+            if(hasFilter()){ lgStrip.hide(); return; }   // 筛选时列的是全部月份里命中的，月份浮条不出
             if(JiwenBase.currentTab==='ledger' && $('pageLedger').style.display!=='none') lgStrip.wake();
         }
         window.addEventListener('scroll', stripWake, { passive:true });
@@ -465,7 +466,6 @@
         function listFlush(){ clearTimeout(listT); listT=null; if(listRest.length) billList.insertAdjacentHTML('beforeend', takeParts(Infinity)); }
 
         function renderBill(){
-            const filterVal=filterCat.value;
             const raw=getUserData();
             renderImpEmptyEntry(raw.length); renderImpRemind(); renderRvChip(raw);
             // 【为什么先算时间戳再排序】排序要做 O(n log n) 次比较，比较器里每次 parseRecTime 太贵：先给每条只解析一次（Schwartzian transform）
@@ -474,7 +474,7 @@
                 .map((r,origIdx)=>({ r, origIdx, ts:parseRecTime(r.time).getTime() }))
                 .sort((a,b)=>{ const t=a.ts-b.ts; return t!==0 ? t : a.origIdx-b.origIdx; })
                 .map(x=>x.r);
-            const filtering = filterVal!=='__all' || hasActiveSearch();
+            const filtering = hasFilter();
             const ym=curYM();
             lgStrip.set(stripMonths(allAsc), ym);
             if(filtering) lgStrip.hide();
@@ -486,7 +486,7 @@
             bar.innerHTML=`<span class="lg-bar-m" id="lgMonth">${ymLabel(ym)}</span><span class="lg-bar-s">支出 <b class="lg-out ov-out">${ms.exp.toFixed(2)}</b></span><span class="lg-bar-s">收入 <b class="pos lg-in ov-in">${ms.inc.toFixed(2)}</b></span><span class="lg-bar-go">统计 ›</span>`;
             bar.setAttribute('aria-label', `到统计页看${ymLabel(ym)}`);
             bar.style.display = filtering ? 'none' : '';
-            const asc=filtering ? allAsc.filter(r=>filterMatch(r, filterVal)) : mon;
+            const asc=filtering ? allAsc.filter(r=>filterMatch(r)) : mon;
             // 筛选小计和批量入口（1023-G 搬去搜一笔的结果页）
             const fBar=$('summaryFilter'), bBar=$('batchBar');
             if(filtering){
@@ -497,10 +497,10 @@
                 if(fFlow) fEx.push(`${fFlow} 条往来`);
                 fIn=round2(fIn); fOut=round2(fOut);
                 const bp=[];
-                if(filterVal!=='__all') bp.push(filterVal);
+                if(searchState.cats.length) bp.push(searchState.cats.length>2 ? `${searchState.cats.slice(0,2).join('、')} 等 ${searchState.cats.length} 类` : searchState.cats.join('、'));
                 if(hasTextSearch()) bp.push('搜索');
-                if(searchState.io) bp.push(searchState.io==='expense' ? '支出' : '收入');
-                if(searchState.mode) bp.push(MODE_NAME[searchState.mode]);
+                if(searchState.ios.length===1) bp.push(searchState.ios[0]==='expense' ? '支出' : '收入');
+                if(searchState.modes.length) bp.push(searchState.modes.map(m=>MODE_NAME[m]).join('、'));
                 const badge=bp.join('·')||'搜索';
                 fBar.innerHTML=
                     `<span class="filter-badge">${escapeHtml(badge)}</span>`+
@@ -593,10 +593,10 @@
             });
             if(!saveUserData(data)) return;      // 一次写盘、一次同步；失败已有提示
             // 按分类筛选时改了分类：命中的记录全部离开当前分类，列表会瞬间变空，看着像数据没了。
-            // 把筛选分类切到新分类，让刚改的这批仍在眼前。
-            const prevFilter=filterCat.value;
-            if(change.cat!==undefined && prevFilter!=='__all' && prevFilter!==change.cat){
-                filterCat.value=change.cat;
+            // 把筛选分类切到新分类，让刚改的这批仍在眼前（1023-F 起分类能多选：新分类不在里面就换成只选它）。
+            const prevFilter=searchState.cats.slice();
+            if(change.cat!==undefined && prevFilter.length && !prevFilter.includes(change.cat)){
+                searchState.cats=[change.cat];
             }
             JiwenBase.curPage=1;
             window.JiwenTabs.refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
@@ -619,7 +619,7 @@
                 data[i]=n;
             });
             if(!saveUserData(data)) return;
-            filterCat.value=u.prevFilter;         // 分类表没变，原筛选值一定还在
+            searchState.cats=u.prevFilter.slice();   // 分类表没变，原筛选值一定还在
             JiwenBase.curPage=1;
             window.JiwenTabs.refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
             customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
@@ -628,5 +628,5 @@
             const t=$('billHead') || document.querySelector('table');
             if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
         }
-        window.JiwenLedger = { applyBatch, clearAllFilters, curYM, listFlush, openBatchMenu, ovOff, renderBill, setYM, stripWake, renderFilterChips, resetSearch, undoBatch };   // ledger 模块对外只有这一个入口
+        window.JiwenLedger = { applyBatch, clearAllFilters, curYM, filterMatch, searchNow, listFlush, openBatchMenu, ovOff, renderBill, setYM, stripWake, renderFilterChips, resetSearch, undoBatch };   // ledger 模块对外只有这一个入口
 })();

@@ -50,9 +50,14 @@ const ids=t=>[...t.$('billList').querySelectorAll('.bl-row[data-act="detail"]')]
   t.chip('filterChips','购物').click(); t.$('sheetApply').click();
   ok(ids(t)==='lp' && t.$('summaryFilter').querySelector('.filter-badge').textContent==='购物·往来', '与分类叠加：'+ids(t));
   // 计入 / 不计
-  t.$('filterFab').click(); t.chip('filterChips','全部').click(); t.chip('filterModeChips','不计').click(); t.$('sheetApply').click();
+  // 1023-F 起统计能多选：点「全部」清空，再点的那几个都算
+  t.$('filterFab').click(); t.chip('filterChips','全部').click(); t.chip('filterModeChips','全部').click(); t.chip('filterModeChips','不计').click(); t.$('sheetApply').click();
   ok(ids(t)==='cc', '只看不计');
-  t.$('filterFab').click(); t.chip('filterModeChips','计入').click(); t.$('sheetApply').click();
+  t.$('filterFab').click(); t.chip('filterModeChips','往来').click(); t.$('sheetApply').click();
+  ok(ids(t)==='cc,dep,lp' && t.$('summaryFilter').querySelector('.filter-badge').textContent==='不计、往来', '多选：不计 + 往来，两种都算（1023-F）：'+ids(t));
+  t.$('filterFab').click();
+  ok([...t.$('filterModeChips').querySelectorAll('.sel')].map(e=>e.textContent).join()==='不计,往来', '重开面板：选了的两个都高亮');
+  t.chip('filterModeChips','全部').click(); t.chip('filterModeChips','计入').click(); t.$('sheetApply').click();
   ok(ids(t)==='a,b', '只看计入');
   // 面板里清除全部：只清草稿
   t.$('filterFab').click(); t.$('sheetClear').click();

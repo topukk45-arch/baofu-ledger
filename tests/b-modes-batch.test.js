@@ -187,10 +187,10 @@ function bootSync(records, extra){
     const n=t3.recs().filter(r=>r.cat==='其他' && r.remark==='游戏充值').length;
     t3.$('batchBar').querySelector('[data-act="batch"]').click();
     t3.choose('改分类'); t3.choose('游戏'); t3.$('askOk').click();
-    ok(t3.w.document.getElementById('filterCat').value==='游戏', '筛选分类跟到新分类');
+    ok(t3.w.JiwenLedger.searchNow().cats.join()==='游戏', '筛选分类跟到新分类');
     ok(t3.$('summaryFilter').textContent.includes(`命中 ${n} 条`), '列表仍显示刚改的那批');
     t3.$('askExtra').click();
-    ok(t3.$('filterCat').value==='其他' && t3.recs().filter(r=>r.cat==='游戏').length===0, '撤销后分类与筛选都还原');
+    ok(t3.w.JiwenLedger.searchNow().cats.join()==='其他' && t3.recs().filter(r=>r.cat==='游戏').length===0, '撤销后分类与筛选都还原');
 
     // 没筛选时没有批量入口
     const t4=await boot();
