@@ -226,7 +226,16 @@
         }
         // 本周 / 上周 / 那周（按今天算）
         function weekName(mon){ const tm=monOf(todayKey()); return mon===tm ? '本周' : (mon===addDay(tm, -7) ? '上周' : '那周'); }
-        const cal={ dk, kd, addDay, monOf, todayKey, monthEnd, mdText, wdText, dayTitle, rangeText, weekName };
+        // 1023-K：一年里的第几周（ISO：周一开始，这一周的周四在哪一年就算哪一年的）；账单页周分隔线：本周写「本周」，别的周写「第 42 周」
+        function isoWeek(mon){ const th=kd(addDay(mon, 3)), y1=new Date(th.getFullYear(), 0, 1); return 1+Math.floor(Math.round((th-y1)/86400000)/7); }
+        function weekLabel(mon){ return mon===monOf(todayKey()) ? '本周' : `第 ${isoWeek(mon)} 周`; }
+        // 「10.19–25」；跨月「9.28–10.4」；同一天「10.4」
+        function shortRange(a, b){
+            const m=k=>+k.slice(5,7), d=k=>+k.slice(8,10);
+            if(a===b) return `${m(a)}.${d(a)}`;
+            return a.slice(0,7)===b.slice(0,7) ? `${m(a)}.${d(a)}–${d(b)}` : `${m(a)}.${d(a)}–${m(b)}.${d(b)}`;
+        }
+        const cal={ dk, kd, addDay, monOf, todayKey, monthEnd, mdText, wdText, dayTitle, rangeText, weekName, isoWeek, weekLabel, shortRange };
 
         // ===== 1023-D：账单页列表、三个详情抽屉共用的小块（每笔两行、合计）=====
         const CHEV='<svg class="lg-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';

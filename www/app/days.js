@@ -40,11 +40,11 @@
             const all=$('daysAllTxt');
             if(!list.length){
                 // 空态：点一下直接进日子页并弹出添加表单
-                if(all) all.textContent='添加 ›';
+                if(all) all.textContent='添加';
                 box.innerHTML='<button type="button" class="dc-item dc-empty days-empty-row" data-day-act="add">添加你的第一个日子</button>';
                 return;
             }
-            if(all) all.textContent=`全部 ${list.length} 个 ›`;
+            if(all) all.textContent=`全部 ${list.length} 个`;   // 1023-K：› 挪到卡片右边，整张卡片点了进全部日子
             box.innerHTML=list.slice(0, DAYS_CARD_ROWS).map((d, i)=>{
                 const c=calcDay(d.date);
                 return `<button type="button" class="dc-item${d.pin ? ' pin' : ''}${i===0 ? ' first' : ''}" data-day-id="${escapeHtml(d.id)}">`

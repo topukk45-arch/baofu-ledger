@@ -87,7 +87,7 @@ const NOW = '2026-10-20T10:00:00';   // 星期二
 
   // 3. 日子、当前用户、分类汇总
   const dcs = [...$('daysEntryRows').querySelectorAll('.dc-item')];
-  ok(dcs.length === 2 && /虚构生日/.test(dcs[0].textContent) && /还有/.test(dcs[0].textContent) && /虚构纪念日/.test(dcs[1].textContent) && $('daysAllTxt').textContent === '全部 2 个 ›', '3 日子竖排卡片（1023-E）：最近的在上，抬头写全部 2 个：' + $('daysEntryRows').textContent);
+  ok(dcs.length === 2 && /虚构生日/.test(dcs[0].textContent) && /还有/.test(dcs[0].textContent) && /虚构纪念日/.test(dcs[1].textContent) && $('daysAllTxt').textContent === '全部 2 个', '3 日子竖排卡片（1023-E）：最近的在上，抬头写全部 2 个：' + $('daysEntryRows').textContent);
   ok(!$('pageLedger').contains($('nowUser')) && $('pageSettings').contains($('nowUser')) && /小明/.test($('nowUser').innerText), '3 「当前用户」在设置页：' + $('nowUser').innerText);   // jsdom 的 innerText 只是个属性，读它
   ok(!$('pageLedger').contains($('catStatsCard')) && $('pageStats').contains($('catStatsCard')), '3 分类汇总在统计页');
   $('daysManageBtn').click(); await wait(10);

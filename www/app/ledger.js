@@ -1,6 +1,6 @@
 (function(){
         const { $, billList, escapeHtml, pad, parseRecTime } = window.JiwenBase;   // 用到前面模块的
-        const { getUserData, impGetJson, impLogKey, impTarget, refundedMap } = window.JiwenStore;   // 用到前面模块的
+        const { getUserData, impGetJson, impLogKey, impTarget, refundedMap, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
         const { openAddModal } = window.JiwenForms;   // 用到前面模块的
@@ -119,6 +119,25 @@
             const t = a===b ? `${C.mdText(a)} ${C.wdText(a)}，没记账` : `${C.rangeText(a, b)}，${Math.round((C.kd(b)-C.kd(a))/86400000)+1} 天没记`;
             return `<div class="lg-gap" data-a="${a}" data-b="${b}"><span class="lg-gap-t">${t}</span><button type="button" class="lg-gap-btn" data-add="${b}">补一笔</button></div>`;
         }
+        // 1023-K：周是一条分隔线「── 本周 10.19–25 ▂▅▃█▁·· ──── 312.38 ›」，不加底色、不装框（可点的地方照旧 48 高，按下整行浅底）；
+        //   7 根小柱子是周一到周日每天的支出（按这一周里最多的那天算高度），这个月以外、还没到的日子是一个点；
+        //   只有小柱子和「本周」两个字用主色，别的周写「第 42 周」、灰色。右边的数：有支出写支出；只有收入写 +收入（绿）；一笔没记写「没记」
+        function weekHtml(mon, a, z, inWk, today){
+            const C=cal, cur=mon===C.monOf(today), s=sumFen(inWk);
+            const byD=new Map(); inWk.forEach(r=>{ const d=(r.time||'').slice(0,10); byD.set(d, (byD.get(d)||0)+statContrib(r).exp); });
+            let max=0; byD.forEach(v=>{ if(v>max) max=v; });
+            let bars='';
+            for(let i=0; i<7; i++){
+                const k=C.addDay(mon, i);
+                if(k<a || k>z || k>today){ bars+='<i class="lg-wk-dot"></i>'; continue; }
+                const v=byD.get(k)||0;
+                bars+=`<i style="height:${v>0 && max>0 ? Math.max(3, Math.round(v/max*16)) : 2}px"></i>`;
+            }
+            const val = s.exp ? `<b>${s.exp.toFixed(2)}</b>` : (s.inc ? `<b class="pos">+${s.inc.toFixed(2)}</b>` : `<span class="lg-wk-e">没记</span>`);
+            return `<button type="button" class="lg-wk${cur ? ' cur' : ''}" data-mon="${mon}" data-a="${a}" data-b="${z}" aria-label="${C.weekLabel(mon)} ${C.rangeText(a, z)}">`
+                + `<span class="lg-wk-line lg-wk-lead" aria-hidden="true"></span><span class="lg-wk-n">${C.weekLabel(mon)}</span><span class="lg-wk-r">${C.shortRange(a, z)}</span>`
+                + `<span class="lg-wk-bars" aria-hidden="true">${bars}</span><span class="lg-wk-line" aria-hidden="true"></span><span class="lg-wk-v">${val}</span>${CHEV}</button>`;
+        }
         // recs：要显示的记录（时间正序）。opt.ym：按月显示的那个月（带没记账的日子）；不传 = 筛选结果（不带）
         //   opt.first：账本第一笔的日子（没记账的日子不往前超过它）
         function listHtml(recs, opt){
@@ -145,9 +164,7 @@
                     const ym=k.slice(0,7), ma=ym+'-01', mz=C.monthEnd(ym);
                     const a = mon<ma ? ma : mon, z0=C.addDay(mon, 6), z = z0>mz ? mz : z0;
                     const inWk=recs.filter(r=>{ const d=(r.time||'').slice(0,10); return d>=a && d<=z; });
-                    if(!(mon===C.monOf(today) && todayMon)){
-                        put(`<button type="button" class="lg-wk" data-mon="${mon}" data-a="${a}" data-b="${z}"><span class="lg-wk-n">${C.weekName(mon)}</span><span class="lg-wk-r">${C.rangeText(a, z)}</span><span class="lg-sum">${sumHtml(sumFen(inWk), inWk.length ? '' : '这周一笔没记')}</span>${CHEV}</button>`);
-                    }
+                    if(!(mon===C.monOf(today) && todayMon)) put(weekHtml(mon, a, z, inWk, today));
                 }
                 const list=byDay.get(k);
                 if(!list){
@@ -213,7 +230,7 @@
             const isNow=ym===ymNow();
             const mon=allAsc.filter(r=>{ const m=(r.time||'').slice(0,7); return m===ym || (isNow && !/^\d{4}-\d{2}$/.test(m)); });   // 没写时间的放在这个月里
             const ms=sumFen(mon);
-            bar.innerHTML=`<span class="lg-bar-m" id="lgMonth">${ymLabel(ym)}</span><span class="lg-bar-s">支出 <b class="lg-out ov-out">${ms.exp.toFixed(2)}</b></span><span class="lg-bar-s">收入 <b class="pos lg-in ov-in">${ms.inc.toFixed(2)}</b></span><span class="lg-bar-go">统计 ›</span>`;
+            bar.innerHTML=`<span class="lg-bar-m" id="lgMonth">${ymLabel(ym)}</span><span class="lg-bar-s"><em>支出</em> <b class="lg-out ov-out">${ms.exp.toFixed(2)}</b></span><span class="lg-bar-s"><em>收入</em> <b class="pos lg-in ov-in">${ms.inc.toFixed(2)}</b></span><span class="lg-bar-go">统计 ›</span>`;   // 1023-K：页头，大字、不加底色不装框
             bar.setAttribute('aria-label', `到统计页看${ymLabel(ym)}`);
             const first=allAsc.length ? (allAsc[0].time||'').slice(0,10) : cal.todayKey();   // 一笔都没有：只有今天那条
             billPainter.paint(listHtml(mon, { ym, first }));

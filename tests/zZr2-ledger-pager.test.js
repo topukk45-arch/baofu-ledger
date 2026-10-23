@@ -35,15 +35,18 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   ok(list.querySelectorAll('.bl-row').length === 14, '0 这个月的全部记录都列出来（14 笔，不分页）');
   // 1. 今天还没记
   const first = list.firstElementChild;
-  ok(first.classList.contains('lg-wk') && txt(first).startsWith('本周10月19日–25日'), '1 第一条是本周小计 ' + txt(first));
+  ok(first.classList.contains('lg-wk') && first.classList.contains('cur') && txt(first).startsWith('本周10.19–25'), '1 第一条是本周的分隔线（1023-K）' + txt(first));
   const today = list.querySelector('.lg-gap-today');
   ok(today && first.nextElementSibling === today && txt(today) === '今天 · 10月23日 周五，还没记账记一笔', '1 今天还没记：单独一条「记一笔」 ' + (today && txt(today)));
   // 2. 周小计
   const wks = [...list.querySelectorAll('.lg-wk')].map(txt);
-  ok(wks.length === 4 && wks[1].startsWith('上周10月12日–18日') && wks[2].startsWith('那周10月5日–11日'), '2 本周 / 上周 / 那周 ' + wks.join(' | '));
-  ok(wks[3].startsWith('那周10月1日–4日'), '2 跨月的周截在这个月里：10月1日–4日 ' + wks[3]);
-  ok(wks[1].includes('支出 22.00') && wks[1].includes('收入 5000.00'), '2 周小计：支出、有收入再加收入 ' + wks[1]);
-  ok(!wks[2].includes('收入'), '2 没收入的周不写收入');
+  ok(wks.length === 4 && wks[1].startsWith('第 42 周10.12–18') && wks[2].startsWith('第 41 周10.5–11'), '2 本周 / 别的周写一年里的第几周（1023-K）' + wks.join(' | '));
+  ok(wks[3].startsWith('第 40 周10.1–4'), '2 跨月的周截在这个月里：10.1–4 ' + wks[3]);
+  ok(wks[1].endsWith('22.00') && !wks[1].includes('5000'), '2 周分隔线右边只写支出（有收入也不写，点开一周详情看）' + wks[1]);
+  const wkEls = [...list.querySelectorAll('.lg-wk')];
+  ok(wkEls.every(b => b.querySelectorAll('.lg-wk-bars i').length === 7) && !wkEls[1].classList.contains('cur'), '2 每条 7 根小柱子；只有本周那条是 cur（主色）');
+  ok([...wkEls[0].querySelectorAll('.lg-wk-bars i')].map(i => i.classList.contains('lg-wk-dot') ? '.' : 'i').join('') === 'iiiii..', '2 本周：周六、周日还没到，是点');
+  ok([...wkEls[3].querySelectorAll('.lg-wk-bars i')].map(i => i.classList.contains('lg-wk-dot') ? '.' : 'i').join('') === '...iiii', '2 10.1–4 那周：9 月那三天（不在这个月）是点');
   // 3. 没记账的日子
   const gaps = [...list.querySelectorAll('.lg-gap')].map(txt);
   ok(gaps.includes('10月20日–21日，2 天没记补一笔') && gaps.includes('10月13日–18日，6 天没记补一笔'), '3 连着没记的几天合成一条 ' + gaps.join(' | '));
@@ -71,9 +74,9 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   ok(txt(bar).startsWith('9月') && list.querySelectorAll('.bl-row').length === 23, '6 点 9 月：列表换成 9 月 ' + txt(bar));
   ok(w.JiwenLedger.ovOff(), '6 看的不是这个月（首屏快照不存）');
   const sw = [...list.querySelectorAll('.lg-wk')].map(txt);
-  ok(sw.some(x => x === '那周9月7日–13日这周一笔没记'), '6 一整周没记：周小计写「这周一笔没记」 ' + sw.join(' | '));
+  ok(sw.some(x => x === '第 37 周9.7–13没记'), '6 一整周没记：分隔线右边写「没记」 ' + sw.join(' | '));
   ok([...list.querySelectorAll('.lg-gap')].map(txt).includes('9月7日–13日，7 天没记补一笔') && !list.querySelector('.lg-gap-today'), '6 下面只一条合并的虚线框；过去的月份没有「今天」那条');
-  ok(sw[0].startsWith('那周9月28日–30日'), '6 月底那周截在 9 月里');
+  ok(sw[0].startsWith('第 40 周9.28–30'), '6 月底那周截在 9 月里');
   // 7. 8 月：不早于账本第一笔（8月5日）
   w.JiwenLedger.setYM('2026-08');
   const ag = [...list.querySelectorAll('.lg-gap')].map(txt);
@@ -93,7 +96,7 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   const t2 = await A.boot({ html, www: WWW, now: '2026-10-19T10:00:00', seed: A.seedOf(recs().filter(r => r.time < '2026-10-19')) });
   t2.d.querySelector('.tab-btn[data-tab="ledger"]').click();
   const l2 = t2.$('billList');
-  ok(l2.firstElementChild.classList.contains('lg-gap-today') && txt(l2.querySelector('.lg-wk')).startsWith('上周'), '9 今天是周一：本周那条不显示，往前的周照旧');
+  ok(l2.firstElementChild.classList.contains('lg-gap-today') && txt(l2.querySelector('.lg-wk')).startsWith('第 42 周'), '9 今天是周一：本周那条不显示，往前的周照旧');
 
   // 10. 一个月很多笔：分批画，先画一部分，接着画完
   const many = Array.from({ length: 900 }, (_, i) => R('m' + i, `2026-10-${pad(1 + i % 22)}`, `${pad(8 + i % 12)}:${pad(i % 60)}`, 1 + i % 50, 'expense', '吃饭', '虚构' + i));

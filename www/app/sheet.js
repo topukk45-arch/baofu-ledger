@@ -386,7 +386,7 @@
         (function(){
             const SEL = 'button, .mini-btn, .link-btn, .cs-display, .dt-day, .dt-now, '
                       + '.pager button, .user-chip, .login-btn, .add-btn, .save, .cancel, '
-                      + '.operate-btn, .logout, .cat-item button, .archive-bar select, .bl-row';   // 1023-A：账单一条一行，整行能点
+                      + '.operate-btn, .logout, .cat-item button, .archive-bar select, .bl-row, .days-card';   // 1023-A：账单一条一行，整行能点；1023-K：日子卡整张能点
             // 1023-J：按下先不变色，手指按住不动 PRESS_DELAY 毫秒才加 .pressed；这期间手指挪了（PRESS_SLOP 像素以上）或页面滚了就作废，
             //   滑动时手指碰到日卡片、周小计不会闪一下。很快点一下（没等到）松手时补一下按下的样子
             const PRESS_DELAY=90, PRESS_SLOP=8;

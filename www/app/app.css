@@ -1777,22 +1777,35 @@
         body.tab-ledger:not(.login-mode) { padding:0; }
         body.tab-ledger:not(.login-mode) .container { background:transparent; border:none; border-radius:0; box-shadow:none;
             padding:12px 16px calc(220px + env(safe-area-inset-bottom)); }
-        /* 顶上的细条：吸在顶上，点了去统计页同一个月 */
-        button.lg-bar { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px; width:calc(100% + 32px); min-height:var(--ui-tap);
-            margin:8px -16px 0; padding:0 16px; border:none; border-bottom:1px solid var(--c-border); border-radius:0; text-align:left;
-            background:var(--c-bg); background:color-mix(in srgb, var(--c-bg) 96%, transparent); color:var(--c-text-soft); font-size:13px; font-family:inherit; cursor:pointer;
+        /* 1023-K：月是页头：大字「10月」+ 支出 / 收入两个数 + 右边「统计 ›」，不加底色、不装框、不吸顶；整行能点（去统计页同一个月），按下整行浅底 */
+        button.lg-bar { display:flex; align-items:flex-end; gap:16px; width:100%; min-height:64px; margin:10px 0 2px; padding:6px 4px 8px;
+            border:none; border-radius:14px; text-align:left; background:transparent; color:var(--c-text-soft); font-size:12px; font-family:inherit; cursor:pointer;
             font-variant-numeric:tabular-nums; white-space:nowrap; }
-        .lg-bar-m { font-size:17px; font-weight:bold; color:var(--c-text); }
-        .lg-bar-s b { font-weight:bold; color:var(--c-text); }
+        button.lg-bar.pressed { background:var(--c-chip); }
+        .lg-bar-m { font-size:32px; line-height:36px; font-weight:800; color:var(--c-text); letter-spacing:.5px; }
+        .lg-bar-s { display:flex; flex-direction:column; line-height:18px; padding-bottom:2px; }
+        .lg-bar-s em { font-style:normal; }
+        .lg-bar-s b { font-size:17px; line-height:22px; font-weight:bold; color:var(--c-text); }
         .lg-bar-s b.pos { color:var(--c-pos); }
-        .lg-bar-go { margin-left:auto; color:var(--c-primary-dark); }
+        .lg-bar-go { margin-left:auto; align-self:center; font-size:14px; color:var(--c-primary-dark); }
         .bill-list { margin-top:0; }
-        /* 周小计：浅底一条，点了看一周（1023-D） */
-        button.lg-wk { display:flex; align-items:center; gap:8px; width:100%; min-height:var(--ui-tap); margin-top:18px; padding:0 8px 0 12px;
-            border:none; border-radius:10px; background:var(--c-chip); background:color-mix(in srgb, var(--c-primary) 16%, var(--c-bg));
-            color:var(--c-text); font-size:13px; font-family:inherit; text-align:left; cursor:pointer; font-variant-numeric:tabular-nums; white-space:nowrap; }
-        .lg-wk-n { font-weight:bold; }
-        .lg-wk-r { color:var(--c-primary-deep); min-width:0; overflow:hidden; text-overflow:ellipsis; }
+        /* 1023-K：周是一条分隔线：── 本周 10.19–25 ▂▅▃█▁·· ──── 312.38 ›，不加底色不装框；可点的高度照旧 48，按下整行浅底 */
+        button.lg-wk { display:flex; align-items:center; gap:8px; width:100%; min-height:var(--ui-tap); margin-top:14px; padding:0 4px;
+            border:none; border-radius:10px; background:transparent; color:var(--c-text-soft); font-size:13px; font-family:inherit; text-align:left; cursor:pointer;
+            font-variant-numeric:tabular-nums; white-space:nowrap; }
+        button.lg-wk.pressed { background:var(--c-chip); }
+        .lg-wk-line { flex:1 1 auto; min-width:12px; height:1px; background:var(--c-border-mid); }
+        .lg-wk-line.lg-wk-lead { flex:0 0 12px; }
+        .lg-wk-n { font-weight:bold; color:var(--c-text-soft); }
+        .lg-wk.cur .lg-wk-n { color:var(--c-primary-dark); }
+        .lg-wk-r { color:var(--c-text-soft); }
+        .lg-wk-bars { flex:none; display:flex; align-items:flex-end; gap:3px; height:16px; }
+        .lg-wk-bars i { display:block; width:4px; border-radius:2px; background:var(--c-primary); }
+        .lg-wk-bars i.lg-wk-dot { width:4px; height:4px; border-radius:50%; background:var(--c-border-mid); }
+        .lg-wk-v { flex:none; }
+        .lg-wk-v b { font-weight:bold; color:var(--c-text); }
+        .lg-wk-v b.pos { color:var(--c-pos); }
+        .lg-wk-e { color:var(--c-text-soft); }
         .lg-sum { display:flex; gap:10px; margin-left:auto; color:var(--c-text-soft); font-size:13px; white-space:nowrap; }
         .lg-sum b { font-weight:bold; color:var(--c-text); }
         .lg-sum b.pos { color:var(--c-pos); }
@@ -1916,7 +1929,10 @@
         .dw-day-none button.lg-gap-btn { margin-left:auto; }
 
         /* ===== 1023-E：日子竖排卡片（账单页）、全部日子页的置顶大卡片、单条日子的详情 ===== */
-        .days-card { margin:0 0 4px; padding:4px 6px 8px; border:1px solid var(--c-border); border-radius:16px; background:var(--c-surface); cursor:pointer; }
+        .days-card { position:relative; margin:0 0 4px; padding:4px 30px 8px 6px; border:1px solid var(--c-border); border-radius:16px; background:var(--c-surface); cursor:pointer; }
+        .days-card.pressed { background:var(--c-chip); }
+        /* 1023-K：整张卡片点了进全部日子，右边一个 › */
+        .dc-go { position:absolute; right:10px; top:50%; width:16px; height:16px; margin-top:-8px; fill:none; stroke:var(--c-text-soft); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
         button.dc-head { display:flex; align-items:center; gap:6px; width:100%; min-height:var(--ui-tap); padding:0 8px; border:none; background:transparent;
             font-family:inherit; text-align:left; cursor:pointer; color:var(--c-text); }
         .dc-k { font-size:15px; font-weight:bold; }

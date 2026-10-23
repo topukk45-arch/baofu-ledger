@@ -520,8 +520,7 @@
 
         // 入口卡事件委托：点某一条 → 直接编辑它（常用操作不必先进管理页）；点空态 → 去添加
         $('daysEntryRows').addEventListener('click', e=>{
-            const it=e.target.closest('[data-day-id]');
-            if(it){ e.stopPropagation(); JiwenDays.openDayItem(it.dataset.dayId); return; }   // 1023-E：点一条：这一条的详情
+            // 1023-K：整张卡片点了都进全部日子页（点某一条也是；一条的详情在全部日子页里点）
             const el=e.target.closest('[data-day-act]');
             if(!el) return;
             if(el.dataset.dayAct==='add'){ e.stopPropagation(); gotoDaysPage(); openDayDialog(null); }   // 1023-A：入口在卡片里，别再让外面那下也进一次日子页
