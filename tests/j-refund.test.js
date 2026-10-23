@@ -36,7 +36,9 @@ function bootSync(records, arcExtra){
   };
   const q=sel=>$('summaryOverall').querySelector(sel).textContent;
   const toStats=()=>d.querySelector('.tab-btn[data-tab="stats"]').click();
-  return {w:dom.window,d,$,errs,recs,refunds,kind,refund,q,toStats};
+  // 1023-A：分类汇总搬去统计页：切过去读一眼再切回账单页
+  const catRows=()=>{ const back=dom.window.JiwenBase.currentTab; toStats(); const r=[...$('catStats').querySelectorAll('.cs-row')]; if(back==='ledger') d.querySelector('.tab-btn[data-tab="ledger"]').click(); return r; };
+  return {w:dom.window,d,$,errs,recs,refunds,kind,refund,q,toStats,catRows};
 }
 
 (async()=>{
@@ -69,16 +71,16 @@ function bootSync(records, arcExtra){
   ok(t.$('askTitle').textContent==='退款完成' && t.$('askMsg').textContent==='已退款 30.00，这笔还能再退 70.00。', '完成提示');
   t.$('askOk').click();
   // 总览：收入不变 5000；支出 100+30-30=100；结余 5000-100-30+30=4900
-  ok(t.q('.ov-in')==='+5000.00' && t.q('.ov-out')==='−100.00', '总览：收入不加、支出扣掉：'+t.q('.ov-in')+' '+t.q('.ov-out'));
+  ok(t.q('.ov-in')==='5000.00' && t.q('.ov-out')==='100.00', '总览：收入不加、支出扣掉：'+t.q('.ov-in')+' '+t.q('.ov-out'));
   ok(t.q('.ov-net')==='4900.00', '结余 +30：'+t.q('.ov-net'));
-  const cs=[...t.$('catStats').querySelectorAll('.cs-row')].map(r=>r.textContent).join('|');
+  const cs=t.catRows().map(r=>r.textContent).join('|');
   ok(cs.includes('购物−70.00'), '分类汇总：购物 −70：'+cs);
   // 列表
-  const rows=[...t.$('billList').querySelectorAll('tr')];
+  const rows=[...t.$('billList').querySelectorAll('.bl-row')];
   const rRow=rows.find(r=>r.textContent.includes('差价')), bRow=rows.find(r=>r.textContent.includes('鞋子'));
-  ok(rRow.querySelector('.io-refund').textContent==='退款' && rRow.querySelector('[data-label="金额"]').textContent==='+30.00' && rRow.querySelector('.pos'), '退款行：退款标签、+30 绿色');
-  ok(bRow.querySelector('.io-refunded').textContent==='已退 30.00' && bRow.querySelector('[data-label="金额"]').textContent==='−100.00', '原账单：金额不变，标已退 30');
-  ok(rRow.querySelector('[data-label="结余"]').textContent==='4900.00', '退款行结余');
+  ok(rRow.querySelector('.io-refund').textContent==='退款' && rRow.querySelector('.bl-amt').textContent==='+30.00' && rRow.querySelector('.pos'), '退款行：退款标签、+30 绿色');
+  ok(bRow.querySelector('.io-refunded').textContent==='已退 30.00' && bRow.querySelector('.bl-amt').textContent==='−100.00', '原账单：金额不变，标已退 30');
+  rRow.click(); ok(t.$('detailBal').textContent==='4900.00', '退款行结余（1023-A 起在详情里）'); t.$('detailClose').click();
   // 统计页
   t.toStats();
   ok(t.$('statMonthIn').textContent==='+5000.00' && t.$('statMonthOut').textContent==='−100.00', '统计页当月收支');
@@ -114,13 +116,13 @@ function bootSync(records, arcExtra){
   t.$('refundOk').click();
   ok(t.$('askMsg').textContent==='已退款 70.00，这笔已全额退款。' && t.refunds().length===2, '全额退完');
   t.$('askOk').click();
-  const bRow=[...t.$('billList').querySelectorAll('tr')].find(r=>r.textContent.includes('鞋子'));
+  const bRow=[...t.$('billList').querySelectorAll('.bl-row')].find(r=>r.textContent.includes('鞋子'));
   ok(bRow.querySelector('.io-refunded').textContent==='已全退', '标「已全退」');
   t.w.openEdit('buy');
   ok(t.$('editRefundBtn').disabled && t.$('editRefundBtn').textContent==='已全额退款', '按钮置灰');
   ok(t.$('editRefundNote').style.display==='' && t.$('editRefundNote').querySelectorAll('.dr-line').length===2, '修改弹窗顶部列出两笔退款');
-  ok(t.q('.ov-out')==='−30.00', '全退后购物支出为 0：'+t.q('.ov-out'));
-  const cs=[...t.$('catStats').querySelectorAll('.cs-row')].map(r=>r.textContent).join('|');
+  ok(t.q('.ov-out')==='30.00', '全退后购物支出为 0：'+t.q('.ov-out'));
+  const cs=t.catRows().map(r=>r.textContent).join('|');
   ok(cs.includes('购物+0.00') || !cs.includes('购物−'), '分类汇总购物净 0：'+cs);
   t.toStats();
   ok(![...t.$('statMonthCatList').querySelectorAll('.sc-cat-name')].some(e=>e.textContent==='购物'), '退完的分类不进饼图');
@@ -144,7 +146,7 @@ function bootSync(records, arcExtra){
   t.$('editMoney').value='45'; t.$('editRemark').value='改了'; t.$('saveEdit').click();
   const r=t.refunds()[0];
   ok(r.money===45 && r.remark==='改了' && r.type==='income' && r.cat==='购物' && r.refundOf==='buy', '改金额与备注，其他不变');
-  ok(t.q('.ov-out')==='−35.00', '支出 100+30-45-50 = 35：'+t.q('.ov-out'));
+  ok(t.q('.ov-out')==='35.00', '支出 100+30-45-50 = 35：'+t.q('.ov-out'));
   // 删退款：可退恢复
   t.w.openEdit(rid); t.$('deleteInEdit').click();
   ok(t.$('askMsg').textContent.includes('原账单的「还能退」金额会恢复'), '删退款的确认文案');
@@ -178,7 +180,7 @@ function bootSync(records, arcExtra){
   t.$('saveEdit').click();
   const rf=t.refunds()[0];
   ok(rf.cat==='游戏' && rf.flow===true, '退款跟着改分类和口径：'+JSON.stringify(rf));
-  ok(t.q('.ov-out')==='−30.00', '只算结余后，原账单和退款都不进支出');
+  ok(t.q('.ov-out')==='30.00', '只算结余后，原账单和退款都不进支出');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 
@@ -307,7 +309,7 @@ function bootSync(records, arcExtra){
   ok(!by('退2超额').refundOf && !by('找不到原账单').refundOf && !by('挂在收入上').refundOf && !by('支出带标记').refundOf, '不合法的退化为普通记录');
   // 旧数据（没有 refundOf）：所有数字与 1010-I3 一致由 regress.js 保证；这里补一条「普通收入」不受影响
   const t2=await boot(base().concat([R('x','2026-10-06T10:00',12,'income','购物','普通收入')]));
-  ok(t2.q('.ov-in')==='+5012.00' && t2.q('.ov-out')==='−130.00', '普通收入照旧算收入');
+  ok(t2.q('.ov-in')==='5012.00' && t2.q('.ov-out')==='130.00', '普通收入照旧算收入');
   ok(t.errs.length+t2.errs.length===0, '无脚本错误');
 }
 

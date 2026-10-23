@@ -28,7 +28,7 @@ function bootSync(){
     Object.defineProperty(ev,'touches',{value: type==='touchend'?[]:[{clientX:x,clientY:y}]}); el.dispatchEvent(ev); return ev.defaultPrevented; };
   return {w:dom.window,d,$,errs,chip,touch};
 }
-const ids=t=>[...t.$('billList').querySelectorAll('[data-act="edit"]')].map(b=>b.dataset.id).sort().join();
+const ids=t=>[...t.$('billList').querySelectorAll('.bl-row[data-act="detail"]')].map(b=>b.dataset.id).sort().join();
 
 (async()=>{
 // ===== 1. 筛选：统计 =====

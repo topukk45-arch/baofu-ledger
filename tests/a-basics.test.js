@@ -131,11 +131,10 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
         $(t.d,'searchKeyword').value = '不存在的关键词';
         $(t.d,'sheetApply').click();
         const so = $(t.d,'summaryOverall'), sf = $(t.d,'summaryFilter');
-        ok(so.style.display !== 'none' && so.textContent.includes('共 4 条'), '筛选无结果时总览仍显示');
+        ok(so.style.display !== 'none' && so.querySelector('.ov-net') && so.querySelector('.ov-out'), '筛选无结果时总览仍显示');   // 1023-A：总览改成这个月支出 + 结余，不再写「共 N 条」
         ok(sf.style.display === 'flex' && sf.textContent.includes('命中 0 条'), '小计显示命中 0 条');
-        ok($(t.d,'catStats').style.display !== 'none' && $(t.d,'catStats').textContent.length > 0, '分类汇总仍显示');
-        ok($(t.d,'billList').textContent.includes('没有符合条件的记录'), '列表显示无结果提示');
-        ok($(t.d,'pager').innerHTML === '', '无结果时不显示翻页');
+        ok($(t.d,'billList').textContent.includes('没有符合条件的记录') && $(t.d,'billList').textContent.includes('清掉筛选'), '列表显示无结果提示（1023-A：多一句怎么清筛选）');   // 1023-A：分类汇总搬去统计页，不在这里查
+        ok($(t.d,'pagerBottom').innerHTML === '', '无结果时不显示翻页');   // 1023-A：页码只在下面
     }
     // ---------- 4b. 存档完全为空：汇总区隐藏 ----------
     {

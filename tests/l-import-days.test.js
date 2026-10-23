@@ -132,7 +132,7 @@ function bootSync(loggedIn, existingDays){
   ok(t.title()==='导入成功' && t.msg().includes('同时导入了 3 个日子') && t.msg().includes('现在进入该账号吗'), '7 最后问进不进账号，带上日子');
   t.$('askOk').click(); await t.idle();
   ok(t.$('mainBox').style.display==='block', '7 进入账号');
-  ok(t.$('daysEntryRows').textContent.includes('春节回家'), '7 进去就能看到日子');
+  ok(DAYS.some(x=>t.$('daysEntryRows').textContent.includes(x.name)) && t.$('daysEntryRows').textContent.includes('等 3 个'), '7 进去就能看到日子（1023-A：缩成一条，写最近的一个、等 3 个）：'+t.$('daysEntryRows').textContent);
   ok(!t.errs.length, '7 无报错 '+t.errs.join('|'));
 }
 

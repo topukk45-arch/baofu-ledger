@@ -386,7 +386,7 @@
         (function(){
             const SEL = 'button, .mini-btn, .link-btn, .cs-display, .dt-day, .dt-now, '
                       + '.pager button, .user-chip, .login-btn, .add-btn, .save, .cancel, '
-                      + '.operate-btn, .logout, .cat-item button, .archive-bar select';
+                      + '.operate-btn, .logout, .cat-item button, .archive-bar select, .bl-row';   // 1023-A：账单一条一行，整行能点
             let cur=null;
             function press(e){
                 const t=e.target.closest(SEL);

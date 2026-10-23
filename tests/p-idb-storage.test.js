@@ -330,7 +330,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   const take13=()=>{ const c=c13; c13=0; return c; };
   t0=Date.now(); t.chip('小明').click(); await t.idle();
   const tEnter=Date.now()-t0, cEnter=take13();
-  ok(t.inMain() && t.$('summaryOverall').textContent.includes(`共 ${N} 条`), `13 从登录页进入账号（读库 + 显示）用时 ${tEnter}ms`);
+  ok(t.inMain() && t.$('billList').querySelectorAll('.bl-row').length===50 && t.$('pagerBottom').textContent.includes(`/ ${Math.ceil(N/50)} 页`), `13 从登录页进入账号（读库 + 显示）用时 ${tEnter}ms`);
   t0=Date.now(); await t.addBill(1, '大账本里记一笔'); const tSave=Date.now()-t0; await t.idle();
   const tSaveAll=Date.now()-t0, cSave=take13();
   J13.parse=op13; J13.stringify=os13;
@@ -388,11 +388,11 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
     const take=()=>{ const c=chars; chars=0; return c; };
     take();
     let t0=ms(); t.chip('小明').click(); await t.idle(); const tEnter=ms()-t0; const cEnter=take();
-    const entered=t.inMain() && t.$('summaryOverall').textContent.includes(`共 ${N} 条`);
+    const entered=t.inMain() && t.$('billList').querySelectorAll('.bl-row').length===50 && t.$('pagerBottom').textContent.includes(`/ ${Math.ceil(N/50)} 页`);
     t0=ms(); await t.addBill(1, '大账本里记一笔'); const tSave=ms()-t0; await t.idle(); const tSaveAll=ms()-t0; const cSave=take();
-    const nextBtn=[...t.$('pager').querySelectorAll('button')].find(b=>b.textContent.includes('下一页'));
+    const nextBtn=[...t.$('pagerBottom').querySelectorAll('button')].find(b=>b.textContent.includes('下一页'));
     t0=ms(); nextBtn.click(); const tPage=ms()-t0; const cPage=take();
-    const paged=t.$('pager').textContent.includes('第 2 /');
+    const paged=t.$('pagerBottom').textContent.includes('第 2 /');
     t0=ms(); t.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle(); const tStats=ms()-t0; const cStats=take();
     J.parse=op; J.stringify=os;
     const stats=t.d.querySelector('.tab-btn[data-tab="stats"]').classList.contains('active');

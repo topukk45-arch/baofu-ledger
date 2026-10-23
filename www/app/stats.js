@@ -1,11 +1,12 @@
 (function(){
-        const { $, escapeHtml, fabWake, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
+        const { $, escapeHtml, fabHold, fabWake, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
         const { IMP_APPS, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, odScheduleSync, refundedMap, refundedTag, refundedTotal, refundsOf, saveStoreSafe, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, playSlide } = window.JiwenDate;   // 用到前面模块的
         const { devImportOn, loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
         const { refundLineHtml } = window.JiwenForms;   // 用到前面模块的
         const { editBudget, openCatManager } = window.JiwenCats;   // 用到前面模块的
+        const { balanceAfter } = window.JiwenLedger;   // 用到前面模块的
 
         // 清单行 → 只读详情。批量确认还没执行，此时允许改记录会让清单和即将执行的范围对不上，
         // 所以从这里进的详情隐藏「修改」按钮，只看不改。
@@ -459,7 +460,96 @@
                 statYear=now.getFullYear(); statMonth=now.getMonth();
             }
             renderStatCalendar();
+            renderAllCatStats();   // 1023-A：分类汇总从账单页搬过来了
         }
+        // ===== 分类汇总卡片 =====
+        // 1023-A 从账单页搬到统计页最下面，算法不变：全部记录、只算计入，按分类的收支净额
+        // 排序：按金额绝对值，收支混排时看的是「量级」——工资 +10604 与餐饮 −5347 比的是 10604 与 5347。
+        // 偏好是全局的，存 localStorage；读写都包 try/catch，取不到就用默认（按金额）。
+        let lastCatStats=null;
+        // 只按金额（绝对值）排：从大到小 / 从小到大。旧版存过的 'amount' / 'cat' 一律当「从大到小」。
+        function getCatSort(){
+            try{ return localStorage.getItem('app_catstats_sort')==='asc' ? 'asc' : 'desc'; }catch(_){ return 'desc'; }
+        }
+        function renderAllCatStats(){
+            const byCat={};
+            getUserData().forEach(r=>{
+                if(recMode(r)!=='normal') return;   // 不进收支统计的不进分类汇总，避免「转账：0.00」「存款：206677」
+                const c=statContrib(r);
+                byCat[r.cat]=(byCat[r.cat]||0)+(c.inc-c.exp);
+            });
+            $('catStatsCard').style.display = getUserData().length ? '' : 'none';
+            renderCatStats(byCat);
+        }
+        function renderCatStats(byCat){
+            if(byCat) lastCatStats=byCat;          // 切排序时传 null，复用上次结果，不重算整本账
+            byCat=lastCatStats||{};
+            const sort=getCatSort();
+            $('catSortSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===sort));
+            const keys=Object.keys(byCat);
+            keys.sort((a,b)=> sort==='asc'
+                ? Math.abs(byCat[a])-Math.abs(byCat[b])
+                : Math.abs(byCat[b])-Math.abs(byCat[a]));
+            if(!keys.length){
+                $('catStats').innerHTML='<div class="cs-empty">暂无计入收支的记录</div>';
+                return;
+            }
+            $('catStats').innerHTML=keys.map(c=>{
+                const v=round2(byCat[c]);
+                const pos=v>=0;
+                return `<div class="cs-row"><span class="cs-name">${escapeHtml(c)}</span>`
+                    + `<span class="cs-amt ${pos?'pos':'neg'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</span></div>`;
+            }).join('');
+        }
+        // ===== 1019-H：分类汇总能滑但看不出来：右下角的小圆钮 =====
+        //   分类超过 6 个、框里装不下时才有：卡片每次从屏幕外回到屏幕上冒一次（IntersectionObserver；卡片一直在屏幕上、滑的是整页时不冒）；
+        //   在框里滑时出现；停下 HINT_IDLE（0.8 秒）淡出（不改共用的 FAB_IDLE）。滑到框底换成 ↑，点了回框顶；在中间点 ↓ 往下翻一屏。
+        //   这次打开 App 以后在框里滑到过底，就不再做进屏幕的提示。设置里「滑动提示」关掉就都不出现（存这台手机，不进备份）。
+        const HINT_IDLE=800, HINT_MIN_ROWS=6;
+        let catHintSeen=false;   // 这次打开 App 以后在框里滑到过底
+        function scrollHintOn(){ try{ return localStorage.getItem('app_scroll_hint')!=='off'; }catch(_){ return true; } }
+        const catHint=$('catStatsHint'), catBox=$('catStats');
+        catHint._fabIdle=HINT_IDLE;
+        fabHold(catHint);
+        function catHintFits(){ return scrollHintOn() && catBox.querySelectorAll('.cs-row').length>HINT_MIN_ROWS && catBox.scrollHeight>catBox.clientHeight+2; }
+        function catHintAtEnd(){ return catBox.scrollTop+catBox.clientHeight>=catBox.scrollHeight-2; }
+        function catHintPaint(){ const end=catHintAtEnd(); catHint.textContent=end ? '↑' : '↓'; catHint.dataset.end=end ? '1' : ''; catHint.setAttribute('aria-label', end ? '回到最上面' : '往下翻'); }
+        function catHintWake(){ if(!catHintFits()){ fabWake(catHint, false); return; } catHintPaint(); fabWake(catHint, true); }
+        catBox.addEventListener('scroll', ()=>{ if(catHintAtEnd()) catHintSeen=true; catHintWake(); }, { passive:true });
+        catHint.addEventListener('click', ()=>{
+            const top=catHintAtEnd() ? 0 : Math.min(catBox.scrollTop+catBox.clientHeight, catBox.scrollHeight-catBox.clientHeight);
+            try{ catBox.scrollTo({ top, behavior:'smooth' }); }catch(_){ catBox.scrollTop=top; }
+            catHintWake();
+        });
+        if(window.IntersectionObserver){
+            let wasIn=false;
+            new IntersectionObserver(es=>{
+                es.forEach(e=>{
+                    const nowIn=e.isIntersecting && e.intersectionRatio>0;
+                    if(nowIn && !wasIn && !catHintSeen) catHintWake();
+                    if(!nowIn) fabWake(catHint, false);
+                    wasIn=nowIn;
+                });
+            }, { threshold:[0, 0.6] }).observe($('catStatsCard'));
+        }
+        window.__catHintWake=catHintWake;   // 给测试用
+        (function(){
+            const seg=$('scrollHintSeg');
+            function paint(){ const on=scrollHintOn(); seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', (b.dataset.v==='on')===on)); }
+            seg.querySelectorAll('button').forEach(b=>b.addEventListener('click', ()=>{
+                try{ if(b.dataset.v==='off') localStorage.setItem('app_scroll_hint', 'off'); else localStorage.removeItem('app_scroll_hint'); }catch(_){}
+                if(b.dataset.v==='off') fabWake(catHint, false);
+                paint();
+            }));
+            paint();
+        })();
+        $('catSortSeg').addEventListener('click', e=>{
+            const b=e.target.closest('button[data-v]'); if(!b) return;
+            try{ localStorage.setItem('app_catstats_sort', b.dataset.v); }catch(_){}
+            renderCatStats(null);
+            $('catStats').scrollTop=0;
+        });
+
         // 1016-P：统计页顶上的待处理横幅「本月还有 N 笔导入账单待确认，共 x 元 [去处理]」。
         //   只在开发开关开着时读待处理池（开关关着时什么都不读、不显示）；这个月没有待处理就不显示。首页不加红点
         var __pendBannerSeq=0;   // var：统计页可能在这行执行前就渲染
@@ -815,6 +905,9 @@
                 + refundedTag(rec, refundedMap(all));
             // 1020-I：统计单独一行（原来是收支后面的小标签）
             $('detailMode').textContent = ({ normal:'计入', skip:'不计', flow:'往来' })[recMode(rec)];
+            // 1023-A：原来列表里每行的「结余」挪到这里：记完这一笔以后的结余（全部记录、含期初余额，不计的不算）
+            const bal=balanceAfter(rec);
+            $('detailBal').textContent = bal==null ? '' : bal.toFixed(2) + (isSkip(rec) ? '（这笔不计，不影响结余）' : '');
             paintDetailRefund(rec, all);
             paintDetailSource(rec);
             paintDetailAiFlag(rec, all);

@@ -28,7 +28,7 @@ const CATS = ['未分类', '吃饭', '购物', '娱乐', '其他'];
   const chip = () => $('rvChip');
   ok(chip() && /待确认分类 2 条/.test(chip().textContent), '2 账单页顶上「待确认分类 2 条」');
   chip().click(); await t.idle();
-  ok(chip().classList.contains('on') && /只看待确认分类 · 2 条/.test(chip().textContent) && $('billList').querySelectorAll('tr').length >= 1 && /命中 2 条/.test($('summaryFilter').textContent), '2 点了只看这 2 条（等于一个筛选）');
+  ok(chip().classList.contains('on') && /只看待确认分类 · 2 条/.test(chip().textContent) && $('billList').querySelectorAll('.bl-row').length === 2 && /命中 2 条/.test($('summaryFilter').textContent), '2 点了只看这 2 条（等于一个筛选）');
   // 批量改分类：去掉标记；撤销放回
   t.w.JiwenLedger.applyBatch(rvs().map(r => r.id), { cat: '其他' }); await t.idle();
   ok(rvs().length === 0 && t.recs().filter(r => r.cat === '其他').length === 2, '3 批量改分类：标记去掉');

@@ -8,7 +8,7 @@ const html = fs.readFileSync(htmlFile, 'utf8');
 const WWW = path.dirname(htmlFile);
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); } };
-const recs = Array.from({ length: 60 }, (_, i) => ({ id: 'r' + i, time: `2026-10-${String(1 + i % 28).padStart(2, '0')}T12:${String(i % 60).padStart(2, '0')}`, money: 10 + i, type: 'expense', cat: '吃饭', remark: '虚构' + i }));
+const recs = Array.from({ length: 160 }, (_, i) => ({ id: 'r' + i, time: `2026-10-${String(1 + i % 28).padStart(2, '0')}T12:${String(i % 60).padStart(2, '0')}`, money: 10 + i, type: 'expense', cat: '吃饭', remark: '虚构' + i }));
 const NOW = '2026-12-20T10:00:00';
 const AT = new Date(NOW).getTime();
 
@@ -20,7 +20,7 @@ async function coldBoot(extra) {
     Object.defineProperty(w, 'scrollY', { get: () => w.__y, configurable: true });
     w.scrollTo = (x, y) => { const v = typeof x === 'object' ? x.top : y; w.__calls.push(v); w.__y = v; };
     const mo = new w.MutationObserver(() => { const m = w.document.getElementById('mainBox'); if (m && m.style.display === 'block' && !w.__first) {
-      const a = w.document.querySelector('.tab-btn.active'), pi = w.document.querySelector('#pager .page-info');
+      const a = w.document.querySelector('.tab-btn.active'), pi = w.document.querySelector('#pagerBottom .page-info');
       w.__first = { tab: a && a.dataset.tab, page: pi ? pi.textContent : '' }; mo.disconnect(); } });
     mo.observe(w.document, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
   } });

@@ -23,14 +23,15 @@ async function snap(file){
   out.backup=noId(dom.window.__files[0]||'');
   out.cloud=noId(JSON.stringify((dom.window.JiwenStore||dom.window).odBuildPayload()));
   out.aiApp=(dom.window.JiwenAiExport || dom.window).buildAiText((dom.window.JiwenStore||dom.window).getUserData().filter(r=>r.time.startsWith('2026-08')),'2026年8月','按月');
-  out.overall=$('summaryOverall').innerHTML; out.cats=$('catStats').innerHTML;
-  const pages=[]; for(let p=0;p<10;p++){ pages.push($('billList').innerHTML); const nx=[...$('pager').querySelectorAll('button')].pop(); if(!nx||nx.disabled)break; nx.click(); }
+  out.overall=$('summaryOverall').innerHTML; out.cats=$('catStats').innerHTML;   // 1023-A 起分类汇总在统计页，下面切到统计页再读一次
+  const pages=[]; for(let p=0;p<10;p++){ pages.push($('billList').innerHTML); const nx=[...($('pager') || $('pagerBottom')).querySelectorAll('button')].pop(); if(!nx||nx.disabled)break; nx.click(); }
   out.pages=pages.join('|');
   // 有命中的筛选
   $('filterFab').click(); $('searchKeyword').value='游戏充值'; $('sheetApply').click();
   out.filter=$('summaryFilter').innerHTML.replace(/<button class="filter-batch"[^>]*>批量<\/button>/,'')+$('billList').innerHTML;
   // 统计页
   d.querySelector('.tab-btn[data-tab="stats"]').click();
+  if(!out.cats) out.cats=$('catStats').innerHTML;
   out.stats=$('statCal').innerHTML+$('statMonthIn').textContent+$('statMonthOut').textContent+$('statMonthCatList').innerHTML;
   [...$('statCal').querySelectorAll('.day.has')][5].click(); out.day=$('statFlowList').innerHTML;
   // AI 导出（直接调构建函数）

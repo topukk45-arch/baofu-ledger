@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1021-T28">
+    <link rel="stylesheet" href="app/app.css?v=1023-A">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1021-T28</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-A</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -37,62 +37,24 @@
         <div class="main-box" id="mainBox">
             <!-- ========== 页面1：记账（账单+记账） ========== -->
             <div class="tab-page" id="pageLedger">
-                <div class="user-info">
-                    <h3 id="nowUser">当前用户：</h3>
-                </div>
-
                 <!-- 筛选条件全部收进底部筛选浮层（点底栏左侧筛选图标唤起）。
                      这里仅保留隐藏 select 作为分类取值来源，renderBill 仍读它的 value。 -->
                 <select id="filterCat" style="display:none"><option value="__all">全部</option></select>
 
+                <!-- 1023-A：总览主数字是这个月支出（‹ › 切月份），下面这个月收入、条数，最下面结余（全部记录，含期初余额；点了拆开）。
+                     「当前用户」挪到设置页；分类汇总搬去统计页 -->
                 <div class="summary-overall" id="summaryOverall"></div>
+                <!-- 1023-A：日子缩成一条：最近的一个，点了进日子页 -->
+                <button type="button" class="days-strip" id="daysManageBtn" aria-label="日子"><span class="ds-k">日子</span><span class="ds-body" id="daysEntryRows"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 <div class="summary-filter" id="summaryFilter" style="display:none"></div>
-                <!-- 分类汇总：各分类计入收支的净额。一行一类，可按金额或分类顺序排列 -->
-                <div class="cat-card" id="catStatsCard">
-                    <div class="cat-card-head">
-                        <span class="cat-card-title">分类汇总</span>
-                        <div class="seg" id="catSortSeg">
-                            <button data-v="desc">从大到小</button>
-                            <button data-v="asc">从小到大</button>
-                        </div>
-                    </div>
-                    <div class="cat-stats" id="catStats"></div>
-                    <!-- 1019-H：框里还有没露出来的分类：右下角冒一个小圆钮 ↓（滑到底变 ↑），停下 0.8 秒淡出 -->
-                    <button class="cs-hint ui-hit" id="catStatsHint" type="button" aria-label="往下翻">↓</button>
-                </div>
-
-                <!-- 「日子」入口卡：显示最近的几个倒数日，点「管理 ›」进管理页。
-                     放在汇总下方、账单上方——用户每次进记账页顺带就瞥到了，
-                     不必主动切页；90% 的需求（看一眼还有几天）在这里就满足。 -->
-                <div class="days-card" id="daysCard">
-                    <div class="days-card-head">
-                        <span class="days-card-title">日子</span>
-                        <span class="days-card-more" id="daysManageBtn">管理 ›</span>
-                    </div>
-                    <div id="daysEntryRows"></div>
-                </div>
 
                 <!-- 批量操作入口：仅筛选生效时出现，放在账单正上方，离列表近、点起来顺手 -->
                 <div class="batch-bar" id="batchBar" style="display:none"></div>
 
                 <div class="bill-head" id="billHead">账单</div>
 
-                <div class="pager" id="pager"></div>
-
-                <table>
-                    <thead>
-                        <tr>
-                            <th>记账时间</th>
-                            <th>收支</th>
-                            <th>金额(元)</th>
-                            <th>分类</th>
-                            <th>结余(元)</th>
-                            <th>备注</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="billList"></tbody>
-                </table>
+                <!-- 1023-A：一条一行（左边分类 + 小字时间、备注，右边金额），按天分组，组头写当天收支；点整行进详情。页码只在下面 -->
+                <div class="bill-list" id="billList"></div>
                 <div class="pager pager-bottom" id="pagerBottom"></div>
                 <div id="pagerPad"></div>
             </div>
@@ -158,6 +120,20 @@
                     </div>
                 </div>
                 <div class="stat-day-empty" id="statDayEmpty"></div>
+
+                <!-- 分类汇总（1023-A 从账单页搬来）：全部记录里各分类计入收支的净额。一行一类，按金额排 -->
+                <div class="cat-card" id="catStatsCard">
+                    <div class="cat-card-head">
+                        <span class="cat-card-title">分类汇总 · 全部记录</span>
+                        <div class="seg" id="catSortSeg">
+                            <button data-v="desc">从大到小</button>
+                            <button data-v="asc">从小到大</button>
+                        </div>
+                    </div>
+                    <div class="cat-stats" id="catStats"></div>
+                    <!-- 1019-H：框里还有没露出来的分类：右下角冒一个小圆钮 ↓（滑到底变 ↑），停下 0.8 秒淡出 -->
+                    <button class="cs-hint ui-hit" id="catStatsHint" type="button" aria-label="往下翻">↓</button>
+                </div>
                 </div><!-- /statPaneFlow -->
 
                 <!-- ===== 预算页签 ===== -->
@@ -178,6 +154,8 @@
             <!-- ========== 页面3：设置 ========== -->
             <div class="tab-page" id="pageSettings" style="display:none">
                 <div class="user-info"><h3>设置</h3></div>
+                <!-- 1023-A：「当前用户」从账单页挪到这里 -->
+                <div class="set-account" id="nowUser">当前用户：</div>
 
                 <div class="set-group">
                     <div class="set-group-title">存档管理</div>
@@ -350,8 +328,21 @@
                 </div>
             </div>
             <div class="sheet-body">
-                <!-- 1020-I：关键词、金额区间、日期范围做成列表行（左边名字，右边填的东西；金额、日期照留框） -->
+                <!-- 1020-I：关键词、金额区间、日期范围做成列表行（左边名字，右边填的东西；金额、日期照留框）
+                     1023-A：日期放第一行，下面一排快捷（本月 / 上月 / 近 7 天，再点一下取消）；多一行收支（全部 / 支出 / 收入） -->
                 <div class="rec-list filter-list">
+                    <div class="rec-row rec-row-in"><span class="rec-row-k">日期</span>
+                        <div class="rec-pair">
+                            <div id="searchFrom" class="search-input dt-input" data-placeholder="起始"></div>
+                            <span class="search-sep">—</span>
+                            <div id="searchTo" class="search-input dt-input" data-placeholder="结束"></div>
+                        </div>
+                    </div>
+                    <div class="filter-quick" id="filterDateQuick">
+                        <button type="button" class="ui-btn small" data-q="month">本月</button>
+                        <button type="button" class="ui-btn small" data-q="last">上月</button>
+                        <button type="button" class="ui-btn small" data-q="7d">近 7 天</button>
+                    </div>
                     <label class="rec-row rec-row-in"><span class="rec-row-k">关键词</span><input type="text" id="searchKeyword" class="search-input rec-row-input" placeholder="备注里的字（不限）"></label>
                     <div class="rec-row rec-row-in"><span class="rec-row-k">金额</span>
                         <div class="rec-pair">
@@ -360,13 +351,10 @@
                             <input type="text" inputmode="decimal" id="searchMax" class="search-input money-input" placeholder="最高">
                         </div>
                     </div>
-                    <div class="rec-row rec-row-in"><span class="rec-row-k">日期</span>
-                        <div class="rec-pair">
-                            <div id="searchFrom" class="search-input dt-input" data-placeholder="起始"></div>
-                            <span class="search-sep">—</span>
-                            <div id="searchTo" class="search-input dt-input" data-placeholder="结束"></div>
-                        </div>
-                    </div>
+                </div>
+                <div class="search-field">
+                    <span class="search-label">收支</span>
+                    <div class="cat-chips mode-chips filter-io-chips" id="filterIoChips" role="radiogroup" aria-label="收支"></div>
                 </div>
                 <div class="search-field">
                     <span class="search-label">统计</span>
@@ -379,9 +367,10 @@
                     <div class="filter-chips" id="filterChips"></div>
                 </div>
             </div>
-            <div class="dialog-btn">
-                <button class="cancel" id="sheetClear">清除全部</button>
-                <button class="save" id="sheetApply">完成</button>
+            <!-- 1023-A：照方案 D：左退右进两个一样大的按钮 -->
+            <div class="ui-pair filter-btns">
+                <button type="button" class="ui-btn" id="sheetClear">清除全部</button>
+                <button type="button" class="ui-btn primary" id="sheetApply">完成</button>
             </div>
         </div>
     </div>
@@ -483,6 +472,7 @@
                     <div class="rec-row detail-row"><span class="rec-row-k">收支</span><span class="rec-row-v" id="detailType"></span></div>
                     <div class="rec-row detail-row"><span class="rec-row-k">分类</span><span class="rec-row-v" id="detailCat"></span></div>
                     <div class="rec-row detail-row"><span class="rec-row-k">统计</span><span class="rec-row-v" id="detailMode"></span></div>
+                    <div class="rec-row detail-row"><span class="rec-row-k">结余</span><span class="rec-row-v" id="detailBal"></span></div>
                     <div class="rec-row detail-row detail-block"><span class="rec-row-k">备注</span><div class="detail-remark" id="detailRemark"></div></div>
                     <!-- 1010-J2：退款 → 原账单是哪笔；原账单 → 退了哪几笔。没有关联时整行隐藏 -->
                     <div class="rec-row detail-row detail-block" id="detailRefundField" style="display:none"><span class="rec-row-k" id="detailRefundLabel">原账单</span><div class="detail-refund" id="detailRefundVal"></div></div>
@@ -845,26 +835,26 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1021-T28"></script>
-    <script src="app/store.js?v=1021-T28"></script>
-    <script src="app/select.js?v=1021-T28"></script>
-    <script src="app/keypad.js?v=1021-T28"></script>
-    <script src="app/text.js?v=1021-T28"></script>
-    <script src="app/sheet.js?v=1021-T28"></script>
-    <script src="app/ask.js?v=1021-T28"></script>
-    <script src="app/date.js?v=1021-T28"></script>
-    <script src="app/ai-export.js?v=1021-T28"></script>
-    <script src="app/import-entry.js?v=1021-T28"></script>
-    <script src="app/forms.js?v=1021-T28"></script>
-    <script src="app/ledger.js?v=1021-T28"></script>
-    <script src="app/cats.js?v=1021-T28"></script>
-    <script src="app/stats.js?v=1021-T28"></script>
-    <script src="app/days.js?v=1021-T28"></script>
-    <script src="app/settings.js?v=1021-T28"></script>
-    <script src="app/tabs.js?v=1021-T28"></script>
-    <script src="app/login.js?v=1021-T28"></script>
-    <script src="app/back.js?v=1021-T28"></script>
-    <script src="app/boot.js?v=1021-T28"></script>
+    <script src="app/base.js?v=1023-A"></script>
+    <script src="app/store.js?v=1023-A"></script>
+    <script src="app/select.js?v=1023-A"></script>
+    <script src="app/keypad.js?v=1023-A"></script>
+    <script src="app/text.js?v=1023-A"></script>
+    <script src="app/sheet.js?v=1023-A"></script>
+    <script src="app/ask.js?v=1023-A"></script>
+    <script src="app/date.js?v=1023-A"></script>
+    <script src="app/ai-export.js?v=1023-A"></script>
+    <script src="app/import-entry.js?v=1023-A"></script>
+    <script src="app/forms.js?v=1023-A"></script>
+    <script src="app/ledger.js?v=1023-A"></script>
+    <script src="app/cats.js?v=1023-A"></script>
+    <script src="app/stats.js?v=1023-A"></script>
+    <script src="app/days.js?v=1023-A"></script>
+    <script src="app/settings.js?v=1023-A"></script>
+    <script src="app/tabs.js?v=1023-A"></script>
+    <script src="app/login.js?v=1023-A"></script>
+    <script src="app/back.js?v=1023-A"></script>
+    <script src="app/boot.js?v=1023-A"></script>
 
 </body>
 </html>

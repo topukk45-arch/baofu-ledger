@@ -42,19 +42,21 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     const ov=t.$('summaryOverall').textContent;
     // 收入只有 购物卡 100；支出 = 夜宵 16 + xss 13 = 29
     const q=c=>t.$('summaryOverall').querySelector(c).textContent;
-    ok(q('.ov-in')==='+100.00' && q('.ov-out')==='−29.00', '总览收支只含「计入」：'+ov);
+    ok(q('.ov-in')==='100.00' && q('.ov-out')==='29.00', '总览收支只含「计入」：'+ov);   // 1023-A：这个月（模拟今天 10 月 10 日）收支，不带正负号
     // 结余 = 存款 + 4500 - 3999.00 - 800 + 100 - 16 - 13（信用卡不算）
     const bal=(50000.00+4500-3999.00-800+100-16-13).toFixed(2);
     ok(q('.ov-net')===bal, '结余含资金往来、不含不计：应为 '+bal+'，实际 '+q('.ov-net'));
-    ok(!t.$('catStats').textContent.includes('存款') && !t.$('catStats').textContent.includes('购物'), '分类汇总不出现「存款」「购物（全是往来）」');
+    t.d.querySelector('.tab-btn[data-tab="stats"]').click();   // 1023-A：分类汇总搬去统计页
+    ok(t.$('catStats').textContent.length>0 && !t.$('catStats').textContent.includes('存款') && !t.$('catStats').textContent.includes('购物'), '分类汇总不出现「存款」「购物（全是往来）」');
+    t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
     t.filterKw('笔记本');
-    const rows=[...t.$('billList').querySelectorAll('tr')];
+    const rows=[...t.$('billList').querySelectorAll('.bl-row')];
     ok(rows.length===2 && rows.every(r=>r.querySelector('.io-flow') && r.querySelector('.amt-flow')), '往来行有灰蓝标签与金额');
     ok(t.$('summaryFilter').textContent.includes('（其中 2 条往来）'), '小计说明往来条数');
     // 结余列：购物卡那行（最新正常记录）的结余应等于总结余
     const t2=await boot(rs);
-    const top=[...t2.$('billList').querySelectorAll('tr')][0];
-    ok(top.querySelector('[data-label="结余"]').textContent===bal, '列表最新一行结余与总览一致');
+    t2.$('billList').querySelector('.bl-row').click();   // 1023-A：结余在详情里
+    ok(t2.$('detailBal').textContent===bal, '列表最新一行结余与总览一致：'+t2.$('detailBal').textContent);
 }
 
 // ===== 2. 统计页 10 月 =====

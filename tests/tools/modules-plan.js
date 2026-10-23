@@ -22,9 +22,9 @@ const MODULES = [
   { key: 'ai', layer: 3, entry: 'JiwenAiExport', file: 'app/ai-export.js', what: '导出账单给 AI 分析', secs: ['导出账单给 AI 分析'], names: [] },
   { key: 'impentry', layer: 3, entry: 'JiwenImportEntry', file: 'app/import-entry.js', what: '导入入口（开发开关、loadImportUI、用记问打开、空账本入口、月初提醒、待处理横幅、AI 标记列表的入口）', secs: ['1015-A：账单导入（开发中）'], names: [] },
   { key: 'forms', layer: 4, entry: 'JiwenForms', file: 'app/forms.js', what: '记一笔、修改账单、退款弹窗、口径选择、常用模板和模板面板', secs: ['悬浮按钮：打开/关闭记账弹窗', '统计选择：计入 / 不计 / 往来', '常用模板（1010-I）', '退款弹窗（1010-J）', '1019-K：模板面板（新建 / 编辑都用它）', '修改弹窗的分类/收支标签（与记账弹窗同款，但打开时预选记录原有值）'], names: ['refundLineHtml', 'formState', 'formSnaps'] },
-  { key: 'ledger', layer: 4, entry: 'JiwenLedger', file: 'app/ledger.js', what: '账单页：列表、翻页、搜索和筛选（含筛选浮层的控件）、分类汇总和滑动提示、批量操作', secs: ['筛选浮层（bottom sheet）控件绑定', '搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加', '批量操作（基于当前筛选结果）', '分类汇总卡片', '1019-H：分类汇总能滑但看不出来：右下角的小圆钮'], names: ['renderPager', 'scrollListTop', 'pagerPad', 'renderFilterChips', 'goPage'] },
+  { key: 'ledger', layer: 4, entry: 'JiwenLedger', file: 'app/ledger.js', what: '账单页：总览（这个月支出、结余）、列表（按天分组）、翻页、搜索和筛选（含筛选浮层的控件）、批量操作（1023-A 起分类汇总搬去统计页）', secs: ['筛选浮层（bottom sheet）控件绑定', '搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加', '批量操作（基于当前筛选结果）'], names: ['renderPager', 'scrollListTop', 'pagerPad', 'renderFilterChips', 'goPage'] },
   { key: 'cats', layer: 4, entry: 'JiwenCats', file: 'app/cats.js', what: '分类管理（列表、拖动排序、改名、删除、设预算）', secs: ['分类长按拖动排序（pointer/touch 手写，避免 WebView 原生 draggable 不稳）'], names: ['openCatManager', 'openCatActions', 'attachCatDrag', 'showCatErr'] },
-  { key: 'stats', layer: 4, entry: 'JiwenStats', file: 'app/stats.js', what: '统计页、预算页、预算建议、年月选择、账单详情', secs: ['统计页：预算', '单独一版（1016-Z9）：按过去 3–6 个月的中位数给每月预算建议，一键写入', '统计模块（纯手写 SVG，跟随外观主题变量）', '年月选择器（统计页）'], names: [] },
+  { key: 'stats', layer: 4, entry: 'JiwenStats', file: 'app/stats.js', what: '统计页、预算页、预算建议、年月选择、账单详情、分类汇总和滑动提示（1023-A 从账单页搬来）', secs: ['统计页：预算', '分类汇总卡片', '1019-H：分类汇总能滑但看不出来：右下角的小圆钮', '单独一版（1016-Z9）：按过去 3–6 个月的中位数给每月预算建议，一键写入', '统计模块（纯手写 SVG，跟随外观主题变量）', '年月选择器（统计页）'], names: [] },
   { key: 'days', layer: 4, entry: 'JiwenDays', file: 'app/days.js', what: '日子（入口卡、管理页、选择删除、编辑弹窗）', secs: ['日子（倒数日）', '入口卡显示条数（可配置）', '记账页的入口卡', '管理页', '日子管理弹窗', '选择模式（批量删除）', '编辑/添加弹窗'], names: [] },
   { key: 'settings', layer: 5, entry: 'JiwenSettings', file: 'app/settings.js', what: '设置页、外观、存储用量', secs: ['外观：主题色（全局，所有账号共用，存 localStorage）'], names: ['renderStorageUse', '__storageSeq', 'STORAGE_WARN', 'refreshArchiveSelect'] },
   { key: 'tabs', layer: 5, entry: 'JiwenTabs', file: 'app/tabs.js', what: '外壳：页签切换、进账号（enterAccount）、历史脏数据自检、进日子管理页 / 回来、刷新所有页面、被杀回来、首屏快照（老入口 window.snapSave / snapDrop 留着）', secs: ['底部标签切换', '1019-F：切到后台被系统杀掉，回来看不出来', '1019-U：首屏快照'], names: ['gotoDaysPage', 'backFromDaysPage', 'refreshAllViews', 'refreshCatSelectors', 'enterAccount', 'runTimeRepairOnce', 'scanAndRepairStore'] },
@@ -70,6 +70,7 @@ const CALLBACKS = {
   'cats → stats': ['renderStats'],   // 设好预算后刷新统计页（1019-Z4-M8 调先后时数出来的）
   'settings → tabs': ['snapDrop', 'refreshCatSelectors', 'refreshAllViews'],   // 换主题、改默认进入页面后删首屏快照（同上）
   'ledger → tabs': ['refreshAllViews'],
+  'ledger → stats': ['openDetail'],   // 1023-A：账单一条一行，点整行进账单详情（详情在统计页模块里，修改从详情进）
   'forms → tabs': ['refreshAllViews'],
   'forms → cats': ['openCatManager'],   // 1020-G：分类抽屉底部「管理分类」打开分类管理（分类管理排在记一笔后面：它要调记一笔那边的刷新），关了回到抽屉
   'stats → tabs': ['refreshAllViews'],

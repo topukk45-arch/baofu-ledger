@@ -88,10 +88,11 @@ async function snap() {
   out.result = $('impResult') ? '' : 'ok';
   $('exportBtn').click(); await until(() => w.__files.length);
   out.backup = w.__files[0] || '';
-  out.overall = $('summaryOverall').innerHTML; out.cats = $('catStats').innerHTML;
-  const pages = []; for (let p = 0; p < 10; p++) { pages.push($('billList').innerHTML); const nx = [...$('pager').querySelectorAll('button')].pop(); if (!nx || nx.disabled) break; nx.click(); }
+  out.overall = $('summaryOverall').innerHTML;
+  const pages = []; for (let p = 0; p < 10; p++) { pages.push($('billList').innerHTML); const nx = [...($('pager') || $('pagerBottom')).querySelectorAll('button')].pop(); if (!nx || nx.disabled) break; nx.click(); }
   out.pages = pages.join('|');
   d.querySelector('.tab-btn[data-tab="stats"]').click();
+  out.cats = $('catStats').innerHTML;   // 1023-A：分类汇总搬去统计页，切过去再读
   out.stats = $('statCal').innerHTML + $('statMonthIn').textContent + $('statMonthOut').textContent + $('statMonthCatList').innerHTML;
   const days = [...$('statCal').querySelectorAll('.day.has')];
   out.day = days.length ? (days[Math.min(5, days.length - 1)].click(), $('statFlowList').innerHTML) : '';

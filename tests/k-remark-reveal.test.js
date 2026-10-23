@@ -73,7 +73,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
   // ===== 4. 修改账单：同样露出「保存」 =====
   {
     const t=await boot();
-    t.d.querySelector('#billList [data-act="edit"]').click();
+    t.d.querySelector('#billList .bl-row').click(); t.$('detailEdit').click();   // 1023-A：点整行进详情，修改在详情里
     ok(t.$('editMask').style.display!=='none' && t.$('editMask').style.display!=='', '打开了修改弹窗');
     const dlg=t.$('editMask').querySelector('.edit-dialog');
     const getSt=fakeLayout(dlg,{dlg:[60,620],inner:[[t.$('editRemarkRow'),[530,600]],[t.$('saveEdit'),[625,665]]]});

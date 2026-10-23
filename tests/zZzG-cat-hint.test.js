@@ -32,7 +32,7 @@ const see = (t, on) => { const io = t.w.__io.find(x => x.el && x.el.id === 'catS
   const t = await bootHint(recs, CATS);
   const { $, w, d } = t, hint = $('catStatsHint'), box = $('catStats');
   w.__setBoxScroll(box);
-  d.querySelector('.tab-btn[data-tab="ledger"]').click(); await t.idle();
+  d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle();   // 1023-A：分类汇总搬去统计页
   ok(box.querySelectorAll('.cs-row').length === 10, '0 分类汇总 10 行');
   ok(hint && hint.classList.contains('ui-hit'), '0 有小圆钮，点击区域撑到 48');
 
@@ -79,18 +79,18 @@ const see = (t, on) => { const io = t.w.__io.find(x => x.el && x.el.id === 'catS
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   [...$('scrollHintSeg').children].find(b => b.dataset.v === 'off').click();
   ok(w.localStorage.getItem('app_scroll_hint') === 'off' && $('scrollHintSeg').querySelector('.on').dataset.v === 'off', '4 关掉：存在这台手机上');
-  d.querySelector('.tab-btn[data-tab="ledger"]').click();
+  d.querySelector('.tab-btn[data-tab="stats"]').click();
   box.scrollTop = 60; box.dispatchEvent(new w.Event('scroll'));
   ok(!hint.classList.contains('show'), '4 关掉以后：在框里滑也不出现');
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   [...$('scrollHintSeg').children].find(b => b.dataset.v === 'on').click();
   ok(!w.localStorage.getItem('app_scroll_hint'), '4 打开：默认值（不存）');
-  t.w.close();
+  await wait(1700); t.w.close();   // 1023-A：在统计页滑过，等圆钮淡出的计时器走完再关
 
   // 5. 分类不超过 6 个：不出现
   const t5 = await bootHint(recs.slice(0, 5), CATS.slice(0, 6));
   t5.w.__setBoxScroll(t5.$('catStats'));
-  t5.d.querySelector('.tab-btn[data-tab="ledger"]').click(); await t5.idle();
+  t5.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t5.idle();
   see(t5, true);
   t5.$('catStats').scrollTop = 10; t5.$('catStats').dispatchEvent(new t5.w.Event('scroll'));
   ok(!t5.$('catStatsHint').classList.contains('show'), '5 只有 5 个分类：不出现');

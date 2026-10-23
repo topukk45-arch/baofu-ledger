@@ -1704,3 +1704,70 @@
         @keyframes tabIn { from { opacity:0; } to { opacity:1; } }
         .tab-page.tab-in { animation:tabIn 160ms ease-out; }
         @media (prefers-reduced-motion: reduce) { .tab-page.tab-in { animation:none; } }
+
+        /* ===== 1023-A：账单页改版 ===== */
+        /* 总览：月份 ‹ 10月 › + 这个月几条；主数字这个月支出；下面一行收入；最下面结余（整行按钮，点了拆开） */
+        .summary-overall { padding:6px 14px 0; }
+        .summary-overall .ov-head { display:flex; align-items:center; justify-content:flex-start; gap:0; margin:0 -8px 0 -14px; }
+        .ov-nav { width:var(--ui-tap); height:var(--ui-tap); flex:none; border:none; background:transparent; padding:0;
+            color:var(--c-primary-dark); font-size:22px; line-height:1; cursor:pointer; border-radius:12px; }
+        .ov-nav:disabled { opacity:.3; cursor:default; }
+        .summary-overall .ov-title { font-size:16px; min-width:3.5em; text-align:center; letter-spacing:0; }
+        .summary-overall .ov-sub { margin-left:auto; padding-right:6px; white-space:nowrap; }
+        .ov-main { padding:0 0 6px; }
+        .ov-main .ov-label { margin:0; }
+        .ov-main .ov-count { font-size:12px; }
+        .summary-overall .ov-main .ov-count b { font-size:12px; color:var(--c-text-soft); font-weight:normal; }
+        .ov-main .ov-out { font-size:32px; letter-spacing:.3px; }
+        .ov-sub { font-size:13px; color:var(--c-text-soft); }
+        .summary-overall .ov-sub b { font-size:14px; font-variant-numeric:tabular-nums; }
+        button.ov-bal { display:flex; align-items:center; gap:8px; width:calc(100% + 28px); min-height:var(--ui-tap); margin:0 -14px; padding:0 10px 0 14px;
+            border:none; border-top:1px dashed var(--c-border); border-bottom:none; border-radius:0 0 12px 12px; background:transparent;
+            color:var(--c-text); font:inherit; text-align:left; cursor:pointer; }
+        .ov-bal-k { flex:1 1 auto; min-width:0; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .ov-bal-k em { font-style:normal; font-size:12px; color:var(--c-text-soft); }
+        button.ov-bal .ov-net { display:inline; flex:none; font-size:17px; color:var(--c-primary-deep); }
+        .ov-bal-go { flex:none; color:var(--c-text-soft); font-size:18px; }
+        /* 日子缩成一条 */
+        button.days-strip { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); margin:0 0 10px; padding:0 10px 0 14px;
+            background:var(--c-card-1); border:1px solid var(--c-border); border-radius:12px; color:var(--c-text); font:inherit; text-align:left; cursor:pointer; }
+        .days-strip .ds-k { flex:none; font-size:14px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; }
+        .days-strip .ds-body { flex:1 1 auto; min-width:0; display:flex; align-items:baseline; gap:8px; overflow:hidden; white-space:nowrap; }
+        .days-strip .d-name { min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:14px; color:var(--c-primary-deep); }
+        .days-strip .d-name .pin { font-size:11px; color:var(--c-primary); margin-right:3px; }
+        .days-strip .d-right { flex:none; display:flex; align-items:baseline; gap:4px; }
+        .days-strip .d-word, .days-strip .d-unit, .days-strip .d-more { font-size:12px; color:var(--c-text-soft); }
+        .days-strip .d-more { flex:none; margin-left:auto; }
+        .days-strip .d-num { font-size:16px; font-weight:bold; color:var(--c-primary-dark); font-variant-numeric:tabular-nums; }
+        .days-strip .d-num.future { color:var(--c-pos); }
+        .days-strip .d-today { font-size:14px; font-weight:bold; color:var(--c-pos); }
+        .days-strip .days-empty-row { display:inline; min-height:0; padding:0; font-size:14px; color:var(--c-text-soft); }
+        /* 账单：一条一行，按天分组 */
+        .bill-list { margin-top:2px; }
+        .bl-day { display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:12px 4px 4px;
+            border-bottom:1px solid var(--c-border); font-size:13px; color:var(--c-text-soft); }
+        .bl-day-d { font-weight:bold; color:var(--c-text); white-space:nowrap; }
+        .bl-day-sum { display:flex; gap:10px; white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .bl-day-sum b { font-weight:600; }
+        .bl-row { display:flex; align-items:center; gap:12px; min-height:54px; padding:6px 4px; border-bottom:1px dashed var(--c-border);
+            cursor:pointer; -webkit-user-select:none; user-select:none; }
+        .bl-row:active, .bl-row.pressed { background:var(--c-chip); }
+        .bl-main { flex:1 1 auto; min-width:0; }
+        .bl-cat { display:flex; align-items:center; gap:2px; min-width:0; font-size:15px; color:var(--c-text); line-height:1.35; }
+        .bl-cat-t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; margin-right:4px; }
+        .bl-cat .io-tag, .bl-cat .io-skip, .bl-cat .io-flow, .bl-cat .io-refunded { flex:none; margin-left:0; margin-right:2px; padding:1px 7px; font-size:11.5px; }
+        .bl-sub { display:flex; gap:8px; min-width:0; margin-top:2px; font-size:12.5px; color:var(--c-text-soft); line-height:1.35; }
+        .bl-time { flex:none; font-variant-numeric:tabular-nums; }
+        .bl-remark { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .bl-amt { flex:none; font-size:16px; font-weight:bold; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .bill-list .empty-tip { padding:36px 12px; border:1px dashed var(--c-border-mid); border-radius:12px; margin-top:10px; }
+        .empty-sub { margin-top:6px; font-size:13px; color:var(--c-text-soft); }
+        .bill-head { margin-bottom:0; }
+        .pager-bottom { margin-top:14px; }
+        /* 设置页顶上的「当前用户」（原来在账单页） */
+        .set-account { font-size:13px; color:var(--c-text-soft); margin:-6px 2px 12px; }
+        /* 1023-A：筛选浮层：日期快捷一排（在日期那行下面）、收支三格、底部「清除全部 | 完成」 */
+        .filter-quick { display:flex; gap:var(--ui-gap); padding:0 12px 10px; border-bottom:1px solid var(--c-border); }
+        .filter-quick .ui-btn { flex:1 1 0; min-width:0; margin:0; font-weight:normal; }
+        .filter-quick .ui-btn.on { background:var(--c-sel-bg); border-color:var(--c-sel-border); color:var(--c-sel-text); font-weight:bold; }
+        .filter-btns { margin-top:18px; }

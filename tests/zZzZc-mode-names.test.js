@@ -50,7 +50,7 @@ ok(/分类,统计,去向/.test(ex) && /,不计,/.test(ex) && /,往来,/.test(ex)
   const { $, w, d } = t;
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await wait(50);
   // 3. 账单列表的标签
-  const rowOf = id => d.querySelector(`tr[data-id="${id}"]`) || [...d.querySelectorAll('#billList tr')].filter(tr => tr.textContent.includes(recs.find(x => x.id === id).remark))[0];
+  const rowOf = id => d.querySelector(`#billList .bl-row[data-id="${id}"]`);   // 1023-A：一条一行
   ok(rowOf('m2') && rowOf('m2').querySelector('.io-skip').textContent === '不计' && rowOf('m3').querySelector('.io-flow').textContent === '往来', '3 账单列表：不计 / 往来');
   { const cl = d.body.cloneNode(true); cl.querySelectorAll('script,style').forEach(x => x.remove()); const m = cl.textContent.match(/.{0,30}(统计口径|只算结余|不计入).{0,20}/); ok(!m, '3 页面上没有老叫法：' + (m && m[0])); }
 

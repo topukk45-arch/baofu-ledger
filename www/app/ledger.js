@@ -1,5 +1,5 @@
 (function(){
-        const { $, MODE_HINT, PAGE_SIZE, billList, escapeHtml, fabHold, fabWake, filterCat, fitNums, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
+        const { $, MODE_HINT, PAGE_SIZE, billList, escapeHtml, fabWake, filterCat, fitNums, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
         const { balContrib, charLen, charSlice, getCats, getUserData, impGetJson, impLogKey, impTarget, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { bindSheetDrag } = window.JiwenPanel;   // 用到前面模块的
         const { askCancel, customAlert, customChoose, customConfirm } = window.JiwenAsk;   // 用到前面模块的
@@ -13,6 +13,7 @@
             const id = el.dataset.id;
             if(el.dataset.act==='remark'){ window.viewRemark && window.viewRemark(id); }
             else if(el.dataset.act==='edit'){ window.openEdit && window.openEdit(id); }
+            else if(el.dataset.act==='detail'){ window.JiwenStats.openDetail(id); }   // 1023-A：一条一行，点整行进详情（修改在详情里）
         });
 
         // 渲染筛选分类标签：「全部」固定第一个，其后按存档 cats 顺序。
@@ -58,6 +59,33 @@
         // 面板里点只改草稿，点「完成」才提交进 searchState.mode。
         let draftMode='';
         const FILTER_MODE_OPTS=[ {v:'', t:'全部'}, {v:'normal', t:'计入'}, {v:'skip', t:'不计'}, {v:'flow', t:'往来'} ];
+        // 1023-A：收支筛选（全部 / 支出 / 收入），和统计筛选同一套草稿规则
+        let draftIo='';
+        const FILTER_IO_OPTS=[ {v:'', t:'全部'}, {v:'expense', t:'支出'}, {v:'income', t:'收入'} ];
+        function renderFilterIoChips(){
+            const box=$('filterIoChips'); if(!box) return;
+            if(!box.children.length){
+                FILTER_IO_OPTS.forEach(o=>{
+                    const b=document.createElement('div');
+                    b.className='cc'; b.textContent=o.t; b.dataset.v=o.v; b.setAttribute('role', 'radio');
+                    b.onclick=()=>{ draftIo=o.v; renderFilterIoChips(); };
+                    box.appendChild(b);
+                });
+            }
+            box.querySelectorAll('.cc').forEach(el=>{ const on=el.dataset.v===draftIo; el.classList.toggle('sel', on); el.setAttribute('aria-checked', on?'true':'false'); });
+        }
+        // 1023-A：日期快捷：本月 / 上月 / 近 7 天（只填起止两个框，照旧点「完成」才生效）；起止正好是它时高亮，再点一下清掉
+        function quickRange(q){
+            const n=new Date(), k=x=>`${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`;
+            if(q==='month') return [k(new Date(n.getFullYear(), n.getMonth(), 1)), k(new Date(n.getFullYear(), n.getMonth()+1, 0))];
+            if(q==='last') return [k(new Date(n.getFullYear(), n.getMonth()-1, 1)), k(new Date(n.getFullYear(), n.getMonth(), 0))];
+            return [k(new Date(n.getFullYear(), n.getMonth(), n.getDate()-6)), k(n)];
+        }
+        function paintDateQuick(){
+            const box=$('filterDateQuick'); if(!box) return;
+            const f=$('searchFrom').dataset.day||'', t=$('searchTo').dataset.day||'';
+            box.querySelectorAll('[data-q]').forEach(b=>{ const [a, z]=quickRange(b.dataset.q); b.classList.toggle('on', f===a && t===z); });
+        }
         function renderFilterModeChips(){
             const box=$('filterModeChips'); if(!box) return;
             if(!box.children.length){
@@ -87,6 +115,8 @@
                 draftCat = filterCat.value || '__all';
                 draftMode = searchState.mode || '';
                 renderFilterModeChips();
+                draftIo = searchState.io || '';
+                renderFilterIoChips(); paintDateQuick();
             }
             // 完成：把控件草稿提交为正式筛选条件，刷新列表
             function commitDraft(){
@@ -97,6 +127,7 @@
                 searchState.from = from.dataset.day || null;
                 searchState.to   = to.dataset.day || null;
                 searchState.mode = draftMode || null;
+                searchState.io = draftIo || null;
                 filterCat.value = draftCat;
                 JiwenBase.curPage=1;
                 renderBill();
@@ -153,13 +184,19 @@
             // 日期：选定后只写控件草稿（显示值 + dataset.day），不提交、不刷新列表
             from.addEventListener('click', ()=>{
                 openDtPickerDate(from.dataset.day || '', (day)=>{
-                    from.value=day; from.dataset.day=day;
+                    from.value=day; from.dataset.day=day; paintDateQuick();
                 });
             });
             to.addEventListener('click', ()=>{
                 openDtPickerDate(to.dataset.day || '', (day)=>{
-                    to.value=day; to.dataset.day=day;
+                    to.value=day; to.dataset.day=day; paintDateQuick();
                 });
+            });
+            $('filterDateQuick').addEventListener('click', e=>{
+                const b=e.target.closest('[data-q]'); if(!b) return;
+                const [a, z]=b.classList.contains('on') ? ['', ''] : quickRange(b.dataset.q);
+                from.value=a; from.dataset.day=a; to.value=z; to.dataset.day=z;
+                paintDateQuick();
             });
 
             // 清除全部：只清草稿（控件 + 草稿分类），不动已提交状态、不刷新列表
@@ -168,6 +205,7 @@
                 from.value=''; from.dataset.day=''; to.value=''; to.dataset.day='';
                 draftCat='__all';
                 draftMode=''; renderFilterModeChips();
+                draftIo=''; renderFilterIoChips(); paintDateQuick();
                 renderFilterChips();   // 重渲染让分类高亮回到「全部」
             });
 
@@ -179,12 +217,12 @@
         // ===== 搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加 =====
         // 金额存数字（null 表示不限）；日期存 'YYYY-MM-DD'（null 表示不限）；关键词存小写串。
         // mode：统计筛选，null 表示不限，否则为 'normal' / 'flow' / 'skip'
-        const searchState={ keyword:'', min:null, max:null, from:null, to:null, mode:null, rv:false };   // rv：1021-T13 只看待确认分类
+        const searchState={ keyword:'', min:null, max:null, from:null, to:null, mode:null, rv:false, io:null };   // io：1023-A 收支筛选（'expense' / 'income'）   // rv：1021-T13 只看待确认分类
         const MODE_NAME={ normal:'计入', skip:'不计', flow:'往来' };
 
         // 是否有任意搜索条件生效（用于显示「清除」入口、高亮筛选按钮、空结果提示文案）
         function hasActiveSearch(){
-            return !!(hasTextSearch() || searchState.mode || searchState.rv);
+            return !!(hasTextSearch() || searchState.mode || searchState.rv || searchState.io);
         }
         // 只看关键词 / 金额 / 日期（不含口径），用来决定徽标里写不写「搜索」
         function hasTextSearch(){
@@ -195,8 +233,10 @@
         // 重置搜索状态与界面控件（切换存档/登录时调用，避免筛选条件跨存档残留）
         function resetSearch(){
             searchState.keyword=''; searchState.min=null; searchState.max=null;
-            searchState.from=null; searchState.to=null; searchState.mode=null; searchState.rv=false;
+            searchState.from=null; searchState.to=null; searchState.mode=null; searchState.rv=false; searchState.io=null;
             draftMode=''; renderFilterModeChips();
+            draftIo=''; renderFilterIoChips();
+            ovYM=null;   // 1023-A：总览回到这个月
             const kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax'),
                   from=$('searchFrom'), to=$('searchTo');
             if(kw) kw.value='';
@@ -204,6 +244,7 @@
             if(max) max.value='';
             if(from){ from.value=''; from.dataset.day=''; }
             if(to){ to.value=''; to.dataset.day=''; }
+            paintDateQuick();
             if(window.setDraftCat) window.setDraftCat('__all');   // 草稿分类也归零，避免跨存档残留
             if(window.syncFilterFab) window.syncFilterFab();
         }
@@ -242,6 +283,7 @@
             // 统计
             if(searchState.mode && recMode(r)!==searchState.mode) return false;
             if(searchState.rv && r.rv!==1) return false;
+            if(searchState.io && r.type!==searchState.io) return false;   // 1023-A：收支（退款算收入）
             return true;
         }
 
@@ -314,6 +356,83 @@
             b.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入')); });
             const head=$('billHead'); head.parentNode.insertBefore(b, head);
         }
+        // ===== 1023-A：账单页顶上的总览 =====
+        //   主数字是「这个月花了多少」（‹ › 切月份，只管这一块，不动下面的列表），下面一行这个月的收入、条数；
+        //   最下面一行结余：全部记录算下来的（含期初余额、往来），写明白，点了拆开给你看为什么不等于收入减支出。
+        //   ovYM：null = 当前月；别的是 'YYYY-MM'。清筛选（✕）、换账号 / 存档时回到当前月
+        let ovYM=null;
+        const WEEK='日一二三四五六';
+        function ymNow(){ const n=new Date(); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`; }
+        function ymAdd(ym, d){ let y=+ym.slice(0,4), m=+ym.slice(5,7)-1+d; y+=Math.floor(m/12); m=((m%12)+12)%12; return `${y}-${pad(m+1)}`; }
+        function dayLabel(day){
+            const y=+day.slice(0,4), m=+day.slice(5,7), d=+day.slice(8,10);
+            if(!y || !m || !d) return escapeHtml(day);
+            const n=new Date(), w=WEEK[new Date(y, m-1, d).getDay()];
+            const k=x=>`${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`;
+            const yest=new Date(n.getFullYear(), n.getMonth(), n.getDate()-1);
+            const pre = day===k(n) ? '今天 · ' : (day===k(yest) ? '昨天 · ' : '');
+            return `${pre}${y!==n.getFullYear()?y+'年':''}${m}月${d}日 周${w}`;
+        }
+        let ovSum=null;   // 结余拆开：给「结余 ›」的说明用
+        function renderOverview(allAsc){
+            const cur=ovYM || ymNow();
+            let mIn=0, mOut=0, mN=0, sIn=0, sOut=0, fNet=0, minYM=cur, maxYM=ymNow();
+            allAsc.forEach(r=>{
+                const ym=(r.time||'').slice(0,7);
+                if(ym && ym<minYM) minYM=ym;
+                if(ym && ym>maxYM) maxYM=ym;
+                const c=statContrib(r);
+                sIn+=c.inc; sOut+=c.exp;
+                if(isFlow(r)){ const b=balContrib(r); fNet+=b.inc-b.exp; }
+                if(ym===cur){ mIn+=c.inc; mOut+=c.exp; mN++; }
+            });
+            sIn=round2(sIn); sOut=round2(sOut); fNet=round2(fNet);
+            const net=round2(sIn-sOut+fNet);   // 和以前「结余」同一个数：只有不计的不算
+            ovSum={ sIn, sOut, fNet, net };
+            const isNow=cur===ymNow(), y=+cur.slice(0,4), m=+cur.slice(5,7);
+            const label=(y!==new Date().getFullYear() ? y+'年' : '')+m+'月';
+            $('summaryOverall').innerHTML=
+                `<div class="ov-head">`+
+                    `<button type="button" class="ov-nav" id="ovPrev" data-ov="-1" aria-label="上个月"${cur<=minYM?' disabled':''}>‹</button>`+
+                    `<span class="ov-title" id="ovMonth">${label}</span>`+
+                    `<button type="button" class="ov-nav" id="ovNext" data-ov="1" aria-label="下个月"${cur>=maxYM?' disabled':''}>›</button>`+
+                    `<span class="ov-sub">收入 <b class="ov-in pos">${round2(mIn).toFixed(2)}</b></span>`+
+                `</div>`+
+                `<div class="ov-main"><div class="ov-label">${isNow?'本月':m+' 月'}支出（元）<span class="ov-count">· 这个月 <b>${mN}</b> 条</span></div><div class="ov-num ov-out neg" data-fit>${round2(mOut).toFixed(2)}</div></div>`+
+                `<button type="button" class="ov-bal" id="ovBal"><span class="ov-bal-k">结余<em>（全部记录，含期初余额）</em></span><span class="ov-num ov-net">${net.toFixed(2)}</span><span class="ov-bal-go" aria-hidden="true">›</span></button>`;
+            fitNums($('summaryOverall'));
+        }
+        $('summaryOverall').addEventListener('click', e=>{
+            const nav=e.target.closest('[data-ov]');
+            if(nav && !nav.disabled){
+                const nx=ymAdd(ovYM || ymNow(), +nav.dataset.ov);
+                ovYM = nx===ymNow() ? null : nx;
+                renderOverview(getUserData().slice());
+                return;
+            }
+            if(e.target.closest('#ovBal') && ovSum){
+                const f=v=>v.toFixed(2);
+                customAlert(`结余是全部记录算下来的，不只这个月：\n\n`+
+                    `累计收入　+${f(ovSum.sIn)}\n累计支出　−${f(ovSum.sOut)}\n`+
+                    `往来　　　${ovSum.fNet<0?'−':'+'}${f(Math.abs(ovSum.fNet))}（期初余额、转账、存取钱这类，记成「往来」的）\n`+
+                    `结余　　　${f(ovSum.net)}\n\n`+
+                    `所以结余不等于收入减支出：期初余额、存取钱不算收支，但算进结余。记成「不计」的哪里都不算。`, '结余怎么算的');
+            }
+        });
+        // 1023-A：详情里的「结余」：记完这一笔以后，全部记录算下来的结余（和以前列表里那一栏同一个算法：按时间排、同一分钟按存的先后）
+        function balanceAfter(rec){
+            const raw=getUserData();
+            let idx=raw.indexOf(rec); if(idx<0) idx=raw.findIndex(r=>r.id===rec.id); if(idx<0) return null;
+            const items=raw.map((r,origIdx)=>({ r, origIdx, ts:parseRecTime(r.time).getTime() }));
+            const me=items[idx];
+            let fen=0;   // 按分加，免得几千笔加下来有浮点零头
+            items.forEach(x=>{
+                if(x.ts<me.ts || (x.ts===me.ts && x.origIdx<=me.origIdx)){ const c=balContrib(x.r); fen+=Math.round(c.inc*100)-Math.round(c.exp*100); }
+            });
+            return fen/100;
+        }
+        function ovOff(){ return ovYM!=null; }   // 首屏快照：总览不在这个月就不存
+
         // 【1017-M】opt.pageOnly：翻页时只换列表那几行，总览、分类汇总、日子卡、筛选小计一概不动
         //   （以前翻页也整页重画：先清空列表、中间量字号逼浏览器排一次版，页面那一刻只剩上半截，
         //    滚动位置被夹到 0，再平滑滚回来——看着像整页重播一遍、上下晃）
@@ -341,18 +460,7 @@
                 })
                 .map(x=>x.r);
 
-            let running=0;
-            // 每笔的累计结余按「记录对象」记在 balOf 里。
-            // 后续筛选/反转/分页都带着同一对象走，渲染时按对象取值，不经过 id 查表，
-            // 因此旧数据里即便存在偶发重复 id 也绝不会互相覆盖、算错结余。
-            //   【1013-G】以前直接挂在记录上（__bal）；现在记录是账本缓存里共用的、冻结的，不能往上挂东西
-            const balOf=new Map();
-            allAsc.forEach(item=>{
-                const c=balContrib(item);        // 结余口径：只有「不计」不算，「往来」照算
-                running += c.inc - c.exp;
-                running = Math.round(running*100)/100;   // 每步对齐到分，避免浮点误差累积（如 19.99 显示成 20.00）
-                balOf.set(item, running);
-            });
+            // 1023-A：每笔记完后的结余不在列表里写了（挪进详情，balanceAfter 现算）
 
             // 再按筛选条件取出要显示的子集（仍保持时间正序）：分类标签 + 搜索条件叠加
             const asc=allAsc.filter(r=>filterMatch(r, filterVal));
@@ -362,45 +470,21 @@
             // 此前是「筛选结果为空」也一并隐藏，导致筛选没命中时顶部总览、分类汇总全没了——
             // 全局总览本不该受筛选影响。现在筛选没命中走下面的正常流程，小计条显示「命中 0 条」。
             if(allAsc.length===0){
-                billList.innerHTML=`<tr><td colspan="7" class="empty-tip">暂无记账记录</td></tr>`;
+                billList.innerHTML=`<div class="empty-tip">暂无记账记录</div>`;
                 // 无记录时连同容器一起隐藏，避免留下带底色/内边距的空白色块
                 $('summaryOverall').innerHTML=''; $('summaryOverall').style.display='none';
                 $('summaryFilter').style.display='none';
                 $('batchBar').innerHTML=''; $('batchBar').style.display='none';
-                $('catStats').innerHTML=''; $('catStatsCard').style.display='none';
                 renderPager(0);
                 return;
             }
             if(!pageOnly){
-            // 有记录：确保汇总/分类统计容器恢复显示（上次可能被空数据分支隐藏过）
+            // 有记录：确保汇总容器恢复显示（上次可能被空数据分支隐藏过）
             $('summaryOverall').style.display='';
-            $('catStatsCard').style.display='';
-
-            // 汇总：收入/支出/结余。结余始终为全账户净额，不随筛选变化
-            let totalIn=0, totalOut=0;
-            let balIn=0, balOut=0;
-            allAsc.forEach(item=>{
-                const c=statContrib(item);
-                totalIn+=c.inc; totalOut+=c.exp;
-                const b=balContrib(item);
-                balIn+=b.inc; balOut+=b.exp;
-            });
-            totalIn=round2(totalIn); totalOut=round2(totalOut);
-            // 结余走结余口径：期初存款这类「往来」不进收入，但必须进结余
-            const net=round2(round2(balIn)-round2(balOut));
-
+            renderOverview(allAsc);
             // 筛选状态下额外提示当前子集的收支，避免「为什么数字对不上」的疑惑
             // 现在「筛选」= 分类标签筛选 或 搜索条件，任一生效都显示这条小计
             const filtering = filterVal!=='__all' || hasActiveSearch();
-            $('summaryOverall').innerHTML=
-                `<div class="ov-head"><span class="ov-title">账户总览</span><span class="ov-count">共 <b>${allAsc.length}</b> 条</span></div>`+
-                `<div class="ov-bal"><div class="ov-label">结余（元）</div><div class="ov-num ov-net" data-fit>${net.toFixed(2)}</div></div>`+
-                `<div class="ov-row">`+
-                    `<div class="ov-cell"><div class="ov-label">累计收入</div><div class="ov-num ov-in pos" data-fit>+${totalIn.toFixed(2)}</div></div>`+
-                    `<div class="ov-cell"><div class="ov-label">累计支出</div><div class="ov-num ov-out neg" data-fit>−${totalOut.toFixed(2)}</div></div>`+
-                `</div>`;
-            fitNums($('summaryOverall'));
-
             const fBar=$('summaryFilter');
             if(filtering){
                 let fIn=0, fOut=0, fSkip=0, fFlow=0;
@@ -414,6 +498,7 @@
                 const bp=[];
                 if(filterVal!=='__all') bp.push(filterVal);
                 if(hasTextSearch()) bp.push('搜索');
+                if(searchState.io) bp.push(searchState.io==='expense' ? '支出' : '收入');
                 if(searchState.mode) bp.push(MODE_NAME[searchState.mode]);
                 const badge=bp.join('·')||'搜索';
                 fBar.innerHTML=
@@ -439,18 +524,10 @@
                 bBar.innerHTML=''; bBar.style.display='none';
             }
 
-            // 分类统计：始终基于全部记录，按收支净额（收入加、支出减）
-            const byCat={};
-            allAsc.forEach(r=>{
-                if(recMode(r)!=='normal') return;   // 不进收支统计的不进分类汇总，避免「转账：0.00」「存款：206677」
-                const c=statContrib(r);
-                byCat[r.cat]=(byCat[r.cat]||0)+(c.inc-c.exp);
-            });
-            renderCatStats(byCat);
             }
 
             if(asc.length===0){
-                billList.innerHTML=`<tr><td colspan="7" class="empty-tip">没有符合条件的记录</td></tr>`;
+                billList.innerHTML=`<div class="empty-tip">没有符合条件的记录${hasActiveSearch() || filterVal!=='__all' ? '<div class="empty-sub">换个条件试试，或点右下角 ✕ 清掉筛选</div>' : ''}</div>`;
                 renderPager(0);
                 return;
             }
@@ -466,38 +543,41 @@
             const pageItems = desc.slice(start, start + PAGE_SIZE);
 
             const rMap=refundedMap(raw);        // 原账单 id → 已退总额（1010-J）
+            // 1023-A：按天分组，组头写当天（这次筛选下）的收支合计——一天被分页切开时，两页的组头照样是整天的数
+            const dayTot=new Map();
+            asc.forEach(r=>{
+                const k=(r.time||'').slice(0,10), c=statContrib(r);
+                const t=dayTot.get(k) || { inc:0, exp:0 }; t.inc+=c.inc; t.exp+=c.exp; dayTot.set(k, t);
+            });
             const frag=document.createDocumentFragment();
+            let lastDay=null;
             pageItems.forEach(item=>{
-                const balance=balOf.get(item);
+                const day=(item.time||'').slice(0,10);
+                if(day!==lastDay){
+                    lastDay=day;
+                    const t=dayTot.get(day) || { inc:0, exp:0 };
+                    const inc=round2(t.inc), exp=round2(t.exp);
+                    const h=document.createElement('div'); h.className='bl-day'; h.dataset.day=day;
+                    h.innerHTML=`<span class="bl-day-d">${dayLabel(day)}</span><span class="bl-day-sum">`
+                        + (exp ? `<span>支出 <b class="neg">${exp.toFixed(2)}</b></span>` : '')
+                        + (inc ? `<span>收入 <b class="pos">${inc.toFixed(2)}</b></span>` : '')
+                        + `</span>`;
+                    frag.appendChild(h);
+                }
                 const isExp = item.type==='expense';
                 const amt=safeNum(item.money);
-                const typeTag = (isExp
-                    ? '<span class="io-tag io-out">支出</span>'
-                    : (isRefund(item) ? '<span class="io-tag io-refund">退款</span>' : '<span class="io-tag io-in">收入</span>'))
-                    + modeTag(item) + refundedTag(item, rMap);
-                const amtCell = `<span class="${isExp?'neg':'pos'}${modeAmtCls(item)}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
-
-                const remarkFull = item.remark || '';
-                let remarkCell;
-                if(!remarkFull){
-                    remarkCell = '<span class="remark-empty">无</span>';
-                } else {
-                    const shown = escapeHtml(charSlice(remarkFull, 10)) + (charLen(remarkFull) > 10 ? '…' : '');
-                    // 用 data-act/data-id + 事件委托，避免把 id 拼进内联 onclick（杜绝属性注入隐患）
-                    remarkCell = `<span class="remark-view" data-act="remark" data-id="${escapeHtml(item.id)}" title="点击查看完整备注">${shown}</span>`;
-                }
-                const tr=document.createElement('tr');
-                tr.innerHTML=`
-                    <td data-label="记账时间">${item.time.replace('T',' ')}</td>
-                    <td data-label="收支">${typeTag}</td>
-                    <td data-label="金额">${amtCell}</td>
-                    <td data-label="分类"><span class="cat-tag">${escapeHtml(item.cat||'未分类')}</span></td>
-                    <td data-label="结余">${balance.toFixed(2)}</td>
-                    <td data-label="备注">${remarkCell}</td>
-                    <td data-label="" class="ops-cell">
-                        <button class="operate-btn edit" data-act="edit" data-id="${escapeHtml(item.id)}">修改</button>
-                    </td>`;
-                frag.appendChild(tr);
+                const tags = (isRefund(item) ? '<span class="io-tag io-refund">退款</span>' : '') + modeTag(item) + refundedTag(item, rMap);
+                const remark=(item.remark||'').trim();
+                const row=document.createElement('div');
+                row.className='bl-row'; row.dataset.act='detail'; row.dataset.id=item.id;
+                row.setAttribute('role', 'button');
+                row.innerHTML=
+                    `<div class="bl-main">`+
+                        `<div class="bl-cat"><span class="bl-cat-t">${escapeHtml(item.cat||'未分类')}</span>${tags}</div>`+
+                        `<div class="bl-sub"><span class="bl-time">${escapeHtml((item.time||'').slice(11,16))}</span>${remark?`<span class="bl-remark">${escapeHtml(remark)}</span>`:''}</div>`+
+                    `</div>`+
+                    `<span class="bl-amt ${isExp?'neg':'pos'}${modeAmtCls(item)}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
+                frag.appendChild(row);
             });
             billList.textContent='';
             billList.appendChild(frag);
@@ -606,126 +686,36 @@
         }
         window.addEventListener('resize', ()=>fitNums($('summaryOverall')), { passive:true });
 
-        // ===== 分类汇总卡片 =====
-        // 排序：按金额绝对值，收支混排时看的是「量级」——工资 +10604 与餐饮 −5347 比的是 10604 与 5347。
-        // 偏好是全局的，存 localStorage；读写都包 try/catch，取不到就用默认（按金额）。
-        let lastCatStats=null;
-        // 只按金额（绝对值）排：从大到小 / 从小到大。旧版存过的 'amount' / 'cat' 一律当「从大到小」。
-        function getCatSort(){
-            try{ return localStorage.getItem('app_catstats_sort')==='asc' ? 'asc' : 'desc'; }catch(_){ return 'desc'; }
-        }
-        function renderCatStats(byCat){
-            if(byCat) lastCatStats=byCat;          // 切排序时传 null，复用上次结果，不重算整本账
-            byCat=lastCatStats||{};
-            const sort=getCatSort();
-            $('catSortSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===sort));
-            const keys=Object.keys(byCat);
-            keys.sort((a,b)=> sort==='asc'
-                ? Math.abs(byCat[a])-Math.abs(byCat[b])
-                : Math.abs(byCat[b])-Math.abs(byCat[a]));
-            if(!keys.length){
-                $('catStats').innerHTML='<div class="cs-empty">暂无计入收支的记录</div>';
-                return;
-            }
-            $('catStats').innerHTML=keys.map(c=>{
-                const v=round2(byCat[c]);
-                const pos=v>=0;
-                return `<div class="cs-row"><span class="cs-name">${escapeHtml(c)}</span>`
-                    + `<span class="cs-amt ${pos?'pos':'neg'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</span></div>`;
-            }).join('');
-        }
-        // ===== 1019-H：分类汇总能滑但看不出来：右下角的小圆钮 =====
-        //   分类超过 6 个、框里装不下时才有：卡片每次从屏幕外回到屏幕上冒一次（IntersectionObserver；卡片一直在屏幕上、滑的是整页时不冒）；
-        //   在框里滑时出现；停下 HINT_IDLE（0.8 秒）淡出（不改共用的 FAB_IDLE）。滑到框底换成 ↑，点了回框顶；在中间点 ↓ 往下翻一屏。
-        //   这次打开 App 以后在框里滑到过底，就不再做进屏幕的提示。设置里「滑动提示」关掉就都不出现（存这台手机，不进备份）。
-        const HINT_IDLE=800, HINT_MIN_ROWS=6;
-        let catHintSeen=false;   // 这次打开 App 以后在框里滑到过底
-        function scrollHintOn(){ try{ return localStorage.getItem('app_scroll_hint')!=='off'; }catch(_){ return true; } }
-        const catHint=$('catStatsHint'), catBox=$('catStats');
-        catHint._fabIdle=HINT_IDLE;
-        fabHold(catHint);
-        function catHintFits(){ return scrollHintOn() && catBox.querySelectorAll('.cs-row').length>HINT_MIN_ROWS && catBox.scrollHeight>catBox.clientHeight+2; }
-        function catHintAtEnd(){ return catBox.scrollTop+catBox.clientHeight>=catBox.scrollHeight-2; }
-        function catHintPaint(){ const end=catHintAtEnd(); catHint.textContent=end ? '↑' : '↓'; catHint.dataset.end=end ? '1' : ''; catHint.setAttribute('aria-label', end ? '回到最上面' : '往下翻'); }
-        function catHintWake(){ if(!catHintFits()){ fabWake(catHint, false); return; } catHintPaint(); fabWake(catHint, true); }
-        catBox.addEventListener('scroll', ()=>{ if(catHintAtEnd()) catHintSeen=true; catHintWake(); }, { passive:true });
-        catHint.addEventListener('click', ()=>{
-            const top=catHintAtEnd() ? 0 : Math.min(catBox.scrollTop+catBox.clientHeight, catBox.scrollHeight-catBox.clientHeight);
-            try{ catBox.scrollTo({ top, behavior:'smooth' }); }catch(_){ catBox.scrollTop=top; }
-            catHintWake();
-        });
-        if(window.IntersectionObserver){
-            let wasIn=false;
-            new IntersectionObserver(es=>{
-                es.forEach(e=>{
-                    const nowIn=e.isIntersecting && e.intersectionRatio>0;
-                    if(nowIn && !wasIn && !catHintSeen) catHintWake();
-                    if(!nowIn) fabWake(catHint, false);
-                    wasIn=nowIn;
-                });
-            }, { threshold:[0, 0.6] }).observe($('catStatsCard'));
-        }
-        window.__catHintWake=catHintWake;   // 给测试用
-        (function(){
-            const seg=$('scrollHintSeg');
-            function paint(){ const on=scrollHintOn(); seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', (b.dataset.v==='on')===on)); }
-            seg.querySelectorAll('button').forEach(b=>b.addEventListener('click', ()=>{
-                try{ if(b.dataset.v==='off') localStorage.setItem('app_scroll_hint', 'off'); else localStorage.removeItem('app_scroll_hint'); }catch(_){}
-                if(b.dataset.v==='off') fabWake(catHint, false);
-                paint();
-            }));
-            paint();
-        })();
-        $('catSortSeg').addEventListener('click', e=>{
-            const b=e.target.closest('button[data-v]'); if(!b) return;
-            try{ localStorage.setItem('app_catstats_sort', b.dataset.v); }catch(_){}
-            renderCatStats(null);
-            $('catStats').scrollTop=0;
-        });
-
-        // 渲染分页控件（≤1 页时不显示）：列表上面、下面各一份（下面那份 1017-M 加）
+        // 渲染分页控件（≤1 页时不显示）：1023-A 起只在列表下面一排（原来上面也有一排）
         //   按钮只建一次、以后只改文字和能不能点——翻页时点的那个按钮还是原来那个，不闪
         function renderPager(totalPages){
-            [['pager','top'],['pagerBottom','bottom']].forEach(([id, from])=>{
-                const box=$(id); if(!box) return;
-                if(totalPages<=1){ box.innerHTML=''; return; }
-                if(!box.querySelector('.page-info')){
-                    box.innerHTML='';
-                    const prev=document.createElement('button');
-                    prev.textContent='‹ 上一页'; prev.dataset.pg='-1';
-                    const info=document.createElement('span'); info.className='page-info';
-                    const next=document.createElement('button');
-                    next.textContent='下一页 ›'; next.dataset.pg='1';
-                    prev.onclick=()=>goPage(-1, from);
-                    next.onclick=()=>goPage(1, from);
-                    box.appendChild(prev); box.appendChild(info); box.appendChild(next);
-                }
-                const [prev, next]=box.querySelectorAll('button');
-                prev.disabled = JiwenBase.curPage<=1;
-                next.disabled = JiwenBase.curPage>=totalPages;
-                box.querySelector('.page-info').textContent=`第 ${JiwenBase.curPage} / ${totalPages} 页`;
-            });
-            if(totalPages<=1) pagerPad(0);
+            const box=$('pagerBottom'); if(!box) return;
+            if(totalPages<=1){ box.innerHTML=''; pagerPad(0); return; }
+            if(!box.querySelector('.page-info')){
+                box.innerHTML='';
+                const prev=document.createElement('button');
+                prev.textContent='‹ 上一页'; prev.dataset.pg='-1';
+                const info=document.createElement('span'); info.className='page-info';
+                const next=document.createElement('button');
+                next.textContent='下一页 ›'; next.dataset.pg='1';
+                prev.onclick=()=>goPage(-1);
+                next.onclick=()=>goPage(1);
+                box.appendChild(prev); box.appendChild(info); box.appendChild(next);
+            }
+            const [prev, next]=box.querySelectorAll('button');
+            prev.disabled = JiwenBase.curPage<=1;
+            next.disabled = JiwenBase.curPage>=totalPages;
+            box.querySelector('.page-info').textContent=`第 ${JiwenBase.curPage} / ${totalPages} 页`;
         }
-        // 列表最下面一块看不见的垫子：翻到最后一页、新的一页比原来短时垫上差的那点高度，
-        //   免得页面变短把滚动位置往上夹、上面那排按钮跟着往下跑（先缩后长）
+        // 列表最下面一块看不见的垫子（1017-M 留下来的；1023-A 起没有上面那排了，只在整页重画时收掉）
         function pagerPad(h){ const p=$('pagerPad'); if(p) p.style.height = h>0 ? h+'px' : ''; }
-        // 【1017-M】翻页：只换列表那几行。
-        //   上面那排：页面一点不动，点的按钮留在原地；
-        //   下面那排：直接（不带动画）跳到新一页的第一行。
-        function goPage(d, from){
-            const y0=window.scrollY;
+        // 【1017-M】翻页：只换列表那几行，直接（不带动画）跳到新一页的第一行（1023-A 起页码只在下面）
+        function goPage(d){
             JiwenBase.curPage+=d;
             pagerPad(0);
             renderBill({ pageOnly:true });
-            if(from==='bottom'){
-                const first=billList.firstElementChild;
-                if(first) window.scrollTo({ top: Math.max(0, first.getBoundingClientRect().top + window.scrollY - 8), behavior:'instant' });
-            } else {
-                const lack = y0 - (document.documentElement.scrollHeight - window.innerHeight);
-                if(lack>0) pagerPad(Math.ceil(lack));
-                if(window.scrollY!==y0) window.scrollTo({ top:y0, behavior:'instant' });
-            }
+            const first=billList.firstElementChild;
+            if(first) window.scrollTo({ top: Math.max(0, first.getBoundingClientRect().top + window.scrollY - 8), behavior:'instant' });
             if(window.syncFilterFab) window.syncFilterFab();
         }
         // 清筛选（✕）后让列表顶部对齐，避免停在半截
@@ -733,5 +723,5 @@
             const t=$('billHead') || document.querySelector('table');
             if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
         }
-        window.JiwenLedger = { applyBatch, clearAllFilters, goPage, openBatchMenu, renderBill, renderFilterChips, resetSearch, undoBatch };   // ledger 模块对外只有这一个入口
+        window.JiwenLedger = { applyBatch, balanceAfter, clearAllFilters, goPage, openBatchMenu, ovOff, renderBill, renderFilterChips, resetSearch, undoBatch };   // ledger 模块对外只有这一个入口
 })();

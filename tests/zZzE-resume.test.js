@@ -8,7 +8,7 @@ const html = fs.readFileSync(htmlFile, 'utf8');
 const WWW = path.dirname(htmlFile);
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); } };
-const recs = Array.from({ length: 60 }, (_, i) => ({ id: 'r' + i, time: `2026-10-${String(1 + i % 28).padStart(2, '0')}T12:${String(i % 60).padStart(2, '0')}`, money: 10 + i, type: 'expense', cat: '吃饭', remark: '虚构' + i }));
+const recs = Array.from({ length: 160 }, (_, i) => ({ id: 'r' + i, time: `2026-10-${String(1 + i % 28).padStart(2, '0')}T12:${String(i % 60).padStart(2, '0')}`, money: 10 + i, type: 'expense', cat: '吃饭', remark: '虚构' + i }));
 const NOW = '2026-12-20T10:00:00';
 
 async function bootWith(ls, phone) {
@@ -18,7 +18,7 @@ async function bootWith(ls, phone) {
     w.scrollTo = (x, y) => { const v = typeof x === 'object' ? x.top : y; w.__calls.push(v); w.__y = v; };
     // 测试工具起好页面以后会点一下「设置」页签，所以在主界面刚出来那一刻记下停在哪、滚到哪
     const mo = new w.MutationObserver(() => { const m = w.document.getElementById('mainBox'); if (m && m.style.display === 'block' && !w.__first) {
-      const a = w.document.querySelector('.tab-btn.active'), pi = w.document.querySelector('#pager .page-info');
+      const a = w.document.querySelector('.tab-btn.active'), pi = w.document.querySelector('#pagerBottom .page-info');
       w.__first = { tab: a && a.dataset.tab, page: pi ? pi.textContent : '', calls: w.__calls.slice() }; mo.disconnect(); } });
     mo.observe(w.document, { attributes: true, subtree: true, attributeFilter: ['style', 'class'] });
   } });
@@ -49,7 +49,7 @@ const tab = (t, n) => t.d.querySelector('.tab-btn[data-tab="' + n + '"]').click(
   // 2. 账单页第 3 页、滚到 1200 → 被杀 → 回来第 3 页、放回 1200
   tab(t, 'ledger');
   t.w.JiwenLedger.goPage(1, 'top'); t.w.JiwenLedger.goPage(1, 'top');
-  const pg = t => t.$('pager').querySelector('.page-info').textContent;
+  const pg = t => t.$('pagerBottom').querySelector('.page-info').textContent;
   ok(/^第 ?3 ?页|^3 ?\//.test(pg(t)) || /3/.test(pg(t).split('/')[0]), '2 翻到第 3 页：' + pg(t));
   t.w.__y = 1200;
   t = await killAndReopen(t);

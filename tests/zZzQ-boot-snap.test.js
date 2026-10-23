@@ -13,7 +13,7 @@ const WWW = path.dirname(htmlFile);
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); } };
 const NOW = '2026-10-20T10:00:00';
-const recs = Array.from({ length: 40 }, (_, i) => ({ id: 'r' + i, time: `2026-10-${String(1 + i % 19).padStart(2, '0')}T12:${String(i % 60).padStart(2, '0')}`, money: 10 + i, type: i % 9 ? 'expense' : 'income', cat: ['吃饭', '购物', '其他'][i % 3], remark: '虚构' + i }));
+const recs = Array.from({ length: 80 }, (_, i) => ({ id: 'r' + i, time: `2026-10-${String(1 + i % 19).padStart(2, '0')}T12:${String(i % 60).padStart(2, '0')}`, money: 10 + i, type: i % 9 ? 'expense' : 'income', cat: ['吃饭', '购物', '其他'][i % 3], remark: '虚构' + i }));
 const KEY = 'app_snap_' + A.ID;
 const RANGE = { from: '2026-10-01 00:00:00', to: '2026-10-31 23:59:59' };
 const wx = (o, n) => B.txn(Object.assign({ kind: '商户消费', cp: '某虚构店', desc: '虚构商品', io: 'expense', fen: 1000, pm: '零钱', status: '支付成功', mno: '', no: '4200000000' + String(n).padStart(19, '0') }, o));
@@ -81,7 +81,7 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   t.$('addBill').click(); await t.idle();
   ok(!snap(t), '3 记了一笔：快照删掉');
   await hide(t);
-  ok(snap(t) && /共\s*(<[^>]*>)?\s*41\s*(<[^>]*>)?\s*条/.test(snap(t).html), '3 再切后台：存的是新的（共 41 条）');
+  ok(snap(t) && /这个月\s*(<[^>]*>)?\s*81\s*(<[^>]*>)?\s*条/.test(snap(t).html), '3 再切后台：存的是新的（这个月 81 条，1023-A 总览改成按月、每页 50 条所以造了 80 条）');
   t = await reopen(t);
   ok(t.w.__snapSeen && t.w.__real && t.w.__snapSeen.text === t.w.__real.text, '3 再打开：快照还是和真的一字不差（多了那一笔）');
 

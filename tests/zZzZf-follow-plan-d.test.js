@@ -27,7 +27,7 @@ const recs = [
   // 一、账单详情：列表卡，统计单独一行；「修改」整宽在上、「关闭」在下
   w.JiwenStats.openDetail('a3');
   const rows = [...$('detailList').querySelectorAll(':scope > .rec-row')].filter(r => r.style.display !== 'none').map(r => r.querySelector('.rec-row-k').textContent);
-  ok(rows.join() === '时间,金额,收支,分类,统计,备注', '一 详情一行一项：时间、金额、收支、分类、统计、备注：' + rows.join());
+  ok(rows.join() === '时间,金额,收支,分类,统计,结余,备注', '一 详情一行一项：时间、金额、收支、分类、统计、结余（1023-A 从列表挪来）、备注：' + rows.join());
   ok($('detailMode').textContent === '不计' && $('detailType').textContent === '支出', '一 统计单独一行写「不计」，收支那行只写收支');
   const db = $('detailEdit').parentElement;
   ok(db.firstElementChild === $('detailEdit') && db.lastElementChild === $('detailClose') && $('detailEdit').classList.contains('primary') && $('detailEdit').classList.contains('block'), '一 「修改」整宽在上，「关闭」在下');
@@ -98,7 +98,7 @@ const recs = [
   // 五、筛选浮层：关键词、金额、日期是列表行；统计按新叫法；分类照旧多选
   $('filterFab').click(); await wait(20);
   const fl = $('filterSheet').querySelector('.filter-list');
-  ok(fl && [...fl.querySelectorAll('.rec-row-k')].map(x => x.textContent).join() === '关键词,金额,日期' && fl.contains($('searchMin')) && fl.contains($('searchFrom')), '五 关键词、金额、日期一张列表卡');
+  ok(fl && [...fl.querySelectorAll('.rec-row-k')].map(x => x.textContent).join() === '日期,关键词,金额' && fl.contains($('searchMin')) && fl.contains($('searchFrom')), '五 日期、关键词、金额一张列表卡（1023-A 日期挪到第一行）');
   ok([...$('filterModeChips').querySelectorAll('.cc')].map(c => c.textContent).join() === '全部,计入,不计,往来' && $('filterChips').classList.contains('filter-chips'), '五 统计按新叫法和顺序，分类照旧是多选分类块');
   $('searchMin').click(); await tick();
   ok(shown('kpMask') && w.JiwenKeypad.kpTarget === $('searchMin') && $('kpCaret'), '五 金额区间用数字键盘、有闪动光标');

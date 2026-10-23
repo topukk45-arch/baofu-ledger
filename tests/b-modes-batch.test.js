@@ -115,28 +115,21 @@ function bootSync(records, extra){
     const ov=t.$('summaryOverall').textContent;
     const out=14+100*0+[...Array(20).keys()].reduce((s,i)=>s+10+i,0); // 午饭 + 20 条游戏
     const q=c=>t.$('summaryOverall').querySelector(c).textContent;
-    ok(ov.includes('共 25 条') && q('.ov-out')==='−'+out.toFixed(2) && q('.ov-in')==='+5200.00', '总览不含不计：'+ov);
-    ok(!t.$('catStats').textContent.includes('转账'), '全部不计的「转账」不出现在分类汇总');
-    const rows=[...t.$('billList').querySelectorAll('tr')];
-    // 找到 a5（09-12 只有不计）与其前一笔（时间正序前一笔）的结余应相同
-    const balOf=time=>{ const tr=rows.find(r=>r.textContent.includes(time)); return tr && tr.querySelector('[data-label="结余"]').textContent; };
+    // 1023-A：总览主数字改成这个月（模拟的今天是 9 月 20 日）支出、下面这个月收入，不带正负号；8 月那两笔是不计
+    ok(ov.includes('这个月 23 条') && q('.ov-out')===out.toFixed(2) && q('.ov-in')==='5200.00', '总览不含不计：'+ov);
+    t.d.querySelector('.tab-btn[data-tab="stats"]').click();   // 1023-A：分类汇总搬去统计页
+    ok(t.$('catStats').textContent.length>0 && !t.$('catStats').textContent.includes('转账'), '全部不计的「转账」不出现在分类汇总');
+    t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
     t.filterKw('信用卡');
-    ok([...t.$('billList').querySelectorAll('tr')].filter(r=>r.querySelector('.io-skip') && r.querySelector('.amt-skip')).length===2, '不计行有灰色标签和灰色金额');
+    ok([...t.$('billList').querySelectorAll('.bl-row')].filter(r=>r.querySelector('.io-skip') && r.querySelector('.amt-skip')).length===2, '不计行有灰色标签和灰色金额');
     const sf=t.$('summaryFilter').textContent;
     ok(sf.includes('命中 2 条（其中 2 条不计）') && sf.includes('支出 0.00'), '筛选小计说明不计条数：'+sf);
     ok(t.$('batchBar').querySelector('[data-act="batch"]'), '筛选生效时有批量按钮');
-    // 结余：a5（100 不计）那一行结余应等于它前一笔
+    // 结余：a5（100 不计）那一笔的结余应等于它前一笔（a4）——1023-A 起结余在详情里（点整行进详情）
     const t2=await boot(baseRecords());
-    const all=[...t2.$('billList').querySelectorAll('tr')].map(r=>({ t:r.querySelector('[data-label="记账时间"]').textContent, b:r.querySelector('[data-label="结余"]').textContent }));
-    // 第一页是最新 15 条，a5 在 09-12，翻页找
-    let found=null; const pages=[all];
-    for(let k=0;k<5 && !found;k++){
-        const rowsNow=[...t2.$('billList').querySelectorAll('tr')].map(r=>({ t:r.querySelector('[data-label="记账时间"]').textContent, b:r.querySelector('[data-label="结余"]').textContent }));
-        const i=rowsNow.findIndex(x=>x.t==='2026-09-12 10:00');
-        if(i>=0 && rowsNow[i+1]) found=[rowsNow[i].b, rowsNow[i+1].b];
-        const nx=[...t2.$('pager').querySelectorAll('button')].pop(); if(nx && !nx.disabled) nx.click(); else break;
-    }
-    ok(found && found[0]===found[1], '不计那一行结余与上一笔相同：'+JSON.stringify(found));
+    const balOf=id=>{ const row=t2.$('billList').querySelector(`.bl-row[data-id="${id}"]`); if(!row) return null; row.click(); const v=t2.$('detailBal').textContent; t2.$('detailClose').click(); return v; };
+    const found=[balOf('a5'), balOf('a4')];
+    ok(found[0] && found[1] && found[0]===found[1]+'（这笔不计，不影响结余）', '不计那一行结余与上一笔相同：'+JSON.stringify(found));
 }
 
 // ===== 5. 统计页 =====

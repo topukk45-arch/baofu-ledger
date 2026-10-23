@@ -149,6 +149,7 @@
             if(document.getElementById('impPage') && document.getElementById('impPage').offsetParent!==null) return false;
             if(tab==='ledger'){
                 if(window.__filterActive && window.__filterActive()) return false;   // 打开时会清掉筛选
+                if(window.JiwenLedger.ovOff()) return false;   // 1023-A：总览翻到了别的月，打开时回这个月
                 if(pref!=='last' && JiwenBase.curPage!==1) return false;                      // 打开时回第 1 页
                 return true;
             }
@@ -530,8 +531,7 @@
         $('daysEntryRows').addEventListener('click', e=>{
             const el=e.target.closest('[data-day-act]');
             if(!el) return;
-            if(el.dataset.dayAct==='add'){ gotoDaysPage(); openDayDialog(null); }
-            else if(el.dataset.dayAct==='edit'){ openDayDialog(el.dataset.dayId); }
+            if(el.dataset.dayAct==='add'){ e.stopPropagation(); gotoDaysPage(); openDayDialog(null); }   // 1023-A：入口在整条按钮里，别再让外面那下也进一次日子页
         });
         $('daysManageBtn').addEventListener('click', gotoDaysPage);
 

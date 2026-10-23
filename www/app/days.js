@@ -28,18 +28,16 @@
             const box=$('daysEntryRows');
             if(!box) return;
             const list=sortedDays(loadDays());
+            // 1023-A：缩成一条：只写最近的一个（置顶的在前，和日子页同一个顺序），后面「等 N 个」；整条点了进日子页
             if(!list.length){
-                // 空态：整行变成添加入口，点一下直接进管理页并弹出添加表单
-                box.innerHTML='<div class="days-empty-row" data-day-act="add">＋ 添加你的第一个日子</div>';
+                // 空态：点一下直接进日子页并弹出添加表单
+                box.innerHTML='<span class="days-empty-row" data-day-act="add">添加你的第一个日子</span>';
                 return;
             }
-            box.innerHTML=list.slice(0, getDaysCardN()).map(d=>{
-                const c=calcDay(d.date);
-                return `<div class="days-row" data-day-act="edit" data-day-id="${escapeHtml(d.id)}">`
-                    + `<span class="d-name">${d.pin?'<span class="pin">★</span>':''}${escapeHtml(d.name)}</span>`
-                    + `<span class="d-right">${dayNumHtml(c,'d')}</span>`
-                    + `</div>`;
-            }).join('');
+            const d=list[0], c=calcDay(d.date);
+            box.innerHTML=`<span class="d-name">${d.pin?'<span class="pin">★</span>':''}${escapeHtml(d.name)}</span>`
+                + `<span class="d-right">${dayNumHtml(c,'d')}</span>`
+                + (list.length>1 ? `<span class="d-more">等 ${list.length} 个</span>` : '');
         }
         $('daysAdd').addEventListener('click', ()=>openDayDialog(null));
 

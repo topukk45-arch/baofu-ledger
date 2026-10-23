@@ -8,7 +8,7 @@ const html = fs.readFileSync(htmlFile, 'utf8');
 const WWW = path.dirname(htmlFile);
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); } };
-const recs = Array.from({ length: 60 }, (_, i) => ({ id: 'r' + i, time: `2026-10-${String(1 + i % 28).padStart(2, '0')}T12:${String(i % 60).padStart(2, '0')}`, money: 10 + i, type: 'expense', cat: ['吃饭', '出行'][i % 2], remark: '虚构' + i }));
+const recs = Array.from({ length: 160 }, (_, i) => ({ id: 'r' + i, time: `2026-10-${String(1 + i % 28).padStart(2, '0')}T12:${String(i % 60).padStart(2, '0')}`, money: 10 + i, type: 'expense', cat: ['吃饭', '出行'][i % 2], remark: '虚构' + i }));
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
@@ -24,7 +24,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await sleep(50);
 
   // 1. 翻到第 2 页：✕ 出现，停下 1.5 秒淡出
-  t.$('pager').querySelector('button:last-child').click();
+  t.$('pagerBottom').querySelector('button:last-child').click();
   ok(on('clearFilterFab'), '1 翻页后 ✕ 出现');
   await sleep(1000);
   ok(on('clearFilterFab'), '1 1 秒时还在');

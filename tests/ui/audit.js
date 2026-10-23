@@ -551,7 +551,7 @@ async function run(cfg, port, browser) {
     await click(page, '.act-add'); await page.waitForTimeout(400);
     await page.evaluate(() => window.kpClose && window.kpClose()); await page.waitForTimeout(100);   // 1020-G：数字键盘盖着下半屏，先收起来再点备注那一行
     await kbCheck('add-record', 'txtMask', '#billRemarkRow', 'addMask');   // 1020-G：备注是列表卡里一行
-    await page.evaluate(() => { const r = document.querySelector('#billList [data-act="edit"]'); if (r) window.openEdit(r.dataset.id); });
+    await page.evaluate(() => { const r = document.querySelector('#billList .bl-row'); if (r) window.openEdit(r.dataset.id); });
     await page.waitForTimeout(400);
     const editOpen = await page.evaluate(() => { if (document.getElementById('editMask').style.display !== 'flex') { const b = document.getElementById('detailEdit'); if (b && document.getElementById('detailMask').style.display === 'flex') b.click(); } return document.getElementById('editMask').style.display === 'flex'; });
     if (editOpen) await kbCheck('edit-record', 'txtMask', '#editRemarkRow', 'editMask');
@@ -735,7 +735,7 @@ async function run(cfg, port, browser) {
     await C('mode-sheet', '#uiSheetMask');
     await page.evaluate(() => window.JiwenSheet.back()); await page.waitForTimeout(400);
     await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400);
-    await page.evaluate(() => { const r = document.querySelector('#billList [data-act="edit"]'); if (r) window.openEdit(r.dataset.id); }); await page.waitForTimeout(600);
+    await page.evaluate(() => { const r = document.querySelector('#billList .bl-row'); if (r) window.openEdit(r.dataset.id); }); await page.waitForTimeout(600);
     await page.evaluate(() => window.kpClose && window.kpClose()); await page.waitForTimeout(300);
     await C('edit-record', '#editMask');
     await page.evaluate(() => document.querySelectorAll('.mask').forEach(m => { m.style.display = 'none'; })); await page.waitForTimeout(400);
@@ -916,6 +916,37 @@ async function run(cfg, port, browser) {
       await shot(page, size, '日子页', '平时'); if (meas) await CLIP(page, '日子页', '#pageDays');
       await click(page, '#daysManage'); await page.waitForTimeout(600); await shot(page, size, '日子管理', '平时');
       await closeAll(page); await page.evaluate(() => document.querySelector('.tab-btn[data-tab="ledger"]').click()); await page.waitForTimeout(300);
+      // 1023-A 账单页改版：首屏、列表、筛选面板、账单详情（结余）、统计页的分类汇总、设置页顶上的当前用户
+      await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+      await shot(page, size, '账单页', '首屏');
+      // 用户说的「账单在第二屏」：账单标题要在屏幕上半截出来；滚到账单标题以后一屏至少看得见 10 条
+      results.push(Object.assign({ name: 'ledger-first', cfg: size, clip: true }, await page.evaluate(() => {
+        const vh = innerHeight, head = document.getElementById('billHead').getBoundingClientRect().top;
+        const bad = head > vh * 0.6 ? ['账单标题在 ' + Math.round(head) + 'px（屏幕 ' + vh + '），账单还在第二屏'] : [];
+        return { bad, ok: !bad.length };
+      })));
+      await page.evaluate(() => document.getElementById('billHead').scrollIntoView({ block: 'start' })); await page.waitForTimeout(300);
+      await shot(page, size, '账单页', '列表');
+      results.push(Object.assign({ name: 'ledger-rows', cfg: size, clip: true }, await page.evaluate(() => {
+        const bar = document.getElementById('actionBar'), tb = document.getElementById('tabBar');
+        const bottom = Math.min(innerHeight, bar && bar.offsetParent ? bar.getBoundingClientRect().top : innerHeight, tb && tb.offsetParent ? tb.getBoundingClientRect().top : innerHeight);
+        const n = [...document.querySelectorAll('#billList .bl-row')].filter(r => { const b = r.getBoundingClientRect(); return b.top >= 0 && b.bottom <= bottom; }).length;
+        const bad = n < 8 ? ['一屏只看得见 ' + n + ' 条'] : [];   // 原来（1023-A 之前）一条 6 行字段，一屏 2 条半
+        return { bad, ok: !bad.length, n };
+      })));
+      if (meas) await CLIP(page, '账单页列表', '#pageLedger');
+      await page.evaluate(() => document.querySelector('#billList .bl-row').click()); await page.waitForTimeout(700);
+      await shot(page, size, '账单详情', '平时'); if (meas) await CLIP(page, '账单详情', '#detailMask');
+      await closeAll(page);
+      await page.evaluate(() => document.getElementById('filterFab').click()); await page.waitForTimeout(700);
+      await page.evaluate(() => document.querySelector('#filterDateQuick [data-q="month"]').click()); await page.waitForTimeout(100);
+      await shot(page, size, '筛选面板', '平时'); if (meas) { await FOOT(page, '筛选面板'); await CLIP(page, '筛选面板', '#filterSheetMask'); }
+      await page.evaluate(() => window.closeFilterSheet()); await page.waitForTimeout(500);
+      await tab(page, 'stats'); await page.evaluate(() => document.getElementById('catStatsCard').scrollIntoView({ block: 'end' })); await page.waitForTimeout(400);
+      await shot(page, size, '统计页', '分类汇总');
+      await tab(page, 'settings'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+      await shot(page, size, '设置页', '顶上');
+      await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
       // 账单页、统计页、设置页：字被切
       if (meas) { await tab(page, 'ledger'); await CLIP(page, '账单页', '#pageLedger'); await tab(page, 'stats'); await CLIP(page, '统计页', '#pageStats'); await tab(page, 'settings'); await CLIP(page, '设置页', '#pageSettings'); }
       // e. 系统数字输入法（数字键盘开着的时候；提示框要金额的那种也打开看一眼）
