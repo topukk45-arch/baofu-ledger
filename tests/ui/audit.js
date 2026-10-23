@@ -792,7 +792,8 @@ async function run(cfg, port, browser) {
       await page.goto(`http://localhost:${port}/index.html`); await page.waitForTimeout(700);
       return page;
     }
-    const closeAll = page => page.evaluate(() => { window.kpClose && window.kpClose(); window.JiwenSheet && window.JiwenSheet.close(); document.querySelectorAll('.mask').forEach(m => { if (m.style.display === 'flex') m.style.display = 'none'; }); }).then(() => page.waitForTimeout(400));
+    const closeAll = page => page.evaluate(() => { window.kpClose && window.kpClose(); window.JiwenSearch && window.JiwenSearch.isOpen() && window.JiwenSearch.closeSearch();   // 1023-G：搜一笔结果页盖住底栏，一起收掉
+      window.JiwenSheet && window.JiwenSheet.close(); document.querySelectorAll('.mask').forEach(m => { if (m.style.display === 'flex') m.style.display = 'none'; }); }).then(() => page.waitForTimeout(400));
     const shot = async (page, size, pg, state) => {
       if (!SHOTS) return;
       const file = `j-${size}-${String(sheetShots.length + 1).padStart(3, '0')}-${pg}-${state}.png`;   // 带编号：不会互相盖掉
@@ -805,8 +806,7 @@ async function run(cfg, port, browser) {
       ['修改账单', 'editMoney', async p => { await p.evaluate(() => window.openEdit('r3')); await p.waitForTimeout(600); await p.click('#editMoney'); }],
       ['筛选金额', 'searchMin', async p => { await tab(p, 'ledger'); await click(p, '#filterFab'); await p.waitForTimeout(500); await p.click('#searchMin'); }],
       ['模板固定金额', 'tplEditMoney', async p => { await tab(p, 'settings'); await click(p, '#manageTplSetting'); await p.waitForTimeout(400); await click(p, '#tplNew'); await p.waitForTimeout(500); await p.click('#tplEditMoney'); }],
-      ['退款金额', 'refundMoney', async p => { await p.evaluate(() => window.openEdit(window.JiwenStore.getUserData().find(r => r.type === 'expense' && !r.refundOf).id)); await p.waitForTimeout(600); await p.evaluate(() => window.kpClose()); await p.click('#editRefundBtn'); await p.waitForTimeout(500);
-        if (await p.evaluate(() => document.getElementById('askMask').style.display === 'flex')) { await p.evaluate(() => document.getElementById('askOk').click()); await p.waitForTimeout(500); }   // 问「修改还没保存，去退款吗」
+      ['退款金额', 'refundMoney', async p => { await p.evaluate(() => window.JiwenDetail.openDetail(window.JiwenStore.getUserData().find(r => r.type === 'expense' && !r.refundOf).id)); await p.waitForTimeout(600); await p.click('#detailRefund'); await p.waitForTimeout(500);   // 1023-D 起退款从单笔详情进
         await p.click('#refundKind .cc[data-v="part"]'); }],
       ['设预算', 'askInput', async p => { await p.evaluate(() => window.customPrompt('给「吃饭」设每月预算（虚构）', '', () => {}, '设预算', null, { inputmode: 'decimal', kpOk: '保存' })); }],
       ['日子管理条数', 'dmCount', async p => { await tab(p, 'ledger'); await p.evaluate(() => document.getElementById('daysManageBtn').click()); await p.waitForTimeout(500); await click(p, '#daysManage'); await p.waitForTimeout(500); await p.click('#dmCount'); }],
@@ -930,8 +930,9 @@ async function run(cfg, port, browser) {
       results.push(Object.assign({ name: 'ledger-rows', cfg: size, clip: true }, await page.evaluate(() => {
         const bar = document.getElementById('actionBar'), tb = document.getElementById('tabBar');
         const bottom = Math.min(innerHeight, bar && bar.offsetParent ? bar.getBoundingClientRect().top : innerHeight, tb && tb.offsetParent ? tb.getBoundingClientRect().top : innerHeight);
-        const n = [...document.querySelectorAll('#billList .bl-row')].filter(r => { const b = r.getBoundingClientRect(); return b.top >= 0 && b.bottom <= bottom; }).length;
-        const bad = n < 8 ? ['一屏只看得见 ' + n + ' 条'] : [];   // 原来（1023-A 之前）一条 6 行字段，一屏 2 条半
+        // 1023-C 起按月显示：一屏里除了记录，还有周小计、日卡片抬头、没记账的日子那几条，都算「一行」（记得稀的月份记录本来就少）
+        const n = [...document.querySelectorAll('#billList .bl-row, #billList .lg-wk, #billList .lg-gap, #billList .lg-dh')].filter(r => { const b = r.getBoundingClientRect(); return b.top >= 0 && b.bottom <= bottom; }).length;
+        const bad = n < 8 ? ['一屏只看得见 ' + n + ' 行'] : [];   // 原来（1023-A 之前）一条 6 行字段，一屏 2 条半
         return { bad, ok: !bad.length, n };
       })));
       if (meas) await CLIP(page, '账单页列表', '#pageLedger');
@@ -952,8 +953,48 @@ async function run(cfg, port, browser) {
       await page.evaluate(() => document.getElementById('filterFab').click()); await page.waitForTimeout(700);
       await page.evaluate(() => document.querySelector('#filterDateQuick [data-q="month"]').click()); await page.waitForTimeout(100);
       await shot(page, size, '筛选面板', '平时'); if (meas) { await FOOT(page, '筛选面板'); await CLIP(page, '筛选面板', '#filterSheetMask'); }
+      // 1023-G：搜一笔结果页（抽屉收起以后）
       await page.evaluate(() => window.closeFilterSheet()); await page.waitForTimeout(500);
-      await tab(page, 'stats'); await page.evaluate(() => document.getElementById('catStatsCard').scrollIntoView({ block: 'end' })); await page.waitForTimeout(400);
+      await shot(page, size, '搜一笔', '结果页'); if (meas) await CLIP(page, '搜一笔结果页', '#pageSearch');
+      results.push(Object.assign({ name: 'search-page', cfg: size, clip: true }, await page.evaluate(() => {
+        const bad = [], pg = document.getElementById('pageSearch');
+        if (!pg || getComputedStyle(pg).display === 'none') return { bad: ['结果页没出来'], ok: false };
+        const foot = document.getElementById('searchToLedger').getBoundingClientRect();
+        if (foot.bottom > innerHeight + 0.5) bad.push('「回到账单」出了屏幕');
+        document.querySelectorAll('#searchTags .sp-tag').forEach(e => { if (e.getBoundingClientRect().right > innerWidth) bad.push('条件标签出了屏幕'); });
+        return { bad, ok: !bad.length };
+      })));
+      await page.evaluate(() => window.JiwenSearch.closeSearch()); await page.waitForTimeout(500);
+      // 1023-E：全部日子页、一条日子的详情
+      await page.evaluate(() => window.JiwenTabs.backFromDaysPage && document.getElementById('daysManageBtn').click()); await page.waitForTimeout(500);
+      await shot(page, size, '全部日子', '平时');
+      await page.evaluate(() => { const it = document.querySelector('#daysList .day-item'); if (it) it.click(); }); await page.waitForTimeout(600);
+      await shot(page, size, '日子详情', '平时');
+      await closeAll(page); await page.evaluate(() => window.JiwenTabs.backFromDaysPage()); await page.waitForTimeout(400);
+      // 1023-H：统计页顶上两格 + 日历周合计、月份浮条、当日 / 一周详情、总结余展开
+      await tab(page, 'stats'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
+      await page.evaluate(() => window.JiwenStats.statStripWake()); await page.waitForTimeout(450);
+      await shot(page, size, '统计页', '首屏和月份浮条');
+      results.push(Object.assign({ name: 'stats-1023h', cfg: size, clip: true }, await page.evaluate(() => {
+        const bad = [], s = document.getElementById('stStrip').getBoundingClientRect(), tb = document.getElementById('tabBar').getBoundingClientRect();
+        if (s.bottom > tb.top - 8) bad.push('月份浮条下沿 ' + Math.round(s.bottom) + ' 离底栏 ' + Math.round(tb.top) + ' 不到 8px');
+        if (s.left < 0 || s.right > innerWidth) bad.push('月份浮条出了屏幕');
+        const fab = document.querySelector('#pageStats .to-top.show, #statTodayFab.show');
+        if (fab) { const f = fab.getBoundingClientRect(); if (f.bottom > s.top - 4 && f.top < s.bottom) bad.push('右下角圆钮压着月份浮条'); }
+        document.querySelectorAll('#statCal .wk-sum').forEach(w => { const r = w.getBoundingClientRect(); if (r.right > innerWidth - 8) bad.push('周合计那一格贴边 / 出了屏幕'); const v = w.querySelector('.wk-v'); if (v && v.scrollWidth > w.clientWidth + 0.5) bad.push('周合计「' + v.textContent + '」放不下'); });
+        document.querySelectorAll('.st-cells .st-cell, .st-cells > *').forEach(c => { [...c.children].forEach(x => { if (x.scrollWidth > c.clientWidth + 0.5) bad.push('两格里「' + x.textContent.slice(0, 12) + '」放不下'); }); });
+        return { bad: [...new Set(bad)].slice(0, 6), ok: !bad.length };
+      })));
+      await page.evaluate(() => { const w = document.querySelector('#statCal .wk-sum.cur') || document.querySelector('#statCal .wk-sum'); w.click(); }); await page.waitForTimeout(700);
+      await shot(page, size, '一周详情', '统计页点周合计');
+      await closeAll(page);
+      await page.evaluate(() => { const c = document.querySelector('#statCal .day.has'); if (c) c.click(); }); await page.waitForTimeout(700);
+      await shot(page, size, '当日详情', '统计页点日子');
+      await closeAll(page);
+      await page.evaluate(() => { document.getElementById('statBalHead').click(); document.getElementById('statBal').scrollIntoView({ block: 'center' }); }); await page.waitForTimeout(400);
+      await shot(page, size, '统计页', '总结余展开');
+      await page.evaluate(() => document.getElementById('statBalMore').click());
+      await page.evaluate(() => document.getElementById('catStatsCard').scrollIntoView({ block: 'end' })); await page.waitForTimeout(400);
       await shot(page, size, '统计页', '分类汇总');
       await tab(page, 'settings'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
       await shot(page, size, '设置页', '顶上');

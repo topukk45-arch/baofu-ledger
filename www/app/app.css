@@ -2031,6 +2031,8 @@
             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
         .sf-sheet button.sf-btn.cc.sel { background:var(--c-primary-dark); border-color:var(--c-primary-dark); color:var(--c-on-primary); font-weight:bold; }
         .sf-list { margin:0; }
+        .sf-sheet .sf-body > * { flex-shrink:0; }   /* 中间这块滚动，里面的卡片不许被压扁（360 宽时列表卡被压到 117px，备注那行被切掉） */
+        .sf-sheet [hidden] { display:none !important; }   /* 「待确认分类」那行没有时藏着（.rec-row 的 display 会盖过 hidden） */
         .sf-list > button.rec-row { width:100%; font-family:inherit; text-align:left; cursor:pointer; }
         .sf-list > button.rec-row.open .rec-row-arrow { transform:rotate(90deg); }
         .sf-list .rec-row-arrow { transition:transform .2s; }

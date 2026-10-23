@@ -97,6 +97,14 @@ const CATS = ['未分类', '吃饭', '购物', '工资', '转账', '其他'];
   const w2 = [...t2.$('statCal').querySelectorAll('.wk-sum')];
   ok(w2[3].classList.contains('cur') && txt(w2[3].querySelector('.wk-v')) === '' && txt(w2[1].querySelector('.wk-v')) === '−50', '6 今天周一：本周那格空着，别的周照旧');
 
+  // 7. 大数（1023-I）：周合计最多 6 个字（「12.3万」「1235万」「1.2亿」），顶上两格带 data-fit（放不下就缩字，不切掉）
+  const big = [R('b1', '2026-10-05T10:00', 123456, 'expense', '购物', ''), R('b2', '2026-10-12T10:00', 12345678.9, 'income', '工资', ''), R('b3', '2026-10-20T10:00', 234567890, 'income', '工资', '')];
+  const t3 = await A.boot({ html, www: WWW, now: '2026-10-23T10:00:00', seed: A.seedOf(big, CATS) });
+  t3.d.querySelector('.tab-btn[data-tab="stats"]').click(); await tick();
+  const w3 = [...t3.$('statCal').querySelectorAll('.wk-sum')].map(b => txt(b.querySelector('.wk-v')));
+  ok(w3.slice(1, 4).join() === '−12.3万,+1235万,+2.3亿', '7 周合计按万 / 亿缩写：' + w3.join());
+  ok(t3.$('statMonthOut').hasAttribute('data-fit') && t3.$('statMonthIn').hasAttribute('data-fit'), '7 两格的大字放不下就缩小');
+
   console.log(`1023-H 统计页：${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.log('出错：' + (e && e.stack || e)); console.log(`${pass} 通过，${fail + 1} 失败`); process.exit(1); });

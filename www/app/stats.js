@@ -1,5 +1,5 @@
 (function(){
-        const { $, escapeHtml, fabHold, fabWake, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
+        const { $, escapeHtml, fabHold, fabWake, fitNums, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
         const { balContrib, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, odScheduleSync, refundedMap, saveStoreSafe, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, playSlide } = window.JiwenDate;   // 用到前面模块的
@@ -598,8 +598,14 @@
                 },
                 foot(box, done){ const c=document.createElement('button'); c.type='button'; c.className='ui-btn block'; c.id='aiFlagListClose'; c.textContent='关闭'; c.addEventListener('click', ()=>done()); box.appendChild(c); } });
         }
-        // 1023-H：周合计按万写（格子窄，5 位数放不下）
-        function shortNum(n){ const a=Math.abs(n), sg=n>0 ? '+' : (n<0 ? '−' : ''); return a>=10000 ? sg+(a/10000).toFixed(1).replace(/\.0$/, '')+'万' : sg+a.toFixed(0); }
+        // 1023-H：周合计按万写（格子窄，5 位数放不下）：不到 1 万写整数，不到 100 万「12.3万」，再大「1235万」，上亿「1.2亿」，最多 6 个字
+        function shortNum(n){
+            const a=Math.abs(n), sg=n>0 ? '+' : (n<0 ? '−' : ''), t=v=>v.toFixed(1).replace(/\.0$/, '');
+            if(a>=1e8) return sg+t(a/1e8)+'亿';
+            if(a>=1e6) return sg+Math.round(a/1e4)+'万';
+            if(a>=1e4) return sg+t(a/1e4)+'万';
+            return sg+a.toFixed(0);
+        }
         function ymKey(y, mo){ return `${y}-${pad(mo+1)}`; }
         function renderStatCalendar(){
             $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
@@ -647,6 +653,7 @@
             $('statMonthIn').textContent='+'+mIn.toFixed(2);
             const net=round2(mIn-mOut);
             $('statNet').innerHTML=`本月净剩 <b class="${net>=0 ? 'pos' : 'out'}">${net>=0 ? '+' : '−'}${Math.abs(net).toFixed(2)}</b>`;
+            fitNums($('statMonthOut').parentElement.parentElement);   // 金额太长（上千万）就把字缩小，不切掉
 
             renderStatBal(dec);
             // 本月预算（共用同一份预解析结果）
