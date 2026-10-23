@@ -1,6 +1,6 @@
 (function(){
-        const { $, billList, escapeHtml, pad, parseRecTime, round2 } = window.JiwenBase;   // 用到前面模块的
-        const { getUserData, impGetJson, impLogKey, impTarget, refundedMap, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { $, billList, escapeHtml, pad, parseRecTime } = window.JiwenBase;   // 用到前面模块的
+        const { getUserData, impGetJson, impLogKey, impTarget, refundedMap } = window.JiwenStore;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
         const { openAddModal } = window.JiwenForms;   // 用到前面模块的
@@ -87,7 +87,7 @@
         function ymNow(){ const n=new Date(); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`; }
         function curYM(){ return lgYM || ymNow(); }
         function ymLabel(ym){ const y=+ym.slice(0,4); return (y!==new Date().getFullYear() ? y+'年' : '')+(+ym.slice(5,7))+'月'; }
-        const lgStrip=window.JiwenMonthStrip.create({ id:'lgStrip', onPick:ym=>setYM(ym) });
+        const lgStrip=window.JiwenMonthStrip.create({ id:'lgStrip', onPick:ym=>setYM(ym), onTop:()=>window.scrollTo({ top:0, behavior:'smooth' }) });   // 1023-J：回顶箭头在浮条右端
         // 1023-H：统计页看的是同一个月。opt.quiet：统计页那边改的（推过来），不滚页面、不算「账单页这边改了」；
         //   ymVer：账单页这边每改一次月份加一，统计页画之前看它变没变，变了就跟过来
         let ymVer=0;
@@ -101,10 +101,16 @@
             if(window.scrollY > y) window.scrollTo({ top:y, behavior:'instant' });   // 切了月份：停在细条那里，新月份从头看
         }
         function ymVersion(){ return ymVer; }
+        // 1023-J：滑的时候浮条出来（停 1.5 秒收起）；滑过一屏才露出右端的回顶箭头、回到顶部就藏；整页不满一屏（不用滑）时浮条一直显示
         function stripWake(){
-            if(JiwenBase.currentTab==='ledger' && $('pageLedger').style.display!=='none') lgStrip.wake();
+            if(JiwenBase.currentTab!=='ledger' || $('pageLedger').style.display==='none') return;
+            const H=window.innerHeight||0, de=document.documentElement;
+            lgStrip.setTop((window.scrollY||de.scrollTop||0) > H);
+            lgStrip.pin(de.scrollHeight>0 && de.scrollHeight <= H+1);   // 量不到高度（还没排版）当作满一屏
+            lgStrip.wake();
         }
         window.addEventListener('scroll', stripWake, { passive:true });
+        window.addEventListener('resize', stripWake, { passive:true });
         function resetYM(){ lgYM=null; ymVer++; }   // 换账号 / 存档：回到这个月（不重画，后面会整页刷新）
         function ovOff(){ return lgYM!=null; }   // 首屏快照：看的不是这个月就不存（名字是 1023-A 留下来的）
         function gapHtml(a, b, today){
@@ -159,13 +165,13 @@
                 + noDay.slice().reverse().map(r=>rowHtml(r, rMap)).join('') + `</div>`, noDay.length);
             return parts;
         }
-        // 月份浮条的月份表：账本第一笔的月份到这个月，每格是那个月的支出
+        // 月份浮条的月份表：账本第一笔的月份到这个月（1023-J 起不画小柱子，只要月份）
         function stripMonths(allAsc){
-            const now=ymNow(), exp=new Map();
+            const now=ymNow();
             let first=now;
-            allAsc.forEach(r=>{ const ym=(r.time||'').slice(0,7); if(!/^\d{4}-\d{2}$/.test(ym)) return; if(ym<first) first=ym; exp.set(ym, (exp.get(ym)||0)+statContrib(r).exp); });
+            allAsc.forEach(r=>{ const ym=(r.time||'').slice(0,7); if(/^\d{4}-\d{2}$/.test(ym) && ym<first) first=ym; });
             const out=[];
-            for(let ym=first; ym<=now; ){ out.push({ ym, v:round2(Math.max(0, exp.get(ym)||0)) }); let y=+ym.slice(0,4), m=+ym.slice(5,7)+1; if(m>12){ m=1; y++; } ym=`${y}-${pad(m)}`; }
+            for(let ym=first; ym<=now; ){ out.push({ ym }); let y=+ym.slice(0,4), m=+ym.slice(5,7)+1; if(m>12){ m=1; y++; } ym=`${y}-${pad(m)}`; }
             return out;
         }
         // 账单页的点击：周小计 → 一周详情、日期抬头 → 当日详情（1023-D）、没记账那条的「记一笔 / 补一笔」
@@ -211,6 +217,7 @@
             bar.setAttribute('aria-label', `到统计页看${ymLabel(ym)}`);
             const first=allAsc.length ? (allAsc[0].time||'').slice(0,10) : cal.todayKey();   // 一笔都没有：只有今天那条
             billPainter.paint(listHtml(mon, { ym, first }));
+            requestAnimationFrame(stripWake);   // 1023-J：换了月份 / 记了一笔，页面变长变短：看要不要一直显示浮条
         }
 
         window.JiwenLedger = { curYM, listFlush, listHtml, makePainter, ovOff, renderBill, resetYM, setYM, stripWake, ymVersion };   // ledger 模块对外只有这一个入口

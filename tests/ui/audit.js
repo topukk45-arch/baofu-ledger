@@ -944,6 +944,9 @@ async function run(cfg, port, browser) {
         const bad = [];
         if (s.bottom > a.top - 8) bad.push('月份浮条下沿 ' + Math.round(s.bottom) + ' 离操作栏 ' + Math.round(a.top) + ' 不到 8px');
         if (s.left < 0 || s.right > innerWidth) bad.push('月份浮条出了屏幕');
+        // 1023-J：选中的月份要露在浮条里（原来打开 App 时浮条滚到最左边，看着像选了最早的月份）
+        const on = document.querySelector('#lgStrip .ms-item.on'), onR = on && on.getBoundingClientRect();
+        if (!on || onR.left < s.left - 0.5 || onR.right > s.right + 0.5) bad.push('选中的月份没露在浮条里');
         document.querySelectorAll('.lg-wk, .lg-dh, .lg-gap, #billHead').forEach(e => { const r = e.getBoundingClientRect(); [...e.children].forEach(c => { const q = c.getBoundingClientRect(); if (q.width && (q.right > r.right + 0.5 || q.left < r.left - 0.5)) bad.push((e.className || e.id) + ' 里「' + c.textContent.slice(0, 12) + '」出了框'); }); });
         return { bad: bad.slice(0, 6), ok: !bad.length };
       })));

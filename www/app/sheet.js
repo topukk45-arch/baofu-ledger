@@ -387,28 +387,46 @@
             const SEL = 'button, .mini-btn, .link-btn, .cs-display, .dt-day, .dt-now, '
                       + '.pager button, .user-chip, .login-btn, .add-btn, .save, .cancel, '
                       + '.operate-btn, .logout, .cat-item button, .archive-bar select, .bl-row';   // 1023-A：账单一条一行，整行能点
-            let cur=null;
+            // 1023-J：按下先不变色，手指按住不动 PRESS_DELAY 毫秒才加 .pressed；这期间手指挪了（PRESS_SLOP 像素以上）或页面滚了就作废，
+            //   滑动时手指碰到日卡片、周小计不会闪一下。很快点一下（没等到）松手时补一下按下的样子
+            const PRESS_DELAY=90, PRESS_SLOP=8;
+            let cur=null, timer=null, sx=0, sy=0;
             function press(e){
                 const t=e.target.closest(SEL);
                 if(!t || t.disabled) return;
-                cur=t; t.classList.add('pressed');
+                cancel();
+                const p=(e.touches && e.touches[0]) || e; cur=t; sx=p.clientX||0; sy=p.clientY||0;
+                timer=setTimeout(()=>{ timer=null; if(cur) cur.classList.add('pressed'); }, PRESS_DELAY);
+            }
+            function move(e){
+                if(!cur) return;
+                if(Math.abs((e.clientX||0)-sx)>PRESS_SLOP || Math.abs((e.clientY||0)-sy)>PRESS_SLOP) cancel();
+            }
+            function cancel(){
+                clearTimeout(timer); timer=null;
+                if(cur){ cur.classList.remove('pressed'); cur=null; }
             }
             function release(){
-                if(cur){ cur.classList.remove('pressed'); cur=null; }
+                if(!cur) return;
+                const t=cur;
+                if(timer){ clearTimeout(timer); timer=null; t.classList.add('pressed'); cur=null; setTimeout(()=>t.classList.remove('pressed'), 90); return; }
+                t.classList.remove('pressed'); cur=null;
             }
             // 有 PointerEvent 就只用 pointer 一套（覆盖鼠标/触摸/触控笔），
             // 否则回退 touch；避免同一次按压在触屏上被 pointer+touch 触发两次。
             if(window.PointerEvent){
                 document.addEventListener('pointerdown', press, {passive:true});
+                document.addEventListener('pointermove', move, {passive:true});
                 document.addEventListener('pointerup', release, {passive:true});
-                document.addEventListener('pointercancel', release, {passive:true});
+                document.addEventListener('pointercancel', cancel, {passive:true});
             } else {
                 document.addEventListener('touchstart', press, {passive:true});
+                document.addEventListener('touchmove', e=>{ const p=e.touches && e.touches[0]; if(p) move(p); }, {passive:true});
                 document.addEventListener('touchend', release, {passive:true});
-                document.addEventListener('touchcancel', release, {passive:true});
+                document.addEventListener('touchcancel', cancel, {passive:true});
             }
             // 滚动时若手指离开按钮，确保还原
-            document.addEventListener('scroll', release, {passive:true, capture:true});
+            document.addEventListener('scroll', cancel, {passive:true, capture:true});
         })();
 
         // ===== 1019-N：所有底部面板关闭都有收起动画 =====

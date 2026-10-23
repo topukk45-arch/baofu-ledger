@@ -402,9 +402,18 @@
         }
         function stepMonth(d){ let y=statYear, mo=statMonth+d; while(mo<0){ mo+=12; y--; } while(mo>11){ mo-=12; y++; } setStatYM(y, mo); bgExpanded.clear(); renderStatCalendar(); }
         // 月份浮条（和账单页同一个组件、同一套 1.5 秒规则、松手才切）；超过月预算的那个月柱子标红
-        const stStrip=window.JiwenMonthStrip.create({ id:'stStrip', onPick:ym=>{ setStatYM(+ym.slice(0,4), +ym.slice(5,7)-1); bgExpanded.clear(); renderStatCalendar(); } });
-        function statStripWake(){ if(JiwenBase.currentTab==='stats') stStrip.wake(); }
+        const stStrip=window.JiwenMonthStrip.create({ id:'stStrip', onPick:ym=>{ setStatYM(+ym.slice(0,4), +ym.slice(5,7)-1); bgExpanded.clear(); renderStatCalendar(); },
+            onTop:()=>window.scrollTo({ top:0, behavior:'smooth' }) });   // 1023-J：回顶箭头在浮条右端（原来右下角单独一个 ↑）
+        // 1023-J：和账单页同一套：滑过一屏才露出回顶箭头、回到顶部就藏；整页不满一屏时浮条一直显示
+        function statStripWake(){
+            if(JiwenBase.currentTab!=='stats') return;
+            const H=window.innerHeight||0, de=document.documentElement;
+            stStrip.setTop((window.scrollY||de.scrollTop||0) > H);
+            stStrip.pin(de.scrollHeight>0 && de.scrollHeight <= H+1);   // 量不到高度（还没排版）当作满一屏
+            stStrip.wake();
+        }
         window.addEventListener('scroll', statStripWake, { passive:true });
+        window.addEventListener('resize', statStripWake, { passive:true });
 
         // 读取 CSS 变量当前值，让 SVG 颜色跟着外观走
         function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -617,15 +626,14 @@
             const dayNet={}, dayHas={}, dayFlow={}, daySkip={}, dayRefund={};
             let mIn=0, mOut=0, mOutN=0, pOut=0;
             const pY = statMonth===0 ? statYear-1 : statYear, pM = statMonth===0 ? 11 : statMonth-1;
-            // 月份浮条：每个月的支出、超没超月预算（设了预算的分类里花的 > 这些预算加起来）
+            // 月份浮条：每个月超没超月预算（设了预算的分类里花的 > 这些预算加起来；当月没过完也实时算），超了的月份字下面一个小红点（1023-J 起不画小柱子）
             const budgets=getBudgets(), budLimit=getCats().reduce((t, c)=>t+(budgets[c]>0 ? safeNum(budgets[c]) : 0), 0);
-            const ymExp=new Map(), ymBud=new Map();
+            const ymBud=new Map();
             let firstYM=ymKey(new Date().getFullYear(), new Date().getMonth());
             dec.forEach(x=>{
                 const ym=ymKey(x.y, x.mo);
                 if(x.y>1000){
                     if(ym<firstYM) firstYM=ym;
-                    const e=statContrib(x.r).exp; if(e) ymExp.set(ym, (ymExp.get(ym)||0)+e);
                     if(budLimit>0 && recMode(x.r)==='normal' && budgets[x.r.cat||'未分类']>0){ const v=expSigned(x.r); if(v) ymBud.set(ym, (ymBud.get(ym)||0)+v); }
                 }
                 if(x.y===pY && x.mo===pM) pOut+=statContrib(x.r).exp;
@@ -642,8 +650,9 @@
             });
             const nowYM=ymKey(new Date().getFullYear(), new Date().getMonth()), months=[];
             let my=+firstYM.slice(0,4), mmo=+firstYM.slice(5,7)-1;
-            while(ymKey(my, mmo)<=nowYM){ const k=ymKey(my, mmo); months.push({ ym:k, v:round2(Math.max(0, ymExp.get(k)||0)), over: budLimit>0 && round2(ymBud.get(k)||0)>budLimit }); mmo++; if(mmo>11){ mmo=0; my++; } }
+            while(ymKey(my, mmo)<=nowYM){ const k=ymKey(my, mmo); months.push({ ym:k, over: budLimit>0 && round2(ymBud.get(k)||0)>budLimit }); mmo++; if(mmo>11){ mmo=0; my++; } }
             stStrip.set(months, ymKey(statYear, statMonth));
+            requestAnimationFrame(statStripWake);   // 1023-J：换了月份页面变长变短：看要不要一直显示浮条、要不要露回顶箭头
             // 两格：当月支出（几笔、比上月多 / 少）| 当月收入（本月净剩）
             mIn=round2(mIn); mOut=round2(mOut); pOut=round2(pOut);
             $('statOutK').textContent=`当月支出 · ${mOutN} 笔`;

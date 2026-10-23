@@ -394,7 +394,7 @@
                 if(JiwenBase.currentTab==='ledger'){
                     show = false;   // 1023-C：账单页不再有 ↑（月份浮条在那块；再点一下底栏「记账」回到顶部）
                 } else if(JiwenBase.currentTab==='stats'){
-                    show = y > 400;
+                    show = false;   // 1023-J：统计页的 ↑ 也收进了月份浮条右端（stats.js 的 statStripWake）
                 } else {
                     show = false;
                 }

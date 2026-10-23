@@ -34,7 +34,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   // 2. 滑动：浮条出来，一直滑一直在，停下 1.5 秒收起；账单页没有 ↑ 了
   scroll(1500, -800);
-  ok(on('lgStrip') && !on('toTopBtn'), '2 滑动时浮条出来，↑ 不出（1023-C）');
+  ok(on('lgStrip') && !on('toTopBtn') && t.$('lgStrip').classList.contains('has-top'), '2 滑动时浮条出来，右下角单独的 ↑ 不出；滑过一屏，浮条右端有 ↑（1023-J）');
   for (let k = 0; k < 4; k++) { await sleep(500); scroll(1500 + k * 100, -900 - k * 100); }
   ok(on('lgStrip') && !on('toTopBtn'), '2 连着滑 2 秒，一直都在');
   await sleep(1700);
@@ -60,14 +60,17 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   ok(on('lgStrip') && !on('toTopBtn'), '4 回到账单再滑：浮条出来');
   await sleep(1700);
 
-  // 5. 统计页：↑ 一样，✕ 不出
+  // 5. 统计页：1023-J 起 ↑ 收进月份浮条右端（滑过一屏才露出来，回到上面就藏），右下角单独的 ↑ 不再出
   d.querySelector('.tab-btn[data-tab="stats"]').click(); await sleep(50);
-  scroll(900);
-  ok(on('toTopBtn') && !d.body.classList.contains('tab-ledger'), '5 统计页滑过 400：↑ 出现（账单页的月份浮条随 tab-ledger 藏起来）');
+  const hasTop = id => t.$(id).classList.contains('has-top');
+  scroll(w.innerHeight + 100);
+  ok(on('stStrip') && hasTop('stStrip') && !on('toTopBtn') && !d.body.classList.contains('tab-ledger'), '5 统计页滑过一屏：浮条出来、右端有 ↑；右下角单独的 ↑ 不出');
   await sleep(1700);
-  ok(!on('toTopBtn'), '5 统计页停下 1.5 秒后 ↑ 淡出');
+  ok(!on('stStrip') && !on('toTopBtn'), '5 统计页停下 1.5 秒后浮条连 ↑ 一起淡出');
   scroll(100);
-  ok(!on('toTopBtn'), '5 统计页回到上面：↑ 不出');
+  ok(on('stStrip') && !hasTop('stStrip'), '5 统计页回到上面：浮条在，↑ 藏起来');
+  t.$('stStrip').querySelector('.ms-top').click();
+  ok(w.__y === 0, '5 点浮条右端的 ↑：回到顶上');
 
   // 6. 淡出后不挡点击（样式里 .show 才 pointer-events:auto）
   const css = [...d.querySelectorAll('style')].map(s => s.textContent).join('\n');

@@ -1751,7 +1751,7 @@
         .bl-day-sum b { font-weight:600; }
         .bl-row { display:flex; align-items:center; gap:12px; min-height:54px; padding:6px 4px; border-bottom:1px dashed var(--c-border);
             cursor:pointer; -webkit-user-select:none; user-select:none; }
-        .bl-row:active, .bl-row.pressed { background:var(--c-chip); }
+        .bl-row.pressed { background:var(--c-chip); }   /* 1023-J：去掉 :active，滑动时手指一碰就变色；只认 .pressed（按住不动约 0.1 秒才加） */
         .bl-main { flex:1 1 auto; min-width:0; }
         .bl-cat { display:flex; align-items:center; gap:2px; min-width:0; font-size:15px; color:var(--c-text); line-height:1.35; }
         .bl-cat-t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; margin-right:4px; }
@@ -1824,36 +1824,38 @@
         /* 底栏：「筛选（1023-G 起搜一笔）| 记一笔」两个一样大 */
         .act-btn { height:56px; border-radius:16px; }
         .clear-filter-fab { bottom:calc(200px + env(safe-area-inset-bottom)); }
-        /* 月份浮条（账单页、统计页共用）：停 1.5 秒收起（fabWake），中间深色选中框，离中间越远越小越淡，每格下面一根小柱子 */
-        .mstrip { position:fixed; left:16px; right:16px; bottom:calc(128px + env(safe-area-inset-bottom)); height:64px; z-index:905;
-            border:1px solid var(--c-border-mid); border-radius:18px; background:var(--c-surface); overflow:hidden;
+        /* 月份浮条（账单页、统计页共用）：停 1.5 秒收起（fabWake）；1023-J 起靠右排、点一下切月份、选中的深色底、超预算的字下面一个小红点、右端回顶箭头 */
+        .mstrip { position:fixed; left:16px; right:16px; bottom:calc(128px + env(safe-area-inset-bottom)); height:60px; z-index:905;
+            display:flex; align-items:center; border:1px solid var(--c-border-mid); border-radius:18px; background:var(--c-surface);
             box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.28);
-            opacity:0; transform:translateY(24px) scale(0.96); pointer-events:none;
-            transition:transform .35s cubic-bezier(.2,.8,.2,1), opacity .25s ease; }
+            opacity:0; transform:translateY(8px); pointer-events:none;
+            transition:transform .18s ease-out, opacity .18s ease-out; }
         .mstrip.show { opacity:1; transform:none; pointer-events:auto; }
         @media (min-width:761px){ .mstrip { left:50%; right:auto; width:480px; margin-left:-240px; } }
         body:not(.tab-ledger) #lgStrip, body.kb-open .mstrip, body.login-mode .mstrip { display:none !important; }
-        .ms-sel { position:absolute; left:50%; top:7px; bottom:7px; width:58px; margin-left:-29px; border-radius:12px; background:var(--c-primary-dark); }
-        .ms-year { position:absolute; left:10px; top:5px; z-index:1; font-size:11px; font-weight:bold; color:var(--c-primary-dark); pointer-events:none; }
-        .ms-track { position:relative; height:100%; display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory;
-            padding:0 calc(50% - 32px); box-sizing:border-box; scrollbar-width:none; touch-action:pan-x; overscroll-behavior:contain; }
+        .ms-year { flex:none; align-self:flex-start; margin:6px 0 0 12px; font-size:11px; font-weight:bold; color:var(--c-primary-dark); pointer-events:none; white-space:nowrap; }
+        .ms-track { flex:1 1 auto; min-width:0; height:100%; display:flex; align-items:center; gap:2px; overflow-x:auto; overflow-y:hidden;
+            padding:0 6px; box-sizing:border-box; scrollbar-width:none; touch-action:pan-x; overscroll-behavior:contain; }
         .ms-track::-webkit-scrollbar { display:none; }
-        button.ms-item { flex:none; width:64px; height:100%; scroll-snap-align:center; border:none; background:transparent; padding:0 0 10px; margin:0;
-            display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; color:var(--c-text); font-family:inherit; cursor:pointer;
-            transition:transform .15s ease, opacity .15s ease; }
-        .ms-bar { width:16px; height:18px; display:flex; align-items:flex-end; justify-content:center; }
-        .ms-bar i { display:block; width:8px; border-radius:3px 3px 0 0; background:var(--c-border-mid); }
+        .ms-pad { flex:1 0 0; }   /* 月份少时把它们推到右边 */
+        button.ms-item { position:relative; flex:none; width:56px; height:44px; border:none; border-radius:12px; background:transparent; padding:0; margin:0;
+            display:flex; align-items:center; justify-content:center; color:var(--c-text-soft); font-family:inherit; cursor:pointer; }
         .ms-lab { font-size:14px; line-height:16px; }
-        .ms-item.on .ms-lab { color:var(--c-on-primary); font-weight:bold; }
-        .ms-item.on .ms-bar i { background:var(--c-on-primary); opacity:.75; }
-        .ms-item.over .ms-bar i { background:var(--c-neg); opacity:1; }
+        button.ms-item.on { background:var(--c-primary-dark); color:var(--c-on-primary); }
+        .ms-item.on .ms-lab { font-weight:bold; }
+        .ms-dot { position:absolute; left:50%; bottom:3px; width:6px; height:6px; margin-left:-5px; border-radius:50%; background:var(--c-neg);
+            border:2px solid #fff; box-sizing:content-box; }
+        button.ms-top { display:none; flex:none; width:48px; height:44px; margin-right:6px; border:none; border-left:1px solid var(--c-border); border-radius:0 12px 12px 0;
+            background:transparent; padding:0; cursor:pointer; align-items:center; justify-content:center; }
+        .mstrip.has-top button.ms-top { display:flex; }
+        button.ms-top svg { width:22px; height:22px; fill:none; stroke:var(--c-primary-dark); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
         /* 统计页的总结余（1023-C 从账单页总览搬来；1023-H 再改样子） */
         button.st-bal { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); text-align:left; font-family:inherit; cursor:pointer; color:var(--c-text); }
         .st-bal-k { flex:1 1 auto; min-width:0; font-size:14px; font-weight:bold; }
         .st-bal-k em { display:block; font-style:normal; font-weight:normal; font-size:12px; color:var(--c-text-soft); }
         .st-bal-v { flex:none; font-size:20px; font-weight:bold; color:var(--c-primary-deep); font-variant-numeric:tabular-nums; }
         .st-bal-go { flex:none; color:var(--c-text-soft); font-size:18px; }
-        @media (prefers-reduced-motion: reduce){ .mstrip, button.ms-item { transition:none; } }
+        @media (prefers-reduced-motion: reduce){ .mstrip { transition:none; transform:none; } }
         .lg-dc-noday .lg-dh { display:flex; align-items:center; gap:8px; min-height:50px; padding:0 14px; border-bottom:1px solid var(--c-border);
             background:color-mix(in srgb, var(--c-primary) 8%, var(--c-surface)); font-size:15px; }
 
