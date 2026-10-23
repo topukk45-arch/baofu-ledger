@@ -132,11 +132,11 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   ok(!snap(t), '7 切到了别的月份（打开时是这个月）：不存（1023-C 起没有翻页）');
   t.w.JiwenLedger.setYM(null);
   t.$('filterFab').click(); t.$('searchKeyword').value = '虚构1'; t.$('sheetApply').click(); await t.idle();
-  ok(t.w.__filterActive(), '7 筛选生效了');
+  ok(t.w.__filterActive(), '7 搜一笔开着');
   await hide(t);
-  ok(!snap(t), '7 开着筛选（打开时会清掉）：不存');
-  t.$('clearFilterFab').click(); await t.idle();
-  ok(!t.w.__filterActive(), '7 清掉筛选');
+  ok(!snap(t), '7 开着搜一笔（打开时不会是这样）：不存');
+  t.$('searchToLedger').click(); await t.idle();
+  ok(!t.w.__filterActive(), '7 回到账单');
   // 「上次停留」：照原来的页码和位置存
   t.w.localStorage.setItem('app_default_tab', 'last');
   await hide(t);

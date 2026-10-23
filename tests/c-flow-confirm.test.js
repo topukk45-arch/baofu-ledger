@@ -50,9 +50,9 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     ok(t.$('catStats').textContent.length>0 && !t.$('catStats').textContent.includes('存款') && !t.$('catStats').textContent.includes('购物'), '分类汇总不出现「存款」「购物（全是往来）」');
     t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
     t.filterKw('笔记本');
-    const rows=[...t.$('billList').querySelectorAll('.bl-row')];
+    const rows=[...t.$('searchList').querySelectorAll('.bl-row')];   // 1023-G：搜一笔的结果页
     ok(rows.length===2 && rows.every(r=>r.querySelector('.io-flow') && r.querySelector('.amt-flow')), '往来行有灰蓝标签与金额');
-    ok(t.$('summaryFilter').textContent.includes('（其中 2 条往来）'), '小计说明往来条数');
+    ok(t.$('summaryFilter').textContent.includes('（其中 2 笔往来）'), '小计说明往来条数');
     // 结余列：购物卡那行（最新正常记录）的结余应等于总结余
     const t2=await boot(rs);
     t2.$('billList').querySelector('.bl-row').click();   // 1023-A：结余在详情里
@@ -88,7 +88,7 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
 {
     const t=await boot(oct());
     t.filterKw('笔记本');
-    t.$('batchBar').querySelector('[data-act="batch"]').click();
+    t.$('batchBar').click();
     const opts=[...t.$('askChoices').querySelectorAll('.cc')].map(e=>(e.querySelector('.cc-label')||e).textContent);
     ok(opts.join('|')==='改分类|恢复计入|标为不计|标为往来', '批量菜单四项：'+opts.join('|'));
     t.choose('标为往来');
@@ -108,7 +108,7 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     const many=[]; for(let i=0;i<30;i++) many.push(R('m'+i,`2026-09-${String(1+i%28).padStart(2,'0')}T12:00`,10+i,'expense','餐饮','东方树叶'));
     const t2=await boot(many);
     t2.filterKw('东方树叶');
-    t2.$('batchBar').querySelector('[data-act="batch"]').click(); t2.choose('改分类'); t2.choose('购物');
+    t2.$('batchBar').click(); t2.choose('改分类'); t2.choose('购物');
     ok(t2.$('askList').querySelectorAll('.al-row').length===30, '30 条全部列出');
     const css=t2.w.getComputedStyle(t2.$('askList'));
     ok(css.overflowY==='auto' && css.maxHeight==='50vh', '清单限高可滑动');
@@ -118,7 +118,7 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     // XSS：备注里的 HTML 只当文字
     const t3=await boot(oct());
     t3.filterKw('img');
-    t3.$('batchBar').querySelector('[data-act="batch"]').click(); t3.choose('标为不计');
+    t3.$('batchBar').click(); t3.choose('标为不计');
     const rk=t3.$('askList').querySelector('.al-remark');
     ok(rk.textContent.includes('<img') && !t3.$('askList').querySelector('img') && !t3.w.__pwn, '备注中的 HTML 不会被执行');
     ok(t.errs.length+t2.errs.length+t3.errs.length===0, '无脚本错误');

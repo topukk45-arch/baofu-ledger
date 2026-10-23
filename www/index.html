@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1023-F">
+    <link rel="stylesheet" href="app/app.css?v=1023-G">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-F</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-G</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -37,10 +37,6 @@
         <div class="main-box" id="mainBox">
             <!-- ========== 页面1：记账（账单+记账） ========== -->
             <div class="tab-page" id="pageLedger">
-                <!-- 筛选条件全部收进底部筛选浮层（点底栏左侧筛选图标唤起）。
-                     这里仅保留隐藏 select 作为分类取值来源，renderBill 仍读它的 value。 -->
-                <select id="filterCat" style="display:none"><option value="__all">全部</option></select>
-
                 <!-- 1023-C：下面一条细条吸在顶上「10月 支出 x 收入 y 统计 ›」，点了去统计页同一个月；
                      列表按月一直往下排（周小计、日卡片、每笔两行、没记账的日子），月份由底栏上方的月份浮条切 -->
                 <!-- 1023-E：日子竖排卡片：抬头「日子 · 全部 N 个 ›」，下面最多 3 条（置顶的排第一、浅底加粗）；点一条看这一条，点空白处或抬头进全部日子页 -->
@@ -48,11 +44,6 @@
                     <button type="button" class="dc-head" id="daysManageBtn"><span class="dc-k">日子</span><span class="dc-all" id="daysAllTxt"></span></button>
                     <div class="dc-rows" id="daysEntryRows"></div>
                 </div>
-                <div class="summary-filter" id="summaryFilter" style="display:none"></div>
-
-                <!-- 批量操作入口：仅筛选生效时出现（1023-G 搬去搜一笔的结果页） -->
-                <div class="batch-bar" id="batchBar" style="display:none"></div>
-
                 <button type="button" class="lg-bar" id="billHead"></button>
 
                 <div class="bill-list" id="billList"></div>
@@ -306,73 +297,90 @@
             </button>
         </nav>
 
-    <!-- 底部常驻操作栏：左「筛选」右「记一笔」，两个等宽对称按钮，均图标+文字 -->
+    <!-- 底部常驻操作栏：左「搜一笔」（1023-G，原来是筛选）右「记一笔」，两个一样大 -->
     <div class="action-bar" id="actionBar">
-        <button class="act-btn act-filter" id="filterFab" title="筛选" aria-label="筛选">
-            <span class="act-txt">筛选</span>
+        <button class="act-btn act-filter" id="filterFab" title="搜一笔" aria-label="搜一笔">
+            <span class="act-txt">搜一笔</span>
         </button>
         <button class="act-btn act-add" id="fabAdd" title="记一笔">
             <span class="act-txt">记一笔</span>
         </button>
     </div>
     <button class="to-top" id="toTopBtn" title="回到顶部" aria-label="回到顶部">↑</button>
-    <button class="clear-filter-fab" id="clearFilterFab" title="清除筛选" aria-label="清除筛选">✕</button>
     <!-- 1010-I3：统计页不在本月时出现，点了回到本月。与账单页的清除筛选同款外观、同一位置 -->
     <button class="clear-filter-fab" id="statTodayFab" title="回到本月" aria-label="回到本月">✕</button>
 
     <!-- 筛选浮层（bottom sheet）：关键词 / 金额区间 / 日期范围 / 分类，全部筛选条件集中于此 -->
+    <!-- 1023-G：搜一笔的结果页（从账单页底栏「搜一笔」从右边滑进来，盖住底栏）：顶上生效的条件一个一个深色小标签（点 × 去掉），
+         条数 + 支出 / 收入合计（右边「批量改 ›」），列表和账单页一样的周小计 / 日卡片 / 每笔两行（不显示没记账的日子）；
+         底部「回到账单 | 改条件」。没条件时是全部记录；没结果时一张缺省页 -->
+    <div class="search-page" id="pageSearch" hidden>
+        <div class="sp-head">
+            <button type="button" class="sp-back" id="searchBack" aria-label="返回账单"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <span class="sp-title">搜一笔</span>
+            <span class="sp-count" id="searchCount"></span>
+        </div>
+        <div class="sp-body" id="searchBody">
+            <div class="sp-tags" id="searchTags"></div>
+            <div class="sp-sum" id="summaryFilter"></div>
+            <div class="bill-list" id="searchList"></div>
+            <div class="sp-empty" id="searchEmpty" hidden>
+                <svg class="sp-empty-ico" viewBox="0 0 96 96" aria-hidden="true"><rect class="e1" x="20" y="12" width="44" height="60" rx="6"/><path class="e2" d="M30 28h24M30 38h18M30 48h12"/><circle class="e3" cx="60" cy="58" r="14"/><path class="e4" d="M70 68l10 10M55 58h10"/></svg>
+                <div class="sp-empty-t">没有找到相关的账</div>
+                <div class="sp-empty-s">点上面的条件把它去掉，或者回去改条件</div>
+            </div>
+        </div>
+        <div class="ui-bar sp-bar">
+            <div class="ui-pair">
+                <button type="button" class="ui-btn" id="searchToLedger">回到账单</button>
+                <button type="button" class="ui-btn primary" id="searchEdit">改条件</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1023-G：筛选条件抽屉（点「搜一笔」自动拉出来；样子照记一笔）：日期范围 + 快捷、金额范围（大字）、收入 | 支出、常用分类 4 个、
+         列表卡（分类 ›、统计 ›、备注直接写，空格隔开的几个词都要包含）；改一下后面的结果页跟着变，底部「看这 N 笔」写着还剩几笔；
+         下面「回到账单 | 清空条件」。往下拉、点暗处、返回键收起（条件留着，就是结果页） -->
     <div class="mask sheet-mask" id="filterSheetMask">
-        <div class="sheet" id="filterSheet">
+        <div class="sheet sf-sheet" id="filterSheet">
             <div class="sheet-grip" id="filterSheetGrip">
                 <div class="sheet-handle" aria-hidden="true"></div>
-                <div class="sheet-head">
-                    <h3>筛选</h3>
+                <div class="sheet-head"><h3>筛选条件</h3></div>
+            </div>
+            <div class="sheet-body sf-body">
+                <div class="sf-dates">
+                    <button type="button" class="sf-date" id="searchFromBtn"><svg class="sf-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span id="searchFrom" class="dt-input sf-date-v" data-placeholder="起始日期"></span></button>
+                    <span class="sf-sep">—</span>
+                    <button type="button" class="sf-date" id="searchToBtn"><svg class="sf-ico" viewBox="0 0 24 24" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span id="searchTo" class="dt-input sf-date-v" data-placeholder="结束日期"></span></button>
+                </div>
+                <div class="sf-quick" id="filterDateQuick" role="radiogroup" aria-label="快捷日期">
+                    <button type="button" class="sf-q" data-q="all">不限</button>
+                    <button type="button" class="sf-q" data-q="month">本月</button>
+                    <button type="button" class="sf-q" data-q="last">上月</button>
+                    <button type="button" class="sf-q" data-q="7d">近 7 天</button>
+                </div>
+                <div class="sf-money">
+                    <label class="sf-m"><span class="sf-yen">¥</span><input type="text" inputmode="decimal" id="searchMin" class="money-input sf-m-in" placeholder="最低" aria-label="最低金额"></label>
+                    <span class="sf-sep">—</span>
+                    <label class="sf-m sf-m-r"><span class="sf-yen">¥</span><input type="text" inputmode="decimal" id="searchMax" class="money-input sf-m-in" placeholder="最高" aria-label="最高金额"></label>
+                </div>
+                <div class="sf-ios" id="filterIoChips" aria-label="收支"></div>
+                <div class="sf-qcats" id="filterQuickCats" aria-label="常用分类"></div>
+                <div class="rec-list sf-list">
+                    <button type="button" class="rec-row" id="filterCatRow" aria-expanded="false"><span class="rec-row-k">分类</span><span class="rec-row-v" id="filterCatVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <div class="sf-grid" id="filterChips" hidden></div>
+                    <button type="button" class="rec-row" id="filterModeRow" aria-expanded="false"><span class="rec-row-k">统计</span><span class="rec-row-v" id="filterModeVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <div class="sf-grid sf-grid3" id="filterModeChips" hidden></div>
+                    <label class="rec-row rec-row-in"><span class="rec-row-k">备注</span><input type="text" id="searchKeyword" class="rec-row-input sf-kw" placeholder="备注里的字，空格隔开找多个"></label>
+                    <button type="button" class="rec-row" id="filterRvRow" hidden><span class="rec-row-k">待确认分类</span><span class="rec-row-v" id="filterRvVal"></span><span class="sf-switch" id="filterRvSw" aria-hidden="true"></span></button>
                 </div>
             </div>
-            <div class="sheet-body">
-                <!-- 1020-I：关键词、金额区间、日期范围做成列表行（左边名字，右边填的东西；金额、日期照留框）
-                     1023-A：日期放第一行，下面一排快捷（本月 / 上月 / 近 7 天，再点一下取消）；多一行收支（全部 / 支出 / 收入） -->
-                <div class="rec-list filter-list">
-                    <div class="rec-row rec-row-in"><span class="rec-row-k">日期</span>
-                        <div class="rec-pair">
-                            <div id="searchFrom" class="search-input dt-input" data-placeholder="起始"></div>
-                            <span class="search-sep">—</span>
-                            <div id="searchTo" class="search-input dt-input" data-placeholder="结束"></div>
-                        </div>
-                    </div>
-                    <div class="filter-quick" id="filterDateQuick">
-                        <button type="button" class="ui-btn small" data-q="month">本月</button>
-                        <button type="button" class="ui-btn small" data-q="last">上月</button>
-                        <button type="button" class="ui-btn small" data-q="7d">近 7 天</button>
-                    </div>
-                    <label class="rec-row rec-row-in"><span class="rec-row-k">关键词</span><input type="text" id="searchKeyword" class="search-input rec-row-input" placeholder="备注里的字（不限）"></label>
-                    <div class="rec-row rec-row-in"><span class="rec-row-k">金额</span>
-                        <div class="rec-pair">
-                            <input type="text" inputmode="decimal" id="searchMin" class="search-input money-input" placeholder="最低">
-                            <span class="search-sep">—</span>
-                            <input type="text" inputmode="decimal" id="searchMax" class="search-input money-input" placeholder="最高">
-                        </div>
-                    </div>
+            <div class="sf-foot">
+                <button type="button" class="ui-btn primary block" id="sheetApply">看这 0 笔</button>
+                <div class="ui-pair">
+                    <button type="button" class="ui-btn" id="filterBack">回到账单</button>
+                    <button type="button" class="ui-btn" id="sheetClear">清空条件</button>
                 </div>
-                <div class="search-field">
-                    <span class="search-label">收支</span>
-                    <div class="cat-chips mode-chips filter-io-chips" id="filterIoChips" role="radiogroup" aria-label="收支"></div>
-                </div>
-                <div class="search-field">
-                    <span class="search-label">统计</span>
-                    <div class="cat-chips mode-chips filter-mode-chips" id="filterModeChips"></div>
-                </div>
-                <div class="search-field">
-                    <div class="field-label-row">
-                        <span class="search-label">分类</span>
-                    </div>
-                    <div class="filter-chips" id="filterChips"></div>
-                </div>
-            </div>
-            <!-- 1023-A：照方案 D：左退右进两个一样大的按钮 -->
-            <div class="ui-pair filter-btns">
-                <button type="button" class="ui-btn" id="sheetClear">清除全部</button>
-                <button type="button" class="ui-btn primary" id="sheetApply">完成</button>
             </div>
         </div>
     </div>
@@ -838,28 +846,29 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1023-F"></script>
-    <script src="app/store.js?v=1023-F"></script>
-    <script src="app/select.js?v=1023-F"></script>
-    <script src="app/keypad.js?v=1023-F"></script>
-    <script src="app/text.js?v=1023-F"></script>
-    <script src="app/sheet.js?v=1023-F"></script>
-    <script src="app/ask.js?v=1023-F"></script>
-    <script src="app/date.js?v=1023-F"></script>
-    <script src="app/monthstrip.js?v=1023-F"></script>
-    <script src="app/ai-export.js?v=1023-F"></script>
-    <script src="app/import-entry.js?v=1023-F"></script>
-    <script src="app/forms.js?v=1023-F"></script>
-    <script src="app/detail.js?v=1023-F"></script>
-    <script src="app/ledger.js?v=1023-F"></script>
-    <script src="app/cats.js?v=1023-F"></script>
-    <script src="app/stats.js?v=1023-F"></script>
-    <script src="app/days.js?v=1023-F"></script>
-    <script src="app/settings.js?v=1023-F"></script>
-    <script src="app/tabs.js?v=1023-F"></script>
-    <script src="app/login.js?v=1023-F"></script>
-    <script src="app/back.js?v=1023-F"></script>
-    <script src="app/boot.js?v=1023-F"></script>
+    <script src="app/base.js?v=1023-G"></script>
+    <script src="app/store.js?v=1023-G"></script>
+    <script src="app/select.js?v=1023-G"></script>
+    <script src="app/keypad.js?v=1023-G"></script>
+    <script src="app/text.js?v=1023-G"></script>
+    <script src="app/sheet.js?v=1023-G"></script>
+    <script src="app/ask.js?v=1023-G"></script>
+    <script src="app/date.js?v=1023-G"></script>
+    <script src="app/monthstrip.js?v=1023-G"></script>
+    <script src="app/ai-export.js?v=1023-G"></script>
+    <script src="app/import-entry.js?v=1023-G"></script>
+    <script src="app/forms.js?v=1023-G"></script>
+    <script src="app/detail.js?v=1023-G"></script>
+    <script src="app/ledger.js?v=1023-G"></script>
+    <script src="app/search.js?v=1023-G"></script>
+    <script src="app/cats.js?v=1023-G"></script>
+    <script src="app/stats.js?v=1023-G"></script>
+    <script src="app/days.js?v=1023-G"></script>
+    <script src="app/settings.js?v=1023-G"></script>
+    <script src="app/tabs.js?v=1023-G"></script>
+    <script src="app/login.js?v=1023-G"></script>
+    <script src="app/back.js?v=1023-G"></script>
+    <script src="app/boot.js?v=1023-G"></script>
 
 </body>
 </html>

@@ -32,14 +32,15 @@ async function snap(file){
   else { [...d.querySelectorAll('#lgStrip .ms-item')].map(b=>b.dataset.ym).forEach(ym=>{ L.setYM(ym); L.listFlush(); pages.push($('billList').innerHTML); }); L.setYM(null); }   // 1023-C：按月显示，每个月读一遍
   out.pages=pages.join('|');
   // 有命中的筛选
-  $('filterFab').click(); $('searchKeyword').value='游戏充值'; $('sheetApply').click();
-  out.filter=$('summaryFilter').innerHTML.replace(/<button class="filter-batch"[^>]*>批量<\/button>/,'')+$('billList').innerHTML;
+  const S=dom.window.JiwenSearch, resList=()=>$('searchList')||$('billList'), resFlush=()=>{ if(S && S.searchFlush) S.searchFlush(); else if(L && L.listFlush) L.listFlush(); };   // 1023-G 起结果在搜一笔页里
+  $('filterFab').click(); $('searchKeyword').value='游戏充值'; $('sheetApply').click(); resFlush();
+  out.filter=$('summaryFilter').innerHTML.replace(/<button class="filter-batch"[^>]*>批量<\/button>/,'')+resList().innerHTML;
   // 1023-F：同样的条件（单选那种，老版本也能点出来）命中的是哪些记录，新老版本必须一模一样（列表怎么画不管，只比记录编号）
   if(L && L.listFlush){
     const chip=(box,t)=>{ const e=[...$(box).querySelectorAll('.cc')].find(x=>x.textContent===t); if(e) e.click(); return !!e; };
     // 打开面板以后等一帧（面板的 open 类是下一帧才加上，老版本的「清除全部」在那之前会把已提交的分类读回去）
     const frame=()=>new Promise(r=>dom.window.requestAnimationFrame(()=>r()));
-    const hit=async setup=>{ $('filterFab').click(); await frame(); $('sheetClear').click(); setup(); $('sheetApply').click(); L.listFlush(); return [...$('billList').querySelectorAll('.bl-row')].map(r=>r.dataset.id).sort().join(','); };
+    const hit=async setup=>{ $('filterFab').click(); await frame(); $('sheetClear').click(); setup(); $('sheetApply').click(); resFlush(); return [...resList().querySelectorAll('.bl-row')].map(r=>r.dataset.id).sort().join(','); };
     const conds=[
       ['备注 午饭', ()=>{ $('searchKeyword').value='午饭'; }], ['备注 游戏充值', ()=>{ $('searchKeyword').value='游戏充值'; }],
       ['支出', ()=>chip('filterIoChips','支出')], ['收入', ()=>chip('filterIoChips','收入')],
@@ -49,7 +50,7 @@ async function snap(file){
     ];
     const hs=[]; for(const [n,f] of conds) hs.push(n+'：'+await hit(f));
     out.hits=hs.join('\n');
-    L.clearAllFilters();
+    if(S && S.resetSearch) S.resetSearch(); else L.clearAllFilters();
   }
   // 统计页
   d.querySelector('.tab-btn[data-tab="stats"]').click();

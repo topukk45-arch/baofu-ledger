@@ -75,13 +75,13 @@ const perfLast = t => { try { const a = JSON.parse(t.w.localStorage.getItem('app
   await wait(1700);
   ok(snap(t) && snap(t).src === 'idle' && (snap(t).html.match(/class="bl-row"/g) || []).length === 41, '4 停下来：存的是新的（这个月 41 条，1023-C 起账单页列这个月的全部），没切后台');
 
-  // 5. 停下来时照现在的条件判断：开着筛选（打开时会清掉）→ 删掉
+  // 5. 停下来时照现在的条件判断：开着搜一笔（打开时不会是这样）→ 删掉
   t.$('filterFab').click(); t.$('searchKeyword').value = '虚构1'; t.$('sheetApply').click(); await t.idle();
-  ok(t.w.__filterActive(), '5 筛选生效了');
+  ok(t.w.__filterActive(), '5 搜一笔开着');
   poke(t); await wait(1700);
-  ok(!snap(t), '5 开着筛选停下来：快照删掉（不存错的）');
-  t.$('clearFilterFab').click(); await t.idle(); poke(t); await wait(1700);
-  ok(snap(t), '5 清掉筛选、停下来：又存上了');
+  ok(!snap(t), '5 开着搜一笔停下来：快照删掉（不存错的）');
+  t.$('searchToLedger').click(); await t.idle(); poke(t); await wait(1700);
+  ok(snap(t), '5 回到账单、停下来：又存上了');
 
   // 6. 记一笔填到一半、停下来 1 秒：先存一份；被杀以后重开接着填
   t.$('fabAdd').click(); await wait(420); t.w.kpClose();

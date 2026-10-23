@@ -24,7 +24,8 @@ const MODULES = [
   { key: 'impentry', layer: 3, entry: 'JiwenImportEntry', file: 'app/import-entry.js', what: '导入入口（开发开关、loadImportUI、用记问打开、空账本入口、月初提醒、待处理横幅、AI 标记列表的入口）', secs: ['1015-A：账单导入（开发中）'], names: [] },
   { key: 'forms', layer: 4, entry: 'JiwenForms', file: 'app/forms.js', what: '记一笔、修改账单、退款弹窗、口径选择、常用模板和模板面板', secs: ['悬浮按钮：打开/关闭记账弹窗', '统计选择：计入 / 不计 / 往来', '常用模板（1010-I）', '退款弹窗（1010-J）', '1019-K：模板面板（新建 / 编辑都用它）', '修改弹窗的分类/收支标签（与记账弹窗同款，但打开时预选记录原有值）'], names: ['refundLineHtml', 'formState', 'formSnaps'] },
   { key: 'detail', layer: 4, entry: 'JiwenDetail', file: 'app/detail.js', what: '账单详情（1023-B 从统计页搬来，账单页、统计页共用）、每笔记完后的结余（balanceAfter，1023-B 从账单页搬来）', secs: [], names: [] },
-  { key: 'ledger', layer: 4, entry: 'JiwenLedger', file: 'app/ledger.js', what: '账单页：总览（这个月支出、结余）、列表（按天分组）、翻页、搜索和筛选（含筛选浮层的控件）、批量操作（1023-A 起分类汇总搬去统计页）', secs: ['筛选浮层（bottom sheet）控件绑定', '搜索状态：备注 / 金额 / 日期 / 收支 / 统计 / 分类', '批量操作（基于当前筛选结果）'], names: ['scrollListTop', 'renderFilterChips'] },
+  { key: 'ledger', layer: 4, entry: 'JiwenLedger', file: 'app/ledger.js', what: '账单页：顶上细条、按月的列表（周小计、日卡片、每笔两行、没记账的日子）、月份浮条、分批画（1023-G 起搜索 / 筛选 / 批量搬去 search）', secs: [], names: [] },
+  { key: 'search', layer: 4, entry: 'JiwenSearch', file: 'app/search.js', what: '搜一笔（1023-G）：搜索条件和口径、筛选条件抽屉、结果页、批量操作', secs: [], names: [] },
   { key: 'cats', layer: 4, entry: 'JiwenCats', file: 'app/cats.js', what: '分类管理（列表、拖动排序、改名、删除、设预算）', secs: ['分类长按拖动排序（pointer/touch 手写，避免 WebView 原生 draggable 不稳）'], names: ['openCatManager', 'openCatActions', 'attachCatDrag', 'showCatErr'] },
   { key: 'stats', layer: 4, entry: 'JiwenStats', file: 'app/stats.js', what: '统计页、预算页、预算建议、年月选择、账单详情、分类汇总和滑动提示（1023-A 从账单页搬来）', secs: ['统计页：预算', '分类汇总卡片', '1019-H：分类汇总能滑但看不出来：右下角的小圆钮', '单独一版（1016-Z9）：按过去 3–6 个月的中位数给每月预算建议，一键写入', '统计模块（纯手写 SVG，跟随外观主题变量）', '年月选择器（统计页）'], names: [] },
   { key: 'days', layer: 4, entry: 'JiwenDays', file: 'app/days.js', what: '日子（入口卡、管理页、选择删除、编辑弹窗）', secs: ['日子（倒数日）', '入口卡显示条数（可配置）', '记账页的入口卡（1023-E：竖排卡片）', '管理页', '日子管理弹窗', '选择模式（批量删除）', '编辑/添加弹窗'], names: [] },
@@ -47,7 +48,6 @@ const BIND = [
   ["askInput.addEventListener('click', ()=>{ if(askInput.dataset.kp", 'ask'],     // 提示框的输入框弹数字键盘
   ["askInput.addEventListener('focus', ()=>{ if(askInput.dataset.kp", 'ask'],
   ["$('askList').addEventListener('click', e=>{", 'detail'],                       // AI 标记列表点一行开详情
-  ["(function(){\n            const kw=$('searchKeyword')", 'ledger'],           // 筛选浮层里的控件
   ["$('manageCatSetting').addEventListener('click', openCatManager);", 'settings'],   // 设置页「管理账单分类」
   ["$('daysBack').addEventListener('click', backFromDaysPage);", 'tabs'],
   ["window.JiwenImportNext={", 'tabs'],
@@ -60,7 +60,7 @@ const BIND = [
 ];
 
 // 主程序以外直接用的老入口（import/、测试、原生层以外的页面代码按名字找），搬完也要留在 window 上
-const LEGACY = ['JiwenPerf', 'JiwenSheet', 'JiwenImportStore', 'JiwenImportNext', 'customAlert', 'customConfirm', 'customPrompt', 'openDevImportCheck', 'kpOpen', 'kpClose', 'openTextPanel', 'snapSave', 'snapDrop', 'openEdit', 'viewRemark', 'syncFilterFab', 'closeFilterSheet', 'setDraftCat', 'getDraftCat', 'dtWheelsSync', 'openPerfPage', 'SHEET_MS',
+const LEGACY = ['JiwenPerf', 'JiwenSheet', 'JiwenImportStore', 'JiwenImportNext', 'customAlert', 'customConfirm', 'customPrompt', 'openDevImportCheck', 'kpOpen', 'kpClose', 'openTextPanel', 'snapSave', 'snapDrop', 'openEdit', 'viewRemark', 'closeFilterSheet', 'dtWheelsSync', 'openPerfPage', 'SHEET_MS',
   // 原来就挂在 window 上、几块之间互相打招呼用的小钩子（__ 开头），照旧
   '__kbHoldInfo', '__relayoutMasks', '__openModalAfterKeyboard', '__revealSave', '__impOpenedNow', '__perfRecs', '__autoLogin', '__impOpened', '__filterActive', '__catHintWake', '__formDirty', '__sheetGhosts'];
 
@@ -71,7 +71,7 @@ const CALLBACKS = {
   'cats → tabs': ['refreshCatSelectors', 'refreshAllViews'],
   'cats → stats': ['renderStats'],   // 设好预算后刷新统计页（1019-Z4-M8 调先后时数出来的）
   'settings → tabs': ['snapDrop', 'refreshCatSelectors', 'refreshAllViews'],   // 换主题、改默认进入页面后删首屏快照（同上）
-  'ledger → tabs': ['refreshAllViews'],
+  'search → tabs': ['refreshAllViews'],   // 1023-G：批量改完刷新页面（原来是 ledger → tabs，跟着批量搬过来）
   'forms → tabs': ['refreshAllViews'],
   'forms → cats': ['openCatManager'],   // 1020-G：分类抽屉底部「管理分类」打开分类管理（分类管理排在记一笔后面：它要调记一笔那边的刷新），关了回到抽屉
   'detail → tabs': ['refreshAllViews'],   // 1023-B：详情里去掉 AI 标记 / 待确认以后刷新页面（原来是 stats → tabs，跟着详情搬过来）

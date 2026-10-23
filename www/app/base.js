@@ -189,7 +189,7 @@
             });
         });
         const saveEdit=$('saveEdit'), cancelEdit=$('cancelEdit');
-        const archiveSelect=$('archiveSelect'), filterCat=$('filterCat');
+        const archiveSelect=$('archiveSelect');
 
         // ===== .dt-input 的 value 垫片 =====
         // 这五个触发框已从 <input readonly> 换成 <div>（原因见 CSS 中 .dt-input 处的长注释）。
@@ -362,5 +362,5 @@
         let currentArchive = '';
         let currentTab = 'ledger';
         let curPage = 1;
-        window.JiwenBase = { txtNudge, setTxtNudge, applyTxtNudge, get currentUser(){ return currentUser; }, set currentUser(v){ currentUser=v; }, get currentArchive(){ return currentArchive; }, set currentArchive(v){ currentArchive=v; }, get currentTab(){ return currentTab; }, set currentTab(v){ currentTab=v; }, get curPage(){ return curPage; }, set curPage(v){ curPage=v; }, $, DEFAULT_CATS, MODE_HINT, PAGE_SIZE, SHEET_MS, addBill, afterOpenAnim, archiveSelect, billCat, billList, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, escapeHtml, fabHold, fabWake, fillSelect, filterCat, fitNums, isDirtyTime, isFlow, isSkip, loginBox, logoutBtn, mainBox, normMoney, nowDtValue, nowUser, pad, parseRecTime, recMode, repairTime, round2, safeNum, sanitizeMoney, saveEdit, setRecMode };   // base 模块对外只有这一个入口
+        window.JiwenBase = { txtNudge, setTxtNudge, applyTxtNudge, get currentUser(){ return currentUser; }, set currentUser(v){ currentUser=v; }, get currentArchive(){ return currentArchive; }, set currentArchive(v){ currentArchive=v; }, get currentTab(){ return currentTab; }, set currentTab(v){ currentTab=v; }, get curPage(){ return curPage; }, set curPage(v){ curPage=v; }, $, DEFAULT_CATS, MODE_HINT, PAGE_SIZE, SHEET_MS, addBill, afterOpenAnim, archiveSelect, billCat, billList, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, escapeHtml, fabHold, fabWake, fillSelect, fitNums, isDirtyTime, isFlow, isSkip, loginBox, logoutBtn, mainBox, normMoney, nowDtValue, nowUser, pad, parseRecTime, recMode, repairTime, round2, safeNum, sanitizeMoney, saveEdit, setRecMode };   // base 模块对外只有这一个入口
 })();

@@ -249,8 +249,8 @@ function bootSync(records, arcExtra){
   const t=await boot();
   t.refund('buy', { part:30, remark:'鞋子退差价' }); t.$('askOk').click();
   t.$('filterFab').click(); t.$('searchKeyword').value='鞋子'; t.$('sheetApply').click();
-  t.$('batchBar').querySelector('[data-act="batch"]').click();
-  ok(t.$('askMsg').textContent.startsWith('对当前筛选命中的 1 条记录') && t.$('askMsg').textContent.includes('另有 1 条退款记录不参与'), '菜单说明：'+t.$('askMsg').textContent);
+  t.$('batchBar').click();
+  ok(t.$('askMsg').textContent.startsWith('对搜到的这 1 条记录') && t.$('askMsg').textContent.includes('另有 1 条退款记录不参与'), '菜单说明：'+t.$('askMsg').textContent);
   const choose=label=>RC.choose(t.d, label);   // 1020-I：批量改分类在分类抽屉里选
   choose('改分类'); choose('游戏');
   ok(t.$('askList').querySelectorAll('.al-row').length===1, '确认清单只有原账单');
@@ -262,7 +262,7 @@ function bootSync(records, arcExtra){
   // 只命中退款
   const t2=await boot(); t2.refund('buy',{part:5, remark:'独有备注'}); t2.$('askOk').click();
   t2.$('filterFab').click(); t2.$('searchKeyword').value='独有备注'; t2.$('sheetApply').click();
-  t2.$('batchBar').querySelector('[data-act="batch"]').click();
+  t2.$('batchBar').click();
   ok(t2.$('askMsg').textContent.startsWith('命中的 1 条都是退款记录'), '只命中退款时提示');
   // 筛选小计按净额
   ok(t.$('summaryFilter').textContent.includes('支出 70.00'), '筛选小计支出 = 100 − 30：'+t.$('summaryFilter').textContent);

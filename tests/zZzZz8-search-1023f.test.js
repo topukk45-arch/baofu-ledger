@@ -24,7 +24,8 @@ const R = (id, time, money, type, cat, remark, extra) => Object.assign({ id, tim
   const frame = () => new Promise(r => w.requestAnimationFrame(() => setTimeout(r, 0)));
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
   const chip = (box, txt) => [...$(box).querySelectorAll('.cc')].find(e => e.textContent === txt);
-  const ids = () => { w.JiwenLedger.listFlush(); return [...$('billList').querySelectorAll('.bl-row')].map(r => r.dataset.id).sort().join(); };
+  const ids = () => { w.JiwenSearch.searchFlush(); return [...$('searchList').querySelectorAll('.bl-row')].map(r => r.dataset.id).sort().join(); };   // 1023-G：结果在搜一笔页里
+  const noCond = () => !$('searchTags').querySelector('.sp-tag');
   const search = async setup => { $('filterFab').click(); await frame(); $('sheetClear').click(); setup(); $('sheetApply').click(); return ids(); };
 
   // 备注：空格隔开的几个词都要包含（不管先后），全角空格也算
@@ -32,36 +33,36 @@ const R = (id, time, money, type, cat, remark, extra) => Object.assign({ id, tim
   ok(await search(() => { $('searchKeyword').value = '午饭 公司'; }) === 'a', '1 不管先后');
   ok(await search(() => { $('searchKeyword').value = '楼下　面馆'; }) === 'b', '1 全角空格也算分隔');
   ok(await search(() => { $('searchKeyword').value = '楼下'; }) === 'a,b', '1 一个词：照旧是包含');
-  ok(w.JiwenLedger.searchNow().keyword === '楼下', '1 存的还是小写、去掉两头空格的原文');
+  ok(w.JiwenSearch.searchNow().keyword === '楼下', '1 存的还是小写、去掉两头空格的原文');
   // 收支：两个都选 = 全部（不算筛选）；退款算收入
   ok(await search(() => chip('filterIoChips', '收入').click()) === 'c,f,g', '2 只看收入（退款算收入）');
-  ok(await search(() => { chip('filterIoChips', '收入').click(); chip('filterIoChips', '支出').click(); }) === 'a,b,c,g' && !w.__filterActive(), '2 收入、支出都选 = 全部，不算筛选（列的是这个月）');
+  ok(await search(() => { chip('filterIoChips', '收入').click(); chip('filterIoChips', '支出').click(); }) === 'a,b,c,d,e,f,g' && noCond(), '2 收入、支出都选 = 全部，不算条件（1023-G：没条件时结果页列全部记录）');
   // 统计：多选，命中其中一种就行
   ok(await search(() => { chip('filterModeChips', '不计').click(); chip('filterModeChips', '往来').click(); }) === 'e,f', '3 不计 + 往来');
   ok(await search(() => { chip('filterModeChips', '计入').click(); chip('filterModeChips', '不计').click(); }) === 'a,b,c,d,e,g', '3 计入 + 不计');
-  ok(await search(() => { chip('filterModeChips', '往来').click(); chip('filterModeChips', '往来').click(); }) === 'a,b,c,g' && !w.__filterActive(), '3 再点一下去掉');
+  ok(await search(() => { chip('filterModeChips', '往来').click(); chip('filterModeChips', '往来').click(); }) === 'a,b,c,d,e,f,g' && noCond(), '3 再点一下去掉');
   // 分类：多选
   ok(await search(() => { chip('filterChips', '吃饭').click(); chip('filterChips', '购物').click(); }) === 'a,b,d,g', '4 吃饭 + 购物');
-  ok(w.JiwenLedger.searchNow().cats.join() === '吃饭,购物' && $('summaryFilter').querySelector('.filter-badge').textContent === '吃饭、购物', '4 存成数组（按分类管理里的顺序），徽标写两个');
+  ok(w.JiwenSearch.searchNow().cats.join() === '吃饭,购物' && [...$('searchTags').querySelectorAll('.sp-tag')].map(e => e.textContent).join() === '吃饭,购物', '4 存成数组（按分类管理里的顺序），结果页两个小标签');
   $('filterFab').click(); await frame();
   ok([...$('filterChips').querySelectorAll('.sel')].map(e => e.textContent).join() === '吃饭,购物', '4 重开面板：两个都高亮');
-  chip('filterChips', '全部').click();
-  ok(!$('filterChips').querySelector('.sel:not([data-v="__all"])') && chip('filterChips', '全部').classList.contains('sel'), '4 点「全部」清空');
+  chip('filterChips', '吃饭').click(); chip('filterChips', '购物').click();
+  ok(!$('filterChips').querySelector('.sel') && noCond(), '4 再点一下去掉（1023-G 起没有「全部」那一格）');
   w.closeFilterSheet();
   // 叠加：分类 + 收支 + 备注
   ok(await search(() => { chip('filterChips', '吃饭').click(); chip('filterIoChips', '支出').click(); $('searchKeyword').value = '楼下'; }) === 'a,b', '5 吃饭 + 支出 + 备注「楼下」');
   // 批量跟着结果走：显示多少条就改多少条
-  const hitN = w.JiwenStore.getUserData().filter(r => w.JiwenLedger.filterMatch(r)).length;
-  ok(hitN === 2 && $('billList').querySelectorAll('.bl-row').length === 2 && /命中 2 条/.test($('batchBar').textContent), '5 批量入口的条数 = 列表里的条数');
+  const hitN = w.JiwenStore.getUserData().filter(r => w.JiwenSearch.filterMatch(r)).length;
+  ok(hitN === 2 && $('searchList').querySelectorAll('.bl-row').length === 2 && /找到 2 笔/.test($('summaryFilter').textContent) && $('batchBar'), '5 批量的条数 = 结果页列出来的条数');
   // 分类改名 / 删掉以后：不在分类表里的不再算条件
   await search(() => chip('filterChips', '杂项').click());
   ok(ids() === 'e', '6 只看杂项');
   w.JiwenCats.deleteCat('杂项'); if ($('askOk') && $('askMask').style.display === 'flex') $('askOk').click();
   await frame();
-  ok(w.JiwenLedger.searchNow().cats.length === 0, '6 删掉了「杂项」：分类条件跟着去掉 ' + JSON.stringify(w.JiwenLedger.searchNow().cats));
+  ok(w.JiwenSearch.searchNow().cats.length === 0, '6 删掉了「杂项」：分类条件跟着去掉 ' + JSON.stringify(w.JiwenSearch.searchNow().cats));
   // 清掉
-  w.JiwenLedger.clearAllFilters();
-  const sn = w.JiwenLedger.searchNow();
+  w.JiwenSearch.resetSearch();
+  const sn = w.JiwenSearch.searchNow();
   ok(!sn.keyword && !sn.ios.length && !sn.modes.length && !sn.cats.length && !w.__filterActive(), '7 一键清掉：全部归零');
 
   ok(!t.errs.length, '没有报错 ' + t.errs.join('|'));

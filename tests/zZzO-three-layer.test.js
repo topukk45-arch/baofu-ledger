@@ -104,7 +104,7 @@ const recs = [
   // 6. 批量操作：确认框取消回上一层
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
   const choose = label => [...$('askChoices').querySelectorAll('.cc')].find(b => (b.querySelector('.cc-label') || b).textContent === label).click();
-  w.JiwenLedger.openBatchMenu(); await settle();
+  w.JiwenSearch.openBatchMenu(); await settle();
   choose('改分类'); $('askOk').click(); await settle();
   // 1020-I：选分类用分类抽屉（共用底部面板）
   const drawer = () => w.JiwenSheet.isOpen() && $('uiSheetTitle').textContent === '改成哪个分类';

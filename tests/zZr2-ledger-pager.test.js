@@ -80,11 +80,13 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   ok(!ag.some(x => /8月[1-4]日/.test(x)) && ag.some(x => x.startsWith('8月21日–23日，3 天没记')) && ag.some(x => x.startsWith('8月24日–30日，7 天没记')), '7 账本第一笔之前的空白日子不显示 ' + ag.join(' | '));
   w.JiwenLedger.setYM(null);
   ok(txt(bar).startsWith('10月') && !w.JiwenLedger.ovOff(), '7 回到这个月');
-  // 8. 有筛选时（老筛选浮层）：全部月份里命中的，不显示没记账的日子，细条藏起来
+  // 8. 搜一笔（1023-G 起是单独的结果页）：全部月份里命中的，同样的周小计 / 日卡片，不显示没记账的日子；账单页不动
   $('filterFab').click(); $('searchKeyword').value = '地铁'; $('sheetApply').click();
-  ok(bar.style.display === 'none' && list.querySelectorAll('.bl-row').length === 23 && !list.querySelector('.lg-gap'), '8 筛选：全部命中的、没有空白日子、细条藏起来');
-  $('clearFilterFab').click();
-  ok(bar.style.display === '' && list.querySelector('.lg-gap-today'), '8 清掉筛选回到这个月');
+  w.JiwenSearch.searchFlush();
+  const sl = $('searchList');
+  ok(sl.querySelectorAll('.bl-row').length === 23 && !sl.querySelector('.lg-gap') && sl.querySelector('.lg-wk') && sl.querySelector('.lg-dc') && list.querySelector('.lg-gap-today'), '8 搜一笔：全部命中的、周小计 / 日卡片照样有、没有空白日子；账单页还是这个月');
+  $('searchToLedger').click();
+  ok(!w.JiwenSearch.isOpen() && bar.style.display === '' && list.querySelector('.lg-gap-today'), '8 回到账单');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
 
   // 9. 今天是周一：本周那条不显示

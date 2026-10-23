@@ -64,7 +64,7 @@ ok(/分类,统计,去向/.test(ex) && /,不计,/.test(ex) && /,往来,/.test(ex)
   ok(H.normal === '算进收入、支出和结余（平时都是这个）' && H.skip === '哪里都不算：信用卡还款、重复记录' && H.flow === '资金往来：转账、存取钱、借还钱，只动结余，不算进收支', '4 三句说明照新的写');
 
   // 5. 筛选：统计这一栏
-  ok([...d.querySelectorAll('.search-label')].some(x => x.textContent === '统计'), '5 筛选里的标题是「统计」');
+  ok(d.querySelector('#filterModeRow .rec-row-k').textContent === '统计', '5 筛选里的标题是「统计」（1023-G：列表卡里一行）');
 
   // 6. 存的值不变：改成「不计」存进去是 skip:true
   const st = w.JiwenStore.loadStore();

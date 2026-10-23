@@ -130,10 +130,11 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
         $(t.d,'filterFab').click();
         $(t.d,'searchKeyword').value = '不存在的关键词';
         $(t.d,'sheetApply').click();
+        // 1023-G：搜一笔是单独一页（结果页），账单页不动
         const sf = $(t.d,'summaryFilter');
-        ok($(t.d,'billHead').style.display === 'none' && !$(t.d,'summaryOverall'), '筛选时顶上的月份细条藏起来（下面是全部月份里命中的）；总览没有了（1023-C：总结余搬去统计页）');
-        ok(sf.style.display === 'flex' && sf.textContent.includes('命中 0 条'), '小计显示命中 0 条');
-        ok($(t.d,'billList').textContent.includes('没有符合条件的记录') && $(t.d,'billList').textContent.includes('清掉筛选'), '列表显示无结果提示（1023-A：多一句怎么清筛选）');   // 1023-A：分类汇总搬去统计页，不在这里查
+        ok(t.w.JiwenSearch.isOpen() && $(t.d,'billHead').style.display !== 'none' && !$(t.d,'summaryOverall') && $(t.d,'billList').querySelector('.lg-gap-today, .bl-row, .lg-wk'), '搜一笔在结果页里，账单页照旧按月（1023-G）；总览没有了（1023-C：总结余搬去统计页）');
+        ok(sf.hidden && $(t.d,'searchCount').textContent === '0 笔', '没结果：不写合计，顶上写 0 笔');
+        ok(!$(t.d,'searchEmpty').hidden && $(t.d,'searchEmpty').textContent.includes('没有找到相关的账') && $(t.d,'searchEmpty').textContent.includes('把它去掉'), '没结果：缺省页写怎么去掉条件');
         ok(!$(t.d,'pagerBottom') && !$(t.d,'pagerPad'), '没有翻页了（1023-C 起按月一直往下排）');
     }
     // ---------- 4b. 存档完全为空：汇总区隐藏 ----------

@@ -1,12 +1,13 @@
 (function(){
-        const { $, PAGE_SIZE, billCat, billMoney, billRemark, billTime, editMask, editMoney, editRemark, editTime, escapeHtml, fabHold, fabWake, fillSelect, filterCat, isDirtyTime, loginBox, mainBox, nowDtValue, nowUser, repairTime } = window.JiwenBase;   // 用到前面模块的
+        const { $, PAGE_SIZE, billCat, billMoney, billRemark, billTime, editMask, editMoney, editRemark, editTime, escapeHtml, fabHold, fabWake, fillSelect, isDirtyTime, loginBox, mainBox, nowDtValue, nowUser, repairTime } = window.JiwenBase;   // 用到前面模块的
         const { getCats, getUserData, loadStore, nameOf, saveStoreDurable, saveStoreSafe, touchAccount, trackBusy } = window.JiwenStore;   // 用到前面模块的
         const { closeAllCs } = window.JiwenSelect;   // 用到前面模块的
         const { customAlertHtml } = window.JiwenAsk;   // 用到前面模块的
         const { getDtInput, setDtInput } = window.JiwenDate;   // 用到前面模块的
         const { impOpenFile } = window.JiwenImportEntry;   // 用到前面模块的
         const { formSnaps, formState, getModeChips, openAddModal, renderEditCatChips, renderEditTypeChips, setModeChips } = window.JiwenForms;   // 用到前面模块的
-        const { clearAllFilters, renderBill, renderFilterChips, resetSearch } = window.JiwenLedger;   // 用到前面模块的
+        const { renderBill } = window.JiwenLedger;   // 用到前面模块的
+        const { renderFilterChips, resetSearch } = window.JiwenSearch;   // 用到前面模块的
         const { renderStats, setStatTab } = window.JiwenStats;   // 用到前面模块的
         const { exitSelectMode, openDayDialog, renderDaysCard, renderDaysList } = window.JiwenDays;   // 用到前面模块的
         const { refreshArchiveSelect, renderStorageUse } = window.JiwenSettings;   // 用到前面模块的
@@ -28,7 +29,7 @@
             $('tabBar').style.display='flex';
             document.body.classList.remove('login-mode');
             nowUser.innerText = `当前用户：${nameOf(id)}`;
-            resetSearch();
+            resetSearch(); JiwenLedger.resetYM();
             refreshArchiveSelect();
             refreshCatSelectors();
             setDtInput(billTime, nowDtValue());   // 进入主界面即默认当前时间
@@ -51,21 +52,13 @@
         function refreshCatSelectors(){
             const cats=getCats();
             fillSelect(billCat, cats, cats[0]);
-            const cur=filterCat.value;
-            filterCat.innerHTML='<option value="__all">全部</option>';
-            cats.forEach(c=>{
-                const o=document.createElement('option'); o.value=c; o.textContent=c;
-                filterCat.appendChild(o);
-            });
-            // 当前筛选值若在新分类表里仍存在则保留，否则回落到「全部」
-            filterCat.value = [...filterCat.options].some(o=>o.value===cur) ? cur : '__all';
-            renderFilterChips();
-            if(window.syncFilterFab) window.syncFilterFab();
+            renderFilterChips();   // 搜一笔的分类：已经不在分类表里的不再算条件（1023-G）
         }
         // 数据变更后统一刷新：账单页总是刷新；统计页若正在显示也立即重算，
         // 避免「新增/删除记录后切到统计页数字没更新」的问题
         function refreshAllViews(){
             renderBill();
+            JiwenSearch.render();   // 1023-G：搜一笔开着时，结果跟着变（关着时什么都不做）
             if(JiwenBase.currentTab==='stats') renderStats();
             // 「日子」入口卡也一并刷新：它虽与账单无关，但改名等路径会换 currentUser，
             // 收在这里就不必在每个调用点各加一行（漏一个就是显示旧账号的日子）。
@@ -359,7 +352,7 @@
             $('actionBar').style.display = tab==='ledger' ? 'flex':'none';
             if(tab!=='ledger'){
                 const tt=$('toTopBtn'); if(tt) tt.classList.remove('show');
-                const cf=$('clearFilterFab'); if(cf) cf.classList.remove('show');
+                if(JiwenSearch.isOpen()) JiwenSearch.closeSearch();   // 1023-G：换页签时搜一笔收起来
             }
             if(tab!=='stats'){ const sf=$('statTodayFab'); if(sf) sf.classList.remove('show'); }
             document.body.classList.toggle('tab-ledger', tab==='ledger');
@@ -367,8 +360,6 @@
             document.querySelectorAll('.tab-btn').forEach(b=>{
                 b.classList.toggle('active', b.dataset.tab===tab);
             });
-            // 进入记账页时按当前筛选状态决定清除浮钮显隐
-            if(tab==='ledger' && window.syncFilterFab) window.syncFilterFab();
             if(tab==='ledger') requestAnimationFrame(()=>JiwenLedger.stripWake());   // 1023-C：打开账单页时月份浮条先露 1.5 秒
             if(tab==='stats') renderStats();
             if(tab==='settings') renderStorageUse();
@@ -409,9 +400,8 @@
                 }
                 fabWake(btn, show);   // 1017-N：滑动时出现，停下 1.5 秒淡出
                 // 账单页滑动时 ✕ 也跟着出现、停下一起淡出
-                if(JiwenBase.currentTab==='ledger' && window.syncFilterFab) window.syncFilterFab();
             }
-            fabHold(btn); fabHold($('clearFilterFab')); fabHold($('statTodayFab'));
+            fabHold(btn); fabHold($('statTodayFab'));
             window.addEventListener('scroll', onScroll, {passive:true});
             btn.addEventListener('click', ()=>{
                 // 记账页：落到账单标题处（其下方就是翻页条），方便随手翻页——而非滚到整页最顶的「日子」卡片。
@@ -421,10 +411,6 @@
                 else { window.scrollTo({top:0, behavior:'smooth'}); }
             });
             onScroll();
-
-            // 清除筛选浮钮：一键清空全部筛选并刷新列表
-            const clearFab=$('clearFilterFab');
-            if(clearFab) clearFab.addEventListener('click', ()=>{ clearAllFilters(); });
         })();
 
         // 默认进入页面：分段选择器
@@ -551,7 +537,6 @@
             $('pageDays').style.display='block';
             $('actionBar').style.display='none';    // 子页里不该有「筛选 / 记一笔」
             const tt=$('toTopBtn');        if(tt) tt.classList.remove('show');
-            const cf=$('clearFilterFab');  if(cf) cf.classList.remove('show');
             document.body.classList.remove('tab-ledger');   // 去掉为记账页底部常驻条留的内边距
             document.body.classList.add('days-page');       // 1020-D：卡片跟着内容高度走，外面让出底部操作栏
             renderDaysList();

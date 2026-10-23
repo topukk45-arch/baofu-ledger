@@ -121,10 +121,10 @@ function bootSync(records, extra){
     ok(t.$('catStats').textContent.length>0 && !t.$('catStats').textContent.includes('转账'), '全部不计的「转账」不出现在分类汇总');
     t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
     t.filterKw('信用卡');
-    ok([...t.$('billList').querySelectorAll('.bl-row')].filter(r=>r.querySelector('.io-skip') && r.querySelector('.amt-skip')).length===2, '不计行有灰色标签和灰色金额');
+    ok([...t.$('searchList').querySelectorAll('.bl-row')].filter(r=>r.querySelector('.io-skip') && r.querySelector('.amt-skip')).length===2, '不计行有灰色标签和灰色金额（1023-G：在搜一笔的结果页里）');
     const sf=t.$('summaryFilter').textContent;
-    ok(sf.includes('命中 2 条（其中 2 条不计）') && sf.includes('支出 0.00'), '筛选小计说明不计条数：'+sf);
-    ok(t.$('batchBar').querySelector('[data-act="batch"]'), '筛选生效时有批量按钮');
+    ok(sf.includes('找到 2 笔（其中 2 笔不计）') && sf.includes('支出 0.00'), '结果页合计说明不计条数：'+sf);
+    ok(t.$('batchBar') && t.$('batchBar').dataset.act==='batch', '有条件时结果页有「批量改」');
     // 结余：a5（100 不计）那一笔的结余应等于它前一笔（a4）——1023-A 起结余在详情里（点整行进详情）
     const t2=await boot(baseRecords());
     const balOf=id=>{ const row=t2.$('billList').querySelector(`.bl-row[data-id="${id}"]`); if(!row) return null; row.click(); const v=t2.$('detailBal').textContent; t2.$('detailClose').click(); return v; };
@@ -162,7 +162,7 @@ function bootSync(records, extra){
 {
     const t=await boot();
     t.filterKw('信用卡');
-    t.$('batchBar').querySelector('[data-act="batch"]').click();
+    t.$('batchBar').click();
     t.choose('标为不计');
     ok(t.$('askMsg').textContent.includes('把下面这 2 条') && t.$('askOk').textContent==='改这 2 条' && t.$('askOk').classList.contains('warn'), '确认框写明条数');
     t.$('askOk').click();
@@ -174,7 +174,7 @@ function bootSync(records, extra){
     // 跨页：20 条游戏充值，每页 15 条
     const t2=await boot();
     t2.filterKw('游戏充值');
-    t2.$('batchBar').querySelector('[data-act="batch"]').click();
+    t2.$('batchBar').click();
     t2.choose('改分类'); t2.choose('游戏');
     ok(t2.$('askMsg').textContent.includes('把下面这 20 条') && t2.$('askOk').textContent==='改这 20 条', '跨页批量：20 条');
     t2.$('askOk').click();
@@ -185,16 +185,17 @@ function bootSync(records, extra){
     const t3=await boot();
     t3.$('filterFab').click(); t3.chip('filterChips','其他').click(); t3.$('searchKeyword').value='游戏充值'; t3.$('sheetApply').click();
     const n=t3.recs().filter(r=>r.cat==='其他' && r.remark==='游戏充值').length;
-    t3.$('batchBar').querySelector('[data-act="batch"]').click();
+    t3.$('batchBar').click();
     t3.choose('改分类'); t3.choose('游戏'); t3.$('askOk').click();
-    ok(t3.w.JiwenLedger.searchNow().cats.join()==='游戏', '筛选分类跟到新分类');
-    ok(t3.$('summaryFilter').textContent.includes(`命中 ${n} 条`), '列表仍显示刚改的那批');
+    ok(t3.w.JiwenSearch.searchNow().cats.join()==='游戏', '筛选分类跟到新分类');
+    ok(t3.$('summaryFilter').textContent.includes(`找到 ${n} 笔`), '列表仍显示刚改的那批');
     t3.$('askExtra').click();
-    ok(t3.w.JiwenLedger.searchNow().cats.join()==='其他' && t3.recs().filter(r=>r.cat==='游戏').length===0, '撤销后分类与筛选都还原');
+    ok(t3.w.JiwenSearch.searchNow().cats.join()==='其他' && t3.recs().filter(r=>r.cat==='游戏').length===0, '撤销后分类与筛选都还原');
 
     // 没筛选时没有批量入口
     const t4=await boot();
-    ok(t4.$('summaryFilter').style.display==='none', '无筛选时不显示批量入口');
+    t4.$('filterFab').click(); t4.$('sheetApply').click();
+    ok(!t4.$('batchBar') && t4.$('searchList').querySelectorAll('.bl-row').length===t4.recs().length, '没条件：结果页列全部记录、不给批量（1023-G）');
     ok(t.errs.length+t2.errs.length+t3.errs.length===0, '批量无脚本错误');
 }
 

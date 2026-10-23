@@ -152,7 +152,7 @@ const merged=(db,id)=>JSON.parse(db['store_'+id]);
   const aid=aidOf(await t.db(), ID_A, '默认存档');
   const ids=['a1','a2','a3'];   // 十月、八月、九月
   breakPut(k=>k===`led_${ID_A}_${aid}_2026-09`, 'abort');
-  t.w.JiwenLedger.applyBatch(ids, { cat:'其他' }); await t.idle();
+  t.w.JiwenSearch.applyBatch(ids, { cat:'其他' }); await t.idle();
   restore();
   let db=await t.db();
   const cats=()=>merged(db, ID_A).archives['默认存档'].records.filter(r=>ids.includes(r.id)).map(r=>r.cat).join(',');
@@ -160,7 +160,7 @@ const merged=(db,id)=>JSON.parse(db['store_'+id]);
   t.$('askOk').click();
   t.w.dispatchEvent(new t.w.Event('pagehide')); db=await t.db();
   ok(cats()==='其他,其他,其他', '3 补写后三个月一起改好');
-  t.w.JiwenLedger.undoBatch(); db=await t.db();
+  t.w.JiwenSearch.undoBatch(); db=await t.db();
   ok(cats()==='餐饮,出行,餐饮', '3 撤销：三个月一起恢复');
   ok(db['store_'+ID_A]===OLD_LS['store_'+ID_A], '3 撤销后和原来逐字节一样');
   ok(!t.errs.length, '3 无报错 '+t.errs.join('|'));

@@ -97,9 +97,10 @@ const recs = [
 
   // 五、筛选浮层：关键词、金额、日期是列表行；统计按新叫法；分类照旧多选
   $('filterFab').click(); await wait(20);
-  const fl = $('filterSheet').querySelector('.filter-list');
-  ok(fl && [...fl.querySelectorAll('.rec-row-k')].map(x => x.textContent).join() === '日期,关键词,金额' && fl.contains($('searchMin')) && fl.contains($('searchFrom')), '五 日期、关键词、金额一张列表卡（1023-A 日期挪到第一行）');
-  ok([...$('filterModeChips').querySelectorAll('.cc')].map(c => c.textContent).join() === '全部,计入,不计,往来' && $('filterChips').classList.contains('filter-chips'), '五 统计按新叫法和顺序，分类照旧是多选分类块');
+  // 1023-G：日期两个带日历图标的按钮在最上面，金额大字，收入 | 支出，常用分类；列表卡：分类 ›、统计 ›、备注
+  const fl = $('filterSheet').querySelector('.sf-list');
+  ok(fl && [...fl.querySelectorAll(':scope > .rec-row:not([hidden]) .rec-row-k')].map(x => x.textContent).join() === '分类,统计,备注' && fl.contains($('searchKeyword')) && $('searchFromBtn').querySelector('svg') && $('searchFromBtn').contains($('searchFrom')) && $('filterSheet').querySelector('.sf-money').contains($('searchMin')), '五 日期按钮、金额大字，列表卡：分类、统计、备注（1023-G）');
+  ok([...$('filterModeChips').querySelectorAll('.cc')].map(c => c.textContent).join() === '计入,不计,往来' && $('filterChips').classList.contains('sf-grid'), '五 统计按新叫法和顺序，分类是多选的块');
   $('searchMin').click(); await tick();
   ok(shown('kpMask') && w.JiwenKeypad.kpTarget === $('searchMin') && $('kpCaret'), '五 金额区间用数字键盘、有闪动光标');
   w.kpClose();
@@ -107,7 +108,7 @@ const recs = [
 
   // 六、批量改分类、导入页的选分类面板：分类抽屉
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await tick();
-  w.JiwenLedger.openBatchMenu(); await tick();
+  w.JiwenSearch.openBatchMenu(); await tick();
   [...$('askChoices').querySelectorAll('.cc')].find(b => (b.querySelector('.cc-label') || b).textContent === '改分类').click(); $('askOk').click(); await tick();
   ok(w.JiwenSheet.isOpen() && $('uiSheetTitle').textContent === '改成哪个分类' && $('catDrawerAll'), '六 批量改分类：分类抽屉');
   w.JiwenSheet.back(); await tick();

@@ -56,8 +56,8 @@ const NOW = '2026-10-20T10:00:00';   // 星期二
   ok(q('#lgMonth').textContent === '10月' && !w.JiwenLedger.ovOff(), '1 回到这个月');
   w.JiwenLedger.setYM('2026-09');
   ok(w.JiwenTabs && w.snapSave && (w.snapSave('hide'), !w.localStorage.getItem('app_snap_' + A.ID)), '1 看的不是这个月：不存首屏快照');
-  $('clearFilterFab').click(); await wait(10);
-  ok(q('#lgMonth').textContent === '10月', '1 ✕ 回到默认：也回到这个月');
+  w.JiwenLedger.resetYM(); w.JiwenLedger.renderBill();   // 1023-G 起没有清筛选的 ✕ 了：换账号 / 存档时回到这个月
+  ok(q('#lgMonth').textContent === '10月', '1 换账号 / 存档：回到这个月');
 
   // 2. 列表
   const list = $('billList');
@@ -92,34 +92,35 @@ const NOW = '2026-10-20T10:00:00';   // 星期二
   ok($('pageDays').style.display === 'block' && $('pageLedger').style.display === 'none', '3 点日子那条进日子页');
   w.JiwenTabs.backFromDaysPage ? w.JiwenTabs.backFromDaysPage() : d.querySelector('.tab-btn[data-tab="ledger"]').click(); await wait(10);
 
-  // 4. 筛选：收支、日期快捷
-  const ids = () => [...list.querySelectorAll('.bl-row')].map(r => r.dataset.id).sort().join();
+  // 4. 搜一笔（1023-G）：收支、日期快捷；改一下结果页就跟着变
+  const ids = () => { w.JiwenSearch.searchFlush(); return [...$('searchList').querySelectorAll('.bl-row')].map(r => r.dataset.id).sort().join(); };
   $('filterFab').click();
   const io = t => [...$('filterIoChips').children].find(c => c.textContent === t);
-  ok([...$('filterIoChips').children].map(c => c.textContent).join() === '全部,支出,收入' && io('全部').classList.contains('sel'), '4 收支三个：全部 / 支出 / 收入，默认全部');
-  ok([...$('filterSheet').querySelectorAll('.filter-list .rec-row-k')].map(x => x.textContent).join() === '日期,关键词,金额', '4 日期在第一行');
+  ok([...$('filterIoChips').children].map(c => c.textContent).join() === '收入,支出' && !$('filterIoChips').querySelector('.sel'), '4 收支两个大按钮：收入 | 支出，默认都不选（= 全部）');
+  ok($('searchFromBtn').compareDocumentPosition($('searchMin')) & 4 && $('searchMin').compareDocumentPosition($('filterIoChips')) & 4, '4 日期在最上面，下面金额、收支');
   io('收入').click(); $('sheetApply').click();
-  ok(ids() === 'o1,s2,t3' && /收入/.test($('summaryFilter').querySelector('.filter-badge').textContent), '4 只看收入：' + ids());
-  $('filterFab').click();
-  ok(io('收入').classList.contains('sel'), '4 重开面板回显收入');
+  ok(ids() === 'o1,s2,t3' && /收入/.test($('searchTags').textContent), '4 只看收入：' + ids());
+  $('searchEdit').click();
+  ok(io('收入').classList.contains('sel'), '4 改条件：收入还选着');
   const qb = k => $('filterDateQuick').querySelector(`[data-q="${k}"]`);
+  ok(qb('all').classList.contains('on'), '4 日期默认「不限」');
   qb('month').click();
-  ok($('searchFrom').dataset.day === '2026-10-01' && $('searchTo').dataset.day === '2026-10-31' && qb('month').classList.contains('on'), '4 本月：10-01 到 10-31，高亮');
+  ok($('searchFrom').dataset.day === '2026-10-01' && $('searchTo').dataset.day === '2026-10-31' && qb('month').classList.contains('on') && $('searchFrom').textContent === '10月1日', '4 本月：10-01 到 10-31，高亮，按钮上写日子');
   qb('last').click();
   ok($('searchFrom').dataset.day === '2026-09-01' && $('searchTo').dataset.day === '2026-09-30' && qb('last').classList.contains('on') && !qb('month').classList.contains('on'), '4 上月：09-01 到 09-30');
   qb('7d').click();
   ok($('searchFrom').dataset.day === '2026-10-14' && $('searchTo').dataset.day === '2026-10-20', '4 近 7 天：10-14 到 10-20');
-  ok(ids() === 'o1,s2,t3', '4 只改草稿，没点完成列表不变');
-  io('全部').click(); $('sheetApply').click();
+  ok(ids() === 't3', '4 改了马上生效（近 7 天 + 收入）：' + ids());
+  io('收入').click();
   ok(ids() === 't1,t2,t3,t4', '4 近 7 天：' + ids());
-  $('filterFab').click(); qb('7d').click();
-  ok(!$('searchFrom').dataset.day && !$('searchTo').dataset.day && !qb('7d').classList.contains('on'), '4 再点一下取消');
+  qb('all').click();
+  ok(!$('searchFrom').dataset.day && !$('searchTo').dataset.day && qb('all').classList.contains('on'), '4 「不限」清掉日期');
   qb('month').click(); io('支出').click(); $('sheetClear').click();
-  ok(!$('searchFrom').dataset.day && io('全部').classList.contains('sel') && !$('filterDateQuick').querySelector('.on'), '4 清除全部：日期、收支一起清');
-  ok($('sheetClear').classList.contains('ui-btn') && $('sheetApply').classList.contains('primary') && $('sheetClear').parentElement.classList.contains('ui-pair') && $('sheetClear').nextElementSibling === $('sheetApply'), '4 底部「清除全部 | 完成」左退右进');
+  ok(!$('searchFrom').dataset.day && !$('filterIoChips').querySelector('.sel') && qb('all').classList.contains('on'), '4 清空条件：日期、收支一起清');
+  ok($('sheetApply').classList.contains('primary') && $('sheetApply').classList.contains('block') && $('filterBack').parentElement.classList.contains('ui-pair') && $('filterBack').nextElementSibling === $('sheetClear'), '4 底部「看这 N 笔」整宽，下面「回到账单 | 清空条件」左右并排');
   $('searchKeyword').value = '不存在的字'; $('sheetApply').click();
-  ok(/没有符合条件的记录/.test(list.textContent) && /清掉筛选/.test(list.textContent) && !$('pagerBottom'), '5 筛选没结果：空状态写怎么清筛选、没有页码');
-  $('clearFilterFab').click(); await wait(10);
+  ok(!$('searchEmpty').hidden && /没有找到相关的账/.test($('searchEmpty').textContent) && !$('pagerBottom'), '5 没结果：缺省页、没有页码');
+  $('searchToLedger').click(); await wait(10);
 
   // 5. 删一条：结余重算
   w.openEdit('t3'); $('deleteEditBtn') ? $('deleteEditBtn').click() : null;

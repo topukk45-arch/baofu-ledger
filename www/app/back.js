@@ -138,6 +138,8 @@
                 // 而不是带着一堆勾选状态直接跳回记账页。
                 { can:()=>JiwenDays.daysSelecting, close:()=>exitSelectMode() },
                 // 最后才是子页：前面全关完了，返回键才把日子页收回记账页
+                // 1023-G：搜一笔的结果页（抽屉在上面那一层先收）
+                { can:()=>JiwenSearch.isOpen(), close:()=>JiwenSearch.closeSearch() },
                 { can:()=>{ const p=$('pageDays'); return !!p && p.style.display==='block'; },
                   close:()=>backFromDaysPage() },
                 // 1021-T23：从导入结果页「接下来可以」跳到统计 / 预算 / 记一笔的：都关完了再按返回，回到导入结果页（15 分钟内）

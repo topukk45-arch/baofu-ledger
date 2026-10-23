@@ -23,47 +23,47 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   const scroll = (y, headTop) => { w.__y = y; if (headTop != null) w.__headTop = headTop; w.dispatchEvent(new w.Event('scroll')); };
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await sleep(50);
 
-  // 1. 筛选生效：✕ 出现，停下 1.5 秒淡出（1023-C 起没有翻页了，改用筛选）
-  t.$('filterFab').click(); t.$('searchKeyword').value = '虚构'; t.$('sheetApply').click();
-  ok(on('clearFilterFab'), '1 筛选后 ✕ 出现');
+  // 1. 打开账单页：月份浮条先露 1.5 秒（1023-G 起清筛选的 ✕ 去掉了，账单页右下角只剩它）
+  d.querySelector('.tab-btn[data-tab="settings"]').click(); await sleep(20);
+  d.querySelector('.tab-btn[data-tab="ledger"]').click(); await sleep(50);
+  ok(on('lgStrip') && !t.$('clearFilterFab'), '1 打开账单页：月份浮条露出来；没有 ✕ 了');
   await sleep(1000);
-  ok(on('clearFilterFab'), '1 1 秒时还在');
+  ok(on('lgStrip'), '1 1 秒时还在');
   await sleep(700);
-  ok(!on('clearFilterFab'), '1 停下 1.5 秒后淡出');
+  ok(!on('lgStrip'), '1 停下 1.5 秒后收起');
 
-  // 2. 筛选时滑动：✕ 出现，一直滑一直在，停下 1.5 秒淡出；账单页没有 ↑ 了，月份浮条也不出（列的是全部月份里命中的）
+  // 2. 滑动：浮条出来，一直滑一直在，停下 1.5 秒收起；账单页没有 ↑ 了
   scroll(1500, -800);
-  ok(on('clearFilterFab') && !on('toTopBtn') && !on('lgStrip'), '2 滑动时 ✕ 出现，↑、月份浮条不出（1023-C）');
+  ok(on('lgStrip') && !on('toTopBtn'), '2 滑动时浮条出来，↑ 不出（1023-C）');
   for (let k = 0; k < 4; k++) { await sleep(500); scroll(1500 + k * 100, -900 - k * 100); }
-  ok(on('clearFilterFab') && !on('toTopBtn'), '2 连着滑 2 秒，✕ 一直都在');
+  ok(on('lgStrip') && !on('toTopBtn'), '2 连着滑 2 秒，一直都在');
   await sleep(1700);
-  ok(!on('clearFilterFab') && !on('toTopBtn'), '2 停下 1.5 秒后淡出');
+  ok(!on('lgStrip') && !on('toTopBtn'), '2 停下 1.5 秒后收起');
 
-  // 3. 手指按在 ✕ 上不淡出，松开重新计时
+  // 3. 手指碰着浮条不收，松开重新计时
   scroll(1600, -950);
-  t.$('clearFilterFab').dispatchEvent(new w.Event('pointerdown'));
+  t.$('lgStrip').dispatchEvent(new w.Event('pointerdown'));
   await sleep(1700);
-  ok(on('clearFilterFab'), '3 按着不放：不淡出');
-  t.$('clearFilterFab').dispatchEvent(new w.Event('pointerup'));
+  ok(on('lgStrip'), '3 按着不放：不收');
+  t.$('lgStrip').dispatchEvent(new w.Event('pointerup'));
   await sleep(1000);
-  ok(on('clearFilterFab'), '3 松开 1 秒还在');
+  ok(on('lgStrip'), '3 松开 1 秒还在');
   await sleep(700);
-  ok(!on('clearFilterFab'), '3 松开 1.5 秒后淡出');
+  ok(!on('lgStrip'), '3 松开 1.5 秒后收起');
 
-  // 4. 没筛选：滑动出月份浮条、不出 ✕ 和 ↑；停下 1.5 秒收起，手指碰着它不收（1023-C）
-  t.$('clearFilterFab').click(); await sleep(1700);
-  ok(!on('clearFilterFab') && !on('lgStrip'), '4 点 ✕ 清掉筛选后 ✕ 收起');
+  // 4. 搜一笔开着：盖住账单页，浮条不出来
+  t.$('filterFab').click(); await sleep(20);
+  ok(t.w.JiwenSearch.isOpen() && d.body.classList.contains('search-open'), '4 搜一笔开着');
+  t.$('searchToLedger').click(); await sleep(300);
+  ok(!t.w.JiwenSearch.isOpen() && !d.body.classList.contains('search-open') && t.$('pageSearch').hidden, '4 回到账单：结果页收起');
   scroll(1400, -700);
-  ok(on('lgStrip') && !on('toTopBtn') && !on('clearFilterFab'), '4 没筛选：滑动只出月份浮条');
-  t.$('lgStrip').dispatchEvent(new w.Event('pointerdown')); await sleep(1700);
-  ok(on('lgStrip'), '4 手指碰着月份浮条：不收');
-  t.$('lgStrip').dispatchEvent(new w.Event('pointerup')); await sleep(1700);
-  ok(!on('lgStrip'), '4 松开 1.5 秒后收起');
+  ok(on('lgStrip') && !on('toTopBtn'), '4 回到账单再滑：浮条出来');
+  await sleep(1700);
 
   // 5. 统计页：↑ 一样，✕ 不出
   d.querySelector('.tab-btn[data-tab="stats"]').click(); await sleep(50);
   scroll(900);
-  ok(on('toTopBtn') && !on('clearFilterFab'), '5 统计页滑过 400：↑ 出现，清筛选 ✕ 不出');
+  ok(on('toTopBtn') && !d.body.classList.contains('tab-ledger'), '5 统计页滑过 400：↑ 出现（账单页的月份浮条随 tab-ledger 藏起来）');
   await sleep(1700);
   ok(!on('toTopBtn'), '5 统计页停下 1.5 秒后 ↑ 淡出');
   scroll(100);
@@ -71,7 +71,8 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   // 6. 淡出后不挡点击（样式里 .show 才 pointer-events:auto）
   const css = [...d.querySelectorAll('style')].map(s => s.textContent).join('\n');
-  ok(/\.to-top\s*\{[^}]*pointer-events:none/.test(css) && /\.clear-filter-fab\s*\{[^}]*pointer-events:none/.test(css) && /\.mstrip\s*\{[^}]*pointer-events:none/.test(css), '6 没出现时 pointer-events:none，不挡下面的记录（月份浮条也是）');
+  ok(/\.to-top\s*\{[^}]*pointer-events:none/.test(css) && /\.mstrip\s*\{[^}]*pointer-events:none/.test(css), '6 没出现时 pointer-events:none，不挡下面的记录（月份浮条也是）');
+  ok(/body:not\(\.tab-ledger\) #lgStrip[^{]*\{ display:none !important; \}/.test(css), '6 不在账单页时月份浮条整个不显示');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

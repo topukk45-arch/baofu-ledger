@@ -4,7 +4,7 @@
         const { customAlert, customChoose, customConfirm, customPrompt } = window.JiwenAsk;   // 用到前面模块的
         const { askImportOtherDays, importDaysSuffix, importFixSuffix, openAiExport } = window.JiwenAiExport;   // 用到前面模块的
         const { devImportOn, loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
-        const { resetSearch } = window.JiwenLedger;   // 用到前面模块的
+        const { resetSearch } = window.JiwenSearch;   // 用到前面模块的
         const { refreshArchiveSelect } = window.JiwenSettings;   // 用到前面模块的
         const { enterAccount, refreshAllViews, refreshCatSelectors } = window.JiwenTabs;   // 用到前面模块的
 
@@ -221,7 +221,7 @@
         archiveSelect.addEventListener('change', () => {
             JiwenBase.currentArchive = archiveSelect.value;
             const store=loadStore(); store.last=JiwenBase.currentArchive; saveStoreSafe(store);
-            JiwenBase.curPage=1; JiwenStats.statSelDay=null; resetSearch(); refreshCatSelectors(); refreshAllViews();
+            JiwenBase.curPage=1; JiwenStats.statSelDay=null; resetSearch(); JiwenLedger.resetYM(); refreshCatSelectors(); refreshAllViews();
             odRefreshStatusUI();
         });
         $('newArchive').addEventListener('click', () => {

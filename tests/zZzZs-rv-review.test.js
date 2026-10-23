@@ -28,11 +28,12 @@ const CATS = ['未分类', '吃饭', '购物', '娱乐', '其他'];
   const chip = () => $('rvChip');
   ok(chip() && /待确认分类 2 条/.test(chip().textContent), '2 账单页顶上「待确认分类 2 条」');
   chip().click(); await t.idle();
-  ok(chip().classList.contains('on') && /只看待确认分类 · 2 条/.test(chip().textContent) && $('billList').querySelectorAll('.bl-row').length === 2 && /命中 2 条/.test($('summaryFilter').textContent), '2 点了只看这 2 条（等于一个筛选）');
+  t.w.JiwenSearch.searchFlush();
+  ok(t.w.JiwenSearch.isOpen() && $('filterSheetMask').style.display !== 'flex' && $('searchTags').textContent.includes('待确认分类') && $('searchList').querySelectorAll('.bl-row').length === 2 && /找到 2 笔/.test($('summaryFilter').textContent), '2 点了打开搜一笔的结果页、只看这 2 条（等于一个筛选）');
   // 批量改分类：去掉标记；撤销放回
-  t.w.JiwenLedger.applyBatch(rvs().map(r => r.id), { cat: '其他' }); await t.idle();
+  t.w.JiwenSearch.applyBatch(rvs().map(r => r.id), { cat: '其他' }); await t.idle();
   ok(rvs().length === 0 && t.recs().filter(r => r.cat === '其他').length === 2, '3 批量改分类：标记去掉');
-  t.w.JiwenLedger.undoBatch(); await t.idle(); if (t.ask()) await t.askOk();
+  t.w.JiwenSearch.undoBatch(); await t.idle(); if (t.ask()) await t.askOk();
   ok(rvs().length === 2, '3 撤销这次批量：标记放回');
   // 详情「分类没问题」
   const id0 = rvs()[0].id;
@@ -51,9 +52,9 @@ const CATS = ['未分类', '吃饭', '购物', '娱乐', '其他'];
   t.w.JiwenForms.pickEditCat ? t.w.JiwenForms.pickEditCat('其他') : null;
   $('saveEdit').click(); await t.idle(); if (t.ask()) await t.askOk();
   ok(!t.recs().find(r => r.id === id1).rv, '6 修改账单改了分类：标记去掉');
-  ok(chip() && /只看待确认分类 · 0 条/.test(chip().textContent), '6 都改完了：开着的胶囊留着写 0 条，好退出');
-  chip().click(); await t.idle();
-  ok(!chip(), '6 再点退出筛选，没有待确认的了胶囊收掉');
+  ok(!chip() && t.w.JiwenSearch.isOpen() && $('searchCount').textContent === '0 笔' && $('searchTags').textContent.includes('待确认分类'), '6 都改完了：账单页的胶囊收掉；结果页条件还在、0 笔（1023-G）');
+  $('searchTags').querySelector('.sp-tag').click(); await t.idle();
+  ok(!$('searchTags').querySelector('.sp-tag'), '6 点 × 去掉「待确认分类」');
 
   console.log(`\n${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
