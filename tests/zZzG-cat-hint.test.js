@@ -1,7 +1,7 @@
-// 1019-H 分类汇总能滑但看不出来：框右下角的小圆钮（jsdom，记录全是虚构的）。node zZzG-cat-hint.test.js [index.html]
-// 分类超过 6 个、框里装不下才有；卡片从屏幕外回到屏幕上冒一次（一直在屏幕上不冒）；在框里滑时出现；停 0.8 秒淡出（不改 1.5 秒的 FAB_IDLE）；
-// 滑到框底换成 ↑、点了回框顶；中间点 ↓ 往下翻一屏；这次打开 App 滑到过底就不再做进屏幕提示；设置里「滑动提示」关掉就不出现。
-// jsdom 没有布局：框的高度、IntersectionObserver 都在页面里装成假的（真浏览器里的样子见提交说明）。
+// 分类汇总（jsdom，记录全是虚构的）。node zZzG-cat-hint.test.js [index.html]
+// 1019-H 原来是「框里能滑、右下角小圆钮提示」；1023-O 起分类汇总不在框里滑：全部铺开、固定从大到小、没有排序切换和滑动提示；
+// 净额是支出的分类在上（「支出」一段）、收入的在下（「收入」一段），中间一道线，每段最后一行合计；一段超过 10 个先列 8 个 +「展开全部 N 个」；
+// 两段合计相加 = 累计收入 − 累计支出（和总结余对得上）。设置里「滑动提示」开关照留。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
@@ -9,92 +9,88 @@ const html = fs.readFileSync(htmlFile, 'utf8');
 const WWW = path.dirname(htmlFile);
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); } };
-const CATS = ['未分类', '吃饭', '购物', '出行', '日用', '娱乐', '房租', '医疗', '学习', '运动', '宠物'];
-const recs = CATS.slice(1).map((c, i) => ({ id: 'r' + i, time: `2026-12-${String(1 + i).padStart(2, '0')}T12:00`, money: 10 + i, type: 'expense', cat: c, remark: '虚构' }));
-const wait = ms => new Promise(r => setTimeout(r, ms));
-
-async function bootHint(rs, cats, ls) {
-  return A.boot({ html, www: WWW, seed: Object.assign(A.seedOf(rs, cats), ls || {}), before(w) {
-    w.__io = [];
-    w.IntersectionObserver = class { constructor(cb) { this.cb = cb; w.__io.push(this); } observe(el) { this.el = el; } disconnect() {} };
-    // 框高 212、一行 36：装得下 5 行多一点；scrollTop 照常能设
-    const P = w.HTMLElement.prototype, gh = Object.getOwnPropertyDescriptor(P, 'scrollHeight'), ch = Object.getOwnPropertyDescriptor(P, 'clientHeight');
-    Object.defineProperty(P, 'scrollHeight', { configurable: true, get() { return this.id === 'catStats' ? this.querySelectorAll('.cs-row').length * 36 : (gh ? gh.get.call(this) : 0); } });
-    Object.defineProperty(P, 'clientHeight', { configurable: true, get() { return this.id === 'catStats' ? 212 : (ch ? ch.get.call(this) : 0); } });
-    let st = 0;
-    w.__setBoxScroll = el => Object.defineProperty(el, 'scrollTop', { configurable: true, get: () => st, set: v => { st = Math.max(0, Math.min(v, el.scrollHeight - el.clientHeight)); } });
-    w.Element.prototype.scrollTo = function (o) { this.scrollTop = typeof o === 'object' ? o.top : arguments[1]; this.dispatchEvent(new w.Event('scroll')); };
-  } });
-}
-const see = (t, on) => { const io = t.w.__io.find(x => x.el && x.el.id === 'catStatsCard'); io.cb([{ isIntersecting: on, intersectionRatio: on ? 1 : 0 }]); };
+const txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+const OUTS = ['吃饭', '购物', '出行', '日用', '娱乐', '房租', '医疗', '学习', '运动', '宠物'];
+const CATS = ['未分类'].concat(OUTS, ['工资', '红包', '杂项', '转账']);
+const R = (id, time, money, type, cat, extra) => Object.assign({ id, time, money, type, cat, remark: '虚构' }, extra || {});
+const base = () => OUTS.map((c, i) => R('r' + i, `2026-10-${String(1 + i).padStart(2, '0')}T12:00`, 10 + i, 'expense', c))
+  .concat([
+    R('w', '2026-10-15T09:00', 1000, 'income', '工资'),
+    R('h1', '2026-10-16T09:00', 50, 'income', '红包'), R('h2', '2026-10-17T09:00', 20, 'expense', '红包'),   // 红包有收有发：净额 +30
+    R('s', '2026-10-18T09:00', 500, 'expense', '吃饭', { skip: true }),                                        // 不计的不进
+    R('f', '2026-10-19T09:00', 300, 'expense', '转账', { flow: true }),                                        // 往来的不进
+  ]);
 
 (async () => {
-  const t = await bootHint(recs, CATS);
-  const { $, w, d } = t, hint = $('catStatsHint'), box = $('catStats');
-  w.__setBoxScroll(box);
-  d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle();   // 1023-A：分类汇总搬去统计页
-  ok(box.querySelectorAll('.cs-row').length === 10, '0 分类汇总 10 行');
-  ok(hint && hint.classList.contains('ui-hit'), '0 有小圆钮，点击区域撑到 48');
+  const t = await A.boot({ html, www: WWW, now: '2026-10-23T10:00:00', seed: A.seedOf(base(), CATS) });
+  const { $, w, d } = t;
+  d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle();
+  const css = [...d.querySelectorAll('style')].map(s => s.textContent).join('\n');
+  const box = $('catStats');
+  const sec = k => box.querySelector(`.cs-sec[data-kind="${k}"]`);
+  const rows = k => [...sec(k).querySelectorAll('.cs-row:not(.cs-total)')].map(r => [txt(r.querySelector('.cs-name')), txt(r.querySelector('.cs-amt'))]);
+  const total = k => txt(sec(k).querySelector('.cs-total .cs-amt'));
 
-  // 1. 卡片进屏幕：冒一次，0.8 秒后淡出
-  see(t, true);
-  ok(hint.classList.contains('show') && hint.textContent === '↓', '1 卡片进屏幕：冒出 ↓');
-  await wait(600);
-  ok(hint.classList.contains('show'), '1 0.6 秒还在');
-  await wait(400);
-  ok(!hint.classList.contains('show'), '1 0.8 秒后淡出（不是 1.5 秒）');
-  // 卡片一直在屏幕上、滑的是整页：再收到「在屏幕上」也不冒
-  see(t, true);
-  ok(!hint.classList.contains('show'), '1 一直在屏幕上：不再冒');
-  // 离开再回来：再冒一次
-  see(t, false); see(t, true);
-  ok(hint.classList.contains('show'), '1 离开屏幕再回来：又冒一次');
-  await wait(900);
+  // 0. 没有滑动提示、排序切换，不在框里滑
+  ok(!$('catStatsHint') && !$('catSortSeg'), '0 没有滑动提示圆钮、没有排序切换');
+  ok(/\.cat-card \.cat-stats \{ max-height:none; overflow:visible; \}/.test(css), '0 框不限高、不在框里滑');
 
-  // 2. 在框里滑：出现；中间点 ↓ 往下翻一屏
-  box.scrollTop = 40; box.dispatchEvent(new w.Event('scroll'));
-  ok(hint.classList.contains('show') && hint.textContent === '↓', '2 在框里滑：出现 ↓');
-  hint.click();
-  ok(box.scrollTop === 148, '2 点 ↓：往下翻一屏（到不了一整屏就停在框底）' + box.scrollTop);
-  ok(hint.textContent === '↑', '2 滑到框底：变成 ↑');
-  hint.click();
-  ok(box.scrollTop === 0 && hint.textContent === '↓', '2 点 ↑：回到框顶');
-  // 3. 滑到过底：这次打开 App 不再做进屏幕的提示
-  await wait(900);
-  see(t, false); see(t, true);
-  ok(!hint.classList.contains('show'), '3 滑到过底以后：卡片再进屏幕也不冒');
-  box.scrollTop = 20; box.dispatchEvent(new w.Event('scroll'));
-  ok(hint.classList.contains('show'), '3 在框里滑照样出现');
-  // 手指按在圆钮上不淡出
-  hint.dispatchEvent(new w.Event('pointerdown'));
-  await wait(1000);
-  ok(hint.classList.contains('show'), '3 手指按着不淡出');
-  hint.dispatchEvent(new w.Event('pointerup'));
-  await wait(900);
-  ok(!hint.classList.contains('show'), '3 松开 0.8 秒后淡出');
-  // 共用的 FAB_IDLE 还是 1.5 秒
-  ok(/const FAB_IDLE=1500;/.test(html) && /const HINT_IDLE=800/.test(html), '3 FAB_IDLE 仍是 1500，提示用 HINT_IDLE 800');
+  // 1. 支出一段：10 个，从大到小，每个带 −
+  ok(sec('out') && /^支出/.test(txt(sec('out').querySelector('.cs-sec-h'))), '1 支出一段在上');
+  ok(rows('out').length === 10, '1 支出 10 个分类全列（不超过 10 个不折）');
+  ok(rows('out')[0].join() === '宠物,−19.00' && rows('out')[9].join() === '吃饭,−10.00', '1 从大到小：' + rows('out').map(r => r[0]).join(''));
+  ok(rows('out').every((r, i, a) => i === 0 || parseFloat(a[i - 1][1].slice(1)) >= parseFloat(r[1].slice(1))), '1 每一行都不比上一行大');
+  ok(sec('out').querySelectorAll('.cs-amt.out').length === 11, '1 支出用正文色（out），合计也是');
+  ok(total('out') === '−145.00', '1 支出合计 −145.00：' + total('out'));
+  ok(!rows('out').some(r => r[0] === '转账'), '1 往来（转账）不进');
+  ok(rows('out').find(r => r[0] === '吃饭')[1] === '−10.00', '1 不计的 500 不算进吃饭');
+  ok(!box.querySelector('.cs-more'), '1 不超过 10 个：没有「展开全部」');
 
-  // 4. 设置里关掉「滑动提示」：不出现；打开又有
+  // 2. 中间一道线；收入一段
+  ok(box.querySelector('.cs-split') && box.querySelector('.cs-split').previousElementSibling === sec('out') && box.querySelector('.cs-split').nextElementSibling === sec('in'), '2 支出、收入中间一道线');
+  ok(rows('in').map(r => r.join(':')).join() === '工资:+1000.00,红包:+30.00', '2 收入一段：工资、红包（有收有发先相减），从大到小');
+  ok(sec('in').querySelectorAll('.cs-amt.pos').length === 3, '2 收入绿色带 +');
+  ok(total('in') === '+1030.00', '2 收入合计 +1030.00：' + total('in'));
+  ok(/相加一定等于「累计收入 − 累计支出」/.test(txt(box.querySelector('.cs-note'))), '2 下面一句说明两段合计相加等于累计收入 − 累计支出');
+
+  // 3. 和总结余对得上
+  $('statBalHead').click(); await t.idle();
+  const bal = [...$('statBalRows').querySelectorAll('.st-bal-row')].map(r => txt(r.querySelector('b')));
+  ok(bal[1] === '1050.00' && bal[2] === '165.00', '3 总结余：累计收入 1050、累计支出 165：' + bal.join('|'));
+  ok(Math.abs((1030 - 145) - (parseFloat(bal[1]) - parseFloat(bal[2]))) < 0.001, '3 1030 − 145 = 1050 − 165');
+
+  // 4. 两块挨在一起、在最下面，前面一行「全部记录」
+  ok($('statAllHead').nextElementSibling === $('statBal') && $('statBal').nextElementSibling === $('catStatsCard'), '4 全部记录 → 总结余 → 分类汇总');
+  ok($('statMonthCatList').compareDocumentPosition($('statAllHead')) & w.Node.DOCUMENT_POSITION_FOLLOWING, '4 在当月那几块后面');
+  ok(/切月份不变/.test(txt($('statAllHead'))), '4 写明切月份不变');
+  w.JiwenStats.stepMonth(-1); await t.idle();
+  ok(total('out') === '−145.00', '4 翻到上个月：分类汇总不变');
+  w.JiwenStats.stepMonth(1); await t.idle();
+
+  // 5. 超过 10 个：先列 8 个 +「展开全部 11 个」，合计照全部算
+  const t2 = await A.boot({ html, www: WWW, now: '2026-10-23T10:00:00', seed: A.seedOf(base().concat([R('z', '2026-10-20T12:00', 1, 'expense', '杂项')]), CATS) });
+  t2.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t2.idle();
+  const s2 = () => t2.$('catStats').querySelector('.cs-sec[data-kind="out"]');
+  ok(s2().querySelectorAll('.cs-row:not(.cs-total)').length === 8 && txt(s2().querySelector('.cs-more')) === '展开全部 11 个 ›', '5 11 个：先列 8 个 +「展开全部 11 个」');
+  ok(txt(s2().querySelector('.cs-total .cs-amt')) === '−146.00', '5 合计照 11 个全算：−146.00');
+  ok(s2().querySelector('.cs-more').tagName === 'BUTTON' && /button\.cs-more \{[^}]*min-height:var\(--ui-tap\)/.test(css), '5 「展开全部」是按钮、48 高');
+  s2().querySelector('.cs-more').click(); await t2.idle();
+  ok(s2().querySelectorAll('.cs-row:not(.cs-total)').length === 11 && !s2().querySelector('.cs-more'), '5 点了：11 个全列、按钮没了');
+  ok(!t2.$('catStats').querySelector('.cs-sec[data-kind="in"] .cs-more'), '5 收入只有 2 个：不折');
+
+  // 6. 设置里「滑动提示」开关照留
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   [...$('scrollHintSeg').children].find(b => b.dataset.v === 'off').click();
-  ok(w.localStorage.getItem('app_scroll_hint') === 'off' && $('scrollHintSeg').querySelector('.on').dataset.v === 'off', '4 关掉：存在这台手机上');
-  d.querySelector('.tab-btn[data-tab="stats"]').click();
-  box.scrollTop = 60; box.dispatchEvent(new w.Event('scroll'));
-  ok(!hint.classList.contains('show'), '4 关掉以后：在框里滑也不出现');
-  d.querySelector('.tab-btn[data-tab="settings"]').click();
+  ok(w.localStorage.getItem('app_scroll_hint') === 'off' && $('scrollHintSeg').querySelector('.on').dataset.v === 'off', '6 关掉：存在这台手机上');
   [...$('scrollHintSeg').children].find(b => b.dataset.v === 'on').click();
-  ok(!w.localStorage.getItem('app_scroll_hint'), '4 打开：默认值（不存）');
-  await wait(1700); t.w.close();   // 1023-A：在统计页滑过，等圆钮淡出的计时器走完再关
+  ok(!w.localStorage.getItem('app_scroll_hint'), '6 打开：默认值（不存）');
 
-  // 5. 分类不超过 6 个：不出现
-  const t5 = await bootHint(recs.slice(0, 5), CATS.slice(0, 6));
-  t5.w.__setBoxScroll(t5.$('catStats'));
-  t5.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t5.idle();
-  see(t5, true);
-  t5.$('catStats').scrollTop = 10; t5.$('catStats').dispatchEvent(new t5.w.Event('scroll'));
-  ok(!t5.$('catStatsHint').classList.contains('show'), '5 只有 5 个分类：不出现');
-  ok(t.errs.length === 0 && t5.errs.length === 0, '没有报错 ' + t.errs.concat(t5.errs).join('；'));
-  console.log(`\n${pass} 通过，${fail} 失败`);
+  // 7. 空账本：卡片藏起来
+  const t3 = await A.boot({ html, www: WWW, now: '2026-10-23T10:00:00', seed: A.seedOf([], CATS) });
+  t3.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t3.idle();
+  ok(t3.$('catStatsCard').style.display === 'none' && t3.$('statBal').style.display === 'none', '7 空账本：总结余、分类汇总都不显示');
+
+  ok(!t.errs.length && !t2.errs.length && !t3.errs.length, '没有报错 ' + t.errs.concat(t2.errs, t3.errs).join('；'));
+  console.log(`\n分类汇总（1023-O）：${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.log(e); process.exit(1); });

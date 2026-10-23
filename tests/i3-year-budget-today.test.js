@@ -19,7 +19,7 @@ function bootSync(arc, now){
   const toBudget=()=>{ toStats(); $('statTabSeg').querySelector('[data-v="budget"]').click(); };
   const yrow=()=>$('bgOverview').querySelector('.bgy-head');
   const mrows=()=>[...$('bgOverview').querySelectorAll('.bgy-row')];
-  const fab=()=>$('statTodayFab').classList.contains('show');
+  const fab=()=>!!$('statTodayFab');   // 1023-O：「回到本月」✕ 去掉了（月份浮条最右边就是这个月），下面原来要它出现的地方都改成「没有它」
   return {w:dom.window,d,$,errs,toStats,toBudget,yrow,mrows,fab};
 }
 // 6 月开始记；8 月一条都没有；预算 游戏 200 + 餐饮 1200 = 1400
@@ -96,52 +96,46 @@ const B={'游戏':200,'餐饮':1200};
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 
-// ===== 5. 回到本月浮钮 =====
+// ===== 5. 回到本月浮钮（1023-O 去掉了，翻月照旧） =====
 {
   const t=await boot({ records:recs, budgets:B });
-  ok(!t.fab(), '记账页不显示');
+  ok(!t.fab(), '记账页没有');
   t.toStats();
-  ok(!t.fab(), '统计页、本月：不显示');
+  ok(!t.fab(), '统计页、本月：没有');
   t.w.JiwenStats.stepMonth(-1);
-  ok(t.fab() && t.$('statTodayFab').textContent==='✕' && t.$('statTodayFab').className.includes('clear-filter-fab'), '翻到上月：出现，与筛选 ✕ 同款');
-  t.$('statTodayFab').click();
-  ok(t.$('statMonthLabel').textContent==='2026年10月' && !t.fab(), '点了回到本月并隐藏');
-  // 预算页签同样生效
+  ok(!t.fab() && t.$('statMonthLabel').textContent==='2026年09月', '翻到上月：没有回到本月 ✕（1023-O）');
+  t.w.JiwenStats.stepMonth(1);
+  ok(t.$('statMonthLabel').textContent==='2026年10月' && !t.fab(), '再翻回本月');
+  // 预算页签同样
   t.$('statTabSeg').querySelector('[data-v="budget"]').click();
   t.w.JiwenStats.stepMonth(-1); t.w.JiwenStats.stepMonth(-1);
-  ok(t.fab() && t.$('statMonthLabel').textContent==='2026年08月', '预算页签翻月也出现');
-  t.$('statTodayFab').click();
-  ok(t.$('statMonthLabel').textContent==='2026年10月' && t.$('statPaneBudget').style.display==='' && !t.fab(), '预算页签里回到本月，仍在预算页签');
-  // 月度列表点月份也触发
+  ok(!t.fab() && t.$('statMonthLabel').textContent==='2026年08月', '预算页签翻月：没有 ✕');
+  t.w.JiwenStats.stepMonth(2);
+  ok(t.$('statMonthLabel').textContent==='2026年10月' && t.$('statPaneBudget').style.display==='' && !t.fab(), '预算页签里翻回本月，仍在预算页签');
+  // 月度列表点月份
   t.yrow().click(); t.mrows()[0].click();
-  ok(t.fab(), '从年度列表跳到 6 月：出现');
-  // 切走统计页：隐藏；切回来：仍不在本月 → 再出现
+  ok(!t.fab() && t.$('statMonthLabel').textContent==='2026年06月', '从年度列表跳到 6 月');
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
-  ok(!t.fab(), '切到记账页隐藏');
+  ok(!t.fab(), '切到记账页');
   t.toStats();
-  ok(t.fab(), '回到统计页（还在 6 月）再出现');
-  // 跨年
+  ok(!t.fab() && t.$('statMonthLabel').textContent==='2026年06月', '回到统计页还在 6 月');
   t.w.eval('JiwenStats.statYear=2025; JiwenStats.statMonth=9; JiwenStats.renderStats()');
-  ok(t.fab(), '去年同月也算不在本月');
-  ok(/body\.kb-open \.clear-filter-fab/.test(html), '键盘弹出时一并隐藏（共用样式）');
+  ok(!t.fab() && t.$('statMonthLabel').textContent==='2025年10月', '去年同月');
+  ok(/body\.kb-open \.clear-filter-fab/.test(html), '键盘弹出时一并隐藏（共用样式，账单页的圆钮还在用）');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 
-// ===== 6. 【1010-K2】停下 1.5 秒自动淡出，滑动再出现 =====
+// ===== 6. 【1010-K2】停下淡出那套随 ✕ 去掉了（1023-O）：滑动、翻月都不会冒出来 =====
 (async()=>{
-  const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const t=await boot({ records:recs, budgets:B });
   t.toStats(); t.w.JiwenStats.stepMonth(-1);
-  ok(t.fab(), '翻月后立即出现');
-  await sleep(800);
-  ok(t.fab(), '0.8 秒时还在（来得及点）');
-  await sleep(900);
-  ok(!t.fab(), '1.7 秒后淡出');
+  ok(!t.fab(), '翻月后没有');
+  ok(!html.includes('id="statTodayFab"'), '页面里没有这个按钮');
+  ok(!/statTodayFab/.test(html), '代码、样式里也不再提它');
   t.w.dispatchEvent(new t.w.Event('scroll'));
-  ok(t.fab(), '滑动再出现');
-  await sleep(1700);
-  ok(!t.fab(), '停下又淡出');
-  t.w.JiwenStats.stepMonth(1);             // 回到本月：滑动也不出现
+  ok(!t.fab(), '滑动不出现');
+  ok(t.$('statMonthLabel').textContent==='2026年09月', '滑动不改月份');
+  t.w.JiwenStats.stepMonth(1);
   t.w.dispatchEvent(new t.w.Event('scroll'));
   ok(!t.fab(), '在本月时滑动不出现');
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click(); t.w.dispatchEvent(new t.w.Event('scroll'));

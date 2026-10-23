@@ -6,7 +6,7 @@ const R=(id,time,money,type,cat,remark,extra)=>Object.assign({id,time,money,type
 let __lastW=null, __phone=null, __lastPhone=null;
 async function boot(...a){ const t=bootSync(...a); const __w=__lastW, __p=__lastPhone; t.idle=()=>IDB.idle(__w); t.phone=__p; t.db=async()=>{ await IDB.idle(__w); return IDB.dumpDb(__p); }; await IDB.idle(__w); t.d.querySelector('.tab-btn[data-tab="stats"]').click(); return t; }
 function bootSync(records, now){
-  now=now||'2026-10-10T14:00:00';
+  now=now||'2026-10-31T14:00:00';   // 1023-O：这个月没过完时比「上月同期」，这里放在月底，比的是整个上月（同期那套在 zZzZzG 里测）
   const store={archives:{'默认存档':{cats:['未分类','餐饮','游戏','订阅','出行','其他','工资','a','b','c','d','e','f','g','h'],records}},last:'默认存档'};
   const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://localhost/',beforeParse(w){ __lastW=w; __lastPhone=IDB.install(w, __phone);
     const ls=w.localStorage; ls.setItem('app_logged_in_user','小明'); ls.setItem('store_小明',JSON.stringify(store)); ls.setItem('app_time_repaired_小明','1');
@@ -56,7 +56,7 @@ function bootSync(records, now){
 // ===== 3. 跨年：1 月和去年 12 月比 =====
 {
   const t=await boot([ R('j','2027-01-05T10:00',90,'expense','餐饮'), R('dz','2026-12-20T10:00',100,'expense','餐饮'),
-                 R('old','2026-01-20T10:00',10,'expense','餐饮') ], '2027-01-10T10:00:00');
+                 R('old','2026-01-20T10:00',10,'expense','餐饮') ], '2027-01-31T10:00:00');
   ok(t.find('餐饮').delta==='较上月 ↓10%', '1 月对比去年 12 月：'+t.find('餐饮').delta);
 }
 

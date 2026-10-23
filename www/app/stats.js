@@ -204,8 +204,9 @@
                 const n={ over:0, warn:0, ok:0 };
                 B.rows.forEach(r=>n[r.state]++);
                 $('bgOverview').innerHTML=
-                    `<div class="bgo-main"><div><div class="ov-label">已花 / 预算合计</div>`
-                    + `<div class="bgo-num"><b>${used.toFixed(2)}</b> / ${lim.toFixed(2)}</div></div>`
+                    // 1023-O：顶上一行「合计 已用 x / y」（设了预算的分类加起来）
+                    `<div class="bgo-main"><div class="bgo-total"><span class="bgo-k">合计 已用</span> `
+                    + `<span class="bgo-num"><b>${used.toFixed(2)}</b> / ${lim.toFixed(2)}</span></div>`
                     + `<div class="bgo-pct ${st}">${pct.toFixed(0)}%</div></div>`
                     + `<div class="bg-bar"><div class="bg-fill ${st}" style="width:${Math.max(0,Math.min(100,pct)).toFixed(1)}%"></div>`
                     + (B.timePct!=null ? `<div class="bg-mark" style="left:${B.timePct.toFixed(1)}%"></div>` : '')
@@ -464,14 +465,13 @@
             renderAllCatStats();   // 1023-A：分类汇总从账单页搬过来了
         }
         // ===== 分类汇总卡片 =====
-        // 1023-A 从账单页搬到统计页最下面，算法不变：全部记录、只算计入，按分类的收支净额
-        // 排序：按金额绝对值，收支混排时看的是「量级」——工资 +10604 与餐饮 −5347 比的是 10604 与 5347。
-        // 偏好是全局的，存 localStorage；读写都包 try/catch，取不到就用默认（按金额）。
-        let lastCatStats=null;
-        // 只按金额（绝对值）排：从大到小 / 从小到大。旧版存过的 'amount' / 'cat' 一律当「从大到小」。
-        function getCatSort(){
-            try{ return localStorage.getItem('app_catstats_sort')==='asc' ? 'asc' : 'desc'; }catch(_){ return 'desc'; }
-        }
+        // 1023-A 从账单页搬到统计页最下面，算法不变：全部记录、只算计入，按分类的收支净额（一个分类有收有支先相减）
+        // 1023-O：不再在框里滑（框的高度限制、右下角的滑动提示、排序切换都去掉了），全部铺开、固定从大到小；
+        //   净额是支出的分类在上（「支出」一段），净额是收入的在下（「收入」一段），中间一道线，每段最后一行合计；
+        //   一段超过 CAT_FOLD_OVER（10）个分类时先列前 CAT_FOLD_SHOW（8）个，最后一行「展开全部 N 个」。
+        //   两段合计相加 = 累计收入 − 累计支出（和总结余里的对得上），下面写一句说明。
+        const CAT_FOLD_OVER=10, CAT_FOLD_SHOW=8;
+        let catOpenAll={ out:false, in:false };
         function renderAllCatStats(){
             const byCat={};
             getUserData().forEach(r=>{
@@ -483,73 +483,39 @@
             renderCatStats(byCat);
         }
         function renderCatStats(byCat){
-            if(byCat) lastCatStats=byCat;          // 切排序时传 null，复用上次结果，不重算整本账
-            byCat=lastCatStats||{};
-            const sort=getCatSort();
-            $('catSortSeg').querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===sort));
-            const keys=Object.keys(byCat);
-            keys.sort((a,b)=> sort==='asc'
-                ? Math.abs(byCat[a])-Math.abs(byCat[b])
-                : Math.abs(byCat[b])-Math.abs(byCat[a]));
-            if(!keys.length){
-                $('catStats').innerHTML='<div class="cs-empty">暂无计入收支的记录</div>';
-                return;
-            }
-            $('catStats').innerHTML=keys.map(c=>{
-                const v=round2(byCat[c]);
-                const pos=v>=0;
-                return `<div class="cs-row"><span class="cs-name">${escapeHtml(c)}</span>`
-                    + `<span class="cs-amt ${pos?'pos':'out'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</span></div>`;
-            }).join('');
+            const keys=Object.keys(byCat).filter(c=>round2(byCat[c])!==0);
+            if(!keys.length){ $('catStats').innerHTML='<div class="cs-empty">暂无计入收支的记录</div>'; return; }
+            const outs=keys.filter(c=>byCat[c]<0).sort((a, b)=>byCat[a]-byCat[b]);
+            const ins=keys.filter(c=>byCat[c]>0).sort((a, b)=>byCat[b]-byCat[a]);
+            const row=c=>{ const v=round2(byCat[c]), pos=v>0; return `<div class="cs-row"><span class="cs-name">${escapeHtml(c)}</span><span class="cs-amt ${pos?'pos':'out'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</span></div>`; };
+            const sec=(kind, title, list)=>{
+                if(!list.length) return '';
+                const open=catOpenAll[kind] || list.length<=CAT_FOLD_OVER;
+                const shown=open ? list : list.slice(0, CAT_FOLD_SHOW);
+                const sum=round2(list.reduce((t, c)=>t+byCat[c], 0)), pos=sum>0;
+                return `<div class="cs-sec" data-kind="${kind}"><div class="cs-sec-h">${title}（${list.length} 个分类，从大到小）</div>`
+                    + shown.map(row).join('')
+                    + (open ? '' : `<button type="button" class="cs-more" data-kind="${kind}">展开全部 ${list.length} 个 ›</button>`)
+                    + `<div class="cs-row cs-total"><span class="cs-name">合计</span><span class="cs-amt ${pos?'pos':'out'}">${pos?'+':'−'}${Math.abs(sum).toFixed(2)}</span></div></div>`;
+            };
+            $('catStats').innerHTML = sec('out', '支出', outs) + (outs.length && ins.length ? '<div class="cs-split" aria-hidden="true"></div>' : '') + sec('in', '收入', ins)
+                + `<div class="cs-note">按分类的净额：一个分类里有收有支先相减（比如红包有收有发）。所以两段合计不一定分别等于总结余里的「累计收入」「累计支出」，但相加一定等于「累计收入 − 累计支出」。</div>`;
         }
-        // ===== 1019-H：分类汇总能滑但看不出来：右下角的小圆钮 =====
-        //   分类超过 6 个、框里装不下时才有：卡片每次从屏幕外回到屏幕上冒一次（IntersectionObserver；卡片一直在屏幕上、滑的是整页时不冒）；
-        //   在框里滑时出现；停下 HINT_IDLE（0.8 秒）淡出（不改共用的 FAB_IDLE）。滑到框底换成 ↑，点了回框顶；在中间点 ↓ 往下翻一屏。
-        //   这次打开 App 以后在框里滑到过底，就不再做进屏幕的提示。设置里「滑动提示」关掉就都不出现（存这台手机，不进备份）。
-        const HINT_IDLE=800, HINT_MIN_ROWS=6;
-        let catHintSeen=false;   // 这次打开 App 以后在框里滑到过底
-        function scrollHintOn(){ try{ return localStorage.getItem('app_scroll_hint')!=='off'; }catch(_){ return true; } }
-        const catHint=$('catStatsHint'), catBox=$('catStats');
-        catHint._fabIdle=HINT_IDLE;
-        fabHold(catHint);
-        function catHintFits(){ return scrollHintOn() && catBox.querySelectorAll('.cs-row').length>HINT_MIN_ROWS && catBox.scrollHeight>catBox.clientHeight+2; }
-        function catHintAtEnd(){ return catBox.scrollTop+catBox.clientHeight>=catBox.scrollHeight-2; }
-        function catHintPaint(){ const end=catHintAtEnd(); catHint.textContent=end ? '↑' : '↓'; catHint.dataset.end=end ? '1' : ''; catHint.setAttribute('aria-label', end ? '回到最上面' : '往下翻'); }
-        function catHintWake(){ if(!catHintFits()){ fabWake(catHint, false); return; } catHintPaint(); fabWake(catHint, true); }
-        catBox.addEventListener('scroll', ()=>{ if(catHintAtEnd()) catHintSeen=true; catHintWake(); }, { passive:true });
-        catHint.addEventListener('click', ()=>{
-            const top=catHintAtEnd() ? 0 : Math.min(catBox.scrollTop+catBox.clientHeight, catBox.scrollHeight-catBox.clientHeight);
-            try{ catBox.scrollTo({ top, behavior:'smooth' }); }catch(_){ catBox.scrollTop=top; }
-            catHintWake();
+        $('catStats').addEventListener('click', e=>{
+            const m=e.target.closest('.cs-more'); if(!m) return;
+            catOpenAll[m.dataset.kind]=true; renderAllCatStats();
         });
-        if(window.IntersectionObserver){
-            let wasIn=false;
-            new IntersectionObserver(es=>{
-                es.forEach(e=>{
-                    const nowIn=e.isIntersecting && e.intersectionRatio>0;
-                    if(nowIn && !wasIn && !catHintSeen) catHintWake();
-                    if(!nowIn) fabWake(catHint, false);
-                    wasIn=nowIn;
-                });
-            }, { threshold:[0, 0.6] }).observe($('catStatsCard'));
-        }
-        window.__catHintWake=catHintWake;   // 给测试用
+        // 「滑动提示」设置（1019-H）：分类汇总的滑动提示 1023-O 去掉了；开关照留（存这台手机），以后别处加这种提示也归它管
+        function scrollHintOn(){ try{ return localStorage.getItem('app_scroll_hint')!=='off'; }catch(_){ return true; } }
         (function(){
             const seg=$('scrollHintSeg');
             function paint(){ const on=scrollHintOn(); seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', (b.dataset.v==='on')===on)); }
             seg.querySelectorAll('button').forEach(b=>b.addEventListener('click', ()=>{
                 try{ if(b.dataset.v==='off') localStorage.setItem('app_scroll_hint', 'off'); else localStorage.removeItem('app_scroll_hint'); }catch(_){}
-                if(b.dataset.v==='off') fabWake(catHint, false);
                 paint();
             }));
             paint();
         })();
-        $('catSortSeg').addEventListener('click', e=>{
-            const b=e.target.closest('button[data-v]'); if(!b) return;
-            try{ localStorage.setItem('app_catstats_sort', b.dataset.v); }catch(_){}
-            renderCatStats(null);
-            $('catStats').scrollTop=0;
-        });
 
         // 1016-P：统计页顶上的待处理横幅「本月还有 N 笔导入账单待确认，共 x 元 [去处理]」。
         //   只在开发开关开着时读待处理池（开关关着时什么都不读、不显示）；这个月没有待处理就不显示。首页不加红点
@@ -616,6 +582,16 @@
             return sg+a.toFixed(0);
         }
         function ymKey(y, mo){ return `${y}-${pad(mo+1)}`; }
+        // 1023-O：拿上个月比时比同期：看的是这个月（还没过完）就只拿上个月 1 号到今天这个日子（上个月没这么多天就到月底）；看的是过完的月份照旧整月比
+        //   返回 { pY, pM, cut（上个月算到几号）, same（是不是同期比）, name（「9月同期」/「9月」）}
+        function prevPeriod(){
+            const pY = statMonth===0 ? statYear-1 : statYear, pM = statMonth===0 ? 11 : statMonth-1;
+            const now=new Date(), cur = now.getFullYear()===statYear && now.getMonth()===statMonth;
+            const pLen=new Date(pY, pM+1, 0).getDate();
+            const cut = cur ? Math.min(now.getDate(), pLen) : 31;
+            const same = cur && cut<pLen;
+            return { pY, pM, cut, same, name:`${pM+1}月${same ? '同期' : ''}` };
+        }
         function renderStatCalendar(){
             $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
             renderPendBanner();
@@ -625,7 +601,7 @@
             // 日净额 / 有无数据 / 当月收支汇总——一趟
             const dayNet={}, dayHas={}, dayFlow={}, daySkip={}, dayRefund={};
             let mIn=0, mOut=0, mOutN=0, pOut=0;
-            const pY = statMonth===0 ? statYear-1 : statYear, pM = statMonth===0 ? 11 : statMonth-1;
+            const pp=prevPeriod(), pY=pp.pY, pM=pp.pM;   // 1023-O：这个月没过完时比上个月同期
             // 月份浮条：每个月超没超月预算（设了预算的分类里花的 > 这些预算加起来；当月没过完也实时算），超了的月份字下面一个小红点（1023-J 起不画小柱子）
             const budgets=getBudgets(), budLimit=getCats().reduce((t, c)=>t+(budgets[c]>0 ? safeNum(budgets[c]) : 0), 0);
             const ymBud=new Map();
@@ -636,7 +612,7 @@
                     if(ym<firstYM) firstYM=ym;
                     if(budLimit>0 && recMode(x.r)==='normal' && budgets[x.r.cat||'未分类']>0){ const v=expSigned(x.r); if(v) ymBud.set(ym, (ymBud.get(ym)||0)+v); }
                 }
-                if(x.y===pY && x.mo===pM) pOut+=statContrib(x.r).exp;
+                if(x.y===pY && x.mo===pM && x.d<=pp.cut) pOut+=statContrib(x.r).exp;
                 if(x.y!==statYear || x.mo!==statMonth) return;
                 dayHas[x.d]=true;               // 不计的记录也算「这天有账」：格子照样能点开看明细
                 // ……但不计金额（不计 / 往来都不进收支统计），只记下「这天有这类记录」用来打标签
@@ -658,7 +634,7 @@
             $('statOutK').textContent=`当月支出 · ${mOutN} 笔`;
             $('statMonthOut').textContent=mOut.toFixed(2);
             const dm=round2(mOut-pOut);
-            $('statOutCmp').textContent = pOut>0 ? (dm>=0 ? `比 ${pM+1}月 多花 ${dm.toFixed(2)}` : `比 ${pM+1}月 少花 ${(-dm).toFixed(2)}`) : `${pM+1}月 没有支出`;
+            $('statOutCmp').textContent = pOut>0 ? (dm>=0 ? `比 ${pp.name} 多花 ${dm.toFixed(2)}` : `比 ${pp.name} 少花 ${(-dm).toFixed(2)}`) : `${pp.name} 没有支出`;
             $('statMonthIn').textContent='+'+mIn.toFixed(2);
             const net=round2(mIn-mOut);
             $('statNet').innerHTML=`本月净剩 <b class="${net>=0 ? 'pos' : 'out'}">${net>=0 ? '+' : '−'}${Math.abs(net).toFixed(2)}</b>`;
@@ -716,22 +692,24 @@
                 const monDay=r*7-firstDow+1, mon=cal.addDay(ymKey(statYear, statMonth)+'-01', monDay-1);
                 const wk=document.createElement('button'); wk.type='button';
                 wk.className='wk-sum'+(curWk ? ' cur' : '');
-                wk.dataset.mon=mon; wk.setAttribute('aria-label', '看这一周');
+                wk.dataset.mon=mon;
                 wkNet=round2(wkNet);
                 const blank = curWk && todayMon;
-                wk.innerHTML=`<span class="wk-n">${curWk ? '本周' : '周'}</span><span class="wk-v ${wkNet>0 ? 'pos' : 'out'}">${blank ? '' : (wkAny ? shortNum(wkNet) : '—')}</span>`;
+                wk.innerHTML=`<span class="wk-v ${wkNet>0 ? 'pos' : 'out'}">${blank ? '' : (wkAny ? shortNum(wkNet) : '—')}</span>`;   // 1023-O：只写数字（列头「周合计」已经说了是什么），本周那格深底
+                wk.setAttribute('aria-label', (curWk ? '本周' : '这一周')+'，点了看一周');
                 wk.addEventListener('click', ()=>openWeek(mon));
                 grid.appendChild(wk);
             }
 
             if(statTab==='budget') renderBudgetPane(dec);
-            syncStatTodayFab();
             statSelDay=null;
         }
 
-        // 1023-C：总结余（原来在账单页总览最下面一行，搬过来）；1023-H 起点了就地展开：期初余额、累计收入、累计支出、往来，加一句为什么不等于收入减支出
-        //   期初余额 = 记成「往来」、备注是「期初余额」的那几笔（导入结果页「补一笔期初余额」就是这样记的），其余往来另算
+        // 1023-C：总结余（原来在账单页总览最下面一行，搬过来）；1023-O 起挪到页面底部和分类汇总挨着（这两块是全部记录的，切月份不变）：
+        //   一行（总结余 + 数 + ⌄），整行点了展开 / 收起；展开是能对上的算式：期初余额 + 累计收入 − 累计支出 + 往来 = 总结余，下面一句不计、往来怎么算
+        //   期初余额 = 记成「往来」、备注是「期初余额」的那几笔（导入结果页「补一笔期初余额」就是这样记的），其余往来另算（1023-P 再给正式入口）
         let balSum=null, balOpen=false;
+        const BAL_CHEV='<svg class="st-bal-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
         function renderStatBal(dec){
             const card=$('statBal'); if(!card) return;
             let sIn=0, sOut=0, fNet=0, open=0;
@@ -739,19 +717,19 @@
             sIn=round2(sIn); sOut=round2(sOut); fNet=round2(fNet); open=round2(open);
             balSum={ sIn, sOut, fNet, open, net:round2(sIn-sOut+fNet+open) };
             card.style.display = dec.length ? '' : 'none';
-            const f=v=>v.toFixed(2), sg=v=>(v<0 ? '−' : '+')+f(Math.abs(v));
+            const f=v=>Math.abs(v).toFixed(2), op=v=>v<0 ? '−' : '+';
             card.classList.toggle('open', balOpen);
-            card.innerHTML=`<button type="button" class="st-bal-head" id="statBalHead" aria-expanded="${balOpen}"><span class="st-bal-k">总结余<em>全部记录累计，含期初余额</em></span><span class="st-bal-v ov-net" id="statBalNum">${f(balSum.net)}</span></button>`
+            card.innerHTML=`<button type="button" class="st-bal-head" id="statBalHead" aria-expanded="${balOpen}"><span class="st-bal-k">总结余<em>全部记录，含期初余额</em></span><span class="st-bal-v ov-net" id="statBalNum">${balSum.net<0 ? '−' : ''}${f(balSum.net)}</span>${BAL_CHEV}</button>`
                 + (balOpen ? `<div class="st-bal-rows" id="statBalRows">`
-                    + `<div class="st-bal-row"><span>期初余额</span><b>${sg(balSum.open)}</b></div>`
-                    + `<div class="st-bal-row"><span>累计收入</span><b class="pos">+${f(sIn)}</b></div>`
-                    + `<div class="st-bal-row"><span>累计支出</span><b>−${f(sOut)}</b></div>`
-                    + `<div class="st-bal-row"><span>往来（转账、存取钱、借还钱）</span><b>${sg(balSum.fNet)}</b></div>`
-                    + `<div class="st-bal-note">期初余额、往来不算进收入、支出，但算进结余；记成「不计」的哪里都不算。所以结余不等于收入减支出。</div></div>` : '')
-                + `<button type="button" class="st-bal-more" id="statBalMore">${balOpen ? '收起' : '怎么算出来的 ›'}</button>`;
+                    + `<div class="st-bal-row"><span>期初余额</span><b>${balSum.open<0 ? '−' : ''}${f(balSum.open)}</b></div>`
+                    + `<div class="st-bal-row"><span>+ 累计收入</span><b class="pos">${f(sIn)}</b></div>`
+                    + `<div class="st-bal-row"><span>− 累计支出</span><b>${f(sOut)}</b></div>`
+                    + `<div class="st-bal-row"><span>${op(balSum.fNet)} 往来（转账、存取钱、借还钱）</span><b>${f(balSum.fNet)}</b></div>`
+                    + `<div class="st-bal-row st-bal-eq"><span>= 总结余</span><b>${balSum.net<0 ? '−' : ''}${f(balSum.net)}</b></div>`
+                    + `<div class="st-bal-note">往来只算进结余，不算进收入、支出；记成「不计」的哪里都不算。所以结余不等于收入减支出。</div></div>` : '');
         }
         $('statBal').addEventListener('click', e=>{
-            if(!e.target.closest('#statBalHead, #statBalMore')) return;
+            if(!e.target.closest('#statBalHead')) return;
             balOpen=!balOpen; renderStatBal(decorateRecs(statRecords()));
         });
 
@@ -784,11 +762,12 @@
                 }
             });
 
-            // 上个月同口径的分类金额，用来算「较上月」
-            const pY = statMonth===0 ? statYear-1 : statYear, pM = statMonth===0 ? 11 : statMonth-1;
+            // 上个月同口径的分类金额，用来算「较上月」；1023-O 起这个月没过完时比上个月同期
+            const pp=prevPeriod(), pY=pp.pY, pM=pp.pM;
+            prevSame=pp.same;
             const prevByCat={};
             dec.forEach(x=>{
-                if(x.y===pY && x.mo===pM && recMode(x.r)==='normal'){
+                if(x.y===pY && x.mo===pM && x.d<=pp.cut && recMode(x.r)==='normal'){
                     const amt=catSigned(x.r, wantType); if(!amt) return;
                     const c=x.r.cat||'未分类';
                     prevByCat[c]=(prevByCat[c]||0)+amt;
@@ -841,13 +820,15 @@
             }).join('');
         }
         // 「较上月 ↑12%」。支出涨了标红、降了标绿；收入相反。上月为 0 时写「上月无」。
+        let prevSame=false;   // 1023-O：这一次比的是上月同期（这个月没过完）
         function monthDeltaHtml(cur, prev, isExp){
             cur=round2(cur); prev=round2(prev);
-            if(prev<=0) return cur>0 ? '<span class="sc-delta">上月无</span>' : '';
+            const w = prevSame ? '上月同期' : '上月';
+            if(prev<=0) return cur>0 ? `<span class="sc-delta">${w}无</span>` : '';
             const pct=Math.round((cur-prev)/prev*100);
-            if(pct===0) return '<span class="sc-delta">与上月持平</span>';
+            if(pct===0) return `<span class="sc-delta">与${w}持平</span>`;
             const up=pct>0, bad = isExp ? up : !up;
-            return `<span class="sc-delta ${bad?'bad':'good'}">较上月 ${up?'↑':'↓'}${Math.abs(pct)}%</span>`;
+            return `<span class="sc-delta ${bad?'bad':'good'}">较${w} ${up?'↑':'↓'}${Math.abs(pct)}%</span>`;
         }
 
         // 支出/收入胶囊切换：只改口径 + 就地重渲染（复用缓存的 recs，不重跑整页统计）
@@ -896,26 +877,7 @@
         //   详情弹窗现在只从两处进入：统计页当日明细 / 预算明细（可修改），批量确认清单（只读）。
 
 
-        // 「回到本月」浮钮：在统计页、且看的不是本月时显示
-        // 【1010-K2】常驻会挡住下面的金额：改成「有动作才出现，停下 1.5 秒淡出」。
-        //   出现：翻月 / 统计页任何重绘（点日期、切页签）/ 滑动页面；隐藏后 pointer-events:none，不挡点击。
-        //   0.5 秒太短，手指挪到右下角时按钮已经没了，所以取 1.5 秒；要调就改 FAB_IDLE。
-        //   【1017-N】这条规矩挪到了 fabWake()，账单页的 ✕ 和两页的 ↑ 都照它走。
-        function statAway(){
-            const now=new Date();
-            return statYear!==undefined && (statYear!==now.getFullYear() || statMonth!==now.getMonth());
-        }
-        function syncStatTodayFab(){
-            const f=$('statTodayFab'); if(!f) return;
-            fabWake(f, JiwenBase.currentTab==='stats' && statAway());
-        }
-        window.addEventListener('scroll', ()=>{ if(JiwenBase.currentTab==='stats' && statAway()) syncStatTodayFab(); }, { passive:true });
-        $('statTodayFab').addEventListener('click', ()=>{
-            const now=new Date();
-            setStatYM(now.getFullYear(), now.getMonth()); bgExpanded.clear();
-            renderStatCalendar();
-            window.scrollTo(0,0);
-        });
+        // 「回到本月」浮钮（1010-K2）1023-O 去掉了：月份浮条最右边就是这个月，拨一下就回来
 
 
         // ===== 年月选择器（统计页）=====

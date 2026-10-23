@@ -991,7 +991,7 @@ async function run(cfg, port, browser) {
         const bad = [], s = document.getElementById('stStrip').getBoundingClientRect(), tb = document.getElementById('tabBar').getBoundingClientRect();
         if (s.bottom > tb.top - 8) bad.push('月份浮条下沿 ' + Math.round(s.bottom) + ' 离底栏 ' + Math.round(tb.top) + ' 不到 8px');
         if (s.left < 0 || s.right > innerWidth) bad.push('月份浮条出了屏幕');
-        const fab = document.querySelector('#pageStats .to-top.show, #statTodayFab.show');
+        const fab = document.querySelector('#pageStats .to-top.show');   // 1023-O：「回到本月」✕ 去掉了
         if (fab) { const f = fab.getBoundingClientRect(); if (f.bottom > s.top - 4 && f.top < s.bottom) bad.push('右下角圆钮压着月份浮条'); }
         document.querySelectorAll('#statCal .wk-sum').forEach(w => { const r = w.getBoundingClientRect(); if (r.right > innerWidth - 8) bad.push('周合计那一格贴边 / 出了屏幕'); const v = w.querySelector('.wk-v'); if (v && v.scrollWidth > w.clientWidth + 0.5) bad.push('周合计「' + v.textContent + '」放不下'); });
         document.querySelectorAll('.st-cells .st-cell, .st-cells > *').forEach(c => { [...c.children].forEach(x => { if (x.scrollWidth > c.clientWidth + 0.5) bad.push('两格里「' + x.textContent.slice(0, 12) + '」放不下'); }); });
@@ -1005,9 +1005,21 @@ async function run(cfg, port, browser) {
       await closeAll(page);
       await page.evaluate(() => { document.getElementById('statBalHead').click(); document.getElementById('statBal').scrollIntoView({ block: 'center' }); }); await page.waitForTimeout(400);
       await shot(page, size, '统计页', '总结余展开');
-      await page.evaluate(() => document.getElementById('statBalMore').click());
+      await page.evaluate(() => document.getElementById('statBalHead').click());   // 1023-O：整行就是开关
       await page.evaluate(() => document.getElementById('catStatsCard').scrollIntoView({ block: 'end' })); await page.waitForTimeout(400);
       await shot(page, size, '统计页', '分类汇总');
+      // 1023-O：分类汇总全部铺开（框里不滑）、金额放得下；总结余那行够 48 高
+      results.push(Object.assign({ name: 'stats-1023o', cfg: size, clip: true }, await page.evaluate(() => {
+        const bad = [], box = document.getElementById('catStats');
+        if (box.scrollHeight > box.clientHeight + 1) bad.push('分类汇总框里还能滑');
+        box.querySelectorAll('.cs-row').forEach(r => { const a = r.querySelector('.cs-amt'), n = r.querySelector('.cs-name'); if (a && n && a.getBoundingClientRect().left < n.getBoundingClientRect().right - 0.5) bad.push('「' + n.textContent + '」金额压着名字'); if (r.getBoundingClientRect().right > innerWidth) bad.push('分类汇总一行出了屏幕'); });
+        const h = document.getElementById('statBalHead').getBoundingClientRect();
+        if (h.height < 48) bad.push('总结余那行不到 48 高');
+        return { bad: [...new Set(bad)].slice(0, 6), ok: !bad.length };
+      })));
+      await page.evaluate(() => { window.JiwenStats.setStatTab('budget'); window.scrollTo(0, 0); }); await page.waitForTimeout(300);
+      await shot(page, size, '统计页', '预算（顶上合计）');
+      await page.evaluate(() => window.JiwenStats.setStatTab('flow')); await page.waitForTimeout(200);
       await tab(page, 'settings'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
       await shot(page, size, '设置页', '顶上');
       await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);

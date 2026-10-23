@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1023-N">
+    <link rel="stylesheet" href="app/app.css?v=1023-O">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-N</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-O</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -61,12 +61,11 @@
                 </div>
                 <div id="statPaneFlow">
 
-                <!-- 1023-H：两格：当月支出（几笔、比上月多 / 少）| 当月收入（本月净剩）；下面总结余（全部记录，含期初余额，点了拆开） -->
+                <!-- 1023-H：两格：当月支出（几笔、比上月多 / 少；1023-O 起这个月没过完时比上月同期）| 当月收入（本月净剩）；总结余 1023-O 挪到页面底部 -->
                 <div class="st-cells">
                     <div class="st-cell"><span class="st-cell-k" id="statOutK">当月支出</span><span class="st-cell-v" id="statMonthOut" data-fit>0.00</span><span class="st-cell-s" id="statOutCmp"></span></div>
                     <div class="st-cell"><span class="st-cell-k">当月收入</span><span class="st-cell-v pos" id="statMonthIn" data-fit>+0.00</span><span class="st-cell-s" id="statNet"></span></div>
                 </div>
-                <div class="stat-card st-bal" id="statBal" style="display:none"></div>
 
                 <!-- 日历：右边一列「周合计」（和格子一样按当天净额算，跨月的周只算本月几天；本周那格深一点；点了打开一周详情）；点某一天打开当日详情 -->
                 <div class="stat-card">
@@ -94,18 +93,14 @@
                     </div>
                 </div>
 
-                <!-- 分类汇总（1023-A 从账单页搬来）：全部记录里各分类计入收支的净额。一行一类，按金额排 -->
+                <!-- 1023-O：下面两块是全部记录的（切月份不变），挨在一起放在最底下：总结余（一行，点了展开算式）、分类汇总（全部铺开，支出在上、收入在下，各一行合计） -->
+                <div class="st-all-h" id="statAllHead">全部记录 · 切月份不变</div>
+                <div class="stat-card st-bal" id="statBal" style="display:none"></div>
                 <div class="cat-card" id="catStatsCard">
                     <div class="cat-card-head">
                         <span class="cat-card-title">分类汇总 · 全部记录</span>
-                        <div class="seg" id="catSortSeg">
-                            <button data-v="desc">从大到小</button>
-                            <button data-v="asc">从小到大</button>
-                        </div>
                     </div>
                     <div class="cat-stats" id="catStats"></div>
-                    <!-- 1019-H：框里还有没露出来的分类：右下角冒一个小圆钮 ↓（滑到底变 ↑），停下 0.8 秒淡出 -->
-                    <button class="cs-hint ui-hit" id="catStatsHint" type="button" aria-label="往下翻">↓</button>
                 </div>
                 </div><!-- /statPaneFlow -->
 
@@ -283,7 +278,6 @@
     </div>
     <button class="to-top" id="toTopBtn" title="回到顶部" aria-label="回到顶部">↑</button>
     <!-- 1010-I3：统计页不在本月时出现，点了回到本月。与账单页的清除筛选同款外观、同一位置 -->
-    <button class="clear-filter-fab" id="statTodayFab" title="回到本月" aria-label="回到本月">✕</button>
 
     <!-- 筛选浮层（bottom sheet）：关键词 / 金额区间 / 日期范围 / 分类，全部筛选条件集中于此 -->
     <!-- 1023-G：搜一笔的结果页（从账单页底栏「搜一笔」从右边滑进来，盖住底栏）：顶上生效的条件一个一个深色小标签（点 × 去掉），
@@ -825,29 +819,29 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1023-N"></script>
-    <script src="app/store.js?v=1023-N"></script>
-    <script src="app/select.js?v=1023-N"></script>
-    <script src="app/keypad.js?v=1023-N"></script>
-    <script src="app/text.js?v=1023-N"></script>
-    <script src="app/sheet.js?v=1023-N"></script>
-    <script src="app/ask.js?v=1023-N"></script>
-    <script src="app/date.js?v=1023-N"></script>
-    <script src="app/monthstrip.js?v=1023-N"></script>
-    <script src="app/ai-export.js?v=1023-N"></script>
-    <script src="app/import-entry.js?v=1023-N"></script>
-    <script src="app/forms.js?v=1023-N"></script>
-    <script src="app/detail.js?v=1023-N"></script>
-    <script src="app/ledger.js?v=1023-N"></script>
-    <script src="app/search.js?v=1023-N"></script>
-    <script src="app/cats.js?v=1023-N"></script>
-    <script src="app/stats.js?v=1023-N"></script>
-    <script src="app/days.js?v=1023-N"></script>
-    <script src="app/settings.js?v=1023-N"></script>
-    <script src="app/tabs.js?v=1023-N"></script>
-    <script src="app/login.js?v=1023-N"></script>
-    <script src="app/back.js?v=1023-N"></script>
-    <script src="app/boot.js?v=1023-N"></script>
+    <script src="app/base.js?v=1023-O"></script>
+    <script src="app/store.js?v=1023-O"></script>
+    <script src="app/select.js?v=1023-O"></script>
+    <script src="app/keypad.js?v=1023-O"></script>
+    <script src="app/text.js?v=1023-O"></script>
+    <script src="app/sheet.js?v=1023-O"></script>
+    <script src="app/ask.js?v=1023-O"></script>
+    <script src="app/date.js?v=1023-O"></script>
+    <script src="app/monthstrip.js?v=1023-O"></script>
+    <script src="app/ai-export.js?v=1023-O"></script>
+    <script src="app/import-entry.js?v=1023-O"></script>
+    <script src="app/forms.js?v=1023-O"></script>
+    <script src="app/detail.js?v=1023-O"></script>
+    <script src="app/ledger.js?v=1023-O"></script>
+    <script src="app/search.js?v=1023-O"></script>
+    <script src="app/cats.js?v=1023-O"></script>
+    <script src="app/stats.js?v=1023-O"></script>
+    <script src="app/days.js?v=1023-O"></script>
+    <script src="app/settings.js?v=1023-O"></script>
+    <script src="app/tabs.js?v=1023-O"></script>
+    <script src="app/login.js?v=1023-O"></script>
+    <script src="app/back.js?v=1023-O"></script>
+    <script src="app/boot.js?v=1023-O"></script>
 
 </body>
 </html>

@@ -46,9 +46,9 @@ const NOW = '2026-10-20T10:00:00';   // 星期二
   ok(net() === bal && /含期初余额/.test($('statBal').textContent), '1 总结余在统计页：全部记录的、写明含期初余额：' + net());
   $('statBalHead').click();   // 1023-H 起就地展开（不再弹提示框）
   { const rs = $('statBalRows') ? $('statBalRows').textContent : '';
-    ok(/累计收入\s*\+300\.00/.test(rs) && /累计支出\s*−41\.50/.test(rs) && /期初余额\s*\+3000\.00/.test(rs) && /结余不等于收入减支出/.test(rs), '1 点总结余拆开说明：' + rs); }
-  $('statBalMore').click();
-  ok(!$('statBalRows'), '1 再点收起');
+    ok(/\+ 累计收入\s*300\.00/.test(rs) && /− 累计支出\s*41\.50/.test(rs) && /期初余额\s*3000\.00/.test(rs) && /= 总结余\s*3258\.50/.test(rs) && /结余不等于收入减支出/.test(rs), '1 点总结余拆开说明：' + rs); }
+  $('statBalHead').click();
+  ok(!$('statBalRows'), '1 整行再点收起');
   w.JiwenLedger.setYM('2026-09');
   ok(q('#lgMonth').textContent === '9月' && q('.ov-out').textContent === '20.00' && q('.ov-in').textContent === '100.00', '1 切到 9 月：9 月支出 20、收入 100');
   ok(w.JiwenLedger.ovOff() && $('billList').querySelectorAll('.bl-row').length === 2, '1 切月份：列表也换成 9 月（1023-C 起按月显示）');

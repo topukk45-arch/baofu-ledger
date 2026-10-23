@@ -354,7 +354,6 @@
                 const tt=$('toTopBtn'); if(tt) tt.classList.remove('show');
                 if(JiwenSearch.isOpen()) JiwenSearch.closeSearch();   // 1023-G：换页签时搜一笔收起来
             }
-            if(tab!=='stats'){ const sf=$('statTodayFab'); if(sf) sf.classList.remove('show'); }
             document.body.classList.toggle('tab-ledger', tab==='ledger');
             document.body.classList.toggle('tab-stats', tab==='stats');
             document.querySelectorAll('.tab-btn').forEach(b=>{
@@ -401,7 +400,7 @@
                 fabWake(btn, show);   // 1017-N：滑动时出现，停下 1.5 秒淡出
                 // 账单页滑动时 ✕ 也跟着出现、停下一起淡出
             }
-            fabHold(btn); fabHold($('statTodayFab'));
+            fabHold(btn);
             window.addEventListener('scroll', onScroll, {passive:true});
             btn.addEventListener('click', ()=>{
                 // 记账页：落到账单标题处（其下方就是翻页条），方便随手翻页——而非滚到整页最顶的「日子」卡片。

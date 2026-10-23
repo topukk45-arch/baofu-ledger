@@ -1356,7 +1356,6 @@
             padding:10px 12px 6px; margin-bottom:12px; }
         .cat-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; }
         .cat-card-title { font-size:14px; font-weight:bold; color:var(--c-primary-dark); letter-spacing:1px; }
-        #catSortSeg button { padding:4px 10px; font-size:12px; }
         .cat-card .cat-stats { text-align:left; margin:0; max-height:212px; overflow-y:auto;
             -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
         .cs-row { display:flex; justify-content:space-between; align-items:center; gap:10px;
@@ -1365,20 +1364,7 @@
         .cs-name { color:var(--c-text); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .cs-amt { flex-shrink:0; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
         .cs-empty { color:var(--c-text-soft); font-size:13px; padding:8px 2px; }
-        /* 1019-H：分类汇总框里还能往下滑的提示：比右下角圆钮小一号，叠在框的右下角；点击区域照样撑到 48（.ui-hit） */
-        .cat-card { position:relative; }
-        .cs-hint { position:absolute; right:12px; bottom:10px; z-index:2; width:36px; height:36px; border-radius:50%; padding:0;
-            border:1px solid var(--c-border-mid); background:var(--c-surface); color:var(--c-primary-dark); font-size:18px; line-height:1;
-            box-shadow:0 2px 8px rgba(var(--c-shadow-rgb),0.3); cursor:pointer; opacity:0; pointer-events:none; transition:opacity 0.2s, transform 0.15s; }
-        .cs-hint.show { opacity:1; pointer-events:auto; }
-        /* 1020-H：↓ / ↑ 不再用字画（按截图像素量，字形偏下 2.5px，各家字体的箭头高低还不一样），画成 Lucide arrow-down 图标、在圆里正中；
-           字还在按钮里（读屏、测试照旧认 ↓ / ↑），只是看不见 */
-        .cs-hint { font-size:0; display:flex; align-items:center; justify-content:center; }
-        .cs-hint::before { content:''; width:18px; height:18px; background:currentColor;
-            -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14'/%3E%3Cpath d='m19 12-7 7-7-7'/%3E%3C/svg%3E") center / contain no-repeat;
-            mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 5v14'/%3E%3Cpath d='m19 12-7 7-7-7'/%3E%3C/svg%3E") center / contain no-repeat; }
-        .cs-hint[data-end="1"]::before { transform:rotate(180deg); }
-        .cs-hint:active { transform:scale(0.92); }
+        /* 1019-H 分类汇总框里的滑动提示 1023-O 去掉了（分类汇总全部铺开） */
 
         /* 列表式选项：一行一个、左对齐，多了框内滑动（批量菜单、选分类） */
         #askChoices.choose-list { flex-direction:column; flex-wrap:nowrap; gap:0; max-height:52vh;
@@ -2132,10 +2118,9 @@
         .stat-cal .day .da.pos { color:var(--c-pos); }
         button.wk-sum { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:0; min-height:62px; padding:0; margin:0;
             border:none; border-radius:8px; background:color-mix(in srgb, var(--c-primary) 12%, var(--c-bg)); font-family:inherit; cursor:pointer; }
-        button.wk-sum.cur { background:color-mix(in srgb, var(--c-primary) 28%, var(--c-bg)); }
-        .wk-n { font-size:10px; color:var(--c-text-soft); }
-        .wk-sum.cur .wk-n { color:var(--c-text); font-weight:bold; }
-        .wk-v { font-size:10.5px; font-weight:bold; line-height:1.2; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        button.wk-sum.cur { background:var(--c-primary-dark); }
+        .wk-v { font-size:11px; font-weight:bold; line-height:1.2; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .wk-sum.cur .wk-v, .wk-sum.cur .wk-v.pos, .wk-sum.cur .wk-v.out { color:var(--c-on-primary); }
         .wk-v.out { color:var(--c-text); }
         .wk-v.pos { color:var(--c-pos); }
         /* 分类占比、分类汇总：花出去的用正文色 */
@@ -2147,4 +2132,20 @@
         #stStrip { bottom:calc(72px + env(safe-area-inset-bottom)); }
         body:not(.tab-stats) #stStrip { display:none !important; }
         body.tab-stats .to-top { bottom:calc(150px + env(safe-area-inset-bottom)); }
-        body.tab-stats #statTodayFab { bottom:calc(204px + env(safe-area-inset-bottom)); }
+        /* 1023-O：统计页底部「全部记录」两块（总结余、分类汇总）；分类汇总不在框里滑、全部铺开 */
+        .st-all-h { display:flex; align-items:center; gap:10px; margin:22px 2px 8px; font-size:12px; color:var(--c-text-soft); letter-spacing:1px; }
+        .st-all-h::after { content:''; flex:1; border-top:1px solid var(--c-border-mid); }
+        .cat-card .cat-stats { max-height:none; overflow:visible; }
+        .st-bal-chev { flex:none; width:20px; height:20px; fill:none; stroke:var(--c-text-soft); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform .2s; }
+        .st-bal.open .st-bal-chev { transform:rotate(180deg); }
+        .st-bal-row.st-bal-eq { padding-top:6px; border-top:1px solid var(--c-border-mid); color:var(--c-text); font-weight:bold; }
+        .st-bal-row.st-bal-eq span { color:var(--c-text); }
+        .cs-sec-h { padding:8px 2px 2px; font-size:12px; color:var(--c-text-soft); }
+        .cs-row.cs-total { border-top:1px solid var(--c-border-mid); border-bottom:none; font-weight:bold; }
+        .cs-split { height:0; margin:6px 0; border-top:2px solid var(--c-border-mid); }
+        button.cs-more { display:block; width:100%; min-height:var(--ui-tap); padding:0 2px; border:none; background:transparent; font-family:inherit;
+            font-size:13px; color:var(--c-primary-dark); text-align:left; cursor:pointer; }
+        .cs-note { padding:8px 2px 6px; font-size:12px; line-height:18px; color:var(--c-text-soft); }
+        .bgo-total { font-size:13px; color:var(--c-text-soft); white-space:nowrap; }
+        .bgo-total .bgo-k { color:var(--c-text); font-weight:bold; }
+        .cs-row:has(+ .cs-total), .cs-row:has(+ .cs-more) { border-bottom:none; }

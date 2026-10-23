@@ -37,7 +37,7 @@ const CATS = ['未分类', '吃饭', '购物', '工资', '转账', '其他'];
   // 1. 标题、两格
   ok(txt($('statMonthLabel')) === '2026年10月' && !$('statPrevM') && !$('statNextM'), '1 标题右边写年月，没有 ‹ ›');
   ok(txt($('statOutK')) === '当月支出 · 3 笔' && txt($('statMonthOut')) === '277.00', '1 当月支出 277（往来不算）、3 笔：' + txt($('statOutK')));
-  ok(txt($('statOutCmp')) === '比 9月 多花 177.00', '1 比上月：' + txt($('statOutCmp')));
+  ok(txt($('statOutCmp')) === '比 9月同期 多花 177.00', '1 比上月（这个月没过完，1023-O 起比 9 月 1–23 日）：' + txt($('statOutCmp')));
   ok(txt($('statMonthIn')) === '+200.00' && txt($('statNet')) === '本月净剩 −77.00' && $('statNet').querySelector('b.out'), '1 当月收入、本月净剩（负的用正文色）');
 
   // 2. 月份浮条
@@ -56,7 +56,7 @@ const CATS = ['未分类', '吃饭', '购物', '工资', '转账', '其他'];
   const wks = [...$('statCal').querySelectorAll('.wk-sum')];
   ok(wks.length === 5 && wks.map(b => b.dataset.mon).join() === '2026-09-28,2026-10-05,2026-10-12,2026-10-19,2026-10-26', '3 每一行一格周合计（10 月 5 行），记着那周的周一');
   ok(wks.map(b => txt(b.querySelector('.wk-v'))).join() === '—,−50,—,−27,—', '3 周合计是净额（往来不算）：' + wks.map(b => txt(b.querySelector('.wk-v'))).join());
-  ok(wks[3].classList.contains('cur') && txt(wks[3].querySelector('.wk-n')) === '本周' && !wks[2].classList.contains('cur'), '3 本周那格深一点');
+  ok(wks[3].classList.contains('cur') && !wks[3].querySelector('.wk-n') && wks[3].getAttribute('aria-label').startsWith('本周') && !wks[2].classList.contains('cur'), '3 本周那格深底（1023-O 起格子里只写数字，「本周」写在读屏文字里）');
   wks[3].click(); await tick();
   ok(sheet() === '本周 · 10月19日–25日', '3 点周合计：一周详情 ' + sheet());
   w.JiwenSheet.close(); await tick();
@@ -71,10 +71,10 @@ const CATS = ['未分类', '吃饭', '购物', '工资', '转账', '其他'];
   ok(txt($('statBalNum')) === (3000 + 1200 - 377 - 500).toFixed(2) && !$('statBalRows'), '4 总结余：全部记录 ' + txt($('statBalNum')));
   $('statBalHead').click();
   const rows = [...$('statBalRows').querySelectorAll('.st-bal-row')].map(r => [...r.children].map(txt).join(' '));
-  ok(rows.join('|') === '期初余额 +3000.00|累计收入 +1200.00|累计支出 −377.00|往来（转账、存取钱、借还钱） −500.00', '4 拆开：' + rows.join('|'));
-  ok(/结余不等于收入减支出/.test(txt($('statBalRows'))) && txt($('statBalMore')) === '收起', '4 写明为什么不等于收入减支出');
-  $('statBalMore').click();
-  ok(!$('statBalRows') && txt($('statBalMore')) === '怎么算出来的 ›', '4 收起');
+  ok(rows.join('|') === '期初余额 3000.00|+ 累计收入 1200.00|− 累计支出 377.00|− 往来（转账、存取钱、借还钱） 500.00|= 总结余 3323.00', '4 展开是能对上的算式（1023-O）：' + rows.join('|'));
+  ok(/结余不等于收入减支出/.test(txt($('statBalRows'))) && $('statBalHead').getAttribute('aria-expanded') === 'true', '4 写明为什么不等于收入减支出');
+  $('statBalHead').click();
+  ok(!$('statBalRows') && $('statBalHead').getAttribute('aria-expanded') === 'false' && !$('statBalMore'), '4 整行再点收起（1023-O 起没有「怎么算出来的 ›」，整行就是开关）');
 
   // 5. 预算明细
   w.JiwenStats.setStatTab('budget'); await tick();

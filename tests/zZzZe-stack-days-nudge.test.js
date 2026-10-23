@@ -82,8 +82,8 @@ const recs = [{ id: 'r1', time: '2026-12-01T12:00', money: 18, type: 'expense', 
   ok(!d.documentElement.style.getPropertyValue('--txt-nudge-dev'), '三 存的值不对（超过 3）：当作自动');
   w.JiwenBase.setTxtNudge(null);
   ok(w.localStorage.getItem('app_txt_nudge') === null, '三 选回「自动」：删掉');
-  // 分类汇总的 ↓ / ↑ 画成图标（字还在按钮里）
-  ok(/\.cs-hint \{ font-size:0;/.test(css) && /\.cs-hint\[data-end="1"\]::before \{ transform:rotate\(180deg\); \}/.test(css) && $('catStatsHint').textContent === '↓', '三 分类汇总的 ↓ / ↑ 画成图标，按钮里的字照旧（读屏认）');
+  // 分类汇总的 ↓ / ↑：1023-O 起分类汇总全部铺开，提示圆钮连同样式一起去掉了
+  ok(!$('catStatsHint') && !/\.cs-hint/.test(css), '三 分类汇总不在框里滑：滑动提示圆钮和它的样式都没了（1023-O）');
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`1020-H 第二层不加深、日子页、字居中：${pass} 通过，${fail} 失败`);
