@@ -534,11 +534,14 @@
 
         // 入口卡事件委托：点某一条 → 直接编辑它（常用操作不必先进管理页）；点空态 → 去添加
         $('daysEntryRows').addEventListener('click', e=>{
+            const it=e.target.closest('[data-day-id]');
+            if(it){ e.stopPropagation(); JiwenDays.openDayItem(it.dataset.dayId); return; }   // 1023-E：点一条：这一条的详情
             const el=e.target.closest('[data-day-act]');
             if(!el) return;
-            if(el.dataset.dayAct==='add'){ e.stopPropagation(); gotoDaysPage(); openDayDialog(null); }   // 1023-A：入口在整条按钮里，别再让外面那下也进一次日子页
+            if(el.dataset.dayAct==='add'){ e.stopPropagation(); gotoDaysPage(); openDayDialog(null); }   // 1023-A：入口在卡片里，别再让外面那下也进一次日子页
         });
-        $('daysManageBtn').addEventListener('click', gotoDaysPage);
+        // 1023-E：点日子卡片的抬头或空白处：全部日子页
+        $('daysCard').addEventListener('click', gotoDaysPage);
 
         // ===== 管理页 =====
         // 它是记账页的子页：进入时把 pageLedger 藏起来、pageDays 显示，底部 tab 仍停在「记账」。

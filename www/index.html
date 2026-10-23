@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1023-D">
+    <link rel="stylesheet" href="app/app.css?v=1023-E">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-D</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-E</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -41,9 +41,13 @@
                      这里仅保留隐藏 select 作为分类取值来源，renderBill 仍读它的 value。 -->
                 <select id="filterCat" style="display:none"><option value="__all">全部</option></select>
 
-                <!-- 1023-C：日子（1023-E 改竖排卡片）；下面一条细条吸在顶上「10月 支出 x 收入 y 统计 ›」，点了去统计页同一个月；
+                <!-- 1023-C：下面一条细条吸在顶上「10月 支出 x 收入 y 统计 ›」，点了去统计页同一个月；
                      列表按月一直往下排（周小计、日卡片、每笔两行、没记账的日子），月份由底栏上方的月份浮条切 -->
-                <button type="button" class="days-strip" id="daysManageBtn" aria-label="日子"><span class="ds-k">日子</span><span class="ds-body" id="daysEntryRows"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                <!-- 1023-E：日子竖排卡片：抬头「日子 · 全部 N 个 ›」，下面最多 3 条（置顶的排第一、浅底加粗）；点一条看这一条，点空白处或抬头进全部日子页 -->
+                <div class="days-card" id="daysCard">
+                    <button type="button" class="dc-head" id="daysManageBtn"><span class="dc-k">日子</span><span class="dc-all" id="daysAllTxt"></span></button>
+                    <div class="dc-rows" id="daysEntryRows"></div>
+                </div>
                 <div class="summary-filter" id="summaryFilter" style="display:none"></div>
 
                 <!-- 批量操作入口：仅筛选生效时出现（1023-G 搬去搜一笔的结果页） -->
@@ -834,28 +838,28 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1023-D"></script>
-    <script src="app/store.js?v=1023-D"></script>
-    <script src="app/select.js?v=1023-D"></script>
-    <script src="app/keypad.js?v=1023-D"></script>
-    <script src="app/text.js?v=1023-D"></script>
-    <script src="app/sheet.js?v=1023-D"></script>
-    <script src="app/ask.js?v=1023-D"></script>
-    <script src="app/date.js?v=1023-D"></script>
-    <script src="app/monthstrip.js?v=1023-D"></script>
-    <script src="app/ai-export.js?v=1023-D"></script>
-    <script src="app/import-entry.js?v=1023-D"></script>
-    <script src="app/forms.js?v=1023-D"></script>
-    <script src="app/detail.js?v=1023-D"></script>
-    <script src="app/ledger.js?v=1023-D"></script>
-    <script src="app/cats.js?v=1023-D"></script>
-    <script src="app/stats.js?v=1023-D"></script>
-    <script src="app/days.js?v=1023-D"></script>
-    <script src="app/settings.js?v=1023-D"></script>
-    <script src="app/tabs.js?v=1023-D"></script>
-    <script src="app/login.js?v=1023-D"></script>
-    <script src="app/back.js?v=1023-D"></script>
-    <script src="app/boot.js?v=1023-D"></script>
+    <script src="app/base.js?v=1023-E"></script>
+    <script src="app/store.js?v=1023-E"></script>
+    <script src="app/select.js?v=1023-E"></script>
+    <script src="app/keypad.js?v=1023-E"></script>
+    <script src="app/text.js?v=1023-E"></script>
+    <script src="app/sheet.js?v=1023-E"></script>
+    <script src="app/ask.js?v=1023-E"></script>
+    <script src="app/date.js?v=1023-E"></script>
+    <script src="app/monthstrip.js?v=1023-E"></script>
+    <script src="app/ai-export.js?v=1023-E"></script>
+    <script src="app/import-entry.js?v=1023-E"></script>
+    <script src="app/forms.js?v=1023-E"></script>
+    <script src="app/detail.js?v=1023-E"></script>
+    <script src="app/ledger.js?v=1023-E"></script>
+    <script src="app/cats.js?v=1023-E"></script>
+    <script src="app/stats.js?v=1023-E"></script>
+    <script src="app/days.js?v=1023-E"></script>
+    <script src="app/settings.js?v=1023-E"></script>
+    <script src="app/tabs.js?v=1023-E"></script>
+    <script src="app/login.js?v=1023-E"></script>
+    <script src="app/back.js?v=1023-E"></script>
+    <script src="app/boot.js?v=1023-E"></script>
 
 </body>
 </html>

@@ -1912,3 +1912,48 @@
         .dw-day-v { min-width:64px; text-align:right; font-weight:bold; font-variant-numeric:tabular-nums; }
         .dw-day-none .dw-day-l { color:var(--c-text-soft); }
         .dw-day-none button.lg-gap-btn { margin-left:auto; }
+
+        /* ===== 1023-E：日子竖排卡片（账单页）、全部日子页的置顶大卡片、单条日子的详情 ===== */
+        .days-card { margin:0 0 4px; padding:4px 6px 8px; border:1px solid var(--c-border); border-radius:16px; background:var(--c-surface); cursor:pointer; }
+        button.dc-head { display:flex; align-items:center; gap:6px; width:100%; min-height:var(--ui-tap); padding:0 8px; border:none; background:transparent;
+            font-family:inherit; text-align:left; cursor:pointer; color:var(--c-text); }
+        .dc-k { font-size:15px; font-weight:bold; }
+        .dc-all { margin-left:auto; font-size:13px; color:var(--c-primary-dark); }
+        .dc-rows { display:flex; flex-direction:column; gap:2px; }
+        button.dc-item { display:flex; align-items:center; gap:10px; width:100%; min-height:52px; padding:0 10px; border:none; border-radius:12px;
+            background:transparent; font-family:inherit; text-align:left; cursor:pointer; color:var(--c-text); }
+        button.dc-item.pin { background:color-mix(in srgb, var(--c-primary) 12%, var(--c-surface)); }
+        .dc-dot { flex:none; width:6px; height:6px; border-radius:3px; background:var(--c-border-mid); }
+        .dc-item.pin .dc-dot { background:var(--c-primary-dark); }
+        .dc-l { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
+        .dc-name { font-size:15px; line-height:20px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .dc-item.pin .dc-name { font-weight:bold; }
+        .dc-date { font-size:11px; line-height:15px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .dc-r { flex:none; display:flex; align-items:baseline; gap:3px; white-space:nowrap; }
+        .dc-w { font-size:12px; color:var(--c-text-soft); }
+        .dc-n { font-size:22px; line-height:26px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; }
+        .dc-n.future { color:var(--c-pos); }
+        .dc-today { font-size:15px; font-weight:bold; color:var(--c-pos); }
+        button.dc-empty { justify-content:center; color:var(--c-text-soft); font-size:14px; }
+        /* 全部日子页：置顶的做成大卡片 */
+        #pageDays .day-item.day-hero { height:auto; display:flex; flex-direction:column; align-items:flex-start; gap:6px; margin:14px 0 6px; padding:20px;
+            border:none; border-radius:18px; background:var(--c-primary-dark); color:var(--c-on-primary); cursor:pointer; }
+        .day-hero .dh-top { display:flex; align-items:center; gap:6px; font-size:14px; opacity:.85; }
+        .day-hero .di-star { width:14px; height:14px; fill:currentColor; stroke:none; }
+        .day-hero .dh-name { font-size:20px; line-height:28px; font-weight:bold; overflow-wrap:anywhere; }
+        .day-hero .dh-num { display:flex; align-items:baseline; gap:6px; }
+        .dhn-w { font-size:14px; opacity:.85; }
+        .dhn-n { font-size:52px; line-height:58px; font-weight:bold; font-variant-numeric:tabular-nums; }
+        .dhn-today { font-size:28px; font-weight:bold; }
+        .day-hero .dh-date { font-size:13px; opacity:.85; }
+        /* 单条日子的详情（共用面板）：名字 + 大号天数，下面日期、在账单页；「置顶 | 修改」、一行小字「删除这个日子」 */
+        .di-hero { display:flex; flex-direction:column; align-items:center; gap:6px; padding:6px 0 14px; text-align:center; }
+        .di-hero-name { font-size:20px; line-height:28px; font-weight:bold; color:var(--c-text); overflow-wrap:anywhere; }
+        .di-hero-num { display:flex; align-items:baseline; gap:6px; }
+        .dih-w { font-size:15px; color:var(--c-text-soft); }
+        .dih-n { font-size:60px; line-height:66px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; }
+        .dih-n.future { color:var(--c-pos); }
+        .dih-today { font-size:30px; font-weight:bold; color:var(--c-pos); }
+        #uiSheetFoot .ui-pair + button.day-item-del { margin-top:4px; }
+        button.day-item-del { align-self:center; display:block; margin:0 auto; min-height:var(--ui-tap); padding:0 20px; border:none; background:transparent; font-family:inherit;
+            color:var(--c-neg); font-size:14px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }

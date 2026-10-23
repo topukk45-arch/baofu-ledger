@@ -23,21 +23,69 @@
             return v;
         }
 
-        // ===== 记账页的入口卡 =====
+        // ===== 记账页的入口卡（1023-E：竖排卡片）=====
+        //   抬头「日子 · 全部 N 个 ›」，下面最多 DAYS_CARD_ROWS（3）条，顺序和日子页一样（置顶的排第一、浅底加粗）；
+        //   每条：名字、日期小字、右边大号天数。点一条 → 这一条的详情（openDayItem）；点抬头或卡片空白处 → 全部日子页（绑定在外壳 tabs 里）
+        const DAYS_CARD_ROWS=3;
+        const DAY_WD=['日','一','二','三','四','五','六'];
+        function dayDateShort(s){ const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||''); return m ? `${s} 周${DAY_WD[new Date(+m[1], +m[2]-1, +m[3]).getDay()]}` : (s||''); }
+        function dayNumBig(c, cls){
+            if(c.state==='today') return `<span class="${cls}-today">就是今天</span>`;
+            return `<span class="${cls}-w">${c.state==='future' ? '还有' : '已经'}</span><b class="${cls}-n${c.state==='future' ? ' future' : ''}">${c.n}</b><span class="${cls}-w">天</span>`;
+        }
         function renderDaysCard(){
             const box=$('daysEntryRows');
             if(!box) return;
             const list=sortedDays(loadDays());
-            // 1023-A：缩成一条：只写最近的一个（置顶的在前，和日子页同一个顺序），后面「等 N 个」；整条点了进日子页
+            const all=$('daysAllTxt');
             if(!list.length){
                 // 空态：点一下直接进日子页并弹出添加表单
-                box.innerHTML='<span class="days-empty-row" data-day-act="add">添加你的第一个日子</span>';
+                if(all) all.textContent='添加 ›';
+                box.innerHTML='<button type="button" class="dc-item dc-empty days-empty-row" data-day-act="add">添加你的第一个日子</button>';
                 return;
             }
-            const d=list[0], c=calcDay(d.date);
-            box.innerHTML=`<span class="d-name">${d.pin?'<span class="pin">★</span>':''}${escapeHtml(d.name)}</span>`
-                + `<span class="d-right">${dayNumHtml(c,'d')}</span>`
-                + (list.length>1 ? `<span class="d-more">等 ${list.length} 个</span>` : '');
+            if(all) all.textContent=`全部 ${list.length} 个 ›`;
+            box.innerHTML=list.slice(0, DAYS_CARD_ROWS).map((d, i)=>{
+                const c=calcDay(d.date);
+                return `<button type="button" class="dc-item${d.pin ? ' pin' : ''}${i===0 ? ' first' : ''}" data-day-id="${escapeHtml(d.id)}">`
+                    + `<span class="dc-dot" aria-hidden="true"></span>`
+                    + `<span class="dc-l"><span class="d-name dc-name">${escapeHtml(d.name)}</span><span class="dc-date">${escapeHtml(dayDateShort(d.date))}</span></span>`
+                    + `<span class="d-right dc-r">${dayNumBig(c, 'dc')}</span></button>`;
+            }).join('');
+        }
+        // 1023-E：点一条日子：这一条的详情（共用面板）：类型（倒数日 / 纪念日）、名字、大号天数；列表卡 日期、在账单页（置顶排第一 / 按日期排）；
+        //   底部「置顶 / 取消置顶 | 修改」，下面一行小字「删除这个日子」（先确认）
+        function openDayItem(id){
+            const d=loadDays().find(x=>x.id===id);
+            if(!d){ customAlert('这个日子不存在了'); renderDaysAll(); return; }
+            if(!window.JiwenSheet){ openDayDialog(id); return; }
+            const c=calcDay(d.date);
+            window.JiwenSheet.open({ title:c.state==='past' ? '纪念日' : '倒数日',
+                body(box){
+                    box.innerHTML=`<div class="di-hero"><span class="di-hero-name">${escapeHtml(d.name)}</span><span class="di-hero-num">${dayNumBig(c, 'dih')}</span></div>`
+                        + `<div class="rec-list"><div class="rec-row"><span class="rec-row-k">日期</span><span class="rec-row-v">${escapeHtml(fmtDayDate(d.date))}</span></div>`
+                        + `<div class="rec-row"><span class="rec-row-k">在账单页</span><span class="rec-row-v">${d.pin ? '置顶，排第一个' : '按日期排'}</span></div></div>`;
+                },
+                foot(box, done){
+                    const mk=(id2, t, cls)=>{ const b=document.createElement('button'); b.type='button'; b.id=id2; b.className=cls; b.textContent=t; return b; };
+                    const pin=mk('dayItemPin', d.pin ? '取消置顶' : '置顶', 'ui-btn'), edit=mk('dayItemEdit', '修改', 'ui-btn primary');
+                    const pair=document.createElement('div'); pair.className='ui-pair'; pair.appendChild(pin); pair.appendChild(edit); box.appendChild(pair);
+                    const del=mk('dayItemDel', '删除这个日子', 'day-item-del');
+                    box.appendChild(del);
+                    pin.addEventListener('click', ()=>{
+                        const list=loadDays(), i=list.findIndex(x=>x.id===id); if(i<0){ done(); return; }
+                        list[i]={ ...list[i], pin:!list[i].pin };
+                        if(!saveDays(list)) return;
+                        renderDaysAll(); openDayItem(id);
+                    });
+                    edit.addEventListener('click', ()=>{ done(); openDayDialog(id); });
+                    del.addEventListener('click', ()=>{
+                        customConfirm(`删除日子「${d.name}」，删掉的找不回来。`, ()=>{
+                            if(!saveDays(loadDays().filter(x=>x.id!==id))) return;
+                            done(); renderDaysAll();
+                        }, '删除日子', { danger:true, okText:'删除这个日子' });
+                    });
+                } });
         }
         $('daysAdd').addEventListener('click', ()=>openDayDialog(null));
 
@@ -167,6 +215,12 @@
                 const on=daysSel.has(d.id);
                 // 勾选圈平时 display:none（由 body.days-selecting 控制显隐），
                 // 所以常态下这段 DOM 是不可见的、不影响布局，不必分两套模板。
+                if(d.pin && !daysSelecting){   // 1023-E：置顶的做成大卡片（主色底、白字、大号天数）
+                    return `<div class="day-item day-hero pinned" data-day-id="${escapeHtml(d.id)}">`
+                        + `<div class="dh-top"><svg class="di-star" viewBox="0 0 24 24" role="img" aria-label="置顶"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>置顶</div>`
+                        + `<div class="dh-name">${escapeHtml(d.name)}</div><div class="dh-num">${dayNumBig(c, 'dhn')}</div>`
+                        + `<div class="dh-date">${escapeHtml(fmtDayDate(d.date))}</div></div>`;
+                }
                 return `<div class="day-item${d.pin?' pinned':''}${on?' sel':''}" data-day-id="${escapeHtml(d.id)}">`
                     + `<div class="di-check">${on?'✓':''}</div>`
                     + `<div class="di-l">`
@@ -194,7 +248,7 @@
             const el=e.target.closest('[data-day-id]');
             if(!el) return;
             if(daysSelecting) toggleDaySel(el.dataset.dayId);
-            else openDayDialog(el.dataset.dayId);
+            else openDayItem(el.dataset.dayId);   // 1023-E：先看这一条（置顶 / 修改 / 删除在详情里）
         });
 
         // ===== 编辑/添加弹窗 =====
@@ -287,5 +341,5 @@
             renderDaysCard();
             if($('pageDays').style.display!=='none') renderDaysList();
         }
-        window.JiwenDays = { closeDayDialog, closeDayMgr, get daysSelecting(){ return daysSelecting; }, exitSelectMode, openDayDialog, renderDaysCard, renderDaysList };   // days 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenDays = { closeDayDialog, closeDayMgr, get daysSelecting(){ return daysSelecting; }, exitSelectMode, openDayDialog, openDayItem, renderDaysCard, renderDaysList };   // days 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();
