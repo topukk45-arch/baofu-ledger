@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1023-B">
+    <link rel="stylesheet" href="app/app.css?v=1023-C">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-B</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-C</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -41,22 +41,17 @@
                      这里仅保留隐藏 select 作为分类取值来源，renderBill 仍读它的 value。 -->
                 <select id="filterCat" style="display:none"><option value="__all">全部</option></select>
 
-                <!-- 1023-A：总览主数字是这个月支出（‹ › 切月份），下面这个月收入、条数，最下面结余（全部记录，含期初余额；点了拆开）。
-                     「当前用户」挪到设置页；分类汇总搬去统计页 -->
-                <div class="summary-overall" id="summaryOverall"></div>
-                <!-- 1023-A：日子缩成一条：最近的一个，点了进日子页 -->
+                <!-- 1023-C：日子（1023-E 改竖排卡片）；下面一条细条吸在顶上「10月 支出 x 收入 y 统计 ›」，点了去统计页同一个月；
+                     列表按月一直往下排（周小计、日卡片、每笔两行、没记账的日子），月份由底栏上方的月份浮条切 -->
                 <button type="button" class="days-strip" id="daysManageBtn" aria-label="日子"><span class="ds-k">日子</span><span class="ds-body" id="daysEntryRows"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                 <div class="summary-filter" id="summaryFilter" style="display:none"></div>
 
-                <!-- 批量操作入口：仅筛选生效时出现，放在账单正上方，离列表近、点起来顺手 -->
+                <!-- 批量操作入口：仅筛选生效时出现（1023-G 搬去搜一笔的结果页） -->
                 <div class="batch-bar" id="batchBar" style="display:none"></div>
 
-                <div class="bill-head" id="billHead">账单</div>
+                <button type="button" class="lg-bar" id="billHead"></button>
 
-                <!-- 1023-A：一条一行（左边分类 + 小字时间、备注，右边金额），按天分组，组头写当天收支；点整行进详情。页码只在下面 -->
                 <div class="bill-list" id="billList"></div>
-                <div class="pager pager-bottom" id="pagerBottom"></div>
-                <div id="pagerPad"></div>
             </div>
 
             <!-- ========== 页面2：统计 ========== -->
@@ -93,6 +88,9 @@
                         <div class="smb-val neg" id="statMonthOut">−0.00</div>
                     </div>
                 </div>
+
+                <!-- 1023-C：总结余（原来在账单页总览里）：全部记录、含期初余额；点了拆开说明 -->
+                <button type="button" class="stat-card st-bal" id="statBal" style="display:none"></button>
 
                 <!-- 预算入口：一行摘要，点开切到「预算」页签。没设任何预算时隐藏 -->
                 <div class="stat-card" id="statBudgetCard" style="display:none"></div>
@@ -835,27 +833,28 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1023-B"></script>
-    <script src="app/store.js?v=1023-B"></script>
-    <script src="app/select.js?v=1023-B"></script>
-    <script src="app/keypad.js?v=1023-B"></script>
-    <script src="app/text.js?v=1023-B"></script>
-    <script src="app/sheet.js?v=1023-B"></script>
-    <script src="app/ask.js?v=1023-B"></script>
-    <script src="app/date.js?v=1023-B"></script>
-    <script src="app/ai-export.js?v=1023-B"></script>
-    <script src="app/import-entry.js?v=1023-B"></script>
-    <script src="app/forms.js?v=1023-B"></script>
-    <script src="app/detail.js?v=1023-B"></script>
-    <script src="app/ledger.js?v=1023-B"></script>
-    <script src="app/cats.js?v=1023-B"></script>
-    <script src="app/stats.js?v=1023-B"></script>
-    <script src="app/days.js?v=1023-B"></script>
-    <script src="app/settings.js?v=1023-B"></script>
-    <script src="app/tabs.js?v=1023-B"></script>
-    <script src="app/login.js?v=1023-B"></script>
-    <script src="app/back.js?v=1023-B"></script>
-    <script src="app/boot.js?v=1023-B"></script>
+    <script src="app/base.js?v=1023-C"></script>
+    <script src="app/store.js?v=1023-C"></script>
+    <script src="app/select.js?v=1023-C"></script>
+    <script src="app/keypad.js?v=1023-C"></script>
+    <script src="app/text.js?v=1023-C"></script>
+    <script src="app/sheet.js?v=1023-C"></script>
+    <script src="app/ask.js?v=1023-C"></script>
+    <script src="app/date.js?v=1023-C"></script>
+    <script src="app/monthstrip.js?v=1023-C"></script>
+    <script src="app/ai-export.js?v=1023-C"></script>
+    <script src="app/import-entry.js?v=1023-C"></script>
+    <script src="app/forms.js?v=1023-C"></script>
+    <script src="app/detail.js?v=1023-C"></script>
+    <script src="app/ledger.js?v=1023-C"></script>
+    <script src="app/cats.js?v=1023-C"></script>
+    <script src="app/stats.js?v=1023-C"></script>
+    <script src="app/days.js?v=1023-C"></script>
+    <script src="app/settings.js?v=1023-C"></script>
+    <script src="app/tabs.js?v=1023-C"></script>
+    <script src="app/login.js?v=1023-C"></script>
+    <script src="app/back.js?v=1023-C"></script>
+    <script src="app/boot.js?v=1023-C"></script>
 
 </body>
 </html>

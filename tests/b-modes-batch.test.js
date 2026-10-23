@@ -112,11 +112,11 @@ function bootSync(records, extra){
 {
     const recs=baseRecords(); recs[0].skip=true; recs[1].skip=true;
     const t=await boot(recs);
-    const ov=t.$('summaryOverall').textContent;
+    const ov=t.$('billHead').textContent;
     const out=14+100*0+[...Array(20).keys()].reduce((s,i)=>s+10+i,0); // 午饭 + 20 条游戏
-    const q=c=>t.$('summaryOverall').querySelector(c).textContent;
+    const q=c=>t.$('billHead').querySelector(c).textContent;   // 1023-C：这个月收支在账单页顶上的细条里
     // 1023-A：总览主数字改成这个月（模拟的今天是 9 月 20 日）支出、下面这个月收入，不带正负号；8 月那两笔是不计
-    ok(ov.includes('这个月 23 条') && q('.ov-out')===out.toFixed(2) && q('.ov-in')==='5200.00', '总览不含不计：'+ov);
+    ok(t.$('billList').querySelectorAll('.bl-row').length===23 && q('.ov-out')===out.toFixed(2) && q('.ov-in')==='5200.00', '总览不含不计：'+ov);
     t.d.querySelector('.tab-btn[data-tab="stats"]').click();   // 1023-A：分类汇总搬去统计页
     ok(t.$('catStats').textContent.length>0 && !t.$('catStats').textContent.includes('转账'), '全部不计的「转账」不出现在分类汇总');
     t.d.querySelector('.tab-btn[data-tab="ledger"]').click();

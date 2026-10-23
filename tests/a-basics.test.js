@@ -130,17 +130,17 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
         $(t.d,'filterFab').click();
         $(t.d,'searchKeyword').value = '不存在的关键词';
         $(t.d,'sheetApply').click();
-        const so = $(t.d,'summaryOverall'), sf = $(t.d,'summaryFilter');
-        ok(so.style.display !== 'none' && so.querySelector('.ov-net') && so.querySelector('.ov-out'), '筛选无结果时总览仍显示');   // 1023-A：总览改成这个月支出 + 结余，不再写「共 N 条」
+        const sf = $(t.d,'summaryFilter');
+        ok($(t.d,'billHead').style.display === 'none' && !$(t.d,'summaryOverall'), '筛选时顶上的月份细条藏起来（下面是全部月份里命中的）；总览没有了（1023-C：总结余搬去统计页）');
         ok(sf.style.display === 'flex' && sf.textContent.includes('命中 0 条'), '小计显示命中 0 条');
         ok($(t.d,'billList').textContent.includes('没有符合条件的记录') && $(t.d,'billList').textContent.includes('清掉筛选'), '列表显示无结果提示（1023-A：多一句怎么清筛选）');   // 1023-A：分类汇总搬去统计页，不在这里查
-        ok($(t.d,'pagerBottom').innerHTML === '', '无结果时不显示翻页');   // 1023-A：页码只在下面
+        ok(!$(t.d,'pagerBottom') && !$(t.d,'pagerPad'), '没有翻页了（1023-C 起按月一直往下排）');
     }
     // ---------- 4b. 存档完全为空：汇总区隐藏 ----------
     {
         const t = await boot({ store: { archives: { '默认存档': { cats:['未分类'], records: [] } }, last: '默认存档' } });
-        ok($(t.d,'summaryOverall').style.display === 'none', '空存档隐藏总览');
-        ok($(t.d,'billList').textContent.includes('暂无记账记录'), '空存档提示暂无记录');
+        ok($(t.d,'billHead').textContent.includes('支出 0.00') && $(t.d,'billHead').textContent.includes('统计'), '空存档：顶上细条写这个月支出 0.00（1023-C）');
+        ok($(t.d,'billList').querySelector('.lg-gap-today') && $(t.d,'billList').textContent.includes('还没记账') && $(t.d,'billList').querySelectorAll('.lg-gap').length === 1, '空存档：只有一条「今天还没记账 · 记一笔」（1023-C：不显示账本第一笔之前的空白日子）');
     }
 
     // ---------- 5. 详情金额 ----------

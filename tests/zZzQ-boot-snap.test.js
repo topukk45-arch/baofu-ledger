@@ -81,7 +81,7 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   t.$('addBill').click(); await t.idle();
   ok(!snap(t), '3 记了一笔：快照删掉');
   await hide(t);
-  ok(snap(t) && /这个月\s*(<[^>]*>)?\s*81\s*(<[^>]*>)?\s*条/.test(snap(t).html), '3 再切后台：存的是新的（这个月 81 条，1023-A 总览改成按月、每页 50 条所以造了 80 条）');
+  ok(snap(t) && (snap(t).html.match(/class="bl-row"/g) || []).length === 81, '3 再切后台：存的是新的（这个月 81 条，1023-C 起账单页列这个月的全部）');
   t = await reopen(t);
   ok(t.w.__snapSeen && t.w.__real && t.w.__snapSeen.text === t.w.__real.text, '3 再打开：快照还是和真的一字不差（多了那一笔）');
 
@@ -128,9 +128,9 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   }
 
   // 7. 屏幕上的不是打开时会看到的：不存
-  t.w.JiwenLedger.goPage(1, 'top'); await hide(t);
-  ok(!snap(t), '7 翻到第 2 页（打开时是第 1 页）：不存');
-  t.w.JiwenLedger.goPage(-1, 'top');
+  t.w.JiwenLedger.setYM('2026-09'); await hide(t);
+  ok(!snap(t), '7 切到了别的月份（打开时是这个月）：不存（1023-C 起没有翻页）');
+  t.w.JiwenLedger.setYM(null);
   t.$('filterFab').click(); t.$('searchKeyword').value = '虚构1'; t.$('sheetApply').click(); await t.idle();
   ok(t.w.__filterActive(), '7 筛选生效了');
   await hide(t);
@@ -139,8 +139,8 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   ok(!t.w.__filterActive(), '7 清掉筛选');
   // 「上次停留」：照原来的页码和位置存
   t.w.localStorage.setItem('app_default_tab', 'last');
-  t.w.JiwenLedger.goPage(1, 'top'); await hide(t);
-  ok(snap(t) && snap(t).pref === 'last' && snap(t).page === 2, '7 选了「上次停留」：第 2 页也存（打开时回到这一页）');
+  await hide(t);
+  ok(snap(t) && snap(t).pref === 'last' && snap(t).page === 1, '7 选了「上次停留」：照样存（1023-C 起没有翻页，page 一直是 1）');
 
   // 8. 快照不进导出的备份
   tab(t, 'ledger'); await hide(t); ok(snap(t), '8 有快照');

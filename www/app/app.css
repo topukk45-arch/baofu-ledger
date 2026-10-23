@@ -1771,3 +1771,88 @@
         .filter-quick .ui-btn { flex:1 1 0; min-width:0; margin:0; font-weight:normal; }
         .filter-quick .ui-btn.on { background:var(--c-sel-bg); border-color:var(--c-sel-border); color:var(--c-sel-text); font-weight:bold; }
         .filter-btns { margin-top:18px; }
+
+        /* ===== 1023-C：账单页按月显示（周小计、日卡片、每笔两行、没记账的日子）+ 月份浮条 ===== */
+        /* 整页铺满（和日子页 1020-H 一样去掉外面那圈卡片框），列表一直往下排，底下让出操作栏 + 月份浮条 + 底栏 */
+        body.tab-ledger:not(.login-mode) { padding:0; }
+        body.tab-ledger:not(.login-mode) .container { background:transparent; border:none; border-radius:0; box-shadow:none;
+            padding:12px 16px calc(220px + env(safe-area-inset-bottom)); }
+        /* 顶上的细条：吸在顶上，点了去统计页同一个月 */
+        button.lg-bar { position:sticky; top:0; z-index:5; display:flex; align-items:center; gap:10px; width:calc(100% + 32px); min-height:var(--ui-tap);
+            margin:8px -16px 0; padding:0 16px; border:none; border-bottom:1px solid var(--c-border); border-radius:0; text-align:left;
+            background:var(--c-bg); background:color-mix(in srgb, var(--c-bg) 96%, transparent); color:var(--c-text-soft); font-size:13px; font-family:inherit; cursor:pointer;
+            font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .lg-bar-m { font-size:17px; font-weight:bold; color:var(--c-text); }
+        .lg-bar-s b { font-weight:bold; color:var(--c-text); }
+        .lg-bar-s b.pos { color:var(--c-pos); }
+        .lg-bar-go { margin-left:auto; color:var(--c-primary-dark); }
+        .bill-list { margin-top:0; }
+        /* 周小计：浅底一条，点了看一周（1023-D） */
+        button.lg-wk { display:flex; align-items:center; gap:8px; width:100%; min-height:var(--ui-tap); margin-top:18px; padding:0 8px 0 12px;
+            border:none; border-radius:10px; background:var(--c-chip); background:color-mix(in srgb, var(--c-primary) 16%, var(--c-bg));
+            color:var(--c-text); font-size:13px; font-family:inherit; text-align:left; cursor:pointer; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .lg-wk-n { font-weight:bold; }
+        .lg-wk-r { color:var(--c-primary-deep); min-width:0; overflow:hidden; text-overflow:ellipsis; }
+        .lg-sum { display:flex; gap:10px; margin-left:auto; color:var(--c-text-soft); font-size:13px; white-space:nowrap; }
+        .lg-sum b { font-weight:bold; color:var(--c-text); }
+        .lg-sum b.pos { color:var(--c-pos); }
+        .lg-sum-e { color:var(--c-text-soft); }
+        .lg-chev { flex:none; width:14px; height:14px; fill:none; stroke:var(--c-text-soft); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        /* 每天一张卡片：抬头是日期 + 当天支出 / 收入（点了看这一天，1023-D），下面每笔两行 */
+        .lg-dc { margin-top:12px; border:1px solid var(--c-border); border-radius:16px; background:var(--c-surface); overflow:hidden;
+            content-visibility:auto; contain-intrinsic-size:auto 200px; }
+        button.lg-dh { display:flex; align-items:center; gap:8px; width:100%; min-height:50px; padding:0 10px 0 14px; margin:0;
+            border:none; border-bottom:1px solid var(--c-border); border-radius:0; background:var(--c-chip); background:color-mix(in srgb, var(--c-primary) 8%, var(--c-surface));
+            font-size:15px; font-family:inherit; text-align:left; cursor:pointer; color:var(--c-text); }
+        button.lg-dh .bl-day-d { font-weight:bold; color:var(--c-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+        .lg-dc .bl-row { min-height:54px; padding:0 14px; gap:10px; border-bottom:none; border-top:1px solid var(--c-border); }
+        .lg-dc button.lg-dh + .bl-row { border-top:none; }
+        .bl-t { display:flex; align-items:center; gap:4px; min-width:0; font-size:15px; line-height:21px; color:var(--c-text); }
+        .bl-t-x { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .bl-t .io-tag, .bl-t .io-skip, .bl-t .io-flow, .bl-t .io-refunded { flex:none; margin:0; padding:0 6px; font-size:11px; line-height:17px; }
+        .lg-dc .bl-sub { display:block; margin-top:0; font-size:12px; line-height:17px; color:var(--c-text-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .bl-amt { font-weight:500; }
+        .bl-amt.out { color:var(--c-text); }
+        /* 没记账的日子：虚线框，右边「补一笔 / 记一笔」 */
+        .lg-gap { display:flex; align-items:center; gap:10px; min-height:var(--ui-tap); margin-top:12px; padding:0 6px 0 14px;
+            border:1.5px dashed var(--c-border-mid); border-radius:16px; font-size:14px; color:var(--c-text-soft); }
+        .lg-gap-t { flex:1 1 auto; min-width:0; }
+        button.lg-gap-btn { flex:none; min-height:36px; padding:0 14px; border:none; border-radius:18px; position:relative;
+            background:color-mix(in srgb, var(--c-primary) 16%, var(--c-bg)); color:var(--c-text); font-size:13px; font-weight:bold; font-family:inherit; cursor:pointer; }
+        button.lg-gap-btn::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%, var(--ui-tap)); height:var(--ui-tap); }
+        .lg-gap-today { border-style:solid; border-color:var(--c-border); background:var(--c-surface); color:var(--c-text); }
+        /* 底栏：「筛选（1023-G 起搜一笔）| 记一笔」两个一样大 */
+        .act-btn { height:56px; border-radius:16px; }
+        .clear-filter-fab { bottom:calc(200px + env(safe-area-inset-bottom)); }
+        /* 月份浮条（账单页、统计页共用）：停 1.5 秒收起（fabWake），中间深色选中框，离中间越远越小越淡，每格下面一根小柱子 */
+        .mstrip { position:fixed; left:16px; right:16px; bottom:calc(128px + env(safe-area-inset-bottom)); height:64px; z-index:905;
+            border:1px solid var(--c-border-mid); border-radius:18px; background:var(--c-surface); overflow:hidden;
+            box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.28);
+            opacity:0; transform:translateY(24px) scale(0.96); pointer-events:none;
+            transition:transform .35s cubic-bezier(.2,.8,.2,1), opacity .25s ease; }
+        .mstrip.show { opacity:1; transform:none; pointer-events:auto; }
+        @media (min-width:761px){ .mstrip { left:50%; right:auto; width:480px; margin-left:-240px; } }
+        body:not(.tab-ledger) #lgStrip, body.kb-open .mstrip, body.login-mode .mstrip { display:none !important; }
+        .ms-sel { position:absolute; left:50%; top:7px; bottom:7px; width:58px; margin-left:-29px; border-radius:12px; background:var(--c-primary-dark); }
+        .ms-year { position:absolute; left:10px; top:5px; z-index:1; font-size:11px; font-weight:bold; color:var(--c-primary-dark); pointer-events:none; }
+        .ms-track { position:relative; height:100%; display:flex; overflow-x:auto; overflow-y:hidden; scroll-snap-type:x mandatory;
+            padding:0 calc(50% - 32px); box-sizing:border-box; scrollbar-width:none; touch-action:pan-x; overscroll-behavior:contain; }
+        .ms-track::-webkit-scrollbar { display:none; }
+        button.ms-item { flex:none; width:64px; height:100%; scroll-snap-align:center; border:none; background:transparent; padding:0 0 10px; margin:0;
+            display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; color:var(--c-text); font-family:inherit; cursor:pointer;
+            transition:transform .15s ease, opacity .15s ease; }
+        .ms-bar { width:16px; height:18px; display:flex; align-items:flex-end; justify-content:center; }
+        .ms-bar i { display:block; width:8px; border-radius:3px 3px 0 0; background:var(--c-border-mid); }
+        .ms-lab { font-size:14px; line-height:16px; }
+        .ms-item.on .ms-lab { color:var(--c-on-primary); font-weight:bold; }
+        .ms-item.on .ms-bar i { background:var(--c-on-primary); opacity:.75; }
+        .ms-item.over .ms-bar i { background:var(--c-neg); opacity:1; }
+        /* 统计页的总结余（1023-C 从账单页总览搬来；1023-H 再改样子） */
+        button.st-bal { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); text-align:left; font-family:inherit; cursor:pointer; color:var(--c-text); }
+        .st-bal-k { flex:1 1 auto; min-width:0; font-size:14px; font-weight:bold; }
+        .st-bal-k em { display:block; font-style:normal; font-weight:normal; font-size:12px; color:var(--c-text-soft); }
+        .st-bal-v { flex:none; font-size:20px; font-weight:bold; color:var(--c-primary-deep); font-variant-numeric:tabular-nums; }
+        .st-bal-go { flex:none; color:var(--c-text-soft); font-size:18px; }
+        @media (prefers-reduced-motion: reduce){ .mstrip, button.ms-item { transition:none; } }
+        .lg-dc-noday .lg-dh { display:flex; align-items:center; gap:8px; min-height:50px; padding:0 14px; border-bottom:1px solid var(--c-border);
+            background:color-mix(in srgb, var(--c-primary) 8%, var(--c-surface)); font-size:15px; }

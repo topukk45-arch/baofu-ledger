@@ -34,7 +34,7 @@ function bootSync(records, arcExtra){
     if(opts.remark!=null) $('refundRemark').value=opts.remark;
     $('refundOk').click();
   };
-  const q=sel=>$('summaryOverall').querySelector(sel).textContent;
+  const q=sel=>sel==='.ov-net' ? (dom.window.JiwenStats.renderStats(), $('statBalNum').textContent) : $('billHead').querySelector(sel).textContent;   // 1023-C：这个月收支在账单页顶上的细条里，总结余搬去统计页
   const toStats=()=>d.querySelector('.tab-btn[data-tab="stats"]').click();
   // 1023-A：分类汇总搬去统计页：切过去读一眼再切回账单页
   const catRows=()=>{ const back=dom.window.JiwenBase.currentTab; toStats(); const r=[...$('catStats').querySelectorAll('.cs-row')]; if(back==='ledger') d.querySelector('.tab-btn[data-tab="ledger"]').click(); return r; };

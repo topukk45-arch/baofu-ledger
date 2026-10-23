@@ -286,7 +286,7 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   const seed=Object.assign({}, OLD); delete seed['store_'+ID_A]; delete seed['store_'+ID_B];
   const t=await boot(seed, { phone });
   if(t.open()) t.$('askOk').click();   // 1013-H：先提示「有数据读不出来」
-  ok(t.inMain() && t.$('billList').textContent.includes('暂无记账记录'), '11 坏账本：界面照常打开（空的）');
+  ok(t.inMain() && t.$('billList').textContent.includes('还没记账') && !t.$('billList').querySelector('.bl-row'), '11 坏账本：界面照常打开（空的，1023-C 起只有「今天还没记账」那一条）');
   const db=await t.db();
   const bk=Object.keys(db).find(k=>k.startsWith('store_'+ID_A+'__corrupted_'));
   ok(bk && db[bk]==='{坏了', '11 原文另存进了库');
@@ -330,7 +330,11 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
   const take13=()=>{ const c=c13; c13=0; return c; };
   t0=Date.now(); t.chip('小明').click(); await t.idle();
   const tEnter=Date.now()-t0, cEnter=take13();
-  ok(t.inMain() && t.$('billList').querySelectorAll('.bl-row').length===50 && t.$('pagerBottom').textContent.includes(`/ ${Math.ceil(N/50)} 页`), `13 从登录页进入账号（读库 + 显示）用时 ${tEnter}ms`);
+  // 1023-C：不分页了，账单页列的是这个月的全部（这份数据最后一笔在 9 月底，这个月是空的），切到 9 月就是 9 月的全部
+  const monthN13=ym=>recs.filter(r=>r.time.startsWith(ym)).length;
+  ok(t.inMain() && t.$('billList').querySelectorAll('.bl-row').length===monthN13(t.w.JiwenLedger.curYM()) && !t.$('pagerBottom'), `13 从登录页进入账号（读库 + 显示）用时 ${tEnter}ms`);
+  t.w.JiwenLedger.setYM('2026-09');
+  ok(t.$('billList').querySelectorAll('.bl-row').length===monthN13('2026-09') && monthN13('2026-09')>200, '13 切到 9 月：列出 9 月全部 '+monthN13('2026-09')+' 条');
   t0=Date.now(); await t.addBill(1, '大账本里记一笔'); const tSave=Date.now()-t0; await t.idle();
   const tSaveAll=Date.now()-t0, cSave=take13();
   J13.parse=op13; J13.stringify=os13;
@@ -388,11 +392,18 @@ const reboot=(t, ls, opts)=>boot(ls, Object.assign({}, opts||{}, { phone:t.phone
     const take=()=>{ const c=chars; chars=0; return c; };
     take();
     let t0=ms(); t.chip('小明').click(); await t.idle(); const tEnter=ms()-t0; const cEnter=take();
-    const entered=t.inMain() && t.$('billList').querySelectorAll('.bl-row').length===50 && t.$('pagerBottom').textContent.includes(`/ ${Math.ceil(N/50)} 页`);
+    // 1023-C 起不分页：列的是这个月的全部；老版本（OLD_HTML）照旧看第一页 50 条
+    const monthN=ym=>recs.filter(r=>r.time.startsWith(ym)).length;
+    const oldPager=!!t.$('pagerBottom');
+    if(!oldPager) t.w.JiwenLedger.listFlush();   // 1023-C：大月份是分批画的，数之前先画完
+    const entered=t.inMain() && (oldPager ? t.$('billList').querySelectorAll('.bl-row').length===50 && t.$('pagerBottom').textContent.includes(`/ ${Math.ceil(N/50)} 页`)
+      : t.$('billList').querySelectorAll('.bl-row').length===monthN(t.w.JiwenLedger.curYM()));
     t0=ms(); await t.addBill(1, '大账本里记一笔'); const tSave=ms()-t0; await t.idle(); const tSaveAll=ms()-t0; const cSave=take();
-    const nextBtn=[...t.$('pagerBottom').querySelectorAll('button')].find(b=>b.textContent.includes('下一页'));
-    t0=ms(); nextBtn.click(); const tPage=ms()-t0; const cPage=take();
-    const paged=t.$('pagerBottom').textContent.includes('第 2 /');
+    // 翻页（老版本）/ 切到上个月（1023-C 起）
+    const nextBtn=oldPager ? [...t.$('pagerBottom').querySelectorAll('button')].find(b=>b.textContent.includes('下一页')) : null;
+    t0=ms(); if(nextBtn) nextBtn.click(); else t.w.JiwenLedger.setYM('2026-09'); const tPage=ms()-t0; const cPage=take();
+    if(!oldPager) t.w.JiwenLedger.listFlush();
+    const paged=oldPager ? t.$('pagerBottom').textContent.includes('第 2 /') : t.$('billList').querySelectorAll('.bl-row').length===monthN('2026-09');
     t0=ms(); t.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle(); const tStats=ms()-t0; const cStats=take();
     J.parse=op; J.stringify=os;
     const stats=t.d.querySelector('.tab-btn[data-tab="stats"]').classList.contains('active');

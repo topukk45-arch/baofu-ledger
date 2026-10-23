@@ -1,11 +1,12 @@
 (function(){
-        const { $, MODE_HINT, PAGE_SIZE, billList, escapeHtml, fabWake, filterCat, fitNums, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
-        const { balContrib, charLen, charSlice, getCats, getUserData, impGetJson, impLogKey, impTarget, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { $, MODE_HINT, billList, escapeHtml, fabWake, filterCat, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
+        const { getCats, getUserData, impGetJson, impLogKey, impTarget, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { bindSheetDrag } = window.JiwenPanel;   // 用到前面模块的
         const { askCancel, customAlert, customChoose, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { openDtPickerDate } = window.JiwenDate;   // 用到前面模块的
         const { loadImportUI, scrollChipIntoView } = window.JiwenImportEntry;   // 用到前面模块的
-        const { openDetail } = window.JiwenDetail;   // 用到前面模块的
+        const { openAddModal } = window.JiwenForms;   // 用到前面模块的
+        const { cal, openDetail } = window.JiwenDetail;   // 用到前面模块的
         // 账单表事件委托：备注查看 / 修改。用 data-act + data-id 取代内联 onclick，
         // 既杜绝把记录 id 拼进 HTML 属性的注入隐患，也避免每行绑定监听。
         billList.addEventListener('click', e => {
@@ -237,7 +238,7 @@
             searchState.from=null; searchState.to=null; searchState.mode=null; searchState.rv=false; searchState.io=null;
             draftMode=''; renderFilterModeChips();
             draftIo=''; renderFilterIoChips();
-            ovYM=null;   // 1023-A：总览回到这个月
+            lgYM=null;   // 1023-C：回到这个月
             const kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax'),
                   from=$('searchFrom'), to=$('searchTo');
             if(kw) kw.value='';
@@ -357,124 +358,150 @@
             b.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入')); });
             const head=$('billHead'); head.parentNode.insertBefore(b, head);
         }
-        // ===== 1023-A：账单页顶上的总览 =====
-        //   主数字是「这个月花了多少」（‹ › 切月份，只管这一块，不动下面的列表），下面一行这个月的收入、条数；
-        //   最下面一行结余：全部记录算下来的（含期初余额、往来），写明白，点了拆开给你看为什么不等于收入减支出。
-        //   ovYM：null = 当前月；别的是 'YYYY-MM'。清筛选（✕）、换账号 / 存档时回到当前月
-        let ovYM=null;
-        const WEEK='日一二三四五六';
+        // ===== 1023-C：账单页按月显示 =====
+        //   顶上一条细条「10月 支出 x 收入 y 统计 ›」吸在顶上（点了去统计页同一个月，绑定在外壳 tabs 里）；
+        //   下面这个月的记录全部一直往下排（不分页）：每周开头一条周小计、每天一张卡片、每笔两行；
+        //   没记账的日子：今天还没记单独一条「记一笔」，过去连着没记的几天合成一条虚线框「补一笔」（按周断开），只到今天、不早于账本第一笔。
+        //   有筛选时（1023-G 之前的老筛选浮层）不按月：全部命中的照同样的周 / 天排，不显示没记账的日子。
+        //   月份由底栏上方的月份浮条切（JiwenMonthStrip，停 1.5 秒收起，滑列表时出来）。lgYM：null = 这个月，别的是 'YYYY-MM'
+        let lgYM=null;
+        const CHEV='<svg class="lg-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
         function ymNow(){ const n=new Date(); return `${n.getFullYear()}-${pad(n.getMonth()+1)}`; }
-        function ymAdd(ym, d){ let y=+ym.slice(0,4), m=+ym.slice(5,7)-1+d; y+=Math.floor(m/12); m=((m%12)+12)%12; return `${y}-${pad(m+1)}`; }
-        function dayLabel(day){
-            const y=+day.slice(0,4), m=+day.slice(5,7), d=+day.slice(8,10);
-            if(!y || !m || !d) return escapeHtml(day);
-            const n=new Date(), w=WEEK[new Date(y, m-1, d).getDay()];
-            const k=x=>`${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`;
-            const yest=new Date(n.getFullYear(), n.getMonth(), n.getDate()-1);
-            const pre = day===k(n) ? '今天 · ' : (day===k(yest) ? '昨天 · ' : '');
-            return `${pre}${y!==n.getFullYear()?y+'年':''}${m}月${d}日 周${w}`;
+        function curYM(){ return lgYM || ymNow(); }
+        function ymLabel(ym){ const y=+ym.slice(0,4); return (y!==new Date().getFullYear() ? y+'年' : '')+(+ym.slice(5,7))+'月'; }
+        const lgStrip=window.JiwenMonthStrip.create({ id:'lgStrip', onPick:ym=>setYM(ym) });
+        function setYM(ym){
+            lgYM = (!ym || ym===ymNow()) ? null : ym;
+            renderBill();
+            const bar=$('billHead'), y=bar ? bar.getBoundingClientRect().top + window.scrollY : 0;
+            if(window.scrollY > y) window.scrollTo({ top:y, behavior:'instant' });   // 切了月份：停在细条那里，新月份从头看
         }
-        let ovSum=null;   // 结余拆开：给「结余 ›」的说明用
-        function renderOverview(allAsc){
-            const cur=ovYM || ymNow();
-            let mIn=0, mOut=0, mN=0, sIn=0, sOut=0, fNet=0, minYM=cur, maxYM=ymNow();
-            allAsc.forEach(r=>{
-                const ym=(r.time||'').slice(0,7);
-                if(ym && ym<minYM) minYM=ym;
-                if(ym && ym>maxYM) maxYM=ym;
-                const c=statContrib(r);
-                sIn+=c.inc; sOut+=c.exp;
-                if(isFlow(r)){ const b=balContrib(r); fNet+=b.inc-b.exp; }
-                if(ym===cur){ mIn+=c.inc; mOut+=c.exp; mN++; }
+        function stripWake(){
+            if(hasActiveSearch() || (filterCat.value && filterCat.value!=='__all')){ lgStrip.hide(); return; }   // 筛选时列的是全部月份里命中的，月份浮条不出
+            if(JiwenBase.currentTab==='ledger' && $('pageLedger').style.display!=='none') lgStrip.wake();
+        }
+        window.addEventListener('scroll', stripWake, { passive:true });
+        function ovOff(){ return lgYM!=null; }   // 首屏快照：看的不是这个月就不存（名字是 1023-A 留下来的）
+        function sumFen(list){ let i=0, e=0; list.forEach(r=>{ const c=statContrib(r); i+=Math.round(c.inc*100); e+=Math.round(c.exp*100); }); return { inc:i/100, exp:e/100 }; }
+        function sumHtml(s, emptyText){
+            if(!s.exp && !s.inc) return emptyText ? `<span class="lg-sum-e">${emptyText}</span>` : '';
+            return (s.exp ? `<span>支出 <b>${s.exp.toFixed(2)}</b></span>` : '') + (s.inc ? `<span>收入 <b class="pos">${s.inc.toFixed(2)}</b></span>` : '');
+        }
+        function rowHtml(r, rMap){
+            const isExp=r.type==='expense', amt=safeNum(r.money).toFixed(2);
+            const tags=(isRefund(r) ? '<span class="io-tag io-refund">退款</span>' : '') + modeTag(r) + refundedTag(r, rMap);
+            const remark=(r.remark||'').trim(), cat=r.cat||'未分类';
+            return `<div class="bl-row" data-act="detail" data-id="${escapeHtml(r.id)}" role="button">`
+                + `<div class="bl-main"><div class="bl-t"><span class="bl-t-x">${escapeHtml(remark || cat)}</span>${tags}</div>`
+                + `<div class="bl-sub"><span class="bl-cat-t">${escapeHtml(cat)}</span> · <span class="bl-time">${escapeHtml((r.time||'').slice(11,16))}</span></div></div>`
+                + `<span class="bl-amt ${isExp ? 'out' : 'pos'}${modeAmtCls(r)}">${isExp ? '−' : '+'}${amt}</span></div>`;
+        }
+        function gapHtml(a, b, today){
+            const C=cal;
+            if(a===b && a===today) return `<div class="lg-gap lg-gap-today" data-a="${a}" data-b="${b}"><span class="lg-gap-t">今天 · ${C.mdText(a)} ${C.wdText(a)}，还没记账</span><button type="button" class="lg-gap-btn" data-add="${a}">记一笔</button></div>`;
+            const t = a===b ? `${C.mdText(a)} ${C.wdText(a)}，没记账` : `${C.rangeText(a, b)}，${Math.round((C.kd(b)-C.kd(a))/86400000)+1} 天没记`;
+            return `<div class="lg-gap" data-a="${a}" data-b="${b}"><span class="lg-gap-t">${t}</span><button type="button" class="lg-gap-btn" data-add="${b}">补一笔</button></div>`;
+        }
+        // recs：要显示的记录（时间正序）。opt.ym：按月显示的那个月（带没记账的日子）；不传 = 筛选结果（不带）
+        //   opt.first：账本第一笔的日子（没记账的日子不往前超过它）
+        function listHtml(recs, opt){
+            const C=cal, today=C.todayKey(), rMap=refundedMap(getUserData());
+            const byDay=new Map();
+            const noDay=[];   // 时间不是正常日子的（老数据里没写时间的）：单独一张卡片放最后
+            recs.forEach(r=>{ const k=(r.time||'').slice(0,10); if(!/^\d{4}-\d{2}-\d{2}$/.test(k)){ noDay.push(r); return; } if(!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(r); });
+            let days;
+            if(opt.ym){
+                const a=opt.ym+'-01', z=C.monthEnd(opt.ym);
+                let hi = z<today ? z : today, lo = opt.first && opt.first>a ? opt.first : a;
+                if(byDay.size){ const ks=[...byDay.keys()].sort(); if(ks[ks.length-1]>hi) hi=ks[ks.length-1]; if(ks[0]<lo) lo=ks[0]; }   // 记在今天以后的照样列出来
+                days=[]; for(let k=hi; k>=lo; k=C.addDay(k, -1)) days.push(k);
+            } else days=[...byDay.keys()].sort().reverse();
+            const todayMon = C.kd(today).getDay()===1;
+            const parts=[];   // 一块一块（周小计、没记账那条、一张日卡片），n 是这块里有几笔：给分批画用
+            const put=(h, n)=>parts.push({ h, n:n||0 });
+            let wkKey=null, run=null;
+            const flush=()=>{ if(run){ put(gapHtml(run.lo, run.hi, today)); run=null; } };
+            days.forEach(k=>{
+                const mon=C.monOf(k), key=mon+'|'+k.slice(0,7);
+                if(key!==wkKey){
+                    flush(); wkKey=key;
+                    const ym=k.slice(0,7), ma=ym+'-01', mz=C.monthEnd(ym);
+                    const a = mon<ma ? ma : mon, z0=C.addDay(mon, 6), z = z0>mz ? mz : z0;
+                    const inWk=recs.filter(r=>{ const d=(r.time||'').slice(0,10); return d>=a && d<=z; });
+                    if(!(mon===C.monOf(today) && todayMon)){
+                        put(`<button type="button" class="lg-wk" data-mon="${mon}" data-a="${a}" data-b="${z}"><span class="lg-wk-n">${C.weekName(mon)}</span><span class="lg-wk-r">${C.rangeText(a, z)}</span><span class="lg-sum">${sumHtml(sumFen(inWk), inWk.length ? '' : '这周一笔没记')}</span>${CHEV}</button>`);
+                    }
+                }
+                const list=byDay.get(k);
+                if(!list){
+                    if(k===today){ flush(); put(gapHtml(k, k, today)); return; }
+                    if(run) run.lo=k; else run={ hi:k, lo:k };
+                    return;
+                }
+                flush();
+                const desc=list.slice().reverse();
+                put(`<div class="lg-dc" data-day="${k}"><button type="button" class="lg-dh bl-day" data-day="${k}"><span class="bl-day-d">${escapeHtml(C.dayTitle(k))}</span><span class="lg-sum bl-day-sum">${sumHtml(sumFen(list))}</span>${CHEV}</button>`
+                    + desc.map(r=>rowHtml(r, rMap)).join('') + `</div>`, list.length);
             });
-            sIn=round2(sIn); sOut=round2(sOut); fNet=round2(fNet);
-            const net=round2(sIn-sOut+fNet);   // 和以前「结余」同一个数：只有不计的不算
-            ovSum={ sIn, sOut, fNet, net };
-            const isNow=cur===ymNow(), y=+cur.slice(0,4), m=+cur.slice(5,7);
-            const label=(y!==new Date().getFullYear() ? y+'年' : '')+m+'月';
-            $('summaryOverall').innerHTML=
-                `<div class="ov-head">`+
-                    `<button type="button" class="ov-nav" id="ovPrev" data-ov="-1" aria-label="上个月"${cur<=minYM?' disabled':''}>‹</button>`+
-                    `<span class="ov-title" id="ovMonth">${label}</span>`+
-                    `<button type="button" class="ov-nav" id="ovNext" data-ov="1" aria-label="下个月"${cur>=maxYM?' disabled':''}>›</button>`+
-                    `<span class="ov-sub">收入 <b class="ov-in pos">${round2(mIn).toFixed(2)}</b></span>`+
-                `</div>`+
-                `<div class="ov-main"><div class="ov-label">${isNow?'本月':m+' 月'}支出（元）<span class="ov-count">· 这个月 <b>${mN}</b> 条</span></div><div class="ov-num ov-out neg" data-fit>${round2(mOut).toFixed(2)}</div></div>`+
-                `<button type="button" class="ov-bal" id="ovBal"><span class="ov-bal-k">结余<em>（全部记录，含期初余额）</em></span><span class="ov-num ov-net">${net.toFixed(2)}</span><span class="ov-bal-go" aria-hidden="true">›</span></button>`;
-            fitNums($('summaryOverall'));
+            flush();
+            if(noDay.length) put(`<div class="lg-dc lg-dc-noday"><div class="lg-dh bl-day"><span class="bl-day-d">没写时间的</span><span class="lg-sum bl-day-sum">${sumHtml(sumFen(noDay))}</span></div>`
+                + noDay.slice().reverse().map(r=>rowHtml(r, rMap)).join('') + `</div>`, noDay.length);
+            return parts;
         }
-        $('summaryOverall').addEventListener('click', e=>{
-            const nav=e.target.closest('[data-ov]');
-            if(nav && !nav.disabled){
-                const nx=ymAdd(ovYM || ymNow(), +nav.dataset.ov);
-                ovYM = nx===ymNow() ? null : nx;
-                renderOverview(getUserData().slice());
-                return;
-            }
-            if(e.target.closest('#ovBal') && ovSum){
-                const f=v=>v.toFixed(2);
-                customAlert(`结余是全部记录算下来的，不只这个月：\n\n`+
-                    `累计收入　+${f(ovSum.sIn)}\n累计支出　−${f(ovSum.sOut)}\n`+
-                    `往来　　　${ovSum.fNet<0?'−':'+'}${f(Math.abs(ovSum.fNet))}（期初余额、转账、存取钱这类，记成「往来」的）\n`+
-                    `结余　　　${f(ovSum.net)}\n\n`+
-                    `所以结余不等于收入减支出：期初余额、存取钱不算收支，但算进结余。记成「不计」的哪里都不算。`, '结余怎么算的');
-            }
+        // 月份浮条的月份表：账本第一笔的月份到这个月，每格是那个月的支出
+        function stripMonths(allAsc){
+            const now=ymNow(), exp=new Map();
+            let first=now;
+            allAsc.forEach(r=>{ const ym=(r.time||'').slice(0,7); if(!/^\d{4}-\d{2}$/.test(ym)) return; if(ym<first) first=ym; exp.set(ym, (exp.get(ym)||0)+statContrib(r).exp); });
+            const out=[];
+            for(let ym=first; ym<=now; ){ out.push({ ym, v:round2(Math.max(0, exp.get(ym)||0)) }); let y=+ym.slice(0,4), m=+ym.slice(5,7)+1; if(m>12){ m=1; y++; } ym=`${y}-${pad(m)}`; }
+            return out;
+        }
+        // 账单页的点击：周小计 / 日期抬头（1023-D 接详情抽屉）、没记账那条的「记一笔 / 补一笔」
+        billList.addEventListener('click', e=>{
+            const add=e.target.closest('[data-add]');
+            if(add){ e.stopPropagation(); openAddModal({ day:add.dataset.add }); return; }
         });
-        function ovOff(){ return ovYM!=null; }   // 首屏快照：总览不在这个月就不存
 
-        // 【1017-M】opt.pageOnly：翻页时只换列表那几行，总览、分类汇总、日子卡、筛选小计一概不动
-        //   （以前翻页也整页重画：先清空列表、中间量字号逼浏览器排一次版，页面那一刻只剩上半截，
-        //    滚动位置被夹到 0，再平滑滚回来——看着像整页重播一遍、上下晃）
-        function renderBill(opt){
-            const pageOnly=!!(opt && opt.pageOnly);
+        // 一个月几百上千笔时分批画：先画前 LIST_FIRST 笔左右（整张日卡片为单位，一屏多），剩下的每次 LIST_CHUNK 笔、让浏览器喘口气再接着画；
+        //   重画时没画完的作废。要用到整页高度的（被杀回来放回滚动位置）先 listFlush() 一次画完
+        const LIST_FIRST=300, LIST_CHUNK=400;
+        let listRest=[], listT=null;
+        function takeParts(max){ let h='', n=0; while(listRest.length && (n<max || !h)){ const p=listRest.shift(); h+=p.h; n+=p.n; } return h; }
+        function listPaint(parts){
+            clearTimeout(listT); listT=null;
+            listRest=parts.slice();
+            billList.innerHTML=takeParts(LIST_FIRST);
+            if(listRest.length) listT=setTimeout(listStep, 0);
+        }
+        function listStep(){ listT=null; if(!listRest.length) return; billList.insertAdjacentHTML('beforeend', takeParts(LIST_CHUNK)); if(listRest.length) listT=setTimeout(listStep, 16); }
+        function listFlush(){ clearTimeout(listT); listT=null; if(listRest.length) billList.insertAdjacentHTML('beforeend', takeParts(Infinity)); }
+
+        function renderBill(){
             const filterVal=filterCat.value;
-            // 结余必须基于「全部记录」累计，否则筛选时结余列会误导（这正是账对不上的根源）
-            // 先对全部记录按时间正序，算出每笔的真实账户累计结余。
-            // 时间精度仅到分钟，同分钟多笔用「记录在存储数组里的原始顺序」作次级键——
-            // 它天然稳定且唯一，不依赖 id 的字符串大小（旧 id 不定长，字符串比较会乱序）。
             const raw=getUserData();
-            if(!pageOnly){ renderImpEmptyEntry(raw.length); renderImpRemind(); renderRvChip(raw); pagerPad(0); }
-            // 【为什么先算时间戳再排序】比较器里每调一次 parseRecTime 就是一次
-            //   正则 + new Date()。而排序要做 O(n log n) 次比较，每次比较调两遍
-            //   —— 12000 条记录约 16 万次比较、32 万次解析，实测占掉 renderBill
-            //   全部耗时的 96%（253ms 里有 244ms）。
-            //   改成先给每条**只解析一次**（O(n)），排序时比较纯数字。
-            //   这就是经典的 Schwartzian transform：用一次预计算换掉重复计算。
+            renderImpEmptyEntry(raw.length); renderImpRemind(); renderRvChip(raw);
+            // 【为什么先算时间戳再排序】排序要做 O(n log n) 次比较，比较器里每次 parseRecTime 太贵：先给每条只解析一次（Schwartzian transform）
+            //   同一分钟多笔按存储里的原始顺序（稳定且唯一）
             const allAsc=raw
                 .map((r,origIdx)=>({ r, origIdx, ts:parseRecTime(r.time).getTime() }))
-                .sort((a,b)=>{
-                    const t=a.ts-b.ts;
-                    if(t!==0) return t;
-                    return a.origIdx-b.origIdx;   // 同分钟多笔：按存储原始顺序，稳定且唯一
-                })
+                .sort((a,b)=>{ const t=a.ts-b.ts; return t!==0 ? t : a.origIdx-b.origIdx; })
                 .map(x=>x.r);
-
-            // 1023-A：每笔记完后的结余不在列表里写了（挪进详情，balanceAfter 现算）
-
-            // 再按筛选条件取出要显示的子集（仍保持时间正序）：分类标签 + 搜索条件叠加
-            const asc=allAsc.filter(r=>filterMatch(r, filterVal));
-
-            // 【1017-M】列表不在这里先清空：新的几行在下面拼好了一次换上，中间不留「列表是空的」那一刻
-            // 只有存档里**一条记录都没有**时才隐藏汇总区。
-            // 此前是「筛选结果为空」也一并隐藏，导致筛选没命中时顶部总览、分类汇总全没了——
-            // 全局总览本不该受筛选影响。现在筛选没命中走下面的正常流程，小计条显示「命中 0 条」。
-            if(allAsc.length===0){
-                billList.innerHTML=`<div class="empty-tip">暂无记账记录</div>`;
-                // 无记录时连同容器一起隐藏，避免留下带底色/内边距的空白色块
-                $('summaryOverall').innerHTML=''; $('summaryOverall').style.display='none';
-                $('summaryFilter').style.display='none';
-                $('batchBar').innerHTML=''; $('batchBar').style.display='none';
-                renderPager(0);
-                return;
-            }
-            if(!pageOnly){
-            // 有记录：确保汇总容器恢复显示（上次可能被空数据分支隐藏过）
-            $('summaryOverall').style.display='';
-            renderOverview(allAsc);
-            // 筛选状态下额外提示当前子集的收支，避免「为什么数字对不上」的疑惑
-            // 现在「筛选」= 分类标签筛选 或 搜索条件，任一生效都显示这条小计
             const filtering = filterVal!=='__all' || hasActiveSearch();
-            const fBar=$('summaryFilter');
+            const ym=curYM();
+            lgStrip.set(stripMonths(allAsc), ym);
+            if(filtering) lgStrip.hide();
+            // 顶上的细条：这个月的支出、收入（统计页同一口径 statContrib）；筛选时藏起来（下面是全部命中的，不是一个月）
+            const bar=$('billHead');
+            const isNow=ym===ymNow();
+            const mon=allAsc.filter(r=>{ const m=(r.time||'').slice(0,7); return m===ym || (isNow && !/^\d{4}-\d{2}$/.test(m)); });   // 没写时间的放在这个月里
+            const ms=sumFen(mon);
+            bar.innerHTML=`<span class="lg-bar-m" id="lgMonth">${ymLabel(ym)}</span><span class="lg-bar-s">支出 <b class="lg-out ov-out">${ms.exp.toFixed(2)}</b></span><span class="lg-bar-s">收入 <b class="pos lg-in ov-in">${ms.inc.toFixed(2)}</b></span><span class="lg-bar-go">统计 ›</span>`;
+            bar.setAttribute('aria-label', `到统计页看${ymLabel(ym)}`);
+            bar.style.display = filtering ? 'none' : '';
+            const asc=filtering ? allAsc.filter(r=>filterMatch(r, filterVal)) : mon;
+            // 筛选小计和批量入口（1023-G 搬去搜一笔的结果页）
+            const fBar=$('summaryFilter'), bBar=$('batchBar');
             if(filtering){
                 let fIn=0, fOut=0, fSkip=0, fFlow=0;
                 asc.forEach(item=>{ const c=statContrib(item); fIn+=c.inc; fOut+=c.exp; if(isSkip(item)) fSkip++; else if(isFlow(item)) fFlow++; });
@@ -482,8 +509,6 @@
                 if(fSkip) fEx.push(`${fSkip} 条不计`);
                 if(fFlow) fEx.push(`${fFlow} 条往来`);
                 fIn=round2(fIn); fOut=round2(fOut);
-                // 徽标文案：有分类显示分类名，否则显示「搜索」；都为真则合并
-                // 徽标按「分类 · 搜索 · 口径」拼，有几样写几样
                 const bp=[];
                 if(filterVal!=='__all') bp.push(filterVal);
                 if(hasTextSearch()) bp.push('搜索');
@@ -492,86 +517,25 @@
                 const badge=bp.join('·')||'搜索';
                 fBar.innerHTML=
                     `<span class="filter-badge">${escapeHtml(badge)}</span>`+
-                    // 「其中 N 条不计」：否则会出现「命中 4 条、支出 0.00」这种看着像 bug 的组合
-                    // 分「段」排：命中 / 收入 / 支出各一段，窄屏折行时只在段与段之间断开
                     `<span class="filter-nums">`+
                         `<span class="fn-seg">命中 <b>${asc.length}</b> 条${fEx.length?`<em class="fn-ex">（其中 ${fEx.join('、')}）</em>`:''}</span>`+
                         `<span class="fn-seg">收入 <b class="pos">${fIn.toFixed(2)}</b></span>`+
                         `<span class="fn-seg">支出 <b class="neg">${fOut.toFixed(2)}</b></span>`+
                     `</span>`;
                 fBar.style.display='flex';
-            } else {
-                fBar.style.display='none';
-            }
-            // 批量入口：日子卡与账单之间的整行按钮。只在筛选生效且有命中时出现——
-            // 没有筛选就等于「全部记录」，一不小心就改了整本账。
-            const bBar=$('batchBar');
+            } else fBar.style.display='none';
+            // 批量入口只在筛选生效且有命中时出现——没有筛选就等于「全部记录」，一不小心就改了整本账
             if(filtering && asc.length){
                 bBar.innerHTML=`<button class="batch-btn" data-act="batch"><span>批量操作</span><span class="bb-sub">当前筛选命中 ${asc.length} 条 ›</span></button>`;
                 bBar.style.display='';
-            } else {
-                bBar.innerHTML=''; bBar.style.display='none';
-            }
+            } else { bBar.innerHTML=''; bBar.style.display='none'; }
 
-            }
-
-            if(asc.length===0){
-                billList.innerHTML=`<div class="empty-tip">没有符合条件的记录${hasActiveSearch() || filterVal!=='__all' ? '<div class="empty-sub">换个条件试试，或点右下角 ✕ 清掉筛选</div>' : ''}</div>`;
-                renderPager(0);
+            if(filtering && !asc.length){
+                listPaint([]); billList.innerHTML=`<div class="empty-tip">没有符合条件的记录<div class="empty-sub">换个条件试试，或点右下角 ✕ 清掉筛选</div></div>`;
                 return;
             }
-
-            // 显示按时间倒序（最新在上）；结余取自全账户累计
-            const desc = asc.slice().reverse();
-
-            // 分页：只渲染当前页，结余/汇总仍按全部记录计算
-            const totalPages = Math.max(1, Math.ceil(desc.length / PAGE_SIZE));
-            if(JiwenBase.curPage > totalPages) JiwenBase.curPage = totalPages;
-            if(JiwenBase.curPage < 1) JiwenBase.curPage = 1;
-            const start = (JiwenBase.curPage - 1) * PAGE_SIZE;
-            const pageItems = desc.slice(start, start + PAGE_SIZE);
-
-            const rMap=refundedMap(raw);        // 原账单 id → 已退总额（1010-J）
-            // 1023-A：按天分组，组头写当天（这次筛选下）的收支合计——一天被分页切开时，两页的组头照样是整天的数
-            const dayTot=new Map();
-            asc.forEach(r=>{
-                const k=(r.time||'').slice(0,10), c=statContrib(r);
-                const t=dayTot.get(k) || { inc:0, exp:0 }; t.inc+=c.inc; t.exp+=c.exp; dayTot.set(k, t);
-            });
-            const frag=document.createDocumentFragment();
-            let lastDay=null;
-            pageItems.forEach(item=>{
-                const day=(item.time||'').slice(0,10);
-                if(day!==lastDay){
-                    lastDay=day;
-                    const t=dayTot.get(day) || { inc:0, exp:0 };
-                    const inc=round2(t.inc), exp=round2(t.exp);
-                    const h=document.createElement('div'); h.className='bl-day'; h.dataset.day=day;
-                    h.innerHTML=`<span class="bl-day-d">${dayLabel(day)}</span><span class="bl-day-sum">`
-                        + (exp ? `<span>支出 <b class="neg">${exp.toFixed(2)}</b></span>` : '')
-                        + (inc ? `<span>收入 <b class="pos">${inc.toFixed(2)}</b></span>` : '')
-                        + `</span>`;
-                    frag.appendChild(h);
-                }
-                const isExp = item.type==='expense';
-                const amt=safeNum(item.money);
-                const tags = (isRefund(item) ? '<span class="io-tag io-refund">退款</span>' : '') + modeTag(item) + refundedTag(item, rMap);
-                const remark=(item.remark||'').trim();
-                const row=document.createElement('div');
-                row.className='bl-row'; row.dataset.act='detail'; row.dataset.id=item.id;
-                row.setAttribute('role', 'button');
-                row.innerHTML=
-                    `<div class="bl-main">`+
-                        `<div class="bl-cat"><span class="bl-cat-t">${escapeHtml(item.cat||'未分类')}</span>${tags}</div>`+
-                        `<div class="bl-sub"><span class="bl-time">${escapeHtml((item.time||'').slice(11,16))}</span>${remark?`<span class="bl-remark">${escapeHtml(remark)}</span>`:''}</div>`+
-                    `</div>`+
-                    `<span class="bl-amt ${isExp?'neg':'pos'}${modeAmtCls(item)}">${isExp?'−':'+'}${amt.toFixed(2)}</span>`;
-                frag.appendChild(row);
-            });
-            billList.textContent='';
-            billList.appendChild(frag);
-
-            renderPager(totalPages);
+            const first=allAsc.length ? (allAsc[0].time||'').slice(0,10) : cal.todayKey();   // 一笔都没有：只有今天那条
+            listPaint(filtering ? listHtml(asc, {}) : listHtml(asc, { ym, first }));
         }
 
         // ===== 批量操作（基于当前筛选结果）=====
@@ -673,44 +637,9 @@
             window.JiwenTabs.refreshAllViews(); renderFilterChips(); if(window.syncFilterFab) window.syncFilterFab();
             customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
         }
-        window.addEventListener('resize', ()=>fitNums($('summaryOverall')), { passive:true });
-
-        // 渲染分页控件（≤1 页时不显示）：1023-A 起只在列表下面一排（原来上面也有一排）
-        //   按钮只建一次、以后只改文字和能不能点——翻页时点的那个按钮还是原来那个，不闪
-        function renderPager(totalPages){
-            const box=$('pagerBottom'); if(!box) return;
-            if(totalPages<=1){ box.innerHTML=''; pagerPad(0); return; }
-            if(!box.querySelector('.page-info')){
-                box.innerHTML='';
-                const prev=document.createElement('button');
-                prev.textContent='‹ 上一页'; prev.dataset.pg='-1';
-                const info=document.createElement('span'); info.className='page-info';
-                const next=document.createElement('button');
-                next.textContent='下一页 ›'; next.dataset.pg='1';
-                prev.onclick=()=>goPage(-1);
-                next.onclick=()=>goPage(1);
-                box.appendChild(prev); box.appendChild(info); box.appendChild(next);
-            }
-            const [prev, next]=box.querySelectorAll('button');
-            prev.disabled = JiwenBase.curPage<=1;
-            next.disabled = JiwenBase.curPage>=totalPages;
-            box.querySelector('.page-info').textContent=`第 ${JiwenBase.curPage} / ${totalPages} 页`;
-        }
-        // 列表最下面一块看不见的垫子（1017-M 留下来的；1023-A 起没有上面那排了，只在整页重画时收掉）
-        function pagerPad(h){ const p=$('pagerPad'); if(p) p.style.height = h>0 ? h+'px' : ''; }
-        // 【1017-M】翻页：只换列表那几行，直接（不带动画）跳到新一页的第一行（1023-A 起页码只在下面）
-        function goPage(d){
-            JiwenBase.curPage+=d;
-            pagerPad(0);
-            renderBill({ pageOnly:true });
-            const first=billList.firstElementChild;
-            if(first) window.scrollTo({ top: Math.max(0, first.getBoundingClientRect().top + window.scrollY - 8), behavior:'instant' });
-            if(window.syncFilterFab) window.syncFilterFab();
-        }
-        // 清筛选（✕）后让列表顶部对齐，避免停在半截
         function scrollListTop(){
             const t=$('billHead') || document.querySelector('table');
             if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
         }
-        window.JiwenLedger = { applyBatch, clearAllFilters, goPage, openBatchMenu, ovOff, renderBill, renderFilterChips, resetSearch, undoBatch };   // ledger 模块对外只有这一个入口
+        window.JiwenLedger = { applyBatch, clearAllFilters, curYM, listFlush, openBatchMenu, ovOff, renderBill, setYM, stripWake, renderFilterChips, resetSearch, undoBatch };   // ledger 模块对外只有这一个入口
 })();

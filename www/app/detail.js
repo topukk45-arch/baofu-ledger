@@ -1,5 +1,5 @@
 (function(){
-        const { $, escapeHtml, isSkip, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
+        const { $, escapeHtml, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
         const { IMP_APPS, balContrib, getUserData, isRefund, modeAmtCls, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { devImportOn } = window.JiwenImportEntry;   // 用到前面模块的
@@ -175,5 +175,32 @@
             });
             return fen/100;
         }
-        window.JiwenDetail = { aiFlagText, balanceAfter, closeDetail, openDetail };   // detail 模块对外只有这一个入口
+
+        // ===== 1023-C：日子、周的小工具（账单页的周小计 / 日卡片、以后统计页的周合计、三个详情抽屉共用）=====
+        //   日子一律用本地日期的 'YYYY-MM-DD'；一周从周一开始（和日期选择器、统计页日历同一个规矩）
+        const CAL_WEEK='日一二三四五六';
+        function dk(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+        function kd(k){ return new Date(+k.slice(0,4), +k.slice(5,7)-1, +k.slice(8,10)); }
+        function addDay(k, n){ const d=kd(k); d.setDate(d.getDate()+n); return dk(d); }
+        function monOf(k){ return addDay(k, -((kd(k).getDay()+6)%7)); }
+        function todayKey(){ return dk(new Date()); }
+        function monthEnd(ym){ const d=new Date(+ym.slice(0,4), +ym.slice(5,7), 0); return dk(d); }
+        function mdText(k){ return `${+k.slice(5,7)}月${+k.slice(8,10)}日`; }
+        function wdText(k){ return '周'+CAL_WEEK[kd(k).getDay()]; }
+        // 「今天 · 10月23日 周五」「昨天 · …」，不是今年的带年份
+        function dayTitle(k){
+            const t=todayKey(), pre = k===t ? '今天 · ' : (k===addDay(t, -1) ? '昨天 · ' : '');
+            const y=+k.slice(0,4);
+            return `${pre}${y!==new Date().getFullYear() ? y+'年' : ''}${mdText(k)} ${wdText(k)}`;
+        }
+        // 「10月1日–4日」；跨月「9月29日–10月4日」；同一天就一个日子
+        function rangeText(a, b){
+            if(a===b) return mdText(a);
+            if(a.slice(0,7)===b.slice(0,7)) return `${mdText(a)}–${+b.slice(8,10)}日`;
+            return `${mdText(a)}–${mdText(b)}`;
+        }
+        // 本周 / 上周 / 那周（按今天算）
+        function weekName(mon){ const tm=monOf(todayKey()); return mon===tm ? '本周' : (mon===addDay(tm, -7) ? '上周' : '那周'); }
+        const cal={ dk, kd, addDay, monOf, todayKey, monthEnd, mdText, wdText, dayTitle, rangeText, weekName };
+        window.JiwenDetail = { aiFlagText, balanceAfter, cal, closeDetail, openDetail };   // detail 模块对外只有这一个入口
 })();

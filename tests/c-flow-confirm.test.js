@@ -39,9 +39,9 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
 {
     let rs=oct(); rs=mark(rs,['cc1','cc2'],'skip'); rs=mark(rs,['dep','lpo','lpi','par'],'flow');
     const t=await boot(rs);
-    const ov=t.$('summaryOverall').textContent;
+    const ov=t.$('billHead').textContent;
     // 收入只有 购物卡 100；支出 = 夜宵 16 + xss 13 = 29
-    const q=c=>t.$('summaryOverall').querySelector(c).textContent;
+    const q=c=>c==='.ov-net' ? (t.w.JiwenStats.renderStats(), t.$('statBalNum').textContent) : t.$('billHead').querySelector(c).textContent;   // 1023-C：这个月收支在细条里，总结余在统计页
     ok(q('.ov-in')==='100.00' && q('.ov-out')==='29.00', '总览收支只含「计入」：'+ov);   // 1023-A：这个月（模拟今天 10 月 10 日）收支，不带正负号
     // 结余 = 存款 + 4500 - 3999.00 - 800 + 100 - 16 - 13（信用卡不算）
     const bal=(50000.00+4500-3999.00-800+100-16-13).toFixed(2);

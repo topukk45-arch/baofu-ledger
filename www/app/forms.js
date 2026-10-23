@@ -1,5 +1,5 @@
 (function(){
-        const { $, MODE_HINT, addBill, billCat, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, escapeHtml, fillSelect, normMoney, nowDtValue, parseRecTime, recMode, round2, safeNum, sanitizeMoney, saveEdit, setRecMode } = window.JiwenBase;   // 用到前面模块的
+        const { $, MODE_HINT, pad, addBill, billCat, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, escapeHtml, fillSelect, normMoney, nowDtValue, parseRecTime, recMode, round2, safeNum, sanitizeMoney, saveEdit, setRecMode } = window.JiwenBase;   // 用到前面模块的
         const { TPL_MAX, TPL_NAME_MAX, __ledger, recentCats, budgetPhrase, budgetSpentIn, charLen, curArchive, genId, getBudgets, getCats, getUserData, isRefund, loadStore, refundedTotal, refundsOf, saveStoreSafe, saveUserData, storeKey, syncRefunds, tplName, tplSame } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customChoose, customConfirm, customPrompt } = window.JiwenAsk;   // 用到前面模块的
         const { getDtInput, openDtPicker, setDtInput } = window.JiwenDate;   // 用到前面模块的
@@ -517,8 +517,10 @@
             }, '删除模板', { danger:true, okText:'删除这个模板' });
         });
         $('tplEditMoney').addEventListener('input', ()=>{ const el=$('tplEditMoney'), v=sanitizeMoney(el.value); if(v!==el.value) el.value=v; });
-        function openAddModal(){
+        function openAddModal(opt){
             resetBillForm();
+            // 1023-C：账单页「补一笔」：日期设成那天（钟点照现在）
+            if(opt && /^\d{4}-\d{2}-\d{2}$/.test(opt.day||'')){ const n=new Date(); setDtInput(billTime, `${opt.day}T${pad(n.getHours())}:${pad(n.getMinutes())}`); }
             if(window.__openModalAfterKeyboard){
                 // 键盘先出来，弹窗再淡入（消除被键盘顶起的闪动）
                 window.__openModalAfterKeyboard(addMask, billMoney);
@@ -528,7 +530,7 @@
                 setTimeout(()=>billMoney.focus(), 60);
             }
         }
-        $('fabAdd').addEventListener('click', openAddModal);
+        $('fabAdd').addEventListener('click', ()=>openAddModal());
         $('closeAdd').addEventListener('click', ()=>{ addMask.style.display='none'; });
 
         addBill.addEventListener('click', () => {

@@ -39,7 +39,6 @@
             const auto=!!window.__autoLogin;
             const rs=auto && getDefaultTabPref()==='last' ? resumeTake(id) : null;   // 1019-L：设置里选了「上次停留」才回去
             window.__autoLogin=false;
-            if(rs && rs.tab==='ledger' && rs.page>1){ JiwenBase.curPage=rs.page; renderBill(); }
             if(rs && rs.tab==='ledger'){ ledgerScrollY=rs.y||0; JiwenBase.currentTab=''; }   // currentTab 先清掉：switchTab 开头记滚动位置那一步别把它冲成 0
             switchTab(rs ? rs.tab : getDefaultTab());   // 按用户设置进入默认页（默认记账）
             if(auto) setTimeout(()=>formDraftRestore(id), 0);   // 填到一半的记一笔 / 修改，不管默认页选哪个都接着来
@@ -370,16 +369,29 @@
             });
             // 进入记账页时按当前筛选状态决定清除浮钮显隐
             if(tab==='ledger' && window.syncFilterFab) window.syncFilterFab();
+            if(tab==='ledger') requestAnimationFrame(()=>JiwenLedger.stripWake());   // 1023-C：打开账单页时月份浮条先露 1.5 秒
             if(tab==='stats') renderStats();
             if(tab==='settings') renderStorageUse();
             // 切换标签后回到顶部：延到布局完成后执行，避免在 display 切换同帧里失效
             // 1017-F：回到账单页时不回顶上，直接放回离开时的位置（同一帧里放一次、布局完成后再放一次，中间不经过顶上）
             const y = tab==='ledger' ? ledgerScrollY : 0;
+            if(y>0) JiwenLedger.listFlush();   // 1023-C：大月份是分批画的，放回滚动位置前先画完
             window.scrollTo(0,y);
             requestAnimationFrame(()=>{ window.scrollTo(0,y); document.documentElement.scrollTop=y; if(!y) document.body.scrollTop=0; });
         }
         document.querySelectorAll('.tab-btn').forEach(b=>{
-            b.addEventListener('click', ()=>switchTab(b.dataset.tab));
+            b.addEventListener('click', ()=>{
+                // 1023-C：再点一下正在看的页签 = 回到顶部（账单页去掉了右下角的 ↑，月份浮条占了那块地方）
+                const pd=$('pageDays');
+                if(b.dataset.tab===JiwenBase.currentTab && !(pd && pd.style.display==='block')){ window.scrollTo({ top:0, behavior:'smooth' }); return; }
+                switchTab(b.dataset.tab);
+            });
+        });
+        // 1023-C：账单页顶上的细条「10月 支出 x 收入 y 统计 ›」：去统计页看同一个月
+        $('billHead').addEventListener('click', ()=>{
+            const ym=JiwenLedger.curYM();
+            JiwenStats.statYear=+ym.slice(0,4); JiwenStats.statMonth=+ym.slice(5,7)-1; JiwenStats.statSelDay=null;
+            switchTab('stats');
         });
 
         // 回到顶部：滚动超过一屏且在记账页时显示
@@ -389,14 +401,7 @@
                 const y = window.scrollY||document.documentElement.scrollTop;
                 let show;
                 if(JiwenBase.currentTab==='ledger'){
-                    // 回顶落点是「账单标题」而非页顶。用标题相对视口的位置判断：标题被滚到视口上方
-                    // 一段距离后才显示按钮；回顶到标题处时它 rect.top≈0，不再满足条件 → 按钮消失。
-                    const head=$('billHead');
-                    if(head){
-                        show = head.getBoundingClientRect().top < -60;
-                    } else {
-                        show = y > 400;
-                    }
+                    show = false;   // 1023-C：账单页不再有 ↑（月份浮条在那块；再点一下底栏「记账」回到顶部）
                 } else if(JiwenBase.currentTab==='stats'){
                     show = y > 400;
                 } else {

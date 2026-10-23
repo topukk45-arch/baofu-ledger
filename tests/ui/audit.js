@@ -935,6 +935,17 @@ async function run(cfg, port, browser) {
         return { bad, ok: !bad.length, n };
       })));
       if (meas) await CLIP(page, '账单页列表', '#pageLedger');
+      // 1023-C：月份浮条出来时不压操作栏、不出屏幕；周小计 / 日卡片抬头里的数一行放得下（不被挤出去）
+      await page.evaluate(() => window.JiwenLedger.stripWake()); await page.waitForTimeout(450);
+      await shot(page, size, '账单页', '月份浮条');
+      results.push(Object.assign({ name: 'ledger-strip', cfg: size, clip: true }, await page.evaluate(() => {
+        const s = document.getElementById('lgStrip').getBoundingClientRect(), a = document.getElementById('actionBar').getBoundingClientRect();
+        const bad = [];
+        if (s.bottom > a.top - 8) bad.push('月份浮条下沿 ' + Math.round(s.bottom) + ' 离操作栏 ' + Math.round(a.top) + ' 不到 8px');
+        if (s.left < 0 || s.right > innerWidth) bad.push('月份浮条出了屏幕');
+        document.querySelectorAll('.lg-wk, .lg-dh, .lg-gap, #billHead').forEach(e => { const r = e.getBoundingClientRect(); [...e.children].forEach(c => { const q = c.getBoundingClientRect(); if (q.width && (q.right > r.right + 0.5 || q.left < r.left - 0.5)) bad.push((e.className || e.id) + ' 里「' + c.textContent.slice(0, 12) + '」出了框'); }); });
+        return { bad: bad.slice(0, 6), ok: !bad.length };
+      })));
       await page.evaluate(() => document.querySelector('#billList .bl-row').click()); await page.waitForTimeout(700);
       await shot(page, size, '账单详情', '平时'); if (meas) await CLIP(page, '账单详情', '#detailMask');
       await closeAll(page);

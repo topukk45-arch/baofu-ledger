@@ -46,15 +46,13 @@ const tab = (t, n) => t.d.querySelector('.tab-btn[data-tab="' + n + '"]').click(
   t = await killAndReopen(t);
   ok(activeTab(t) === 'stats', '1 回来还在统计页');
 
-  // 2. 账单页第 3 页、滚到 1200 → 被杀 → 回来第 3 页、放回 1200
+  // 2. 账单页滚到 1200 → 被杀 → 回来放回 1200（1023-C 起不分页了，没有「第几页」）
   tab(t, 'ledger');
-  t.w.JiwenLedger.goPage(1, 'top'); t.w.JiwenLedger.goPage(1, 'top');
-  const pg = t => t.$('pagerBottom').querySelector('.page-info').textContent;
-  ok(/^第 ?3 ?页|^3 ?\//.test(pg(t)) || /3/.test(pg(t).split('/')[0]), '2 翻到第 3 页：' + pg(t));
+  ok(!t.$('pagerBottom') && t.$('billHead').textContent.includes('统计'), '2 账单页按月一直往下排，没有翻页');
   t.w.__y = 1200;
   t = await killAndReopen(t);
   ok(activeTab(t) === 'ledger', '2 回来在账单页');
-  ok(/3/.test(pg(t).split('/')[0]), '2 还是第 3 页：' + pg(t));
+  ok(!t.w.JiwenLedger.ovOff(), '2 回来看的是这个月');
   ok(t.w.__calls[0] === 1200, '2 滚动位置直接放回 1200，不先回顶上（后面的 0 是测试工具点了「设置」）' + JSON.stringify(t.w.__calls));
 
   // 3. 离开超过 2 小时：1019-L 起（选了「上次停留」）还是回到上次的页签，只是页码、位置从头开始

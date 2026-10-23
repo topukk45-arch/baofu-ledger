@@ -73,7 +73,7 @@ const perfLast = t => { try { const a = JSON.parse(t.w.localStorage.getItem('app
   t.$('addBill').click(); await t.idle();
   ok(!snap(t), '4 记了一笔：快照删掉');
   await wait(1700);
-  ok(snap(t) && snap(t).src === 'idle' && /这个月\s*(<[^>]*>)?\s*41\s*(<[^>]*>)?\s*条/.test(snap(t).html), '4 停下来：存的是新的（这个月 41 条，1023-A 总览改成按月），没切后台');
+  ok(snap(t) && snap(t).src === 'idle' && (snap(t).html.match(/class="bl-row"/g) || []).length === 41, '4 停下来：存的是新的（这个月 41 条，1023-C 起账单页列这个月的全部），没切后台');
 
   // 5. 停下来时照现在的条件判断：开着筛选（打开时会清掉）→ 删掉
   t.$('filterFab').click(); t.$('searchKeyword').value = '虚构1'; t.$('sheetApply').click(); await t.idle();

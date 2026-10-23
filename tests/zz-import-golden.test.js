@@ -88,8 +88,11 @@ async function snap() {
   out.result = $('impResult') ? '' : 'ok';
   $('exportBtn').click(); await until(() => w.__files.length);
   out.backup = w.__files[0] || '';
-  out.overall = $('summaryOverall').innerHTML;
-  const pages = []; for (let p = 0; p < 10; p++) { pages.push($('billList').innerHTML); const nx = [...($('pager') || $('pagerBottom')).querySelectorAll('button')].pop(); if (!nx || nx.disabled) break; nx.click(); }
+  // 1023-C：大总览没有了，这个月的收支在账单页顶上的细条里、总结余在统计页；列表按月显示，月份浮条上的每个月都读一遍
+  w.JiwenStats.renderStats();
+  out.overall = $('billHead').innerHTML + $('statBal').innerHTML;
+  const pages = [...d.querySelectorAll('#lgStrip .ms-item')].map(b => b.dataset.ym).map(ym => { w.JiwenLedger.setYM(ym); w.JiwenLedger.listFlush(); return $('billList').innerHTML; });
+  w.JiwenLedger.setYM(null);
   out.pages = pages.join('|');
   d.querySelector('.tab-btn[data-tab="stats"]').click();
   out.cats = $('catStats').innerHTML;   // 1023-A：分类汇总搬去统计页，切过去再读

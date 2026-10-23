@@ -1,6 +1,6 @@
 (function(){
         const { $, escapeHtml, fabHold, fabWake, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
-        const { catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, odScheduleSync, saveStoreSafe, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { balContrib, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, odScheduleSync, saveStoreSafe, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, playSlide } = window.JiwenDate;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
@@ -626,6 +626,7 @@
             $('statMonthIn').textContent='+'+round2(mIn).toFixed(2);
             $('statMonthOut').textContent='−'+round2(mOut).toFixed(2);
 
+            renderStatBal(dec);
             // 本月预算（共用同一份预解析结果）
             renderStatBudget(dec);
 
@@ -686,6 +687,27 @@
                 $('statDayEmpty').style.display='block';
             }
         }
+
+        // 1023-C：总结余（原来在账单页总览最下面一行，搬过来）：全部记录算下来的（含期初余额、往来，只有不计的不算），点了拆开说明为什么不等于收入减支出
+        let balSum=null;
+        function renderStatBal(dec){
+            const card=$('statBal'); if(!card) return;
+            let sIn=0, sOut=0, fNet=0;
+            dec.forEach(x=>{ const c=statContrib(x.r); sIn+=c.inc; sOut+=c.exp; if(isFlow(x.r)){ const b=balContrib(x.r); fNet+=b.inc-b.exp; } });
+            sIn=round2(sIn); sOut=round2(sOut); fNet=round2(fNet);
+            balSum={ sIn, sOut, fNet, net:round2(sIn-sOut+fNet) };
+            card.style.display = dec.length ? '' : 'none';
+            card.innerHTML=`<span class="st-bal-k">总结余<em>全部记录累计，含期初余额</em></span><span class="st-bal-v ov-net" id="statBalNum">${balSum.net.toFixed(2)}</span><span class="st-bal-go" aria-hidden="true">›</span>`;
+        }
+        $('statBal').addEventListener('click', ()=>{
+            if(!balSum) return;
+            const f=v=>v.toFixed(2);
+            customAlert(`结余是全部记录算下来的，不只这个月：\n\n`+
+                `累计收入　+${f(balSum.sIn)}\n累计支出　−${f(balSum.sOut)}\n`+
+                `往来　　　${balSum.fNet<0?'−':'+'}${f(Math.abs(balSum.fNet))}（期初余额、转账、存取钱这类，记成「往来」的）\n`+
+                `结余　　　${f(balSum.net)}\n\n`+
+                `所以结余不等于收入减支出：期初余额、存取钱不算收支，但算进结余。记成「不计」的哪里都不算。`, '结余怎么算的');
+        });
 
         // dec 由调用方（renderStatCalendar）传入，避免又一次 loadStore + 全表解析。
         // 不传则自行取数，保留独立可调用性——但正常路径下不会走到那个分支。

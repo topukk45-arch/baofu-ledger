@@ -39,7 +39,7 @@ const ids=t=>[...t.$('billList').querySelectorAll('.bl-row[data-act="detail"]')]
   ok(opts.join()==='全部,计入,不计,往来', '口径选项四个：'+opts.join());
   ok(t.$('filterModeChips').querySelector('.sel').textContent==='全部', '默认「全部」');
   t.chip('filterModeChips','往来').click();
-  ok(ids(t)==='a,b,cc,dep,lp', '只改草稿，未点完成列表不变');
+  ok(ids(t)==='a,b,cc,lp', '只改草稿，未点完成列表不变（1023-C：没筛选时只列这个月，7 月那笔 dep 不在）');
   t.$('sheetApply').click();
   ok(ids(t)==='dep,lp', '只看往来：'+ids(t));
   ok(t.$('summaryFilter').querySelector('.filter-badge').textContent==='往来', '徽标显示口径名');
@@ -58,11 +58,11 @@ const ids=t=>[...t.$('billList').querySelectorAll('.bl-row[data-act="detail"]')]
   t.$('filterFab').click(); t.$('sheetClear').click();
   ok(t.$('filterModeChips').querySelector('.sel').textContent==='全部' && ids(t)==='a,b', '清除全部只清草稿');
   t.$('sheetApply').click();
-  ok(ids(t)==='a,b,cc,dep,lp', '点完成后才生效');
+  ok(ids(t)==='a,b,cc,lp', '点完成后才生效（没筛选：这个月）');
   // 浮钮一键清除
   t.$('filterFab').click(); t.chip('filterModeChips','不计').click(); t.$('sheetApply').click();
   t.$('clearFilterFab').click();
-  ok(ids(t)==='a,b,cc,dep,lp' && t.$('batchBar').style.display==='none', '✕ 一键清除连口径一起清');
+  ok(ids(t)==='a,b,cc,lp' && t.$('batchBar').style.display==='none', '✕ 一键清除连口径一起清（回到这个月）');
   t.$('filterFab').click();
   ok(t.$('filterModeChips').querySelector('.sel').textContent==='全部', '清除后面板回到「全部」');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));

@@ -23,8 +23,13 @@ async function snap(file){
   out.backup=noId(dom.window.__files[0]||'');
   out.cloud=noId(JSON.stringify((dom.window.JiwenStore||dom.window).odBuildPayload()));
   out.aiApp=(dom.window.JiwenAiExport || dom.window).buildAiText((dom.window.JiwenStore||dom.window).getUserData().filter(r=>r.time.startsWith('2026-08')),'2026年8月','按月');
-  out.overall=$('summaryOverall').innerHTML; out.cats=$('catStats').innerHTML;   // 1023-A 起分类汇总在统计页，下面切到统计页再读一次
-  const pages=[]; for(let p=0;p<10;p++){ pages.push($('billList').innerHTML); const nx=[...($('pager') || $('pagerBottom')).querySelectorAll('button')].pop(); if(!nx||nx.disabled)break; nx.click(); }
+  const L=dom.window.JiwenLedger;
+  if($('summaryOverall')) out.overall=$('summaryOverall').innerHTML;   // 1023-C 起没有大总览：这个月收支在细条里、总结余在统计页
+  else { dom.window.JiwenStats.renderStats(); out.overall=$('billHead').innerHTML+$('statBal').innerHTML; }
+  out.cats=$('catStats').innerHTML;   // 1023-A 起分类汇总在统计页，下面切到统计页再读一次
+  const pages=[];
+  if($('pager') || $('pagerBottom')){ for(let p=0;p<10;p++){ pages.push($('billList').innerHTML); const nx=[...($('pager') || $('pagerBottom')).querySelectorAll('button')].pop(); if(!nx||nx.disabled)break; nx.click(); } }
+  else { [...d.querySelectorAll('#lgStrip .ms-item')].map(b=>b.dataset.ym).forEach(ym=>{ L.setYM(ym); L.listFlush(); pages.push($('billList').innerHTML); }); L.setYM(null); }   // 1023-C：按月显示，每个月读一遍
   out.pages=pages.join('|');
   // 有命中的筛选
   $('filterFab').click(); $('searchKeyword').value='游戏充值'; $('sheetApply').click();

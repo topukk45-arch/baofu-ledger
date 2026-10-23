@@ -159,6 +159,7 @@ const LEGACY={
 {
   const t=await boot({ 'billData_老用户':JSON.stringify([R('o1','2026-09-01T12:00',9,'expense','餐饮','很早的账')]), users_index:JSON.stringify(['老用户']) });
   t.chip('老用户').click(); await t.idle();
+  t.w.JiwenLedger.setYM('2026-09');   // 1023-C：账单页按月显示，切到 9 月看
   ok(t.inMain() && t.$('billList').textContent.includes('很早的账'), '5 billData_ 老账也能进去看到');
 }
 

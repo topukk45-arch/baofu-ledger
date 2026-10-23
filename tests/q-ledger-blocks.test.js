@@ -76,7 +76,10 @@ async function boot(seed, opts){
     title:()=>$('askTitle').textContent, msg:()=>$('askMsg').textContent,
     chip:n=>[...$('recentUsers').querySelectorAll('.user-chip')].find(c=>c.querySelector('span').textContent===n),
     dump:()=>{ const o={}; for(let i=0;i<ls.length;i++){ const k=ls.key(i); o[k]=ls.getItem(k); } return o; },
-    list:()=>$('billList').textContent,
+    // 1023-C 起账单页按月显示：把月份浮条上的每个月都切过去读一遍，读完回到这个月
+    list:()=>{ const L=w.JiwenLedger; if(!L || !L.setYM) return $('billList').textContent;
+      const yms=[...w.document.querySelectorAll('#lgStrip .ms-item')].map(b=>b.dataset.ym); let t='';
+      yms.forEach(ym=>{ L.setYM(ym); L.listFlush(); t+=$('billList').textContent; }); L.setYM(null); return t; },
     prompt:v=>{ $('askInput').value=v; $('askOk').click(); },
   };
   // 改一条记录（走数据层：换成新对象再存）
@@ -350,7 +353,7 @@ const F_SEED=Object.assign({}, BASE);
   let db=await t.db();
   // 搬的时候原文原样放到 meta 的位置；进入账号会存一次（记下当前存档），和 1013-F 一样这时就覆盖成正常的空账本了
   ok(!realKeys(db).includes('store_'+ID_A) && metaOf(db, ID_A).archives['默认存档'], '11 搬完：旧键删了，进入账号后 meta 已是正常的空账本');
-  ok(t.inMain() && t.list().includes('暂无记账记录'), '11 进去是空账本，不白屏');
+  ok(t.inMain() && t.list().includes('还没记账') && !t.$('billList').querySelector('.bl-row'), '11 进去是空账本，不白屏（1023-C：只有「今天还没记账」）');
   ok(realKeys(db).some(k=>k.startsWith('store_'+ID_A+'__corrupted_') && db[k]==='{坏了'), '11 原文另存了');
   t.ls.setItem(`onedrive_link_${ID_A}__默认存档`, JSON.stringify({ uri:'content://a', name:'a.json', lastCount:1 }));
   await (t.w.JiwenStore || t.w).odSyncNow();

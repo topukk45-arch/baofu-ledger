@@ -45,14 +45,14 @@ const resume = (tab, page, y, ageMs) => ({ ['app_resume_' + A.ID]: JSON.stringif
   // 3. 选「上次停留」：回到上次的页签、页码、滚动位置
   {
     const t = await coldBoot(Object.assign({ app_default_tab: 'last' }, resume('ledger', 3, 900)));
-    ok(t.w.__first.tab === 'ledger' && /3/.test(t.w.__first.page.split('/')[0]) && t.w.__calls[0] === 900, '3 「上次停留」：账单页第 3 页、滚到 900 ' + t.w.__first.page + ' ' + JSON.stringify(t.w.__calls));
+    ok(t.w.__first.tab === 'ledger' && t.w.__calls[0] === 900, '3 「上次停留」：账单页、滚到 900（1023-C 起没有页码，存的 page 不用了） ' + JSON.stringify(t.w.__calls));
     t.w.close();
     const t2 = await coldBoot(Object.assign({ app_default_tab: 'last' }, resume('stats', 1, 0)));
     ok(t2.w.__first.tab === 'stats', '3 「上次停留」：上次停在统计页就进统计页');
     t2.w.close();
     // 离开超过 2 小时：还是回到上次的页签，页码和位置从头开始
     const t3 = await coldBoot(Object.assign({ app_default_tab: 'last' }, resume('ledger', 3, 900, 3 * 3600 * 1000)));
-    ok(t3.w.__first.tab === 'ledger' && /^第? ?1/.test(t3.w.__first.page.replace(/\s/g, '')) && t3.w.__calls[0] !== 900, '3 「上次停留」离开 3 小时：回到账单页、第 1 页、不放回位置 ' + t3.w.__first.page);
+    ok(t3.w.__first.tab === 'ledger' && t3.w.__calls[0] !== 900, '3 「上次停留」离开 3 小时：回到账单页、不放回位置');
     t3.w.close();
   }
   // 4. 设置页上：四个选项，选「上次停留」存 last

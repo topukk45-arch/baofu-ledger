@@ -39,10 +39,10 @@ const recs = Array.from({ length: 60 }, (_, i) => ({ id: 'r' + i, time: `2026-10
   w.__calls = [];
   t.$('daysBack').click(); await frame();
   ok(w.__y === 640 && w.__calls.every(v => v === 640), '3 从日子管理页返回：放回 640');
-  // 4. 在账单页点底栏「账单」：位置不动
+  // 4. 在账单页点底栏「账单」：1023-C 起 = 回到顶部（账单页去掉了右下角的 ↑）
   w.__y = 700; w.__calls = [];
   tab('ledger'); await frame();
-  ok(w.__y === 700, '4 已经在账单页再点「账单」：位置不动');
+  ok(w.__y === 0 && w.__calls.length === 1, '4 已经在账单页再点「账单」：回到顶部（1023-C）');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
