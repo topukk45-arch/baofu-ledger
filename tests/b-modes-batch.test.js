@@ -123,7 +123,7 @@ function bootSync(records, extra){
     t.filterKw('信用卡');
     ok([...t.$('searchList').querySelectorAll('.bl-row')].filter(r=>r.querySelector('.io-skip') && r.querySelector('.amt-skip')).length===2, '不计行有灰色标签和灰色金额（1023-G：在搜一笔的结果页里）');
     const sf=t.$('summaryFilter').textContent;
-    ok(sf.includes('找到 2 笔（其中 2 笔不计）') && sf.includes('支出 0.00'), '结果页合计说明不计条数：'+sf);
+    ok(sf.includes('找到 2 笔') && t.$('summaryFilter').querySelector('.sp-ex').textContent==='其中 2 笔不计' && sf.includes('支出 0.00'), '结果页合计说明不计条数：'+sf);
     ok(t.$('batchBar') && t.$('batchBar').dataset.act==='batch', '有条件时结果页有「批量改」');
     // 结余：a5（100 不计）那一笔的结余应等于它前一笔（a4）——1023-A 起结余在详情里（点整行进详情）
     const t2=await boot(baseRecords());

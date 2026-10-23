@@ -251,7 +251,7 @@ function bootSync(records, arcExtra){
   t.refund('buy', { part:30, remark:'鞋子退差价' }); t.$('askOk').click();
   t.$('filterFab').click(); t.$('searchKeyword').value='鞋子'; t.$('sheetApply').click();
   t.$('batchBar').click();
-  ok(t.$('askMsg').textContent.startsWith('对搜到的这 1 条记录') && t.$('askMsg').textContent.includes('另有 1 条退款记录不参与'), '菜单说明：'+t.$('askMsg').textContent);
+  ok(t.$('askMsg').textContent.startsWith('这 1 笔是这次搜到的全部记录') && t.$('askMsg').textContent.includes('另有 1 条退款记录不参与'), '菜单说明：'+t.$('askMsg').textContent);
   const choose=label=>RC.choose(t.d, label);   // 1020-I：批量改分类在分类抽屉里选
   choose('改分类'); choose('游戏');
   ok(t.$('askList').querySelectorAll('.al-row').length===1, '确认清单只有原账单');

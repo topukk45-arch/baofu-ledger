@@ -962,9 +962,14 @@ async function run(cfg, port, browser) {
       results.push(Object.assign({ name: 'search-page', cfg: size, clip: true }, await page.evaluate(() => {
         const bad = [], pg = document.getElementById('pageSearch');
         if (!pg || getComputedStyle(pg).display === 'none') return { bad: ['结果页没出来'], ok: false };
-        const foot = document.getElementById('searchToLedger').getBoundingClientRect();
+        const foot = document.getElementById('searchEdit').getBoundingClientRect();
         if (foot.bottom > innerHeight + 0.5) bad.push('「回到账单」出了屏幕');
-        document.querySelectorAll('#searchTags .sp-tag').forEach(e => { if (e.getBoundingClientRect().right > innerWidth) bad.push('条件标签出了屏幕'); });
+        // 1023-M：条件卡浮在底部按钮上面，不许压着按钮；条件一行（横着滑），不换行
+        const card = document.getElementById('searchCard').getBoundingClientRect(), bar = document.querySelector('.sp-bar').getBoundingClientRect();
+        if (card.bottom > bar.top + 0.5) bad.push('条件卡压着底部按钮');
+        if (card.left < 0 || card.right > innerWidth) bad.push('条件卡出了屏幕');
+        const tg = document.getElementById('searchTags'), tops = new Set([...tg.querySelectorAll('.sp-tag')].map(e => Math.round(e.getBoundingClientRect().top)));
+        if (tops.size > 1) bad.push('条件换了行');
         return { bad, ok: !bad.length };
       })));
       await page.evaluate(() => window.JiwenSearch.closeSearch()); await page.waitForTimeout(500);

@@ -90,13 +90,14 @@
         // 生效的条件：一个一个小标签，每个带「去掉」
         function condTags(){
             const s=searchState, out=[];
-            if(s.from || s.to) out.push({ t: s.from && s.to ? (s.from===s.to ? dayLabel(s.from) : `${dayLabel(s.from)}–${dayLabel(s.to)}`) : (s.from ? `${dayLabel(s.from)}起` : `到${dayLabel(s.to)}`), drop(){ s.from=null; s.to=null; } });
-            if(s.min!=null || s.max!=null) out.push({ t: s.min!=null && s.max!=null ? `¥${s.min}–${s.max}` : (s.min!=null ? `¥${s.min} 起` : `¥${s.max} 以内`), drop(){ s.min=null; s.max=null; } });
-            if(s.ios.length===1) out.push({ t: s.ios[0]==='expense' ? '支出' : '收入', drop(){ s.ios=[]; } });
-            s.cats.forEach(c=>out.push({ t:c, drop(){ s.cats=s.cats.filter(x=>x!==c); } }));
-            MODE_ORDER.filter(m=>s.modes.includes(m)).forEach(m=>out.push({ t:MODE_NAME[m], drop(){ s.modes=s.modes.filter(x=>x!==m); } }));
-            if(s.keyword) out.push({ t:'备注：'+s.keyword, drop(){ s.keyword=''; } });
-            if(s.rv) out.push({ t:'待确认分类', drop(){ s.rv=false; } });
+            // sec：点条件本身时打开抽屉、翻到这一项（1023-M）
+            if(s.from || s.to) out.push({ sec:'date', t: s.from && s.to ? (s.from===s.to ? dayLabel(s.from) : `${dayLabel(s.from)}–${dayLabel(s.to)}`) : (s.from ? `${dayLabel(s.from)}起` : `到${dayLabel(s.to)}`), drop(){ s.from=null; s.to=null; } });
+            if(s.min!=null || s.max!=null) out.push({ sec:'money', t: s.min!=null && s.max!=null ? `¥${s.min}–${s.max}` : (s.min!=null ? `¥${s.min} 起` : `¥${s.max} 以内`), drop(){ s.min=null; s.max=null; } });
+            if(s.ios.length===1) out.push({ sec:'io', t: s.ios[0]==='expense' ? '支出' : '收入', drop(){ s.ios=[]; } });
+            s.cats.forEach(c=>out.push({ sec:'cat', t:c, drop(){ s.cats=s.cats.filter(x=>x!==c); } }));
+            MODE_ORDER.filter(m=>s.modes.includes(m)).forEach(m=>out.push({ sec:'mode', t:MODE_NAME[m], drop(){ s.modes=s.modes.filter(x=>x!==m); } }));
+            if(s.keyword) out.push({ sec:'kw', t:'备注：'+s.keyword, drop(){ s.keyword=''; } });
+            if(s.rv) out.push({ sec:'rv', t:'待确认分类', drop(){ s.rv=false; } });
             return out;
         }
         let tagList=[];
@@ -104,26 +105,36 @@
             if(!pageOpen) return;
             const asc=sortedRecs().filter(filterMatch), any=hasFilter();
             tagList=condTags();
+            // 1023-M：条件一个一个排成一行（多了横着滑、不换行）；点条件本身是改这个条件（打开抽屉翻到那一项），点 × 是去掉
             $('searchTags').innerHTML = tagList.length
-                ? tagList.map((x, i)=>`<button type="button" class="sp-tag" data-i="${i}" aria-label="去掉条件：${escapeHtml(x.t)}"><span class="sp-tag-t">${escapeHtml(x.t)}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`).join('')
+                ? tagList.map((x, i)=>`<span class="sp-tag" data-i="${i}"><button type="button" class="sp-tag-t" data-act="edit" aria-label="改条件：${escapeHtml(x.t)}">${escapeHtml(x.t)}</button>`
+                    + `<button type="button" class="sp-tag-x" data-act="drop" aria-label="去掉条件：${escapeHtml(x.t)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>`).join('')
                 : `<span class="sp-nocond">还没设条件，下面是全部账单</span>`;
             $('searchCount').textContent=`${asc.length} 笔`;
             const s=sumFen(asc);
             let nSkip=0, nFlow=0; asc.forEach(r=>{ if(isSkip(r)) nSkip++; else if(isFlow(r)) nFlow++; });
             const ex=[]; if(nSkip) ex.push(`${nSkip} 笔不计`); if(nFlow) ex.push(`${nFlow} 笔往来`);
+            // 条件只限了支出（或只限了收入）：只写那一项的合计
+            const io1 = searchState.ios.length===1 ? searchState.ios[0] : '';
+            const money = io1==='expense' ? `支出 <b>${s.exp.toFixed(2)}</b>`
+                : io1==='income' ? `收入 <b class="pos">${s.inc.toFixed(2)}</b>`
+                : `支出 <b>${s.exp.toFixed(2)}</b>${s.inc ? ` · 收入 <b class="pos">${s.inc.toFixed(2)}</b>` : ''}`;
             const sum=$('summaryFilter');
             sum.innerHTML = asc.length
-                ? `<span class="sp-n">找到 <b>${asc.length}</b> 笔${ex.length ? `<em>（其中 ${ex.join('、')}）</em>` : ''}</span>`
-                    + `<span class="sp-s">支出 <b>${s.exp.toFixed(2)}</b>${s.inc ? ` · 收入 <b class="pos">${s.inc.toFixed(2)}</b>` : ''}</span>`
+                ? `<span class="sp-sumtx"><span class="sp-n">找到 <b>${asc.length}</b> 笔 · <span class="sp-s">${money}</span></span>`
+                    + (ex.length ? `<span class="sp-ex">其中 ${ex.join('、')}</span>` : '') + `</span>`
                     // 批量：有条件、搜到了才有（没条件就等于全部记录，一不小心就改了整本账）；范围 = 这里列出来的全部
-                    + (any ? `<button type="button" class="sp-batch" id="batchBar" data-act="batch">批量改 ›</button>` : '')
+                    + (any ? `<button type="button" class="sp-batch" id="batchBar" data-act="batch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>批量改</button>` : '')
                 : '';
             sum.hidden=!asc.length;
+            // 底部按钮：有条件「清空条件 | 改条件」，没条件只有一个「设条件」
+            $('searchClear').hidden=!any;
+            $('searchEdit').textContent = any ? '改条件' : '设条件';
             const empty=!asc.length;
             $('searchEmpty').hidden=!empty;
             if(empty){
                 $('searchEmpty').querySelector('.sp-empty-t').textContent = any ? '没有找到相关的账' : '账本里还没有记录';
-                $('searchEmpty').querySelector('.sp-empty-s').textContent = any ? '点上面的条件把它去掉，或者回去改条件' : '记了账以后，在这里按条件找';
+                $('searchEmpty').querySelector('.sp-empty-s').textContent = any ? '点下面的条件把它去掉，或者改条件' : '记了账以后，在这里按条件找';
                 painter.paint([]);
             } else painter.paint(listHtml(asc, {}));
             paintSheet();
@@ -132,7 +143,8 @@
         $('searchTags').addEventListener('click', e=>{
             const b=e.target.closest('.sp-tag'); if(!b) return;
             const x=tagList[+b.dataset.i]; if(!x) return;
-            x.drop(); render();
+            if(e.target.closest('[data-act="drop"]')){ x.drop(); render(); return; }
+            if(e.target.closest('[data-act="edit"]')) openSheet({ focus:x.sec });
         });
         $('summaryFilter').addEventListener('click', e=>{ if(e.target.closest('[data-act="batch"]')) openBatchMenu(); });
         list.addEventListener('click', e=>{
@@ -141,7 +153,7 @@
             const dh=e.target.closest('.lg-dh[data-day]'); if(dh){ openDay(dh.dataset.day); }
         });
         $('searchBack').addEventListener('click', closeSearch);
-        $('searchToLedger').addEventListener('click', closeSearch);
+        $('searchClear').addEventListener('click', ()=>{ clearState(); kw.value=''; min.value=''; max.value=''; render(); });   // 只清条件，结果页留着   // 1023-M：原来的「回到账单」换成「清空条件」（回账单走顶上的 ‹ 或返回键）
         $('searchEdit').addEventListener('click', ()=>openSheet());
         $('filterFab').addEventListener('click', ()=>openSearch());
         // 账单页的「待确认分类 N 条 ›」（ledger.js 画的）：打开结果页，只看待确认分类
@@ -156,10 +168,13 @@
         const from=$('searchFrom'), to=$('searchTo'), kw=$('searchKeyword'), min=$('searchMin'), max=$('searchMax');
         let quickCats=[], catOpen=false, modeOpen=false;
         function sheetOpen(){ return mask.style.display==='flex'; }
-        function openSheet(){
+        // opt.focus：从结果页点某个条件进来，翻到那一项（分类 / 统计顺便展开）、闪一下
+        const FOCUS_EL={ date:'filterDateQuick', money:'searchMin', io:'filterIoChips', cat:'filterCatRow', mode:'filterModeRow', kw:'searchKeyword', rv:'filterRvRow' };
+        function openSheet(opt){
             if(!pageOpen){ openSearch({ noSheet:true }); }
             quickCats=recentCats(searchState.ios.length===1 ? searchState.ios[0] : undefined, 4);   // 打开时定下来，开着时不挪位置
-            catOpen=false; modeOpen=false;
+            const focus=opt && opt.focus;
+            catOpen=focus==='cat'; modeOpen=focus==='mode';
             kw.value=searchState.keyword;
             min.value = searchState.min!=null ? String(searchState.min) : '';
             max.value = searchState.max!=null ? String(searchState.max) : '';
@@ -167,6 +182,13 @@
             mask.style.display='flex';
             sheetDrag.reset();
             requestAnimationFrame(()=>mask.classList.add('open'));
+            const fe=focus && $(FOCUS_EL[focus]);
+            const row=fe && (fe.closest('.rec-row, .sf-sec') || fe);
+            if(row){
+                try{ row.scrollIntoView({ block:'center' }); }catch(_){}
+                row.classList.remove('sf-flash'); void row.offsetWidth; row.classList.add('sf-flash');
+                setTimeout(()=>row.classList.remove('sf-flash'), 1200);
+            }
         }
         function closeSheet(){
             if(!sheetOpen() && !mask.classList.contains('open')) return;
@@ -265,7 +287,7 @@
             const list=hit.filter(r=>!isRefund(r));
             const rfN=hit.length-list.length;
             if(!list.length){ customAlert(`命中的 ${rfN} 条都是退款记录。退款的分类和统计跟着原账单走，请改原账单。`); return; }
-            customChoose(`对搜到的这 ${list.length} 条记录：${rfN?`\n另有 ${rfN} 条退款记录不参与，会跟着各自的原账单一起变。`:''}`, [
+            customChoose(`这 ${list.length} 笔是这次搜到的全部记录。先选怎么改，下一步会再让你确认：${rfN?`\n另有 ${rfN} 条退款记录不参与，会跟着各自的原账单一起变。`:''}`, [
                 // 说明文字与记一笔里的口径说明（MODE_HINT）同源，两处永远一致
                 { value:'cat',    label:'改分类',       desc:'把这些记录统一改到同一个分类，比如把「永劫无间」归到「游戏」' },
                 { value:'normal', label:'恢复计入',     desc:'取消「不计」「往来」：'+MODE_HINT.normal },
@@ -290,7 +312,7 @@
                         ()=>applyBatch(targets.map(r=>r.id), { mode:act }), '批量修改统计',
                         { okText:`改这 ${targets.length} 条`, list:targets, danger:true, onCancel:openBatchMenu });   // 1019-S：取消回到批量操作
                 }
-            }, '批量操作', null, { layout:'list' });
+            }, `将修改 ${list.length} 笔`, null, { layout:'list' });   // 1023-M：第一屏先说清楚改几笔，下一步再确认
         }
         function applyBatch(ids, change){
             const idSet=new Set(ids);

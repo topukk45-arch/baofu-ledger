@@ -54,7 +54,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   // 4. 搜一笔开着：盖住账单页，浮条不出来
   t.$('filterFab').click(); await sleep(20);
   ok(t.w.JiwenSearch.isOpen() && d.body.classList.contains('search-open'), '4 搜一笔开着');
-  t.$('searchToLedger').click(); await sleep(300);
+  t.$('searchBack').click(); await sleep(300);
   ok(!t.w.JiwenSearch.isOpen() && !d.body.classList.contains('search-open') && t.$('pageSearch').hidden, '4 回到账单：结果页收起');
   scroll(1400, -700);
   ok(on('lgStrip') && !on('toTopBtn'), '4 回到账单再滑：浮条出来');

@@ -52,7 +52,7 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     t.filterKw('笔记本');
     const rows=[...t.$('searchList').querySelectorAll('.bl-row')];   // 1023-G：搜一笔的结果页
     ok(rows.length===2 && rows.every(r=>r.querySelector('.io-flow') && r.querySelector('.amt-flow')), '往来行有灰蓝标签与金额');
-    ok(t.$('summaryFilter').textContent.includes('（其中 2 笔往来）'), '小计说明往来条数');
+    ok(t.$('summaryFilter').querySelector('.sp-ex').textContent==='其中 2 笔往来', '小计说明往来条数（1023-M 起单独一行小字）');
     // 结余列：购物卡那行（最新正常记录）的结余应等于总结余
     const t2=await boot(rs);
     t2.$('billList').querySelector('.bl-row').click();   // 1023-A：结余在详情里

@@ -68,10 +68,10 @@ const tags=t=>[...t.$('searchTags').querySelectorAll('.sp-tag')].map(e=>e.textCo
   // 结果页的小标签：点 × 去掉那一条
   t.chip('filterModeChips','不计').click(); t.chip('filterChips','其他').click(); t.$('sheetApply').click();
   ok(tags(t)==='其他,不计' && sids(t)==='cc', '两个条件');
-  t.$('searchTags').querySelector('.sp-tag').click();
+  t.$('searchTags').querySelector('.sp-tag-x').click();
   ok(tags(t)==='不计' && sids(t)==='cc', '点标签去掉「其他」');
   // 回到账单：页面收起，账单页照旧
-  t.$('searchToLedger').click();
+  t.$('searchBack').click();
   ok(!t.w.JiwenSearch.isOpen() && ids(t)==='a,b,cc,lp', '「回到账单」：结果页收起，账单页照旧是这个月');
   t.$('filterFab').click();
   ok(t.$('filterModeChips').querySelector('.sel').textContent==='不计', '再点「搜一笔」：上次的条件还在');

@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1023-L">
+    <link rel="stylesheet" href="app/app.css?v=1023-M">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-L</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1023-M</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -296,18 +296,21 @@
             <span class="sp-count" id="searchCount"></span>
         </div>
         <div class="sp-body" id="searchBody">
-            <div class="sp-tags" id="searchTags"></div>
-            <div class="sp-sum" id="summaryFilter"></div>
             <div class="bill-list" id="searchList"></div>
             <div class="sp-empty" id="searchEmpty" hidden>
                 <svg class="sp-empty-ico" viewBox="0 0 96 96" aria-hidden="true"><rect class="e1" x="20" y="12" width="44" height="60" rx="6"/><path class="e2" d="M30 28h24M30 38h18M30 48h12"/><circle class="e3" cx="60" cy="58" r="14"/><path class="e4" d="M70 68l10 10M55 58h10"/></svg>
                 <div class="sp-empty-t">没有找到相关的账</div>
-                <div class="sp-empty-s">点上面的条件把它去掉，或者回去改条件</div>
+                <div class="sp-empty-s">点下面的条件把它去掉，或者改条件</div>
             </div>
+        </div>
+        <!-- 1023-M：条件卡浮在底部按钮上面：条件一行（横着滑）、找到几笔和合计、其中几笔不计 / 往来、批量改 -->
+        <div class="sp-card" id="searchCard">
+            <div class="sp-tags" id="searchTags"></div>
+            <div class="sp-sum" id="summaryFilter"></div>
         </div>
         <div class="ui-bar sp-bar">
             <div class="ui-pair">
-                <button type="button" class="ui-btn" id="searchToLedger">回到账单</button>
+                <button type="button" class="ui-btn" id="searchClear">清空条件</button>
                 <button type="button" class="ui-btn primary" id="searchEdit">改条件</button>
             </div>
         </div>
@@ -821,29 +824,29 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1023-L"></script>
-    <script src="app/store.js?v=1023-L"></script>
-    <script src="app/select.js?v=1023-L"></script>
-    <script src="app/keypad.js?v=1023-L"></script>
-    <script src="app/text.js?v=1023-L"></script>
-    <script src="app/sheet.js?v=1023-L"></script>
-    <script src="app/ask.js?v=1023-L"></script>
-    <script src="app/date.js?v=1023-L"></script>
-    <script src="app/monthstrip.js?v=1023-L"></script>
-    <script src="app/ai-export.js?v=1023-L"></script>
-    <script src="app/import-entry.js?v=1023-L"></script>
-    <script src="app/forms.js?v=1023-L"></script>
-    <script src="app/detail.js?v=1023-L"></script>
-    <script src="app/ledger.js?v=1023-L"></script>
-    <script src="app/search.js?v=1023-L"></script>
-    <script src="app/cats.js?v=1023-L"></script>
-    <script src="app/stats.js?v=1023-L"></script>
-    <script src="app/days.js?v=1023-L"></script>
-    <script src="app/settings.js?v=1023-L"></script>
-    <script src="app/tabs.js?v=1023-L"></script>
-    <script src="app/login.js?v=1023-L"></script>
-    <script src="app/back.js?v=1023-L"></script>
-    <script src="app/boot.js?v=1023-L"></script>
+    <script src="app/base.js?v=1023-M"></script>
+    <script src="app/store.js?v=1023-M"></script>
+    <script src="app/select.js?v=1023-M"></script>
+    <script src="app/keypad.js?v=1023-M"></script>
+    <script src="app/text.js?v=1023-M"></script>
+    <script src="app/sheet.js?v=1023-M"></script>
+    <script src="app/ask.js?v=1023-M"></script>
+    <script src="app/date.js?v=1023-M"></script>
+    <script src="app/monthstrip.js?v=1023-M"></script>
+    <script src="app/ai-export.js?v=1023-M"></script>
+    <script src="app/import-entry.js?v=1023-M"></script>
+    <script src="app/forms.js?v=1023-M"></script>
+    <script src="app/detail.js?v=1023-M"></script>
+    <script src="app/ledger.js?v=1023-M"></script>
+    <script src="app/search.js?v=1023-M"></script>
+    <script src="app/cats.js?v=1023-M"></script>
+    <script src="app/stats.js?v=1023-M"></script>
+    <script src="app/days.js?v=1023-M"></script>
+    <script src="app/settings.js?v=1023-M"></script>
+    <script src="app/tabs.js?v=1023-M"></script>
+    <script src="app/login.js?v=1023-M"></script>
+    <script src="app/back.js?v=1023-M"></script>
+    <script src="app/boot.js?v=1023-M"></script>
 
 </body>
 </html>

@@ -114,11 +114,11 @@ const recs = [
   await t.askCancel(); await settle();
   ok(drawer(), '6 确认框取消：回到选分类');
   w.JiwenSheet.back(); await settle();
-  ok(t.ask() && t.ask().title === '批量操作', '6 选分类取消：回到批量操作（原来就是）');
+  ok(t.ask() && /^将修改 \d+ 笔$/.test(t.ask().title), '6 选分类取消：回到批量操作（原来就是）');
   choose('标为不计'); $('askOk').click(); await settle();
   ok(t.ask() && t.ask().title === '批量修改统计', '6 标为不计：确认框');
   await t.askCancel(); await settle();
-  ok(t.ask() && t.ask().title === '批量操作', '6 确认框取消：回到批量操作');
+  ok(t.ask() && /^将修改 \d+ 笔$/.test(t.ask().title), '6 确认框取消：回到批量操作');
   await t.askCancel(); await settle();
   ok(!t.ask() && arc().records.every(r => !r.skip && r.cat !== '小项'), '6 一路取消：什么都没改');
 

@@ -53,7 +53,7 @@ const CATS = ['未分类', '吃饭', '购物', '娱乐', '其他'];
   $('saveEdit').click(); await t.idle(); if (t.ask()) await t.askOk();
   ok(!t.recs().find(r => r.id === id1).rv, '6 修改账单改了分类：标记去掉');
   ok(!chip() && t.w.JiwenSearch.isOpen() && $('searchCount').textContent === '0 笔' && $('searchTags').textContent.includes('待确认分类'), '6 都改完了：账单页的胶囊收掉；结果页条件还在、0 笔（1023-G）');
-  $('searchTags').querySelector('.sp-tag').click(); await t.idle();
+  $('searchTags').querySelector('.sp-tag-x').click(); await t.idle();
   ok(!$('searchTags').querySelector('.sp-tag'), '6 点 × 去掉「待确认分类」');
 
   console.log(`\n${pass} 通过，${fail} 失败`);

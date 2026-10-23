@@ -80,7 +80,7 @@ const perfLast = t => { try { const a = JSON.parse(t.w.localStorage.getItem('app
   ok(t.w.__filterActive(), '5 搜一笔开着');
   poke(t); await wait(1700);
   ok(!snap(t), '5 开着搜一笔停下来：快照删掉（不存错的）');
-  t.$('searchToLedger').click(); await t.idle(); poke(t); await wait(1700);
+  t.$('searchBack').click(); await t.idle(); poke(t); await wait(1700);
   ok(snap(t), '5 回到账单、停下来：又存上了');
 
   // 6. 记一笔填到一半、停下来 1 秒：先存一份；被杀以后重开接着填

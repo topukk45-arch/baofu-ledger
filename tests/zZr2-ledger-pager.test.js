@@ -89,7 +89,7 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   w.JiwenSearch.searchFlush();
   const sl = $('searchList');
   ok(sl.querySelectorAll('.bl-row').length === 23 && !sl.querySelector('.lg-gap') && sl.querySelector('.lg-wk') && sl.querySelector('.lg-dc') && list.querySelector('.lg-gap-today'), '8 搜一笔：全部命中的、周小计 / 日卡片照样有、没有空白日子；账单页还是这个月');
-  $('searchToLedger').click();
+  $('searchBack').click();
   ok(!w.JiwenSearch.isOpen() && bar.style.display === '' && list.querySelector('.lg-gap-today'), '8 回到账单');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
 

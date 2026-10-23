@@ -72,7 +72,7 @@ const txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
   ok(/找到 1 笔/.test(txt($('summaryFilter'))) && /支出 10\.44/.test(txt($('summaryFilter'))) && $('batchBar'), '3 条数 + 合计 + 批量改');
   ok($('searchList').querySelector('.lg-wk') && $('searchList').querySelector('.lg-dc .lg-dh') && txt($('searchList').querySelector('.bl-t')) === '打车回家' && !$('searchList').querySelector('.lg-gap'), '3 列表：周小计 / 日卡片 / 两行，没有空白日');
   // 小标签点 × 去掉
-  [...$('searchTags').querySelectorAll('.sp-tag')].find(b => txt(b) === '出行').click();
+  [...$('searchTags').querySelectorAll('.sp-tag')].find(b => txt(b) === '出行').querySelector('.sp-tag-x').click();
   ok(ids() === 'a,c' && tags().join() === '支出,计入,备注：打车', '3 点「出行」的 ×：去掉那一条');
   // 改条件：条件留着
   $('searchEdit').click(); await frame();
@@ -102,7 +102,7 @@ const txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
   $('sheetApply').click(); await tick();
   ok(ids() === 'a,b,f', '6 出行 3 笔');
   $('batchBar').click(); await tick();
-  ok(/对搜到的这 3 条记录/.test($('askMsg').textContent), '6 批量写的是这 3 条');
+  ok(/这 3 笔是这次搜到的全部记录/.test($('askMsg').textContent) && $('askTitle').textContent === '将修改 3 笔', '6 批量写的是这 3 条');
   $('askCancel').click(); await tick();
   w.JiwenDetail.openDetail('b'); $('detailEdit').click(); await tick();
   w.JiwenForms.pickEditCat('吃饭'); $('saveEdit').click(); await t.idle(); await tick();
@@ -114,7 +114,7 @@ const txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
   $('searchList').querySelector('.lg-dh').click(); await tick();
   ok($('uiSheetMask').style.display === 'flex', '6 点日期抬头：当日详情');
   w.JiwenSheet.close();
-  $('searchToLedger').click(); await new Promise(r => setTimeout(r, 300));
+  $('searchBack').click(); await new Promise(r => setTimeout(r, 300));
 
   // 7. 待确认分类：账单页的胶囊打开结果页（不拉抽屉）
   const chip = $('rvChip');

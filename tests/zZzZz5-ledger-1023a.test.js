@@ -122,7 +122,7 @@ const NOW = '2026-10-20T10:00:00';   // 星期二
   ok($('sheetApply').classList.contains('primary') && $('sheetApply').classList.contains('block') && $('filterBack').parentElement.classList.contains('ui-pair') && $('filterBack').nextElementSibling === $('sheetClear'), '4 底部「看这 N 笔」整宽，下面「回到账单 | 清空条件」左右并排');
   $('searchKeyword').value = '不存在的字'; $('sheetApply').click();
   ok(!$('searchEmpty').hidden && /没有找到相关的账/.test($('searchEmpty').textContent) && !$('pagerBottom'), '5 没结果：缺省页、没有页码');
-  $('searchToLedger').click(); await wait(10);
+  $('searchBack').click(); await wait(10);
 
   // 5. 删一条：结余重算
   w.openEdit('t3'); $('deleteEditBtn') ? $('deleteEditBtn').click() : null;
