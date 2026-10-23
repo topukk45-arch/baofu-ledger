@@ -21,12 +21,12 @@ const RECS = [
   const { $, d } = t;
   const settle = async () => { await t.idle(); await new Promise(r => setTimeout(r, 20)); await t.idle(); };
   // ===== 1. 详情 =====
-  t.w.JiwenStats.openDetail('r1');
+  t.w.JiwenDetail.openDetail('r1');
   ok($('detailAiFlag') && $('detailAiFlag').textContent === 'AI 觉得可能和 10 月 5 日那笔（30.00）重复' && /理由：同一分钟、同金额/.test($('detailAiWhy').textContent), '1 详情：「AI 觉得可能和 10 月 5 日那笔（30.00）重复」+ 理由');
   ok($('detailAiClear') && $('detailAiClear').textContent === '知道了，去掉标记', '1 有「知道了，去掉标记」');
-  t.w.JiwenStats.openDetail('r3');
+  t.w.JiwenDetail.openDetail('r3');
   ok(/AI 觉得这笔可能漏配了/.test($('detailAiFlag').textContent), '1 漏配、没说哪一笔：「AI 觉得这笔可能漏配了」');
-  t.w.JiwenStats.openDetail('r2');
+  t.w.JiwenDetail.openDetail('r2');
   ok(!$('detailAiField'), '1 没标记的：不显示');
   $('detailMask').style.display = 'none';
   // ===== 2. 统计页横幅 =====
@@ -52,7 +52,7 @@ const RECS = [
   t.w.localStorage.removeItem('app_dev_import');
   $('statNextM').click(); await settle();
   ok(!banner(), '4 开发开关关着：横幅不显示');
-  t.w.JiwenStats.openDetail('r3');
+  t.w.JiwenDetail.openDetail('r3');
   ok($('detailAiFlag'), '4 详情照样显示（标记在记录上）');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);

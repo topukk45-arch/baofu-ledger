@@ -180,7 +180,7 @@
   | 1 存储 | store（`JiwenStore`） | 账本存储（IndexedDB 分块、写入队列）、loadStore / saveStore、账号、老数据迁移、搬家、退款和预算的计算、分类 / 模板 / 日子的数据、导入数据和写入（入口 `JiwenImportStore` 不变）、云备份、单号表上云、备份文件导出 / 导入 |
   | 2 面板底座 | select（`JiwenSelect`）→ keypad（`JiwenKeypad`）→ text（`JiwenText`）→ sheet（`JiwenPanel`，共用面板的老入口 `JiwenSheet` 不变）→ ask（`JiwenAsk`）→ date（`JiwenDate`） | 金色下拉、数字键盘、文字小面板、共用底部面板（往下拉关闭、收起动画、滚动锁、按下反馈）、提示 / 确认 / 输入框（要用面板的往下拉）、日期时间选择（要用提示框）（1019-Z4-M5 调了先后） |
   | 3 业务 | ai（`JiwenAiExport`）→ impentry（`JiwenImportEntry`） | 导出账单给 AI、导入入口（开发开关、`loadImportUI`、用记问打开、空账本入口、月初提醒、待处理横幅） |
-  | 4 页面 | forms（`JiwenForms`）→ ledger（`JiwenLedger`）→ stats（`JiwenStats`）→ days（`JiwenDays`）→ cats（`JiwenCats`） | 记一笔 / 修改 / 退款 / 口径 / 模板；账单页（总览、列表、翻页、搜索筛选、批量）；统计页（预算、预算建议、年月选择、账单详情、分类汇总（1023-A 从账单页搬来））；日子；分类管理 |
+  | 4 页面 | forms（`JiwenForms`）→ detail（`JiwenDetail`，1023-B 起）→ ledger（`JiwenLedger`）→ stats（`JiwenStats`）→ days（`JiwenDays`）→ cats（`JiwenCats`） | 记一笔 / 修改 / 退款 / 口径 / 模板；账单详情和「这笔之后结余」（1023-B 从统计页、账单页搬来，两页共用；以后单笔 / 当日 / 一周三个详情抽屉都在这里）；账单页（总览、列表、翻页、搜索筛选、批量）；统计页（预算、预算建议、年月选择、分类汇总（1023-A 从账单页搬来））；日子；分类管理 |
   | 5 外壳 | settings（`JiwenSettings`）→ tabs（`JiwenTabs`）→ login（`JiwenLogin`）→ back（`JiwenBack`）→ boot（`JiwenBoot`，空的） | 设置页、外观、存储用量；页签切换、进账号、日子管理页进出、刷新所有页面、被杀回来、首屏快照、历史脏数据自检；登录页；返回键层级表和弹窗关闭表（要认得每一种弹窗，所以放最上面）；启动 |
   按节归、个别名字单独挪（比如 `pad`、`escapeHtml` 原来在日期选择、存储那几节，归基础；`getUserData` 原来在分类拖动那节，归存储），全表见 `modules-plan.js`；`node tests/tools/modules-plan.js` 打印每个模块多大、还有哪些往上调用。
 - 往上调用（回调口）：按这张表算下来只剩三种，暂时留着、测试锁住只减不增：数据改了删首屏快照（存储 → `snapDrop`）、存储写不进去弹提示（存储 → `customAlert`）、数据改了刷新所有页面（分类 / 账单页批量 / 记一笔 / 详情 → `refreshAllViews`、`refreshCatSelectors`）。写法：调用的时候才去 `window.JiwenXxx.fn()` 拿（加载时不取）；1019-Z4-M25 起都这样写了（`window.JiwenTabs.refreshAllViews()`、`window.JiwenStats.renderStats()`），本来就挂在 window 上的老入口 `snapDrop`、`customAlert` 照旧按名字调。「改成下层留一个口子、上层登记进来」1019-Z4-M26 定了：不改，以后改到那块再说。
@@ -220,6 +220,7 @@
   - 1019-Z4-M23 返回键 `app/back.js`（`JiwenBack`，7 条、对外 ）。
   - 1019-Z4-M24 启动 `app/boot.js`（`JiwenBoot`，1 条、对外 ）。
   - 1019-Z4-M25 收尾：旧文件 `app-1…7.js` 只剩旧代码引用表和空行，删掉、`index.html` 去掉引用；模块里按名字直接调回调口的 20 处改成 `window.JiwenTabs.xxx()` / `window.JiwenStats.renderStats()`（工具 `tests/tools/finish-legacy.js`）。现在 `www/app/` 下 20 个模块文件，每个就是一个 IIFE、对外一个入口，`zZzX-modules-lock` 每个都锁着。
+  - 1023-B 账单详情 `app/detail.js`（`JiwenDetail`，对外 aiFlagText / balanceAfter / closeDetail / openDetail）：`openDetail` 那一套（含批量确认清单点一行开只读详情的绑定）从 stats.js 原样剪过来，`balanceAfter` 从 ledger.js 剪过来；回调口少了 `ledger → stats: openDetail`，`stats → tabs: refreshAllViews` 跟着详情变成 `detail → tabs`。测试改写法：`JiwenStats.openDetail / closeDetail` → `JiwenDetail.…`（a-basics、b-modes-batch、j-refund、zQ、zZy、zZzA、zZzZf、zZzZs）。
   - 1019-Z4-M26 合并前收尾：首屏快照不接点击（`.boot-snap` 加 `pointer-events:none`）；版本号连点的计数 `__buildTaps` 挪进设置页模块里定义（`JiwenImportEntry` 上不再有它的读写口）；`build.yml` 删掉「模块测试版」那段。
 
 ## 启动画面修复的体验版（1021-T26～T28，分支 `claude/compassionate-fermat-shebn3`；10-23 快进合进 main，这一节留下来查）

@@ -6,7 +6,7 @@
         const { askMask, closeAsk, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { closeDtPicker } = window.JiwenDate;   // 用到前面模块的
         const { closeEditModal, closeRefund, closeTplEditor, formSnaps, formState } = window.JiwenForms;   // 用到前面模块的
-        const { closeDetail } = window.JiwenStats;   // 用到前面模块的
+        const { closeDetail } = window.JiwenDetail;   // 用到前面模块的
         const { closeDayDialog, closeDayMgr, exitSelectMode } = window.JiwenDays;   // 用到前面模块的
         const { backFromDaysPage } = window.JiwenTabs;   // 用到前面模块的
 

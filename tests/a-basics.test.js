@@ -146,7 +146,7 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
     // ---------- 5. 详情金额 ----------
     {
         const t = await boot();
-        t.w.JiwenStats.openDetail('r4');
+        t.w.JiwenDetail.openDetail('r4');
         const txt = $(t.d,'detailMoney').textContent;
         ok(!txt.includes('NaN') && txt.includes('0.00'), '脏金额详情显示 0.00 而非 NaN：' + txt);
     }

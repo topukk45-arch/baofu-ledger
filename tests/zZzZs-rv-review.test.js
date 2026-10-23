@@ -36,11 +36,11 @@ const CATS = ['未分类', '吃饭', '购物', '娱乐', '其他'];
   ok(rvs().length === 2, '3 撤销这次批量：标记放回');
   // 详情「分类没问题」
   const id0 = rvs()[0].id;
-  t.w.JiwenStats.openDetail(id0); await t.idle();
+  t.w.JiwenDetail.openDetail(id0); await t.idle();
   ok($('detailRvOk'), '4 详情里有「分类没问题」');
   $('detailRvOk').click(); await t.idle();
   ok(!t.recs().find(r => r.id === id0).rv && t.recs().find(r => r.id === id0).cat === '未分类', '4 只去掉标记、分类不动');
-  try { t.w.JiwenStats.closeDetail(); } catch (_) {}
+  try { t.w.JiwenDetail.closeDetail(); } catch (_) {}
   // 去掉标记不算「导入后你改过」
   const [lg] = await t.st().importsRead();
   const rows = (await t.st().aiExportRows(lg.b)).rows;

@@ -22,6 +22,7 @@ const MODULES = [
   { key: 'ai', layer: 3, entry: 'JiwenAiExport', file: 'app/ai-export.js', what: '导出账单给 AI 分析', secs: ['导出账单给 AI 分析'], names: [] },
   { key: 'impentry', layer: 3, entry: 'JiwenImportEntry', file: 'app/import-entry.js', what: '导入入口（开发开关、loadImportUI、用记问打开、空账本入口、月初提醒、待处理横幅、AI 标记列表的入口）', secs: ['1015-A：账单导入（开发中）'], names: [] },
   { key: 'forms', layer: 4, entry: 'JiwenForms', file: 'app/forms.js', what: '记一笔、修改账单、退款弹窗、口径选择、常用模板和模板面板', secs: ['悬浮按钮：打开/关闭记账弹窗', '统计选择：计入 / 不计 / 往来', '常用模板（1010-I）', '退款弹窗（1010-J）', '1019-K：模板面板（新建 / 编辑都用它）', '修改弹窗的分类/收支标签（与记账弹窗同款，但打开时预选记录原有值）'], names: ['refundLineHtml', 'formState', 'formSnaps'] },
+  { key: 'detail', layer: 4, entry: 'JiwenDetail', file: 'app/detail.js', what: '账单详情（1023-B 从统计页搬来，账单页、统计页共用）、每笔记完后的结余（balanceAfter，1023-B 从账单页搬来）', secs: [], names: [] },
   { key: 'ledger', layer: 4, entry: 'JiwenLedger', file: 'app/ledger.js', what: '账单页：总览（这个月支出、结余）、列表（按天分组）、翻页、搜索和筛选（含筛选浮层的控件）、批量操作（1023-A 起分类汇总搬去统计页）', secs: ['筛选浮层（bottom sheet）控件绑定', '搜索状态：记账页顶部的备注/金额/日期筛选，与分类标签筛选叠加', '批量操作（基于当前筛选结果）'], names: ['renderPager', 'scrollListTop', 'pagerPad', 'renderFilterChips', 'goPage'] },
   { key: 'cats', layer: 4, entry: 'JiwenCats', file: 'app/cats.js', what: '分类管理（列表、拖动排序、改名、删除、设预算）', secs: ['分类长按拖动排序（pointer/touch 手写，避免 WebView 原生 draggable 不稳）'], names: ['openCatManager', 'openCatActions', 'attachCatDrag', 'showCatErr'] },
   { key: 'stats', layer: 4, entry: 'JiwenStats', file: 'app/stats.js', what: '统计页、预算页、预算建议、年月选择、账单详情、分类汇总和滑动提示（1023-A 从账单页搬来）', secs: ['统计页：预算', '分类汇总卡片', '1019-H：分类汇总能滑但看不出来：右下角的小圆钮', '单独一版（1016-Z9）：按过去 3–6 个月的中位数给每月预算建议，一键写入', '统计模块（纯手写 SVG，跟随外观主题变量）', '年月选择器（统计页）'], names: [] },
@@ -44,7 +45,7 @@ const BIND = [
   ["if($('odDisconnectBtn')){", 'settings'],
   ["askInput.addEventListener('click', ()=>{ if(askInput.dataset.kp", 'ask'],     // 提示框的输入框弹数字键盘
   ["askInput.addEventListener('focus', ()=>{ if(askInput.dataset.kp", 'ask'],
-  ["$('askList').addEventListener('click', e=>{", 'stats'],                       // AI 标记列表点一行开详情
+  ["$('askList').addEventListener('click', e=>{", 'detail'],                       // AI 标记列表点一行开详情
   ["(function(){\n            const kw=$('searchKeyword')", 'ledger'],           // 筛选浮层里的控件
   ["$('manageCatSetting').addEventListener('click', openCatManager);", 'settings'],   // 设置页「管理账单分类」
   ["$('daysManageBtn').addEventListener('click', gotoDaysPage);", 'tabs'],         // 进日子管理页 / 回来（外壳管页面切换）
@@ -70,10 +71,9 @@ const CALLBACKS = {
   'cats → stats': ['renderStats'],   // 设好预算后刷新统计页（1019-Z4-M8 调先后时数出来的）
   'settings → tabs': ['snapDrop', 'refreshCatSelectors', 'refreshAllViews'],   // 换主题、改默认进入页面后删首屏快照（同上）
   'ledger → tabs': ['refreshAllViews'],
-  'ledger → stats': ['openDetail'],   // 1023-A：账单一条一行，点整行进账单详情（详情在统计页模块里，修改从详情进）
   'forms → tabs': ['refreshAllViews'],
   'forms → cats': ['openCatManager'],   // 1020-G：分类抽屉底部「管理分类」打开分类管理（分类管理排在记一笔后面：它要调记一笔那边的刷新），关了回到抽屉
-  'stats → tabs': ['refreshAllViews'],
+  'detail → tabs': ['refreshAllViews'],   // 1023-B：详情里去掉 AI 标记 / 待确认以后刷新页面（原来是 stats → tabs，跟着详情搬过来）
 };
 
 function plan(www) {

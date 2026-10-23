@@ -25,7 +25,7 @@ const recs = [
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
 
   // 一、账单详情：列表卡，统计单独一行；「修改」整宽在上、「关闭」在下
-  w.JiwenStats.openDetail('a3');
+  w.JiwenDetail.openDetail('a3');
   const rows = [...$('detailList').querySelectorAll(':scope > .rec-row')].filter(r => r.style.display !== 'none').map(r => r.querySelector('.rec-row-k').textContent);
   ok(rows.join() === '时间,金额,收支,分类,统计,结余,备注', '一 详情一行一项：时间、金额、收支、分类、统计、结余（1023-A 从列表挪来）、备注：' + rows.join());
   ok($('detailMode').textContent === '不计' && $('detailType').textContent === '支出', '一 统计单独一行写「不计」，收支那行只写收支');

@@ -269,15 +269,15 @@ function bootSync(records, arcExtra){
   const t=await boot();
   t.refund('buy', { part:30, remark:'差价' }); t.$('askOk').click();
   const rid=t.refunds()[0].id;
-  t.w.JiwenStats.openDetail(rid);
+  t.w.JiwenDetail.openDetail(rid);
   ok(t.$('detailType').textContent==='退款', '收支栏只放标签：'+t.$('detailType').textContent);
   ok(t.$('detailRefundField').style.display==='' && t.$('detailRefundLabel').textContent==='原账单'
      && t.$('detailRefundVal').textContent==='10-02 10:00鞋子−100.00', '单独一栏写原账单：'+t.$('detailRefundVal').textContent);
   t.$('detailClose').click();
-  t.w.JiwenStats.openDetail('buy');
+  t.w.JiwenDetail.openDetail('buy');
   ok(t.$('detailType').textContent==='支出已退 30.00', '原账单收支栏：'+t.$('detailType').textContent);
   ok(t.$('detailRefundLabel').textContent==='退款记录 · 还能退 70.00' && t.$('detailRefundVal').textContent==='10-10 14:00差价+30.00', '原账单单独一栏列退款');
-  t.$('detailClose').click(); t.w.JiwenStats.openDetail('eat');
+  t.$('detailClose').click(); t.w.JiwenDetail.openDetail('eat');
   ok(t.$('detailRefundField').style.display==='none', '没有关联时整栏隐藏');
   // 日历：有退款的日子标「退款」
   t.$('detailClose').click(); t.toStats();

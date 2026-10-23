@@ -5,6 +5,7 @@
         const { askCancel, customAlert, customChoose, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { openDtPickerDate } = window.JiwenDate;   // 用到前面模块的
         const { loadImportUI, scrollChipIntoView } = window.JiwenImportEntry;   // 用到前面模块的
+        const { openDetail } = window.JiwenDetail;   // 用到前面模块的
         // 账单表事件委托：备注查看 / 修改。用 data-act + data-id 取代内联 onclick，
         // 既杜绝把记录 id 拼进 HTML 属性的注入隐患，也避免每行绑定监听。
         billList.addEventListener('click', e => {
@@ -13,7 +14,7 @@
             const id = el.dataset.id;
             if(el.dataset.act==='remark'){ window.viewRemark && window.viewRemark(id); }
             else if(el.dataset.act==='edit'){ window.openEdit && window.openEdit(id); }
-            else if(el.dataset.act==='detail'){ window.JiwenStats.openDetail(id); }   // 1023-A：一条一行，点整行进详情（修改在详情里）
+            else if(el.dataset.act==='detail'){ openDetail(id); }   // 1023-A：一条一行，点整行进详情（修改在详情里）
         });
 
         // 渲染筛选分类标签：「全部」固定第一个，其后按存档 cats 顺序。
@@ -419,18 +420,6 @@
                     `所以结余不等于收入减支出：期初余额、存取钱不算收支，但算进结余。记成「不计」的哪里都不算。`, '结余怎么算的');
             }
         });
-        // 1023-A：详情里的「结余」：记完这一笔以后，全部记录算下来的结余（和以前列表里那一栏同一个算法：按时间排、同一分钟按存的先后）
-        function balanceAfter(rec){
-            const raw=getUserData();
-            let idx=raw.indexOf(rec); if(idx<0) idx=raw.findIndex(r=>r.id===rec.id); if(idx<0) return null;
-            const items=raw.map((r,origIdx)=>({ r, origIdx, ts:parseRecTime(r.time).getTime() }));
-            const me=items[idx];
-            let fen=0;   // 按分加，免得几千笔加下来有浮点零头
-            items.forEach(x=>{
-                if(x.ts<me.ts || (x.ts===me.ts && x.origIdx<=me.origIdx)){ const c=balContrib(x.r); fen+=Math.round(c.inc*100)-Math.round(c.exp*100); }
-            });
-            return fen/100;
-        }
         function ovOff(){ return ovYM!=null; }   // 首屏快照：总览不在这个月就不存
 
         // 【1017-M】opt.pageOnly：翻页时只换列表那几行，总览、分类汇总、日子卡、筛选小计一概不动
@@ -723,5 +712,5 @@
             const t=$('billHead') || document.querySelector('table');
             if(t) t.scrollIntoView({ behavior:'smooth', block:'start' });
         }
-        window.JiwenLedger = { applyBatch, balanceAfter, clearAllFilters, goPage, openBatchMenu, ovOff, renderBill, renderFilterChips, resetSearch, undoBatch };   // ledger 模块对外只有这一个入口
+        window.JiwenLedger = { applyBatch, clearAllFilters, goPage, openBatchMenu, ovOff, renderBill, renderFilterChips, resetSearch, undoBatch };   // ledger 模块对外只有这一个入口
 })();
