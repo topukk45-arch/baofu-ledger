@@ -47,10 +47,10 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   ok(t.$('statPaneBudget').style.display==='' && t.$('statPaneFlow').style.display==='none' && t.$('statTabSeg').querySelector('.on').dataset.v==='budget', '点入口切到预算页签');
   t.tab('flow');
   ok(t.$('statPaneFlow').style.display==='', '切回收支');
-  // 共用月份
-  t.$('statPrevM').click(); t.tab('budget');
-  ok(t.$('bgMonthLabel').textContent==='2026年09月', '收支翻到 9 月，预算也是 9 月');
-  t.$('bgNextM').click(); t.tab('flow');
+  // 共用月份（1023-H 起月份由底栏上方的月份浮条切，标题右边写着年月）
+  t.w.JiwenStats.stepMonth(-1); t.tab('budget');
+  ok(t.$('statMonthLabel').textContent==='2026年09月', '收支翻到 9 月，预算也是 9 月');
+  t.w.JiwenStats.stepMonth(1); t.tab('flow');
   ok(t.$('statMonthLabel').textContent==='2026年10月', '预算翻回 10 月，收支也是 10 月');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
@@ -74,10 +74,10 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   const t=await boot(B); t.tab('budget');
   t.rowOf('游戏').click();
   const det=t.$('bgGroups').querySelector('.bg-detail');
-  const items=[...det.querySelectorAll('.sf-item')];
+  const items=[...det.querySelectorAll('.bl-row')];
   ok(t.rowOf('游戏').classList.contains('open') && items.length===4, '展开：4 笔计入预算的游戏消费');
-  ok(items.map(i=>i.querySelector('.sf-time').textContent).join()==='10-09 14:15,10-09 14:14,10-06 10:00,10-04 16:20', '时间倒序');
-  ok(items[0].querySelector('.sf-remark').textContent==='游戏充值' && items[0].querySelector('.sf-amt').textContent==='−98.97', '备注与金额');
+  ok(items.map(i=>i.querySelector('.bl-time').textContent).join()==='10月9日 14:15,10月9日 14:14,10月6日 10:00,10月4日 16:20', '时间倒序');
+  ok(items[0].querySelector('.bl-t-x').textContent==='游戏充值' && items[0].querySelector('.bl-amt').textContent==='−98.97', '备注与金额');
   ok(det.querySelector('.bg-detail-head span').textContent==='4 笔；另有 1 笔不计 / 往来，未算在内', '说明另有不计的');
   ok(!det.textContent.includes('九月'), '不混入别的月份');
   items[0].click();
@@ -107,10 +107,10 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   const urow=c=>[...t.$('bgUnsetCard').querySelectorAll('.bgu-row')].find(r=>r.dataset.cat===c);
   urow('出行').click();
   const det=t.$('bgUnsetCard').querySelector('.bg-detail');
-  ok(det && det.querySelectorAll('.sf-item').length===1 && det.textContent.includes('火车站') && det.textContent.includes('−483.00'), '未设预算的出行可展开看明细');
+  ok(det && det.querySelectorAll('.bl-row').length===1 && det.textContent.includes('火车站') && det.textContent.includes('−483.00'), '未设预算的出行可展开看明细');
   ok(urow('出行').classList.contains('open') && t.rowOf('游戏').classList.contains('open') && t.$('bgGroups').querySelector('.bg-detail'), '【1013-E】上面已设预算的游戏照样开着');
   ok(!det.querySelector('[data-act="bgSet"]'), '未设预算的明细里不放「改预算」（行上已有「设预算」）');
-  det.querySelector('.sf-item').click();
+  det.querySelector('.bl-row').click();
   ok(t.$('detailMask').style.display==='flex' && t.$('detailRemark').textContent==='火车站', '明细条目点开详情');
   t.$('detailClose').click();
   // 点「设预算」不会顺带展开/收起这一行

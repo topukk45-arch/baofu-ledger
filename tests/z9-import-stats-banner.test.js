@@ -30,12 +30,12 @@ const man = (id, mo, d, money, cat) => ({ id, time: `2026-${p2(mo)}-${p2(d)}T08:
   const settle = async () => { await t.idle(); await new Promise(r => setTimeout(r, 20)); await t.idle(); };
   d.querySelector('.tab-btn[data-tab="stats"]').click(); await settle();
   ok(!banner(), '1 12 月没有待处理：不显示横幅');
-  $('statPrevM').click(); $('statPrevM').click(); await settle();
+  t.w.JiwenStats.stepMonth(-1); t.w.JiwenStats.stepMonth(-1); await settle();
   ok(banner() && banner().textContent.includes('本月还有 2 笔导入账单待确认，共 79.50 元') && $('statPendGo'), '1 翻到 10 月：横幅「本月还有 2 笔导入账单待确认，共 79.50 元」 ' + (banner() && banner().textContent));
   ok(banner() && banner().parentNode === $('statPaneFlow') && banner() === $('statPaneFlow').firstChild, '1 横幅在统计页最上面');
-  $('statPrevM').click(); await settle();
+  t.w.JiwenStats.stepMonth(-1); await settle();
   ok(!banner(), '1 9 月：不显示');
-  $('statNextM').click(); await settle();
+  t.w.JiwenStats.stepMonth(1); await settle();
   ok(!!banner(), '1 回到 10 月：又显示');
   // 去处理
   $('statPendGo').click();
@@ -47,10 +47,10 @@ const man = (id, mo, d, money, cat) => ({ id, time: `2026-${p2(mo)}-${p2(d)}T08:
   ok(banner() && banner().textContent.includes('本月还有 1 笔'), '2 处理掉一笔回来：横幅变成 1 笔');
   // 开发开关关掉：不显示
   t.w.localStorage.removeItem('app_dev_import');
-  $('statNextM').click(); $('statPrevM').click(); await settle();
+  t.w.JiwenStats.stepMonth(1); t.w.JiwenStats.stepMonth(-1); await settle();
   ok(!banner(), '3 开发开关关着：不显示横幅');
   t.w.localStorage.setItem('app_dev_import', '1');
-  $('statNextM').click(); $('statPrevM').click(); await settle();
+  t.w.JiwenStats.stepMonth(1); t.w.JiwenStats.stepMonth(-1); await settle();
   ok(!!banner(), '3 再打开：显示');
   // 首页（账单页）没有红点之类的东西
   ok(!d.querySelector('#pageLedger #statPendBanner') && !/待确认/.test(($('pageLedger') || d.body).textContent.replace(banner() ? banner().textContent : '', '')), '3 首页不加提醒');

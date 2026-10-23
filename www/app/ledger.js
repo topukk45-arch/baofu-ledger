@@ -88,17 +88,24 @@
         function curYM(){ return lgYM || ymNow(); }
         function ymLabel(ym){ const y=+ym.slice(0,4); return (y!==new Date().getFullYear() ? y+'年' : '')+(+ym.slice(5,7))+'月'; }
         const lgStrip=window.JiwenMonthStrip.create({ id:'lgStrip', onPick:ym=>setYM(ym) });
-        function setYM(ym){
+        // 1023-H：统计页看的是同一个月。opt.quiet：统计页那边改的（推过来），不滚页面、不算「账单页这边改了」；
+        //   ymVer：账单页这边每改一次月份加一，统计页画之前看它变没变，变了就跟过来
+        let ymVer=0;
+        function setYM(ym, opt){
+            const quiet=!!(opt && opt.quiet);
             lgYM = (!ym || ym===ymNow()) ? null : ym;
+            if(!quiet) ymVer++;
             renderBill();
+            if(quiet) return;
             const bar=$('billHead'), y=bar ? bar.getBoundingClientRect().top + window.scrollY : 0;
             if(window.scrollY > y) window.scrollTo({ top:y, behavior:'instant' });   // 切了月份：停在细条那里，新月份从头看
         }
+        function ymVersion(){ return ymVer; }
         function stripWake(){
             if(JiwenBase.currentTab==='ledger' && $('pageLedger').style.display!=='none') lgStrip.wake();
         }
         window.addEventListener('scroll', stripWake, { passive:true });
-        function resetYM(){ lgYM=null; }   // 换账号 / 存档：回到这个月（不重画，后面会整页刷新）
+        function resetYM(){ lgYM=null; ymVer++; }   // 换账号 / 存档：回到这个月（不重画，后面会整页刷新）
         function ovOff(){ return lgYM!=null; }   // 首屏快照：看的不是这个月就不存（名字是 1023-A 留下来的）
         function gapHtml(a, b, today){
             const C=cal;
@@ -206,5 +213,5 @@
             billPainter.paint(listHtml(mon, { ym, first }));
         }
 
-        window.JiwenLedger = { curYM, listFlush, listHtml, makePainter, ovOff, renderBill, resetYM, setYM, stripWake };   // ledger 模块对外只有这一个入口
+        window.JiwenLedger = { curYM, listFlush, listHtml, makePainter, ovOff, renderBill, resetYM, setYM, stripWake, ymVersion };   // ledger 模块对外只有这一个入口
 })();

@@ -64,13 +64,13 @@ const mark=(rs, ids, k)=>rs.map(r=>ids.includes(r.id)?Object.assign({},r,{[k]:tr
     let rs=oct(); rs=mark(rs,['cc1','cc2'],'skip'); rs=mark(rs,['lpo','lpi','par'],'flow');
     const t=await boot(rs);
     t.d.querySelector('.tab-btn[data-tab="stats"]').click();
-    ok(t.$('statMonthIn').textContent==='+100.00' && t.$('statMonthOut').textContent==='−29.00',
+    ok(t.$('statMonthIn').textContent==='+100.00' && t.$('statMonthOut').textContent==='29.00',
        '10 月收支只剩真实部分：'+t.$('statMonthIn').textContent+' / '+t.$('statMonthOut').textContent);
     const cell=n=>[...t.$('statCal').querySelectorAll('.day')].find(c=>c.querySelector('.dn')&&c.querySelector('.dn').textContent===String(n));
     ok(cell(4).classList.contains('has') && !cell(4).querySelector('.da'), '4 号只有资金往来：可点开、不显示金额');
     ok(cell(1).querySelector('.da').textContent==='-16', '1 号只算夜宵 -16');
     cell(4).click();
-    ok(t.$('statFlowList').querySelectorAll('.sf-io.flow').length===2, '当日明细标出往来');
+    ok(t.$('uiSheetBody').querySelectorAll('.io-flow').length===2, '当日明细标出往来（1023-H 起是当日详情抽屉）'); t.w.JiwenSheet.close();
     ok(!t.$('statMonthCatList').textContent.includes('购物'), '饼图不含往来');
 }
 

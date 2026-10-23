@@ -83,11 +83,12 @@ function bootSync(records, arcExtra){
   rRow.click(); ok(t.$('detailBal').textContent==='4900.00', '退款行结余（1023-A 起在详情里）'); t.$('detailClose').click();
   // 统计页
   t.toStats();
-  ok(t.$('statMonthIn').textContent==='+5000.00' && t.$('statMonthOut').textContent==='−100.00', '统计页当月收支');
+  ok(t.$('statMonthIn').textContent==='+5000.00' && t.$('statMonthOut').textContent==='100.00', '统计页当月收支（1023-H 起支出不带 −）');
   const cell=n=>[...t.$('statCal').querySelectorAll('.day')].find(c=>c.querySelector('.dn')&&c.querySelector('.dn').textContent===String(n));
   ok(cell(10).querySelector('.da').textContent==='+30', '10 号日历 +30');
   cell(10).click();
-  ok(t.$('statFlowList').querySelector('.sf-io.refund').textContent==='退款' && t.$('statFlowList').querySelector('.sf-amt').textContent.trim()==='+30.00', '当日明细：退款');
+  { const b=t.$('uiSheetBody');   // 1023-H 起点日子开当日详情（和账单页同一个抽屉）
+  ok(b.querySelector('.io-refund').textContent==='退款' && b.querySelector('.bl-amt').textContent.trim()==='+30.00', '当日明细：退款'); t.w.JiwenSheet.close(); }
   const pie=[...t.$('statMonthCatList').querySelectorAll('.sc-item')].map(it=>it.querySelector('.sc-cat-name').textContent+it.querySelector('.sc-amt').textContent).join('|');
   ok(pie.includes('购物−70.00') && pie.includes('餐饮−30.00'), '饼图按净额：'+pie);
   // 收入口径饼图不含退款
@@ -230,7 +231,7 @@ function bootSync(records, arcExtra){
   ok(row.querySelector('.bg-num').textContent==='70.00 / 200.00', '预算已花扣掉退款：'+row.querySelector('.bg-num').textContent);
   row.click();
   const det=t.$('bgGroups').querySelector('.bg-detail');
-  ok(det.querySelectorAll('.sf-item').length===2 && det.querySelector('.sf-io.refund') && det.textContent.includes('+30.00'), '预算明细列出退款');
+  ok(det.querySelectorAll('.bl-row').length===2 && det.querySelector('.io-refund') && det.textContent.includes('+30.00'), '预算明细列出退款');
   ok(t.$('bgOverview').querySelector('.bgy-head .bgo-v').textContent.startsWith('170 /'), '年度已用 100+70：'+t.$('bgOverview').querySelector('.bgy-head .bgo-v').textContent);
   t.$('statTabSeg').querySelector('[data-v="flow"]').click();
   const it=[...t.$('statMonthCatList').querySelectorAll('.sc-item')].find(i=>i.querySelector('.sc-cat-name').textContent==='购物');

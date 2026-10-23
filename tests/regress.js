@@ -56,7 +56,7 @@ async function snap(file){
   d.querySelector('.tab-btn[data-tab="stats"]').click();
   if(!out.cats) out.cats=$('catStats').innerHTML;
   out.stats=$('statCal').innerHTML+$('statMonthIn').textContent+$('statMonthOut').textContent+$('statMonthCatList').innerHTML;
-  [...$('statCal').querySelectorAll('.day.has')][5].click(); out.day=$('statFlowList').innerHTML;
+  [...$('statCal').querySelectorAll('.day.has')][5].click(); { const el=$('statFlowList')||$('uiSheetBody'); out.day=el?el.innerHTML:''; if(!$('statFlowList')&&dom.window.JiwenSheet) dom.window.JiwenSheet.close(); }   // 1023-H 起是当日详情抽屉
   // AI 导出（直接调构建函数）
   out.ai=(dom.window.JiwenAiExport || dom.window).buildAiText(records.filter(r=>r.time.startsWith('2026-09')),'2026年9月','按月');
   return out;

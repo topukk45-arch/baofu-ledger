@@ -98,7 +98,8 @@ async function snap() {
   out.cats = $('catStats').innerHTML;   // 1023-A：分类汇总搬去统计页，切过去再读
   out.stats = $('statCal').innerHTML + $('statMonthIn').textContent + $('statMonthOut').textContent + $('statMonthCatList').innerHTML;
   const days = [...$('statCal').querySelectorAll('.day.has')];
-  out.day = days.length ? (days[Math.min(5, days.length - 1)].click(), $('statFlowList').innerHTML) : '';
+  const dayOut = () => { const el = $('statFlowList') || $('uiSheetBody'), h = el ? el.innerHTML : ''; if (!$('statFlowList') && w.JiwenSheet) w.JiwenSheet.close(); return h; };
+  out.day = days.length ? (days[Math.min(5, days.length - 1)].click(), dayOut()) : '';   // 1023-H 起点日子开当日详情抽屉
   // 每次不一样的：记录编号、批次号、账号编号、导出时间、新增记录的指纹（含批次号）→ 按出现顺序的占位
   const ids = new Map(), bs = new Map();
   const norm = s => s.replace(/r\d{23}/g, m => { if (!ids.has(m)) ids.set(m, '<记录' + (ids.size + 1) + '>'); return ids.get(m); })

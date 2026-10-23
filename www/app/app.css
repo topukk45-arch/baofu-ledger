@@ -2045,3 +2045,50 @@
         .sf-switch.on { background:var(--c-primary-dark); }
         .sf-switch.on::after { transform:translateX(16px); }
         @media (prefers-reduced-motion: reduce){ .search-page.sp-in, .search-page.sp-out { animation:none; } }
+
+        /* ===== 1023-H：统计页（标题右边年月、两格、总结余展开、日历周合计、月份浮条、支出正文色）===== */
+        .user-info.st-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+        .st-title h3 { margin:0; }
+        button.st-ym { min-height:var(--ui-tap); padding:0 4px 0 12px; border:none; background:transparent; font-family:inherit; font-size:15px; font-weight:bold;
+            color:var(--c-primary-dark); cursor:pointer; font-variant-numeric:tabular-nums; }
+        .st-cells { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin-bottom:12px; }
+        .st-cell { display:flex; flex-direction:column; gap:2px; min-width:0; padding:12px 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
+        .st-cell-k { font-size:12px; color:var(--c-text-soft); }
+        .st-cell-v { font-size:24px; line-height:30px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .st-cell-v.pos { color:var(--c-pos); }
+        .st-cell-s { font-size:12px; color:var(--c-text-soft); }
+        .st-cell-s b.pos { color:var(--c-pos); }
+        .st-cell-s b.out { color:var(--c-text); }
+        .stat-card.st-bal { display:block; padding:4px 14px 6px; }
+        button.st-bal-head { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); padding:6px 0; border:none; background:transparent;
+            font-family:inherit; text-align:left; cursor:pointer; color:var(--c-text); }
+        .st-bal-rows { display:flex; flex-direction:column; gap:6px; padding:6px 0 4px; border-top:1px dashed var(--c-border); font-size:14px; color:var(--c-text); }
+        .st-bal-row { display:flex; justify-content:space-between; gap:10px; font-variant-numeric:tabular-nums; }
+        .st-bal-row span { color:var(--c-text-soft); }
+        .st-bal-row b.pos { color:var(--c-pos); }
+        .st-bal-note { font-size:12px; line-height:18px; color:var(--c-text-soft); }
+        button.st-bal-more { display:block; margin:0 0 0 auto; min-height:var(--ui-tap); padding:0 2px 0 12px; border:none; background:transparent; font-family:inherit;
+            font-size:13px; color:var(--c-primary-dark); cursor:pointer; }
+        /* 日历：7 天 + 一列周合计 */
+        .st-week8, .stat-cal.st-cal8 { grid-template-columns:repeat(7, minmax(0,1fr)) 44px; }
+        .st-week8 .st-wk-h { font-size:10.5px; font-weight:bold; color:var(--c-primary-dark); white-space:nowrap; }
+        .stat-cal .day .da.out { color:var(--c-text); }
+        .stat-cal .day .da.pos { color:var(--c-pos); }
+        button.wk-sum { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-width:0; min-height:62px; padding:0; margin:0;
+            border:none; border-radius:8px; background:color-mix(in srgb, var(--c-primary) 12%, var(--c-bg)); font-family:inherit; cursor:pointer; }
+        button.wk-sum.cur { background:color-mix(in srgb, var(--c-primary) 28%, var(--c-bg)); }
+        .wk-n { font-size:10px; color:var(--c-text-soft); }
+        .wk-sum.cur .wk-n { color:var(--c-text); font-weight:bold; }
+        .wk-v { font-size:10.5px; font-weight:bold; line-height:1.2; font-variant-numeric:tabular-nums; white-space:nowrap; }
+        .wk-v.out { color:var(--c-text); }
+        .wk-v.pos { color:var(--c-pos); }
+        /* 分类占比、分类汇总：花出去的用正文色 */
+        .sc-amt.out, .cs-amt.out { color:var(--c-text); }
+        /* 预算明细：每笔两行（照账单页） */
+        .bg-detail .lg-dc.bg-rows { margin-top:8px; content-visibility:visible; }
+        .bg-detail .lg-dc.bg-rows .bl-row:first-child { border-top:none; }
+        /* 统计页的月份浮条：没有操作栏，贴底栏上面；↑、回到本月让到浮条上面 */
+        #stStrip { bottom:calc(72px + env(safe-area-inset-bottom)); }
+        body:not(.tab-stats) #stStrip { display:none !important; }
+        body.tab-stats .to-top { bottom:calc(150px + env(safe-area-inset-bottom)); }
+        body.tab-stats #statTodayFab { bottom:calc(204px + env(safe-area-inset-bottom)); }

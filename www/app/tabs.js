@@ -361,7 +361,7 @@
                 b.classList.toggle('active', b.dataset.tab===tab);
             });
             if(tab==='ledger') requestAnimationFrame(()=>JiwenLedger.stripWake());   // 1023-C：打开账单页时月份浮条先露 1.5 秒
-            if(tab==='stats') renderStats();
+            if(tab==='stats'){ renderStats(); requestAnimationFrame(()=>JiwenStats.statStripWake()); }   // 1023-H：打开统计页时月份浮条也先露 1.5 秒
             if(tab==='settings') renderStorageUse();
             // 切换标签后回到顶部：延到布局完成后执行，避免在 display 切换同帧里失效
             // 1017-F：回到账单页时不回顶上，直接放回离开时的位置（同一帧里放一次、布局完成后再放一次，中间不经过顶上）

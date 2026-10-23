@@ -1,11 +1,12 @@
 (function(){
         const { $, escapeHtml, fabHold, fabWake, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
-        const { balContrib, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, odScheduleSync, saveStoreSafe, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { balContrib, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isRefund, loadStore, modeAmtCls, odScheduleSync, refundedMap, saveStoreSafe, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, playSlide } = window.JiwenDate;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
         const { editBudget, openCatManager } = window.JiwenCats;   // 用到前面模块的
-        const { aiFlagText, closeDetail, openDetail } = window.JiwenDetail;   // 用到前面模块的
+        const { aiFlagText, cal, closeDetail, openDay, openDetail, openWeek, rowHtml } = window.JiwenDetail;   // 用到前面模块的
+        const { curYM, setYM, ymVersion } = window.JiwenLedger;   // 用到前面模块的
 
         // ===== 统计页：预算 =====
         // 一处算、两处用：computeBudget 给「收支」页签的一行入口和「预算」页签共用，口径永远一致。
@@ -187,7 +188,6 @@
         // 「预算」页签
         function renderBudgetPane(dec){
             renderBudgetSuggest(dec);
-            $('bgMonthLabel').textContent=`${statYear}年${pad(statMonth+1)}月`;
             const B=computeBudget(dec, statYear, statMonth);
 
             // —— 总览 ——
@@ -331,15 +331,9 @@
             const list=dec.filter(x=>x.y===statYear && x.mo===statMonth && x.r.cat===r.cat
                     && expSigned(x.r)!==0 && recMode(x.r)==='normal')
                 .sort((a,b)=>b.ts-a.ts);
-            const items = list.length ? `<div class="stat-flow">` + list.map(x=>{
-                const rm=(x.r.remark||'').trim();
-                const rf=isRefund(x.r);
-                return `<div class="sf-item" data-act="bgRec" data-id="${escapeHtml(x.r.id)}">`
-                    + `<div class="sf-top"><span class="sf-time">${pad(x.mo+1)}-${pad(x.d)} ${pad(x.hh)}:${pad(x.mi)}</span>`
-                    + (rf ? `<span class="sf-io refund">退款</span>` : '')
-                    + (rm ? `<span class="sf-remark">${escapeHtml(rm)}</span>` : `<span class="sf-cat">${escapeHtml(r.cat)}</span>`)
-                    + `</div><span class="sf-amt ${rf?'pos':'neg'}">${rf?'+':'−'}${safeNum(x.r.money).toFixed(2)}</span></div>`;
-            }).join('') + `</div>` : `<div class="bg-detail-empty">这个月还没有计入的支出</div>`;
+            // 1023-H：每笔照账单页的两行（备注 / 「分类 · 日期 时间」），点了打开同一个单笔详情
+            const rMap=refundedMap(getUserData());
+            const items = list.length ? `<div class="lg-dc bg-rows">` + list.map(x=>rowHtml(x.r, rMap, { date:true })).join('') + `</div>` : `<div class="bg-detail-empty">这个月还没有计入的支出</div>`;
             const note = `${list.length} 笔${r.excl?`；另有 ${r.excl} 笔不计 / 往来，未算在内`:''}`;
             // 【1013-E】设了预算的分类，展开后就地改上限，不用再跑去设置里的分类管理
             const edit = r.limit>0 ? `<button class="mini-btn bg-edit" data-act="bgSet" data-cat="${escapeHtml(r.cat)}">改预算</button>` : '';
@@ -351,7 +345,9 @@
         $('statPaneBudget').addEventListener('click', e=>{
             const el=e.target.closest('[data-act]'); if(!el) return;
             const act=el.dataset.act;
-            if(act==='bgRow'){
+            if(act==='detail'){
+                openDetail(el.dataset.id);
+            } else if(act==='bgRow'){
                 const c=el.dataset.cat;
                 if(bgExpanded.has(c)) bgExpanded.delete(c); else bgExpanded.add(c);
                 renderStats();
@@ -362,7 +358,7 @@
             } else if(act==='bgYearToggle'){
                 bgYearOpen=!bgYearOpen; renderStats();
             } else if(act==='bgYearMonth'){
-                statMonth=Number(el.dataset.mo); statSelDay=null; bgExpanded.clear();
+                setStatYM(statYear, Number(el.dataset.mo)); bgExpanded.clear();
                 renderStatCalendar();
                 window.scrollTo(0,0);
             } else if(act==='bgOutside'){
@@ -387,21 +383,28 @@
         $('statTabSeg').addEventListener('click', e=>{
             const b=e.target.closest('button[data-v]'); if(b) setStatTab(b.dataset.v);
         });
-        // 预算页签的月份切换：与收支页签共用 statYear/statMonth
-        $('bgPrevM').addEventListener('click', ()=>{
-            statMonth--; if(statMonth<0){ statMonth=11; statYear--; }
-            statSelDay=null; renderStatCalendar();
-        });
-        $('bgNextM').addEventListener('click', ()=>{
-            statMonth++; if(statMonth>11){ statMonth=0; statYear++; }
-            statSelDay=null; renderStatCalendar();
-        });
-        $('bgMonthLabel').addEventListener('click', ()=>$('statMonthLabel').click());   // 复用年月选择器
         // ============================================================
         // ===== 统计模块（纯手写 SVG，跟随外观主题变量） =====
         // ============================================================
         let statYear, statMonth;     // 当前查看的年/月（month: 0-11）
-        let statSelDay=null;         // 当前选中的日（1-31）
+        let statSelDay=null;         // 当前选中的日（1-31）；1023-H 起点某一天打开当日详情，这个一直是 null（首屏快照还看它）
+        // 1023-H：统计页和账单页看的是同一个月：月份记在账单页那边（JiwenLedger.curYM），这边一改就推过去，画之前先对一下
+        function setStatYM(y, mo){
+            statYear=y; statMonth=mo; statSelDay=null;
+            setYM(`${y}-${pad(mo+1)}`, { quiet:true });
+        }
+        let seenYMVer=-1;
+        function syncFromLedger(){
+            const v=ymVersion(); if(v===seenYMVer && statYear!==undefined) return;   // 账单页那边没改过：照这边的
+            seenYMVer=v;
+            const ym=curYM(), y=+ym.slice(0,4), mo=+ym.slice(5,7)-1;
+            if(statYear!==y || statMonth!==mo){ statYear=y; statMonth=mo; statSelDay=null; }
+        }
+        function stepMonth(d){ let y=statYear, mo=statMonth+d; while(mo<0){ mo+=12; y--; } while(mo>11){ mo-=12; y++; } setStatYM(y, mo); bgExpanded.clear(); renderStatCalendar(); }
+        // 月份浮条（和账单页同一个组件、同一套 1.5 秒规则、松手才切）；超过月预算的那个月柱子标红
+        const stStrip=window.JiwenMonthStrip.create({ id:'stStrip', onPick:ym=>{ setStatYM(+ym.slice(0,4), +ym.slice(5,7)-1); bgExpanded.clear(); renderStatCalendar(); } });
+        function statStripWake(){ if(JiwenBase.currentTab==='stats') stStrip.wake(); }
+        window.addEventListener('scroll', statStripWake, { passive:true });
 
         // 读取 CSS 变量当前值，让 SVG 颜色跟着外观走
         function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
@@ -447,10 +450,7 @@
         }
 
         function renderStats(){
-            if(statYear===undefined){
-                const now=new Date();
-                statYear=now.getFullYear(); statMonth=now.getMonth();
-            }
+            syncFromLedger();   // 1023-H：和账单页同一个月
             renderStatCalendar();
             renderAllCatStats();   // 1023-A：分类汇总从账单页搬过来了
         }
@@ -490,7 +490,7 @@
                 const v=round2(byCat[c]);
                 const pos=v>=0;
                 return `<div class="cs-row"><span class="cs-name">${escapeHtml(c)}</span>`
-                    + `<span class="cs-amt ${pos?'pos':'neg'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</span></div>`;
+                    + `<span class="cs-amt ${pos?'pos':'out'}">${pos?'+':'−'}${Math.abs(v).toFixed(2)}</span></div>`;
             }).join('');
         }
         // ===== 1019-H：分类汇总能滑但看不出来：右下角的小圆钮 =====
@@ -598,20 +598,31 @@
                 },
                 foot(box, done){ const c=document.createElement('button'); c.type='button'; c.className='ui-btn block'; c.id='aiFlagListClose'; c.textContent='关闭'; c.addEventListener('click', ()=>done()); box.appendChild(c); } });
         }
+        // 1023-H：周合计按万写（格子窄，5 位数放不下）
+        function shortNum(n){ const a=Math.abs(n), sg=n>0 ? '+' : (n<0 ? '−' : ''); return a>=10000 ? sg+(a/10000).toFixed(1).replace(/\.0$/, '')+'万' : sg+a.toFixed(0); }
+        function ymKey(y, mo){ return `${y}-${pad(mo+1)}`; }
         function renderStatCalendar(){
             $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
             renderPendBanner();
-            // 【P4】统计页此前的形状与当初 renderBill 的性能坑同源：
-            //   statRecords() 每次都把整个 store（含所有存档）重新 JSON.parse，
-            //   而日净额、当月汇总、分类占比、当日明细四处各自把全表 parseRecTime 遍历一遍。
-            //   点一次日历格子就要付 3 次 JSON.parse + 3 趟正则解析。
-            //   改法同 renderBill：取一次数、给每条只解析一次时间，四个消费点共用同一份。
+            // 【P4】取一次数、给每条只解析一次时间，几个消费点共用同一份（和 renderBill 同一个改法）
             const dec=decorateRecs(statRecords());
 
-            // 日净额 / 有无数据 / 当月收支汇总——原先三趟遍历，合并为一趟
+            // 日净额 / 有无数据 / 当月收支汇总——一趟
             const dayNet={}, dayHas={}, dayFlow={}, daySkip={}, dayRefund={};
-            let mIn=0, mOut=0;
+            let mIn=0, mOut=0, mOutN=0, pOut=0;
+            const pY = statMonth===0 ? statYear-1 : statYear, pM = statMonth===0 ? 11 : statMonth-1;
+            // 月份浮条：每个月的支出、超没超月预算（设了预算的分类里花的 > 这些预算加起来）
+            const budgets=getBudgets(), budLimit=getCats().reduce((t, c)=>t+(budgets[c]>0 ? safeNum(budgets[c]) : 0), 0);
+            const ymExp=new Map(), ymBud=new Map();
+            let firstYM=ymKey(new Date().getFullYear(), new Date().getMonth());
             dec.forEach(x=>{
+                const ym=ymKey(x.y, x.mo);
+                if(x.y>1000){
+                    if(ym<firstYM) firstYM=ym;
+                    const e=statContrib(x.r).exp; if(e) ymExp.set(ym, (ymExp.get(ym)||0)+e);
+                    if(budLimit>0 && recMode(x.r)==='normal' && budgets[x.r.cat||'未分类']>0){ const v=expSigned(x.r); if(v) ymBud.set(ym, (ymBud.get(ym)||0)+v); }
+                }
+                if(x.y===pY && x.mo===pM) pOut+=statContrib(x.r).exp;
                 if(x.y!==statYear || x.mo!==statMonth) return;
                 dayHas[x.d]=true;               // 不计的记录也算「这天有账」：格子照样能点开看明细
                 // ……但不计金额（不计 / 往来都不进收支统计），只记下「这天有这类记录」用来打标签
@@ -621,10 +632,21 @@
                 if(isRefund(x.r)) dayRefund[x.d]=true;    // 1010-J2：这天的净额里含退款，标出来
                 const c=statContrib(x.r);
                 dayNet[x.d]=(dayNet[x.d]||0)+(c.inc-c.exp);
-                mIn+=c.inc; mOut+=c.exp;
+                mIn+=c.inc; mOut+=c.exp; if(c.exp>0) mOutN++;
             });
-            $('statMonthIn').textContent='+'+round2(mIn).toFixed(2);
-            $('statMonthOut').textContent='−'+round2(mOut).toFixed(2);
+            const nowYM=ymKey(new Date().getFullYear(), new Date().getMonth()), months=[];
+            let my=+firstYM.slice(0,4), mmo=+firstYM.slice(5,7)-1;
+            while(ymKey(my, mmo)<=nowYM){ const k=ymKey(my, mmo); months.push({ ym:k, v:round2(Math.max(0, ymExp.get(k)||0)), over: budLimit>0 && round2(ymBud.get(k)||0)>budLimit }); mmo++; if(mmo>11){ mmo=0; my++; } }
+            stStrip.set(months, ymKey(statYear, statMonth));
+            // 两格：当月支出（几笔、比上月多 / 少）| 当月收入（本月净剩）
+            mIn=round2(mIn); mOut=round2(mOut); pOut=round2(pOut);
+            $('statOutK').textContent=`当月支出 · ${mOutN} 笔`;
+            $('statMonthOut').textContent=mOut.toFixed(2);
+            const dm=round2(mOut-pOut);
+            $('statOutCmp').textContent = pOut>0 ? (dm>=0 ? `比 ${pM+1}月 多花 ${dm.toFixed(2)}` : `比 ${pM+1}月 少花 ${(-dm).toFixed(2)}`) : `${pM+1}月 没有支出`;
+            $('statMonthIn').textContent='+'+mIn.toFixed(2);
+            const net=round2(mIn-mOut);
+            $('statNet').innerHTML=`本月净剩 <b class="${net>=0 ? 'pos' : 'out'}">${net>=0 ? '+' : '−'}${Math.abs(net).toFixed(2)}</b>`;
 
             renderStatBal(dec);
             // 本月预算（共用同一份预解析结果）
@@ -633,134 +655,89 @@
             // 当月支出分类占比（复用当日分析的甜甜圈 + 分类列表画法）
             renderStatMonthCats(dec);
 
-            // 画日历格子
-            // 周一为一周起始：与记账/筛选/AI导出的日期选择器（renderDtDays）以及
-            // AI「按周」分组（(getDay()+6)%7）保持一致，避免同一 App 里两套周起始。
+            // 画日历格子：周一为一周起始（和日期选择器、账单页同一个规矩）；1023-H 起每一行右边一格「周合计」
             const firstDow=(new Date(statYear, statMonth, 1).getDay()+6)%7;   // 0=周一
             const daysInMonth=new Date(statYear, statMonth+1, 0).getDate();
             const today=new Date();
             const isThisMonth = today.getFullYear()===statYear && today.getMonth()===statMonth;
+            const todayMon = today.getDay()===1;
 
             const grid=$('statCal'); grid.innerHTML='';
-            for(let i=0;i<firstDow;i++){ grid.appendChild(document.createElement('div')); }
-            for(let day=1; day<=daysInMonth; day++){
-                const cell=document.createElement('div');
-                cell.className='day';
-                const has=!!dayHas[day];
-                if(has) cell.classList.add('has');
-                // 当天有账、但全是不计 / 往来：换一种底色，一眼和「花了钱的日子」分开
-                const excl = has && dayNet[day]===undefined;
-                if(excl) cell.classList.add('excl');
-                if(isThisMonth && today.getDate()===day) cell.classList.add('today');
-                if(statSelDay===day && has) cell.classList.add('sel');
-
-                let inner=`<div class="dn">${day}</div>`;
-                // 当天只有不计的记录时 dayNet 没有这一天：只显示日期、不显示金额（否则会是 NaN）
-                if(has && dayNet[day]!==undefined){
-                    const n=round2(dayNet[day]);   // 收支浮点相消可能剩 -5e-17，不归整会渲染成「-0」
-                    const col = n>=0 ? 'var(--c-pos,#2f7d57)' : 'var(--c-neg,#d05a52)';
-                    inner+=`<div class="da" style="color:${col}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
+            const rows=Math.ceil((firstDow+daysInMonth)/7);
+            for(let r=0; r<rows; r++){
+                let wkNet=0, wkAny=false, curWk=false;
+                for(let i=0; i<7; i++){
+                    const day=r*7+i-firstDow+1;
+                    if(day<1 || day>daysInMonth){ grid.appendChild(document.createElement('div')); continue; }
+                    const cell=document.createElement('div');
+                    cell.className='day';
+                    const has=!!dayHas[day];
+                    if(has) cell.classList.add('has');
+                    // 当天有账、但全是不计 / 往来：换一种底色，一眼和「花了钱的日子」分开
+                    const excl = has && dayNet[day]===undefined;
+                    if(excl) cell.classList.add('excl');
+                    if(isThisMonth && today.getDate()===day){ cell.classList.add('today'); curWk=true; }
+                    let inner=`<div class="dn">${day}</div>`;
+                    // 当天只有不计的记录时 dayNet 没有这一天：只显示日期、不显示金额（否则会是 NaN）
+                    if(has && dayNet[day]!==undefined){
+                        const n=round2(dayNet[day]);   // 收支浮点相消可能剩 -5e-17，不归整会渲染成「-0」
+                        wkNet+=n; wkAny=true;
+                        // 1023-H：花出去的用正文色（和账单页一样），进账绿色
+                        inner+=`<div class="da ${n>=0 ? 'pos' : 'out'}">${n>=0?'+':''}${n.toFixed(0)}</div>`;
+                    }
+                    // 统计标签：退款 / 不计 / 往来（普通日子里夹着这类记录也照样标）
+                    if(dayFlow[day] || daySkip[day] || dayRefund[day]){
+                        inner+=`<div class="day-tags">${dayRefund[day]?'<span class="dtag refund">退款</span>':''}${daySkip[day]?'<span class="dtag skip">不计</span>':''}${dayFlow[day]?'<span class="dtag flow">往来</span>':''}</div>`;
+                    }
+                    cell.innerHTML=inner;
+                    if(has){
+                        cell.dataset.day=`${statYear}-${pad(statMonth+1)}-${pad(day)}`;
+                        cell.addEventListener('click', ()=>openDay(cell.dataset.day));   // 1023-H：和账单页同一个当日详情
+                    }
+                    grid.appendChild(cell);
                 }
-                // 统计标签：当天有「不计」就标「不计」，有「往来」就标「往来」，两者都有就都标（1020-F 起「结余」改叫「往来」，先不计后往来）。
-                // 普通日子里夹着这类记录也照样标，免得以为那天的净额就是全部。
-                if(dayFlow[day] || daySkip[day] || dayRefund[day]){
-                    inner+=`<div class="day-tags">${dayRefund[day]?'<span class="dtag refund">退款</span>':''}${daySkip[day]?'<span class="dtag skip">不计</span>':''}${dayFlow[day]?'<span class="dtag flow">往来</span>':''}</div>`;
-                }
-                cell.innerHTML=inner;
-                if(has){
-                    // 只设选中天 + 重绘日历即可：renderStatCalendar 末尾会依据 statSelDay
-                    // 自行调用 renderStatDay。此处若再调一次就是整份数据白算一遍。
-                    cell.addEventListener('click', ()=>{ statSelDay=day; renderStatCalendar(); });
-                }
-                grid.appendChild(cell);
+                // 周合计：这一行在这个月里的几天的净额（和格子同一个口径）；本周那格深一点；今天是周一时本周那格空着（和账单页同一个规矩）
+                const monDay=r*7-firstDow+1, mon=cal.addDay(ymKey(statYear, statMonth)+'-01', monDay-1);
+                const wk=document.createElement('button'); wk.type='button';
+                wk.className='wk-sum'+(curWk ? ' cur' : '');
+                wk.dataset.mon=mon; wk.setAttribute('aria-label', '看这一周');
+                wkNet=round2(wkNet);
+                const blank = curWk && todayMon;
+                wk.innerHTML=`<span class="wk-n">${curWk ? '本周' : '周'}</span><span class="wk-v ${wkNet>0 ? 'pos' : 'out'}">${blank ? '' : (wkAny ? shortNum(wkNet) : '—')}</span>`;
+                wk.addEventListener('click', ()=>openWeek(mon));
+                grid.appendChild(wk);
             }
 
             if(statTab==='budget') renderBudgetPane(dec);
             syncStatTodayFab();
-
-            // 若已选中某天且该天仍在本月有数据，刷新当日分析；否则隐藏
-            if(statSelDay && dayHas[statSelDay]){
-                renderStatDay(statSelDay, dec);   // 共用同一份预解析结果
-            } else {
-                statSelDay=null;
-                $('statDayWrap').style.display='none';
-                $('statDayEmpty').style.display='block';
-            }
+            statSelDay=null;
         }
 
-        // 1023-C：总结余（原来在账单页总览最下面一行，搬过来）：全部记录算下来的（含期初余额、往来，只有不计的不算），点了拆开说明为什么不等于收入减支出
-        let balSum=null;
+        // 1023-C：总结余（原来在账单页总览最下面一行，搬过来）；1023-H 起点了就地展开：期初余额、累计收入、累计支出、往来，加一句为什么不等于收入减支出
+        //   期初余额 = 记成「往来」、备注是「期初余额」的那几笔（导入结果页「补一笔期初余额」就是这样记的），其余往来另算
+        let balSum=null, balOpen=false;
         function renderStatBal(dec){
             const card=$('statBal'); if(!card) return;
-            let sIn=0, sOut=0, fNet=0;
-            dec.forEach(x=>{ const c=statContrib(x.r); sIn+=c.inc; sOut+=c.exp; if(isFlow(x.r)){ const b=balContrib(x.r); fNet+=b.inc-b.exp; } });
-            sIn=round2(sIn); sOut=round2(sOut); fNet=round2(fNet);
-            balSum={ sIn, sOut, fNet, net:round2(sIn-sOut+fNet) };
+            let sIn=0, sOut=0, fNet=0, open=0;
+            dec.forEach(x=>{ const c=statContrib(x.r); sIn+=c.inc; sOut+=c.exp; if(isFlow(x.r)){ const b=balContrib(x.r), v=b.inc-b.exp; if((x.r.remark||'').trim()==='期初余额') open+=v; else fNet+=v; } });
+            sIn=round2(sIn); sOut=round2(sOut); fNet=round2(fNet); open=round2(open);
+            balSum={ sIn, sOut, fNet, open, net:round2(sIn-sOut+fNet+open) };
             card.style.display = dec.length ? '' : 'none';
-            card.innerHTML=`<span class="st-bal-k">总结余<em>全部记录累计，含期初余额</em></span><span class="st-bal-v ov-net" id="statBalNum">${balSum.net.toFixed(2)}</span><span class="st-bal-go" aria-hidden="true">›</span>`;
+            const f=v=>v.toFixed(2), sg=v=>(v<0 ? '−' : '+')+f(Math.abs(v));
+            card.classList.toggle('open', balOpen);
+            card.innerHTML=`<button type="button" class="st-bal-head" id="statBalHead" aria-expanded="${balOpen}"><span class="st-bal-k">总结余<em>全部记录累计，含期初余额</em></span><span class="st-bal-v ov-net" id="statBalNum">${f(balSum.net)}</span></button>`
+                + (balOpen ? `<div class="st-bal-rows" id="statBalRows">`
+                    + `<div class="st-bal-row"><span>期初余额</span><b>${sg(balSum.open)}</b></div>`
+                    + `<div class="st-bal-row"><span>累计收入</span><b class="pos">+${f(sIn)}</b></div>`
+                    + `<div class="st-bal-row"><span>累计支出</span><b>−${f(sOut)}</b></div>`
+                    + `<div class="st-bal-row"><span>往来（转账、存取钱、借还钱）</span><b>${sg(balSum.fNet)}</b></div>`
+                    + `<div class="st-bal-note">期初余额、往来不算进收入、支出，但算进结余；记成「不计」的哪里都不算。所以结余不等于收入减支出。</div></div>` : '')
+                + `<button type="button" class="st-bal-more" id="statBalMore">${balOpen ? '收起' : '怎么算出来的 ›'}</button>`;
         }
-        $('statBal').addEventListener('click', ()=>{
-            if(!balSum) return;
-            const f=v=>v.toFixed(2);
-            customAlert(`结余是全部记录算下来的，不只这个月：\n\n`+
-                `累计收入　+${f(balSum.sIn)}\n累计支出　−${f(balSum.sOut)}\n`+
-                `往来　　　${balSum.fNet<0?'−':'+'}${f(Math.abs(balSum.fNet))}（期初余额、转账、存取钱这类，记成「往来」的）\n`+
-                `结余　　　${f(balSum.net)}\n\n`+
-                `所以结余不等于收入减支出：期初余额、存取钱不算收支，但算进结余。记成「不计」的哪里都不算。`, '结余怎么算的');
+        $('statBal').addEventListener('click', e=>{
+            if(!e.target.closest('#statBalHead, #statBalMore')) return;
+            balOpen=!balOpen; renderStatBal(decorateRecs(statRecords()));
         });
-
-        // dec 由调用方（renderStatCalendar）传入，避免又一次 loadStore + 全表解析。
-        // 不传则自行取数，保留独立可调用性——但正常路径下不会走到那个分支。
-        function renderStatDay(day, dec){
-            const src = dec || decorateRecs(statRecords());
-            const flow = src
-                .filter(x=> x.y===statYear && x.mo===statMonth && x.d===day)
-                // 排序比较器里不再调 parseRecTime：ts 已预算好，比的是纯数字。
-                // 同分钟多笔的相对次序由 sort 的稳定性保证，与原实现一致。
-                .sort((a,b)=> a.ts-b.ts);
-
-            $('statDayEmpty').style.display='none';
-            $('statDayWrap').style.display='block';
-            $('statDayTitle').textContent=`${statYear}-${pad(statMonth+1)}-${pad(day)} · 当日收支分析`;
-
-            // —— 当日收支明细：一条一行，按时间正序（含收入与支出）——
-            if(flow.length){
-                $('statFlowList').innerHTML = flow.map(x=>{
-                    const r=x.r;
-                    const hm=`${pad(x.hh)}:${pad(x.mi)}`;
-                    const isOut=r.type==='expense';
-                    const rf=isRefund(r);
-                    const io=isOut?'支出':(rf?'退款':'收入');
-                    const cat=r.cat||'未分类';
-                    const remark=(r.remark||'').trim();
-                    const amt=safeNum(r.money).toFixed(2);
-                    return `<div class="sf-item" data-act="sfItem" data-id="${escapeHtml(r.id)}">
-                        <div class="sf-top">
-                            <span class="sf-time">${hm}</span>
-                            <span class="sf-io ${isOut?'out':(rf?'refund':'in')}">${io}</span>${isSkip(r)?'<span class="sf-io skip">不计</span>':(isFlow(r)?'<span class="sf-io flow">往来</span>':'')}
-                            <span class="sf-cat">${escapeHtml(cat)}</span>
-                            ${remark?`<span class="sf-remark">${escapeHtml(remark)}</span>`:''}
-                        </div>
-                        <span class="sf-amt ${isOut?'neg':'pos'}${modeAmtCls(r)}">${isOut?'−':'+'}${amt}</span>
-                    </div>`;
-                }).join('');
-            } else {
-                $('statFlowList').innerHTML = '<div class="stat-day-empty">当日无收支记录</div>';
-            }
-        }
-
-        // 当日收支明细：点整行进「账单详情」（openDetail 弹窗）。
-        // statFlowList 是静态容器，事件委托只绑一次，反复重写 innerHTML 不重复挂监听。
-        (function(){
-            const box=$('statFlowList');
-            if(!box) return;
-            box.addEventListener('click', e=>{
-                const row=e.target.closest('[data-act="sfItem"]');
-                if(!row || !box.contains(row)) return;
-                const id=row.getAttribute('data-id');
-                if(id) openDetail(id);
-            });
-        })();
 
         // 当月分类占比：可按「支出」或「收入」两种口径渲染（由 statMonthCatMode 决定）。
         // 入参 recs 已是整档全量，此处按 statYear/statMonth + 收支类型过滤后按分类聚合。
@@ -837,7 +814,7 @@
             list.innerHTML=items.map((it,i)=>{
                 const pct=total>0 ? (it.val/total*100).toFixed(2) : '0.00';
                 const sign=isExp?'−':'+';
-                const cls=isExp?'neg':'pos';
+                const cls=isExp?'out':'pos';   // 1023-H：花出去的用正文色（和账单页一样），红色只留给「有问题」的
                 return `<div class="sc-item">
                     <div class="sc-top">
                         <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span><span class="sc-cat-name">${escapeHtml(it.name)}</span></span>
@@ -919,20 +896,11 @@
         window.addEventListener('scroll', ()=>{ if(JiwenBase.currentTab==='stats' && statAway()) syncStatTodayFab(); }, { passive:true });
         $('statTodayFab').addEventListener('click', ()=>{
             const now=new Date();
-            statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null; bgExpanded.clear();
+            setStatYM(now.getFullYear(), now.getMonth()); bgExpanded.clear();
             renderStatCalendar();
             window.scrollTo(0,0);
         });
 
-        // 统计页月份切换
-        $('statPrevM').addEventListener('click', ()=>{
-            statMonth--; if(statMonth<0){ statMonth=11; statYear--; }
-            statSelDay=null; renderStatCalendar();
-        });
-        $('statNextM').addEventListener('click', ()=>{
-            statMonth++; if(statMonth>11){ statMonth=0; statYear++; }
-            statSelDay=null; renderStatCalendar();
-        });
 
         // ===== 年月选择器（统计页）=====
         // 与日期选择器同构，只是没有「日」这一级：月网格 → 点标题 → 年网格。
@@ -982,7 +950,7 @@
                     if(now.getFullYear()===pickYear && now.getMonth()===m) b.classList.add('today');
                     if(has.has(m)) b.classList.add('has');   // 有数据的月份打点
                     b.onclick=()=>{
-                        statYear=pickYear; statMonth=m; statSelDay=null;
+                        setStatYM(pickYear, m);
                         mask.style.display='none'; renderStatCalendar();
                     };
                     grid.appendChild(b);
@@ -1049,7 +1017,7 @@
             $('ymCancel').addEventListener('click', ()=>{ mask.style.display='none'; });
             $('ymToCurrent').addEventListener('click', ()=>{
                 const now=new Date();
-                statYear=now.getFullYear(); statMonth=now.getMonth(); statSelDay=null;
+                setStatYM(now.getFullYear(), now.getMonth());
                 mask.style.display='none'; renderStatCalendar();
             });
         })();
@@ -1121,5 +1089,5 @@
                  + `<span class="${cls}-num${fut}">${c.n}</span>`
                  + `<span class="${cls}-unit">天</span>`;
         }
-        window.JiwenStats = { get bgSuggestOpen(){ return bgSuggestOpen; }, set bgSuggestOpen(v){ bgSuggestOpen=v; }, calcDay, dayNumHtml, fmtDayDate, openAiFlagList, renderStats, saveDays, setStatTab, sortedDays, get statMonth(){ return statMonth; }, set statMonth(v){ statMonth=v; }, get statMonthCatMode(){ return statMonthCatMode; }, get statSelDay(){ return statSelDay; }, set statSelDay(v){ statSelDay=v; }, get statTab(){ return statTab; }, get statYear(){ return statYear; }, set statYear(v){ statYear=v; } };   // stats 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenStats = { get bgSuggestOpen(){ return bgSuggestOpen; }, set bgSuggestOpen(v){ bgSuggestOpen=v; }, calcDay, dayNumHtml, fmtDayDate, openAiFlagList, renderStats, saveDays, setStatTab, setStatYM, sortedDays, stepMonth, statStripWake, get statMonth(){ return statMonth; }, set statMonth(v){ statMonth=v; }, get statMonthCatMode(){ return statMonthCatMode; }, get statSelDay(){ return statSelDay; }, set statSelDay(v){ statSelDay=v; }, get statTab(){ return statTab; }, get statYear(){ return statYear; }, set statYear(v){ statYear=v; } };   // stats 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();

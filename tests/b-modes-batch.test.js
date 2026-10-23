@@ -143,8 +143,8 @@ function bootSync(records, extra){
     ok(!c12.innerHTML.includes('NaN'), '不出现 NaN');
     ok(!t.$('statMonthCatList').textContent.includes('转账'), '饼图不含不计');
     c12.click();
-    ok(t.$('statFlowList').querySelector('.sf-io.skip'), '当日明细标出不计');
-    ok(t.$('statMonthOut').textContent==='−'+(14+[...Array(20).keys()].reduce((s,i)=>s+10+i,0)).toFixed(2), '当月支出不含不计：'+t.$('statMonthOut').textContent);
+    ok(t.$('uiSheetBody').querySelector('.io-skip'), '当日明细标出不计（1023-H 起是当日详情抽屉）'); t.w.JiwenSheet.close();
+    ok(t.$('statMonthOut').textContent===(14+[...Array(20).keys()].reduce((s,i)=>s+10+i,0)).toFixed(2), '当月支出不含不计：'+t.$('statMonthOut').textContent);
 }
 
 // ===== 6. AI 导出 =====

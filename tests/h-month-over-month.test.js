@@ -87,7 +87,7 @@ function bootSync(records, now){
 // ===== 6. 切到上个月看：用再上一个月比 =====
 {
   const t=await boot([ R('a','2026-10-02T10:00',1,'expense','餐饮'), R('b','2026-09-02T10:00',30,'expense','餐饮'), R('c','2026-08-02T10:00',60,'expense','餐饮') ]);
-  t.$('statPrevM').click();
+  t.w.JiwenStats.stepMonth(-1);   // 1023-H 起用月份浮条切
   ok(t.find('餐饮').delta==='较上月 ↓50%', '9 月对比 8 月：'+t.find('餐饮').delta);
 }
 

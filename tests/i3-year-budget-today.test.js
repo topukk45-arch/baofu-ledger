@@ -63,7 +63,7 @@ const B={'游戏':200,'餐饮':1200};
   ok(t.yrow().classList.contains('open'), '箭头转向');
   // 点 7 月：留在预算页签、切到 7 月、展开状态保留
   rs[1].click();
-  ok(t.$('bgMonthLabel').textContent==='2026年07月' && t.$('statPaneBudget').style.display==='', '点 7 月 → 预算页签切到 7 月');
+  ok(t.$('statMonthLabel').textContent==='2026年07月' && t.$('statPaneBudget').style.display==='', '点 7 月 → 预算页签切到 7 月');
   ok(t.mrows().length===5 && t.mrows()[1].classList.contains('cur'), '列表还开着，7 月高亮');
   // 年度数字不随查看月份变化
   ok(t.yrow().querySelector('.bgo-v').textContent==='4167 / 9800 · 43%', '翻到 7 月，年度进度不变');
@@ -102,16 +102,16 @@ const B={'游戏':200,'餐饮':1200};
   ok(!t.fab(), '记账页不显示');
   t.toStats();
   ok(!t.fab(), '统计页、本月：不显示');
-  t.$('statPrevM').click();
+  t.w.JiwenStats.stepMonth(-1);
   ok(t.fab() && t.$('statTodayFab').textContent==='✕' && t.$('statTodayFab').className.includes('clear-filter-fab'), '翻到上月：出现，与筛选 ✕ 同款');
   t.$('statTodayFab').click();
   ok(t.$('statMonthLabel').textContent==='2026年10月' && !t.fab(), '点了回到本月并隐藏');
   // 预算页签同样生效
   t.$('statTabSeg').querySelector('[data-v="budget"]').click();
-  t.$('bgPrevM').click(); t.$('bgPrevM').click();
-  ok(t.fab() && t.$('bgMonthLabel').textContent==='2026年08月', '预算页签翻月也出现');
+  t.w.JiwenStats.stepMonth(-1); t.w.JiwenStats.stepMonth(-1);
+  ok(t.fab() && t.$('statMonthLabel').textContent==='2026年08月', '预算页签翻月也出现');
   t.$('statTodayFab').click();
-  ok(t.$('bgMonthLabel').textContent==='2026年10月' && t.$('statPaneBudget').style.display==='' && !t.fab(), '预算页签里回到本月，仍在预算页签');
+  ok(t.$('statMonthLabel').textContent==='2026年10月' && t.$('statPaneBudget').style.display==='' && !t.fab(), '预算页签里回到本月，仍在预算页签');
   // 月度列表点月份也触发
   t.yrow().click(); t.mrows()[0].click();
   ok(t.fab(), '从年度列表跳到 6 月：出现');
@@ -131,7 +131,7 @@ const B={'游戏':200,'餐饮':1200};
 (async()=>{
   const sleep=ms=>new Promise(r=>setTimeout(r,ms));
   const t=await boot({ records:recs, budgets:B });
-  t.toStats(); t.$('statPrevM').click();
+  t.toStats(); t.w.JiwenStats.stepMonth(-1);
   ok(t.fab(), '翻月后立即出现');
   await sleep(800);
   ok(t.fab(), '0.8 秒时还在（来得及点）');
@@ -141,7 +141,7 @@ const B={'游戏':200,'餐饮':1200};
   ok(t.fab(), '滑动再出现');
   await sleep(1700);
   ok(!t.fab(), '停下又淡出');
-  t.$('statNextM').click();             // 回到本月：滑动也不出现
+  t.w.JiwenStats.stepMonth(1);             // 回到本月：滑动也不出现
   t.w.dispatchEvent(new t.w.Event('scroll'));
   ok(!t.fab(), '在本月时滑动不出现');
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click(); t.w.dispatchEvent(new t.w.Event('scroll'));

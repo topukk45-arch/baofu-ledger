@@ -72,8 +72,8 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
   const t3=await boot(null,{'游戏':150}); t3.stats(); t3.$('statTabSeg').querySelector('[data-v="budget"]').click();
   const r3=t3.$('bgGroups').querySelector('.bg-row');
   ok(r3.querySelector('.bg-fill').classList.contains('over') && r3.querySelector('.bg-foot .over').textContent==='超出 8.87', '超支：红色、写明超出多少');
-  t.$('bgPrevM').click();
-  ok(t.$('bgMonthLabel').textContent==='2026年09月' && !t.$('bgGroups').querySelector('.bg-mark'), '看上个月：无竖线');
+  t.w.JiwenStats.stepMonth(-1);   // 1023-H 起用月份浮条切（标题右边写年月）
+  ok(t.$('statMonthLabel').textContent==='2026年09月' && !t.$('bgGroups').querySelector('.bg-mark'), '看上个月：无竖线');
   ok(t.$('bgGroups').querySelector('.bg-num').textContent==='300.00 / 200.00', '9 月按 9 月的记录算');
 }
 

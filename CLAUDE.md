@@ -93,6 +93,13 @@
     - 待确认分类：账单页顶上的胶囊「待确认分类 N 条 ›」（`ledger.js` 画、`search.js` 委托绑定）点了直接打开结果页、条件只有「待确认分类」、不拉抽屉。
     - 返回键：先收抽屉，再收结果页（`back.js` 层级表在日子页前面一层）。换页签时结果页收起；改了记录（`refreshAllViews`）结果跟着变；换账号 / 存档 `resetSearch()` 清掉条件、`JiwenLedger.resetYM()` 回到这个月。首屏快照：搜一笔开着时不存（`window.__filterActive` 现在 = 结果页开着）。
     - 测试 `tests/zZzZz9-search-1023g.test.js`；`f-filter-sheet` 第 1 段整个改成搜一笔（没有草稿、改一下就生效）。
+  - 统计页（1023-H，`stats.js`；1010-I3 的翻月 ‹ ›、预算那栏自己的翻月、1017-L / 1023-A 里「当日明细」`statFlowList`、总结余点了弹提示框都过时了）：
+    - 月份：标题右边写「2026年10月」（`#statMonthLabel`，按钮，点了照旧年月选择），‹ › 去掉了；底栏上面一条和账单页同一个月份浮条（`#stStrip`，`JiwenMonthStrip`，1.5 秒规则、松手才切；超过月预算的那个月柱子标红：设了预算的分类里计入的支出加起来 > 这些预算加起来，`over`）；收支、预算两栏共用。统计页和账单页看同一个月：月份记在账单页那边（`JiwenLedger.curYM()`），统计页切月份 `setStatYM()` 推过去（`setYM(ym, { quiet:true })`，不重画账单页），账单页那边改过（`ymVersion()` 变了）统计页画之前 `syncFromLedger()` 跟上；账单页细条「统计 ›」进统计页同一个月。代码里翻月 `JiwenStats.stepMonth(±1)`；右下角「回到本月」✕ 照旧（在浮条上面）。
+    - 两格（`.st-cells`）：「当月支出 · N 笔」（`#statOutK`）+ 大字支出（`#statMonthOut`，不带 −、正文色）+ 「比 9月 多花 / 少花 x」（`#statOutCmp`，上个月没支出写「9月 没有支出」）｜ 当月收入（`#statMonthIn`，带 +、绿色）+「本月净剩 ±x」（`#statNet`）。
+    - 总结余（`#statBal`）：点「总结余」那一行或「怎么算出来的 ›」就地展开（`#statBalRows`：期初余额、累计收入、累计支出、往来，加一句为什么不等于收入减支出），再点收起；期初余额 = 记成往来、备注是「期初余额」的那几笔（还要确认）。
+    - 日历（`.st-cal8`，一行 8 格）：每行右边一格周合计（`button.wk-sum`，`data-mon` 那周的周一，这一行在这个月里的几天的净额、往来 / 不计不算，没有写「—」，过万写「1.2万」；本周那格 `.cur` 深一点；今天是周一时本周那格空着），点了 `openWeek()` 一周详情；有账的日子点了 `openDay()` 当日详情（和账单页同一个抽屉），原来日历下面的当日分析 / 当日明细去掉了。日子格里花出去的金额用正文色（`.da.out`），进账绿色。
+    - 预算明细：一笔两行（`rowHtml(…, { date:true })`，「分类 · 10月9日 14:15」），点一笔开单笔详情；「改预算」在说明那一行。饼图、较上月、分类汇总不变（分类汇总里支出的金额也用正文色）。
+    - 测试 `tests/zZzZzA-stats-1023h.test.js`；老测试里点 `statPrevM` / `bgPrevM` 的改成 `JiwenStats.stepMonth(-1)`、读 `bgMonthLabel` 的改读 `statMonthLabel`、读 `statFlowList` 的改读当日详情（`#uiSheetBody`）、`statMonthOut` 不带 −（g-budget、g-budget-tab、h-month-over-month、i3-year-budget-today、b-modes-batch、c-flow-confirm、j-refund、z9-import-stats-banner、zZy-ai-flag、zZzZz5）；导入标准答案 overall / cats / stats / day 四项变了（只是显示），记录一条不少。
   - 测试：`tests/zZr2-ledger-pager.test.js`（整个改写成按月显示）、`zZzZz5`（总览 → 细条 / 浮条 / 统计页总结余）；`regress.js`、`zz-import-golden` 按月份浮条上的每个月读列表（导入标准答案只有 overall / pages 两项变了，记录一条不少）；`audit.js` 第 11 段加了月份浮条截图和一条几何检查（浮条离操作栏 ≥ 8px、细条 / 周小计 / 日卡片抬头里的字不出框）。
 - 账单页改版（1023-A，用户点名要改的，不受「界面冻住」限制；以这条为准，下面 1017-M、1019-H 里说账单页上面一排页码、分类汇总在账单页的地方都过时了）：
   - 总览（`ledger.js` 的 `renderOverview()`）：顶上一行「‹ 10月 ›」切月份（`ovYM`，null = 这个月；最早到有记录的最早一个月、最晚到这个月，切月份只动总览、不动列表；清筛选 ✕、换账号 / 存档回到这个月）+ 右边这个月收入；主数字是这个月支出（`.ov-out`，不带正负号，和统计页同一口径 `statContrib`），旁边小字「这个月 N 条」；最下面一整行按钮「结余（全部记录，含期初余额）x ›」（`#ovBal`），点了拆开写累计收入、累计支出、往来、结余，说明为什么结余不等于收入减支出。`.ov-in` / `.ov-out` / `.ov-net` 这三个类名照旧。总览不在这个月时不存首屏快照（`JiwenLedger.ovOff()`，`snapBootState` 看它）。

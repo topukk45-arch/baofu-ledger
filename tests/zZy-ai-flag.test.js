@@ -44,13 +44,13 @@ const RECS = [
   ok(!('aiFlag' in r1) && r1.remark === '虚构午饭' && r1.cat === '吃饭', '3 去掉标记：只去掉标记，别的不动');
   ok(!$('detailAiField') && $('detailMask').style.display === 'flex', '3 详情里那一行没了');
   $('detailMask').style.display = 'none';
-  $('statNextM').click(); $('statPrevM').click(); await settle();
+  t.w.JiwenStats.stepMonth(1); t.w.JiwenStats.stepMonth(-1); await settle();
   ok(banner() && /有 1 条 AI 标记待看/.test(banner().textContent), '3 横幅变成 1 条');
-  $('statPrevM').click(); await settle();
+  t.w.JiwenStats.stepMonth(-1); await settle();
   ok(banner() && /有 1 条 AI 标记待看/.test(banner().textContent), '3 9 月那条：9 月的横幅里');
   // ===== 4. 开发开关关着：横幅不显示，详情照样显示 =====
   t.w.localStorage.removeItem('app_dev_import');
-  $('statNextM').click(); await settle();
+  t.w.JiwenStats.stepMonth(1); await settle();
   ok(!banner(), '4 开发开关关着：横幅不显示');
   t.w.JiwenDetail.openDetail('r3');
   ok($('detailAiFlag'), '4 详情照样显示（标记在记录上）');
