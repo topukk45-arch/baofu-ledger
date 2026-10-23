@@ -306,32 +306,63 @@
         // ===== 1023-D：一周详情（账单页点周小计；统计页 1023-H 也用它）=====
         //   支出（比上一周多 / 少）、记了几笔（日均按过去了的天数算）、周一到周日 7 根柱子（今天深色、没到的日子虚线框）、
         //   每天一行（点了进当日详情，关了回到这里；没记的写「没记 · 补一笔」）；底部「关闭」
+        // 1023-L：一周详情顶上 7 根大柱子带每天的金额，点一根换成那一天的当日详情（关了回到这一周）；
+        //   左右滑（或点顶上的 ‹ ›）看上一周 / 下一周，就在这个面板里换，不关不开；最晚到本周
         function openWeek(mon, opt){
             if(!window.JiwenSheet || !/^\d{4}-\d{2}-\d{2}$/.test(mon||'')) return;
             const C=cal; mon=C.monOf(mon);
-            const sun=C.addDay(mon, 6), today=C.todayKey();
-            const list=recsOfDays(mon, sun), s=sumFen(list), prev=recsOfDays(C.addDay(mon, -7), C.addDay(mon, -1)), ps=sumFen(prev);
-            const days=[]; for(let i=0;i<7;i++){ const k=C.addDay(mon, i), rs=list.filter(r=>(r.time||'').slice(0,10)===k); days.push({ k, rs, exp:sumFen(rs).exp, future:k>today }); }
-            const passed=days.filter(d=>!d.future).length;
-            const back=opt && opt.onClose, reopen=()=>openWeek(mon, opt);
-            window.JiwenSheet.open({ title:`${C.weekName(mon)} · ${C.rangeText(mon, sun)}`, tall:true, onDismiss:back,
+            const back=opt && opt.onClose;
+            const today=C.todayKey(), thisMon=C.monOf(today);
+            let bodyBox=null;
+            function render(){
+                const sun=C.addDay(mon, 6);
+                const list=recsOfDays(mon, sun), s=sumFen(list), prev=recsOfDays(C.addDay(mon, -7), C.addDay(mon, -1)), ps=sumFen(prev);
+                const days=[]; for(let i=0;i<7;i++){ const k=C.addDay(mon, i), rs=list.filter(r=>(r.time||'').slice(0,10)===k); days.push({ k, rs, exp:sumFen(rs).exp, future:k>today }); }
+                const passed=days.filter(d=>!d.future).length;
+                const t=document.getElementById('uiSheetTitle'); if(t) t.textContent=`${C.weekLabel(mon)} · ${C.rangeText(mon, sun)}`;
+                const canNext = mon<thisMon;
+                let h=`<div class="dw-nav"><button type="button" class="dw-prev" id="weekPrev" aria-label="上一周">‹</button>`
+                    + `<span class="dw-nav-t">左右滑动看上一周、下一周</span>`
+                    + `<button type="button" class="dw-next" id="weekNext" aria-label="下一周"${canNext ? '' : ' disabled'}>›</button></div>`;
+                h+=`<div class="dd-cells">`
+                    + cellHtml('支出', s.exp.toFixed(2), prev.length ? moreLess(round2(s.exp-ps.exp), '上一周') : '上一周没有记录可比')
+                    + cellHtml('记了', `${list.length} <small>笔</small>`, passed ? `日均 ${(s.exp/passed).toFixed(2)}（${passed} 天）` : '')
+                    + `</div>`;
+                const mx=Math.max(1, ...days.map(d=>d.exp));
+                h+=`<div class="dw-chart"><div class="dw-bars">` + days.map(d=>d.future
+                        ? `<div class="dw-bar future"><span class="dw-v"></span><i class="dw-fdot"></i></div>`
+                        : `<button type="button" class="dw-bar${d.k===today ? ' today' : ''}" data-day="${d.k}" aria-label="${C.mdText(d.k)} 支出 ${d.exp.toFixed(2)}"><span class="dw-v">${Math.round(d.exp)}</span><i style="height:${Math.max(4, Math.round(d.exp/mx*96))}px"></i></button>`).join('')
+                    + `</div><div class="dw-labs">` + days.map(d=>`<span${d.k===today ? ' class="today"' : ''}>${C.wdText(d.k).slice(1)}</span>`).join('') + `</div>`
+                    + `<span class="dw-hint">点某一根，换成那一天的明细</span></div>`;
+                h+=`<div class="lg-dc dw-days">` + days.filter(d=>!d.future).reverse().map(d=>d.rs.length
+                    ? `<button type="button" class="dw-day" data-day="${d.k}"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">${d.rs.length} 笔</span><span class="dw-day-v">${d.exp.toFixed(2)}</span>${CHEV}</button>`
+                    : `<div class="dw-day dw-day-none"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">没记</span><button type="button" class="lg-gap-btn" data-add="${d.k}">补一笔</button></div>`).join('') + `</div>`;
+                bodyBox.innerHTML=h;
+            }
+            function go(d){
+                const m=C.addDay(mon, 7*d);
+                if(m>thisMon) return;
+                mon=m; render();
+            }
+            window.JiwenSheet.open({ title:`${C.weekLabel(mon)} · ${C.rangeText(mon, C.addDay(mon, 6))}`, tall:true, onDismiss:back,
                 body(box, done){
                     box.classList.add('dd-body');
-                    let h=`<div class="dd-cells">`
-                        + cellHtml('支出', s.exp.toFixed(2), prev.length ? moreLess(round2(s.exp-ps.exp), '上一周') : '上一周没有记录可比')
-                        + cellHtml('记了', `${list.length} <small>笔</small>`, passed ? `日均 ${(s.exp/passed).toFixed(2)}（${passed} 天）` : '')
-                        + `</div>`;
-                    const mx=Math.max(1, ...days.map(d=>d.exp));
-                    h+=`<div class="dw-chart"><div class="dw-bars">` + days.map(d=>`<div class="dw-bar${d.k===today ? ' today' : ''}${d.future ? ' future' : ''}"><span class="dw-v">${d.future ? '' : Math.round(d.exp)}</span><i style="height:${d.future ? 6 : Math.max(4, Math.round(d.exp/mx*60))}px"></i></div>`).join('')
-                        + `</div><div class="dw-labs">` + days.map(d=>`<span${d.k===today ? ' class="today"' : ''}>${C.wdText(d.k).slice(1)}</span>`).join('') + `</div></div>`;
-                    h+=`<div class="lg-dc dw-days">` + days.filter(d=>!d.future).reverse().map(d=>d.rs.length
-                        ? `<button type="button" class="dw-day" data-day="${d.k}"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">${d.rs.length} 笔</span><span class="dw-day-v">${d.exp.toFixed(2)}</span>${CHEV}</button>`
-                        : `<div class="dw-day dw-day-none"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">没记</span><button type="button" class="lg-gap-btn" data-add="${d.k}">补一笔</button></div>`).join('') + `</div>`;
-                    box.innerHTML=h;
+                    bodyBox=box; render();
                     box.addEventListener('click', e=>{
+                        if(e.target.closest('#weekPrev')){ go(-1); return; }
+                        if(e.target.closest('#weekNext')){ go(1); return; }
                         const add=e.target.closest('[data-add]'); if(add){ done(); openAddModal({ day:add.dataset.add }); return; }
-                        const d=e.target.closest('.dw-day[data-day]'); if(d){ done(); openDay(d.dataset.day, { onClose:reopen }); }
+                        const d=e.target.closest('[data-day]'); if(d){ const m=mon; done(); openDay(d.dataset.day, { onClose:()=>openWeek(m, opt) }); }
                     });
+                    // 左右滑：横着挪了 50px 以上、而且比竖着挪得多，就换一周（往右滑看上一周，往左滑看下一周）
+                    let sx=null, sy=0;
+                    box.addEventListener('pointerdown', e=>{ sx=e.clientX; sy=e.clientY; }, { passive:true });
+                    box.addEventListener('pointerup', e=>{
+                        if(sx==null) return;
+                        const dx=e.clientX-sx, dy=e.clientY-sy; sx=null;
+                        if(Math.abs(dx)>=50 && Math.abs(dx)>Math.abs(dy)*1.5){ e.preventDefault(); go(dx>0 ? -1 : 1); box.__swiped=Date.now(); }
+                    });
+                    box.addEventListener('click', e=>{ if(box.__swiped && Date.now()-box.__swiped<400){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // 滑完那一下不算点
                 },
                 foot(box, done){ const c=btn('weekClose', '关闭', 'block'); c.addEventListener('click', ()=>{ done(); if(back) back(); }); box.appendChild(c); } });
         }

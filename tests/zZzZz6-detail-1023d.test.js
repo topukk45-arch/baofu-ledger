@@ -106,7 +106,7 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');   // 一块�
   $('dayClose').click(); await tick();
   ok(!sheet(), '4 关闭');
   w.JiwenDetail.openWeek('2026-10-12'); await tick();
-  ok(sheet().title === '上周 · 10月12日–18日' && sp(sheet().body.querySelector('.dd-cell')) === '支出 50.00 上一周没有记录可比', '4 上一周没有记录：写「没有记录可比」');
+  ok(sheet().title === '第 42 周 · 10月12日–18日' && sp(sheet().body.querySelector('.dd-cell')) === '支出 50.00 上一周没有记录可比', '4 上一周没有记录：写「没有记录可比」');
   $('weekClose').click(); await tick();
 
   ok(!t.errs.length, '没有报错 ' + t.errs.join('|'));

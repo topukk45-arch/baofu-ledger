@@ -1909,12 +1909,20 @@
         .dd-rows .bl-row:first-child { border-top:none; }
         .dd-empty { padding:24px 0; text-align:center; color:var(--c-text-soft); font-size:14px; }
         .dw-chart { display:flex; flex-direction:column; gap:6px; padding:12px 14px 10px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
-        .dw-bars { height:84px; display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; align-items:end; }
+        /* 1023-L：大柱子（能点，点了换成那一天），每根上面写那天的金额；顶上一行 ‹ 左右滑动看上一周、下一周 › */
+        .dw-nav { display:flex; align-items:center; gap:4px; margin:-4px 0 2px; }
+        .dw-nav button { flex:none; width:48px; height:44px; border:none; border-radius:12px; background:transparent; font-size:24px; line-height:1; color:var(--c-text-soft); font-family:inherit; cursor:pointer; }
+        .dw-nav button[disabled] { opacity:.3; cursor:default; }
+        .dw-nav-t { flex:1 1 auto; text-align:center; font-size:12px; color:var(--c-text-soft); }
+        .dw-hint { font-size:12px; color:var(--c-text-soft); text-align:center; }
+        .dw-bars { height:124px; display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; align-items:end; touch-action:pan-y; }
         .dw-bar { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; height:100%; min-width:0; }
-        .dw-v { font-size:10px; color:var(--c-text-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
+        button.dw-bar { border:none; background:transparent; padding:0; margin:0; font-family:inherit; cursor:pointer; border-radius:8px; }
+        button.dw-bar.pressed { background:var(--c-chip); }
+        .dw-bar .dw-fdot { width:8px; height:8px; border-radius:50%; background:var(--c-border-mid); border:none; }
+        .dw-v { font-size:11px; font-weight:bold; color:var(--c-text); white-space:nowrap; font-variant-numeric:tabular-nums; }
         .dw-bar i { display:block; width:100%; border-radius:4px 4px 0 0; background:color-mix(in srgb, var(--c-primary) 40%, var(--c-surface)); }
         .dw-bar.today i { background:var(--c-primary-dark); }
-        .dw-bar.future i { background:transparent; border:1px dashed var(--c-border-mid); border-bottom:0; }
         .dw-labs { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; text-align:center; font-size:12px; color:var(--c-text-soft); }
         .dw-labs .today { color:var(--c-text); font-weight:bold; }
         .dw-days.lg-dc { margin-top:0; content-visibility:visible; }
