@@ -562,6 +562,7 @@
   function start(files) {
     var my = ++runId;
     S.fileCount = files.length;
+    if (!S.t0) S.t0 = Date.now();      // 导入简化第 1 版：从选好文件算起（量度里「用了几分钟」）
     S.phase = 'progress';
     progress('读文件…', 0, 1);
     var alive = function () { return my === runId && S; };
@@ -2599,10 +2600,37 @@
     var ws;
     try {
       ws = window.JiwenImportWrite.build({ parsed: S.parsed, matched: S.matched, info: S.info, manualById: S.manualById }, p,
-                                         { batch: batch, at: at, cpCats: S.edits.cpCats, types: S.types, statuses: S.statuses, ruleFix: S.edits.ruleFix });
+                                         { batch: batch, at: at, cpCats: S.edits.cpCats, types: S.types, statuses: S.statuses, ruleFix: S.edits.ruleFix, m: measureNow(p) });
       if (onlyKeys) ws = window.JiwenImportWrite.onlyKeys(ws, onlyKeys, S.info);   // 1016-Q：只对账，只写勾选的几笔
     } catch (e) { alertMsg('整理要写的内容时出错了，什么都没写：' + (e && e.message || e)); return; }
     askImport(ws, p);     // 1017-UI2：先弹确认面板（写明这次会对账本做什么），再点一次「确认导入」才写
+  }
+  // 导入简化第 1 版：导入量度（只有数字，存进导入记录的 m）。要你定的几件按 stepItems 算，chg = 你改了推荐；
+  //   第 2a 版之前只有分步确认，都记成「逐项看看」（path 'step'）
+  function itemChanged(x) {
+    var E = S.edits, i = x.id.indexOf(':'), kind = i < 0 ? x.id : x.id.slice(0, i), k = i < 0 ? '' : x.id.slice(i + 1);
+    if (kind === 'sum') return E.sums[k] !== undefined;
+    if (kind === 'nc') return k in E.newCats;
+    if (kind === 'cp') return k in E.cpCats;
+    if (kind === 'ty') return !!S.types[k];
+    if (kind === 'st') return !!S.statuses[k];
+    if (kind === 'near' && E.nearPay) return true;
+    return (x.keys || []).some(function (rk) { var e = E.rows[rk]; return !!e && Object.keys(e).length > 0; });
+  }
+  function measureNow(p) {
+    if (!Plan.measure) return null;
+    try {
+      var its = stepItems(p), items = {};
+      Object.keys(its).forEach(function (st) { items[st] = its[st].map(function (x) { return { id: x.id, keys: x.keys, chg: itemChanged(x) }; }); });
+      var total = S.parsed.files.reduce(function (s0, f) { return s0 + (f.fatal ? 0 : f.stats.parsed.total); }, 0);
+      return Plan.measure(p, items, { total: total, ms: S.t0 ? Date.now() - S.t0 : 0, path: 'step' });
+    } catch (_) { return null; }     // 量度出错不挡导入
+  }
+  // 「893 笔，自动定了 812，要你看 81（分类 60、手记 12、退款 6、金额 3）」（主页面「导入量度」那页有一份一样的，import-entry.js 的 measureLine）
+  function measureLine(m) {
+    if (!m || !m.why) return '';
+    var parts = [['cat', '分类'], ['match', '手记'], ['refund', '退款'], ['amount', '金额'], ['type', '类型']].filter(function (x) { return m.why[x[0]]; }).map(function (x) { return x[1] + ' ' + m.why[x[0]]; });
+    return m.n + ' 笔，自动定了 ' + m.auto + '，要你看 ' + m.look + (parts.length ? '（' + parts.join('、') + '）' : '');
   }
   // 1017-UI2：导入确认面板：数字都从写入清单里数（和真正写进去的一样）；没有的项不显示
   function confirmLines(ws, p) {
@@ -2861,7 +2889,7 @@
         if (l.kind === 'ai') { viewSheet('这一次 AI 修改', [['修改时间', String(l.at || '').replace('T', ' ')], ['改的是', ofL ? String(ofL.at || '').replace('T', ' ') + ' 那次导入的记录' : '那次导入已经不在记录里了'], ['改了', nChg + ' 条记录（' + aiWhat() + '）'], ['编号', l.b]], 'impLogDetailClose'); return; }
         var ra = l.rulesAdded || {}, rn = ['cat', 'map', 'type'].reduce(function (n, k) { return n + ((ra[k] || []).length); }, 0);
         viewSheet('这一次导入', [['导入时间', String(l.at || '').replace('T', ' ')], ['来源', appNames(l.apps) + (l.only ? '（只对账）' : '')], ['账单', String(l.from || '').slice(0, 10) + ' 至 ' + String(l.to || '').slice(0, 10)],
-          ['新建', (l.add || []).length + ' 条'], ['改了以前的记录', (l.chg || []).length ? (l.chg || []).length + ' 条' : ''], ['待处理', nb[l.b] ? nb[l.b] + ' 笔' : ''], ['存了规则', rn ? rn + ' 条' : ''],
+          ['笔数', measureLine(l.m)], ['新建', (l.add || []).length + ' 条'], ['改了以前的记录', (l.chg || []).length ? (l.chg || []).length + ' 条' : ''], ['待处理', nb[l.b] ? nb[l.b] + ' 笔' : ''], ['存了规则', rn ? rn + ' 条' : ''],
           ['改了规则', (l.rulesChanged || []).length ? (l.rulesChanged || []).length + ' 条' : ''], ['编号', l.b]], 'impLogDetailClose');
       });
       var u = btn('撤销', 'imp-btn imp-log-undo', function () { undoBatch(l.b); }); u.style.minWidth = '64px';

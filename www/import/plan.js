@@ -624,6 +624,55 @@
     return out;
   }
 
+  // 导入简化第 1 版：导入量度（只有数字，不带对方名、金额）。p 是方案；items 是确认页「要你定」的几件
+  //   （{ 步骤: [{ id, keys, chg }] }，chg = 你改了推荐），o = { total 总笔数, ms 从选文件到点导入的毫秒, path 'quick' | 'step' }。
+  //   要人看的笔数按原因分（一笔只算一次，按 和手记对不上 → 退款没原单 → 金额提醒 → 没见过的类型 → 分类拿不准 的先后）；
+  //   分类是哪一层给的只数这次新建的记录（新增组）。→ { v, n, auto, look, why, chg, layer, min, path }
+  var M_WHY = ['match', 'refund', 'amount', 'type', 'cat'];
+  var M_LAYER = ['rule', 'learned', 'history', 'borrow', 'builtin', 'alipay', 'none'];
+  function measure(p, items, o) {
+    o = o || {}; items = items || {};
+    var byKey = {}, why = {}, chg = {}, layer = {}, keysBy = {};
+    M_WHY.forEach(function (w) { why[w] = 0; chg[w] = 0; keysBy[w] = []; });
+    M_LAYER.forEach(function (l) { layer[l] = 0; });
+    var rows = (p && p.rows) || [], units = function (d) { return Number.isInteger(d.units) && d.units > 0 ? d.units : 1; };
+    rows.forEach(function (d) { if (d.src === 'row') byKey[d.key] = d; });
+    var reasonOf = function (step, id) {
+      var i = id.indexOf(':'), kind = i < 0 ? id : id.slice(0, i);
+      if (step === 'match') return 'match';
+      if (step === 'refund') return kind === 'ps' ? 'refund' : null;     // 转账往来、全额退款提醒、收款、零碎扣款不算「要人看」
+      if (step === 'amount') return 'amount';
+      if (step === 'cat') return kind === 'ty' || kind === 'st' ? 'type' : 'cat';
+      return null;
+    };
+    Object.keys(items).forEach(function (step) {
+      (items[step] || []).forEach(function (x) {
+        var w = x && typeof x.id === 'string' ? reasonOf(step, x.id) : null; if (!w) return;
+        (x.keys || []).forEach(function (k) { keysBy[w].push(k); });
+        if (x.chg) chg[w]++;
+      });
+    });
+    rows.forEach(function (d) {
+      if (d.src !== 'row') return;
+      if ((d.tags || []).some(function (t) { return t === 'otherType' || t === 'otherStatus'; })) keysBy.type.push(d.key);
+      var r = d.rec || (d.item && d.item.rec);
+      if (d.group === 'add' && d.mode !== 'skip' && (!r || r.layer === 'none' || r.conf === 'low' || r.cat === '未分类')) keysBy.cat.push(d.key);
+    });
+    ((p && p.sections && p.sections.cpSingles) || []).forEach(function (s) { (s.keys || []).forEach(function (k) { keysBy.cat.push(k); }); });
+    var seen = {}, look = 0;
+    M_WHY.forEach(function (w) {
+      keysBy[w].forEach(function (k) { var d = byKey[k]; if (!d || seen[k]) return; seen[k] = 1; why[w] += units(d); look += units(d); });
+    });
+    rows.forEach(function (d) {
+      if (d.src !== 'row' || d.group !== 'add') return;
+      var r = d.rec || (d.item && d.item.rec), l = r && M_LAYER.indexOf(r.layer) >= 0 ? r.layer : 'none';
+      layer[l] += units(d);
+    });
+    var n = Number.isInteger(o.total) && o.total >= 0 ? o.total : rows.reduce(function (s0, d) { return s0 + (d.src === 'row' ? units(d) : 0); }, 0);
+    var ms = Number(o.ms), min = isFinite(ms) && ms > 0 ? Math.round(ms / 6000) / 10 : 0;
+    return { v: 1, n: n, auto: Math.max(0, n - look), look: look, why: why, chg: chg, layer: layer, min: min, path: o.path === 'quick' ? 'quick' : 'step' };
+  }
+
   function devText(p) {
     var out = ['记问 · 账单导入 · 认不出来的情况（' + VERSION + '）'];
     p.files.forEach(function (f, i) {
@@ -636,6 +685,6 @@
     return out.join('\n');
   }
 
-  return { VERSION: VERSION, isAliRefundDesc: isAliRefundDesc, AMOUNT: AMOUNT, patternHint: patternHint, plan: plan, devText: devText, missed: missed, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
+  return { VERSION: VERSION, isAliRefundDesc: isAliRefundDesc, AMOUNT: AMOUNT, patternHint: patternHint, plan: plan, devText: devText, missed: missed, measure: measure, M_WHY: M_WHY, M_LAYER: M_LAYER, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
            GROUPS: GROUPS, GROUP_NAME: GROUP_NAME };
 });

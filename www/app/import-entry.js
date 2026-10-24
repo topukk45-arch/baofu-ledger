@@ -7,7 +7,7 @@
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devPerfBtn').style.display = $('devSplashBtn').style.display = $('devNudgeBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()){ splashWaitPaint(); nudgePaint(); } }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devPerfBtn').style.display = $('devMeasureBtn').style.display = $('devSplashBtn').style.display = $('devNudgeBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()){ splashWaitPaint(); nudgePaint(); } }
         // 1019-X：开发开关里的「启动画面等首屏」（默认开）：真正的开关存在原生层（SharedPreferences，打开 App 时原生那边一开始就要知道），
         //   这里只是读 / 写它；关掉 = 回到 1019-U 之前「系统画出第一帧就收启动画面」，下次打开 App 生效。不在手机上时记在 localStorage 里只为显示
         function splashPlugin(){ const c=window.Capacitor; return c && c.Plugins && c.Plugins.Launch && typeof c.Plugins.Launch.setWait==='function' ? c.Plugins.Launch : null; }
@@ -246,5 +246,46 @@
         }
         $('closeCat').addEventListener('click', ()=>{ $('catMask').style.display='none'; });
         window.openDevImportCheck = openDevImportCheck;   // 老入口：原来是顶层的，自己就在 window 上，搬进来以后照旧挂上
+        // 导入简化第 1 版：开发开关里的「导入量度（开发中）」：最近几次导入的量度（导入记录里的 m，只有数字），一键复制发给开发者。
+        //   「导入后改了分类」不存，打开时按导入记录里的指纹现算（JiwenImportStore.measureList）
+        const MEASURE_N=10;
+        // 「893 笔，自动定了 812，要你看 81（分类 60、手记 12、退款 6、金额 3）」（导入页导入记录详情里有一份一样的，import/ui.js 的 measureLine）
+        function measureLine(m){
+            const parts=[['cat','分类'],['match','手记'],['refund','退款'],['amount','金额'],['type','类型']].filter(x=>m.why && m.why[x[0]]).map(x=>x[1]+' '+m.why[x[0]]);
+            return `${m.n} 笔，自动定了 ${m.auto}，要你看 ${m.look}`+(parts.length ? '（'+parts.join('、')+'）' : '');
+        }
+        function measureText(x){
+            const APPN={ wechat:'微信', alipay:'支付宝' }, m=x.m;
+            const head=String(x.at||'').replace('T', ' ').slice(5)+' · '+(x.apps.map(a=>APPN[a]||a).join('+')||'—')+(x.only ? '（只对账）' : '')+' · '+x.from.slice(5)+' 至 '+x.to.slice(5);
+            const L=[head];
+            if(!m) L.push('  这次没有量度（1024-B 之前导入的）');
+            else {
+                L.push('  '+measureLine(m));
+                L.push('  走的是「'+(m.path==='quick' ? '导入' : '逐项看看')+'」，从选文件到点导入 '+m.min+' 分钟');
+                const cg=[['cat','分类'],['match','手记'],['refund','退款'],['amount','金额'],['type','类型']].filter(k=>m.chg && m.chg[k[0]]).map(k=>k[1]+' '+m.chg[k[0]]);
+                L.push('  改了推荐：'+(cg.length ? cg.join('、') : '没改'));
+                const LY=[['rule','你的规则'],['learned','合并里学'],['history','账本历史'],['borrow','两家互借'],['builtin','词表'],['alipay','支付宝分类'],['none','没推出']];
+                L.push('  分类来自：'+LY.map(k=>k[1]+' '+((m.layer && m.layer[k[0]])||0)).join('、'));
+            }
+            L.push('  导入后改了分类 '+x.catChg+' 笔，改了别的 '+x.otherChg+' 笔，删了 '+x.gone+' 笔'+(x.days===null ? '' : '（导入 '+x.days+' 天了）'));
+            return L.join('\n');
+        }
+        async function openMeasurePage(){
+            const S=window.JiwenImportStore;
+            let list=[];
+            try{ list=S && S.measureList ? await S.measureList(MEASURE_N) : []; }catch(e){ customAlert('读导入记录出错了：'+(e && e.message || e)); return; }
+            const text=['记问导入量度（只有数字）'].concat(list.map(measureText)).join('\n');
+            window.JiwenSheet.open({ title:'导入量度（开发中）', sub:list.length ? `最近 ${list.length} 次导入，新的在上（只有数字，不带对方名和金额）` : '还没有导入过：导入一次账单，这里就有了。',
+                body(box){ const pre=document.createElement('pre'); pre.id='measureList'; pre.className='perf-list'; pre.textContent=list.map(measureText).join('\n\n'); box.appendChild(pre); },
+                foot(box, done){
+                    const st=document.createElement('div'); st.className='ui-stack';
+                    const cp=document.createElement('button'); cp.type='button'; cp.className='ui-btn primary block'; cp.id='measureCopy'; cp.textContent='复制全部';
+                    cp.addEventListener('click', ()=>{ const ok=()=>{ cp.textContent='已复制'; }; try{ navigator.clipboard.writeText(text).then(ok, ()=>{ window.prompt && window.prompt('复制下面的文字', text); }); }catch(_){ } });
+                    const x=document.createElement('button'); x.type='button'; x.className='ui-btn block'; x.id='measureClose'; x.textContent='关闭';
+                    x.addEventListener('click', ()=>done());
+                    st.appendChild(cp); st.appendChild(x); box.appendChild(st);
+                } });
+        }
+        $('devMeasureBtn').addEventListener('click', openMeasurePage);
         window.JiwenImportEntry = { DEV_IMPORT_KEY, devImportOn, impOpenFile, loadImportUI, renderDevImport, scrollChipIntoView };   // impentry 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();

@@ -282,12 +282,14 @@
       if (a && b) { var r0 = rng[f.app]; rng[f.app] = r0 ? [a < r0[0] ? a : r0[0], b > r0[1] ? b : r0[1]] : [a, b]; }
     });
     var total = parsed.files.reduce(function (s, f) { return s + (f.fatal ? 0 : f.stats.parsed.total); }, 0);
+    var log = { b: batch, at: ctx.at || '', apps: apps, from: from, to: to, rng: rng, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded,
+                rulesAdded: mapsAdd.length ? { cat: rulesAdd, type: typesAdd, map: mapsAdd } : { cat: rulesAdd, type: typesAdd } };
+    if (ctx.m && typeof ctx.m === 'object') log.m = ctx.m;     // 导入简化第 1 版：导入量度（plan.js 的 measure()，只有数字），没有就不写
     return {
       version: VERSION, batch: batch, at: ctx.at || '',
       records: recs, changes: chgList, orders: orders, pending: pending, pendTaken: pendTaken,
       cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd, typesAdd: typesAdd, rulesChange: rulesChange, learnedN: learnedN,
-      log: { b: batch, at: ctx.at || '', apps: apps, from: from, to: to, rng: rng, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded,
-             rulesAdded: mapsAdd.length ? { cat: rulesAdd, type: typesAdd, map: mapsAdd } : { cat: rulesAdd, type: typesAdd } },
+      log: log,
       counts: counts, total: total
     };
   }

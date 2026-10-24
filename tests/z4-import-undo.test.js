@@ -108,7 +108,7 @@ function snap(p) {
   return { counts: p.counts, rows: p.rows.filter(d => d.src === 'row').map(d => [d.key, d.group, d.cat, d.why || '']).sort((a, b) => a[0] < b[0] ? -1 : 1),
            newCats: p.sections.newCats.map(n => n.name).sort() };
 }
-// 名单以外比：记录编号、批次号换成按出现顺序的占位；对方、支付方式编号换成名字；名单、名单长度、指纹、时间不比
+// 名单以外比：记录编号、批次号换成按出现顺序的占位；对方、支付方式编号换成名字；名单、名单长度、指纹、时间（含导入量度里的分钟数 m.min）不比
 //   存档号（每台手机随机）换成占位；月份块里的顺序号 s 换成全局名次（删记录会留空号，和手动删一样，顺序不变）
 function norm(dump) {
   const o = {};
@@ -134,6 +134,7 @@ function norm(dump) {
       const out = {};
       Object.keys(v).forEach(k => {
         if (DROP.includes(k)) return;
+        if (k === 'm' && v[k] && typeof v[k] === 'object' && 'min' in v[k]) { const m = Object.assign({}, v[k]); delete m.min; out[k] = walk(m, k); return; }   // 1024-B：导入量度里的「用了几分钟」和 at 一样是时间，不比；量度的其余数字照比
         if (k === 'cp' && Number.isInteger(v[k])) out[k] = 'cp:' + cps[v[k]];
         else if (k === 'pm' && Number.isInteger(v[k])) out[k] = 'pm:' + pms[v[k]];
         else out[k] = walk(v[k], k);

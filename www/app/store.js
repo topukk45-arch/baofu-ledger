@@ -991,6 +991,17 @@
                 return o;
             }).filter(Boolean);
         }
+        // 导入简化第 1 版：导入记录上的导入量度 m（只有数字，不存对方名和金额）：总笔数、自动定了、要人看（按原因分）、
+        //   每种里改了推荐的几件、分类是哪一层给的、从选文件到点导入几分钟、走的是「导入」还是「逐项看看」。形状不对的整个不要
+        const IMP_M_WHY=['match','refund','amount','type','cat'], IMP_M_LAYER=['rule','learned','history','borrow','builtin','alipay','none'];
+        function impCleanMeasure(m){
+            if(!m || typeof m!=='object' || Array.isArray(m)) return null;
+            const int=v=>Number.isInteger(v) && v>=0 && v<=1e7 ? v : 0;
+            const pick=(src, keys)=>{ const o={}; const ok=src && typeof src==='object' && !Array.isArray(src); keys.forEach(k=>{ o[k]=ok ? int(src[k]) : 0; }); return o; };
+            const min=Number(m.min);
+            return { v:1, n:int(m.n), auto:int(m.auto), look:int(m.look), why:pick(m.why, IMP_M_WHY), chg:pick(m.chg, IMP_M_WHY), layer:pick(m.layer, IMP_M_LAYER),
+                     min:isFinite(min) && min>=0 && min<=1e5 ? Math.round(min*10)/10 : 0, path:m.path==='quick' ? 'quick' : 'step' };
+        }
         function impCleanLog(list, mapId, cats, cpsLen, pmsLen){
             if(!Array.isArray(list)) return [];
             const str=(v, n)=>typeof v==='string' ? v.slice(0, n) : '';
@@ -1056,6 +1067,8 @@
                     IMP_APPS.forEach(app=>{ const r=x.rng[app]; if(Array.isArray(r) && /^\d{4}-\d{2}-\d{2}$/.test(r[0]) && /^\d{4}-\d{2}-\d{2}$/.test(r[1])) rng[app]=[r[0], r[1]]; });
                     if(Object.keys(rng).length) o.rng=rng;
                 }
+                // 导入简化第 1 版：导入量度（只有数字）
+                const m=impCleanMeasure(x.m); if(m) o.m=m;
                 // 1016-O：这批从待处理池里拿掉的（有了结论），带原来的位置；撤销时放回去
                 if(Array.isArray(x.pendTaken) && x.pendTaken.length){
                     const pt=x.pendTaken.filter(p=>p && Number.isInteger(p.i) && p.i>=0).map(p=>{ const c=impCleanPending([p.x], mapId)[0]; return c ? { i:p.i, x:c } : null; }).filter(Boolean);
@@ -1688,6 +1701,30 @@
                              cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', desc:'', remark:r.remark||'', oc:r.oc||'', app:(r.src && r.src.app)||'', edited, aiFlag:r.aiFlag||null, refund:!!r.refundOf, hasRefunds:refunded.has(id) };
                 });
                 return { batch, at:lg.at||'', cats:(a.cats||[]).slice(), rows, aiAt:(lg.aiAt||[]).slice() };
+            },
+            // 导入简化第 1 版：导入量度（开发开关里「导入量度」看）：最近几次导入（不含 AI 修改），新的在前，每次 { b, at, apps, from, to, only, m（没有就是 null）,
+            //   catChg 导入后改了分类的笔数, otherChg 改了别的的笔数, gone 删掉了的, days 导入到现在几天 }。改了分类不存，按导入记录里的指纹现算：
+            //   新建的记录现在的指纹和导入时不一样，把分类换成别的分类（现在的分类、这次新建的、未分类）有一个能对上指纹 = 只改了分类。只读
+            async measureList(n, archive){
+                const t=impTarget(archive);
+                const log=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
+                const a=ledgerAssembleArchive(t.e, t.aid);
+                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, byId=new Map(recs.map(r=>[r.id, r]));
+                const now=Date.now();
+                return ((log && log.list) || []).filter(l=>l && l.kind!=='ai').slice(-(Number.isInteger(n) && n>0 ? n : 10)).reverse().map(l=>{
+                    const tries=Array.from(new Set(['未分类'].concat(a.cats||[], l.catsAdded||[])));
+                    let catChg=0, otherChg=0, gone=0;
+                    (l.add||[]).forEach((id, k)=>{
+                        const r=byId.get(id), h=Array.isArray(l.h) ? l.h[k] : '';
+                        if(!r){ gone++; return; }
+                        if(!h || impRecHash(r)===h) return;
+                        const cat=r.cat||'未分类';
+                        if(tries.some(c=>c!==cat && impRecHash(Object.assign({}, r, { cat:c }))===h)) catChg++; else otherChg++;
+                    });
+                    const at=typeof l.at==='string' ? Date.parse(l.at) : NaN;
+                    return { b:l.b, at:l.at||'', apps:(l.apps||[]).slice(), from:l.from||'', to:l.to||'', only:!!l.only, m:l.m||null,
+                             catChg, otherChg, gone, days:isFinite(at) ? Math.max(0, Math.floor((now-at)/86400000)) : null };
+                });
             },
             // 记下这一批交给 AI 时的导出时间（最近 5 次；AI 回复里的导出时间要对得上才认）。只改导入记录这一项
             async aiExportMark(batch, at, archive){
