@@ -361,11 +361,11 @@
       return t.length >= 2 ? t.slice(0, 32) : String(k || '').slice(0, 32);
     };
     var cpKwE = edits.cpKw || {};
-    var PERSON_GROUP = '（和个人之间的转账、红包、收钱码）';
+    var PERSON_GROUP = { lunch: '（工作日中午付给个人的 10–30 元）', qr: '（扫个人收钱码）', transfer: '（和个人之间的转账）', redpack: '（和个人之间的红包）', other: '（别的和个人之间的）' };
     var groupKeyOf = function (d) {
       var cp = String(d.cp || '');
       if (cp.indexOf('*') >= 0 || GROUP_PLAT_RE.test(cp)) { var dk = descKey(d.desc || ''); if (dk.length >= 2) return '品：' + dk; }
-      if (d.rec && d.rec.person) return PERSON_GROUP;     // 1024-W：和个人之间的转账、红包、扫收钱码合成一组，一次定（括号开头的组不存规则）
+      if (d.rec && d.rec.person) return PERSON_GROUP[d.rec.psub] || PERSON_GROUP.other;     // 1024-W / X：和个人之间的按种类各成一组（括号开头的组不存规则）
       return clean(d.cp) || '（没有交易对方）';
     };
     rows.forEach(function (d) {
@@ -803,6 +803,9 @@
     //   none 推不出的：按交易类型归成 商户消费 shop / 扫码付款 qr / 转账 transfer / 红包 redpack / 别的 other，另数对方是个人的 person；
     //   low 推出了但把握低的：只在商品说明里认出 desc / 平台或综合商超 plat / 付给个人 person / 礼包 game / 别的 other
     var none = { shop: 0, qr: 0, transfer: 0, redpack: 0, other: 0, person: 0 }, low = { desc: 0, plat: 0, person: 0, game: 0, other: 0 };
+    // 1024-X：这次的每一笔各去了哪（新增 / 合并 / 待处理 / 退款 / 不计 / 跳过……）：「分类来自」只数新增，「自动定了」显示时去掉跳过的
+    var grp = {}; GROUPS.forEach(function (g) { grp[g] = 0; });
+    rows.forEach(function (d) { if (d.src === 'row' && grp[d.group] !== undefined) grp[d.group] += units(d); });
     // 1024-W：「要你看 · 分类」里不是推不出、也不是把握低的那些：新建分类的 newcat / 不到 3 笔并进「其他」的merged / 别的 other
     var rest = { newcat: 0, merged: 0, other: 0 };
     catGot.forEach(function (k) {
@@ -823,15 +826,34 @@
     rows.forEach(function (d) {
       if (d.src !== 'row' || d.group !== 'add' || d.mode === 'skip') return;
       var r = d.rec || (d.item && d.item.rec), u = units(d);
-      if (!r || r.layer === 'none' || d.cat === '未分类') { none[kindOf(d)] += u; if (personal(d)) none.person += u; return; }
+      if (!r || r.layer === 'none' || d.cat === '未分类') { none[kindOf(d)] += u; if ((r && r.person) || personal(d)) none.person += u; return; }
       if (r.conf !== 'low') return;
       var rs = String(r.reason || '');
       low[r.person || /付给个人|个人转给你/.test(rs) ? 'person' : r.descOnly || /商品说明/.test(rs) ? 'desc' : /平台|综合商超/.test(rs) ? 'plat' : /礼包/.test(rs) ? 'game' : 'other'] += u;
     });
     var n = Number.isInteger(o.total) && o.total >= 0 ? o.total : rows.reduce(function (s0, d) { return s0 + (d.src === 'row' ? units(d) : 0); }, 0);
     var ms = Number(o.ms), min = isFinite(ms) && ms > 0 ? Math.round(ms / 6000) / 10 : 0;
-    return { v: 1, n: n, auto: Math.max(0, n - look), look: look, why: why, chg: chg, layer: layer, min: min, path: o.path === 'quick' ? 'quick' : 'step', none: none, low: low, rest: rest };
+    return { v: 1, n: n, auto: Math.max(0, n - look), look: look, why: why, chg: chg, layer: layer, min: min, path: o.path === 'quick' ? 'quick' : 'step', none: none, low: low, rest: rest, grp: grp };
   }
+
+  // 1024-X：一笔新建记录的分类是哪一类依据给的（导入记录 bk 存着，导入后改了多少按这个分桶算）。只有短代码，后面「.a」= 自动定了、「.l」= 要你看
+  //   rule 你的规则 / learned 合并里学 / history 账本历史（含手记备注）/ borrow 两家互借 / cp 词表认出对方 / desc 只靠商品说明 / plat 平台或综合商超 /
+  //   game 礼包 / ali 支付宝分类 / person 和个人之间的 / none 没推出
+  function bucketOf(rec, cat) {
+    var r = rec || {}, rs = String(r.reason || ''), b;
+    if (!rec || r.layer === 'none') b = r.person ? 'person' : 'none';
+    else if (r.layer === 'rule' || r.layer === 'learned' || r.layer === 'borrow') b = r.layer;
+    else if (r.layer === 'history' || r.layer === 'remark') b = 'history';
+    else if (r.person) b = 'person';
+    else if (r.layer === 'alipay') b = 'ali';
+    else if (/商品说明/.test(rs)) b = 'desc';
+    else if (/平台|综合商超/.test(rs)) b = 'plat';
+    else if (/礼包/.test(rs)) b = 'game';
+    else b = 'cp';
+    var look = !rec || r.layer === 'none' || r.conf === 'low' || (cat || r.cat) === '未分类' || !!r.newCat;     // 推荐新建分类的（建了、并进其他的）也算要你看，和 measure 一样
+    return b + (look ? '.l' : '.a');
+  }
+  var BUCKETS = ['rule', 'learned', 'history', 'borrow', 'cp', 'desc', 'plat', 'game', 'ali', 'person', 'none'];
 
   function devText(p) {
     var out = ['记问 · 账单导入 · 认不出来的情况（' + VERSION + '）'];
@@ -845,6 +867,6 @@
     return out.join('\n');
   }
 
-  return { VERSION: VERSION, isAliRefundDesc: isAliRefundDesc, AMOUNT: AMOUNT, patternHint: patternHint, plan: plan, devText: devText, missed: missed, measure: measure, M_WHY: M_WHY, M_LAYER: M_LAYER, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
+  return { VERSION: VERSION, isAliRefundDesc: isAliRefundDesc, AMOUNT: AMOUNT, patternHint: patternHint, plan: plan, devText: devText, missed: missed, measure: measure, bucketOf: bucketOf, BUCKETS: BUCKETS, M_WHY: M_WHY, M_LAYER: M_LAYER, yuan: yuan, cleanDesc: cleanDesc, pettyCat: pettyCat, isTransferKind: isTransferKind,
            GROUPS: GROUPS, GROUP_NAME: GROUP_NAME };
 });

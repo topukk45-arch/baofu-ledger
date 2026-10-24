@@ -300,7 +300,7 @@
     });
     var aliRows = [];
     rowItems.forEach(function (it) { if (it.bucket !== 'error') { var r = rowOf(parsed, it); if (parsed.files[it.file].app === 'alipay') aliRows.push({ cp: r.cp, kind: r.kind }); } });
-    var cl = C.classify(toClass.map(function (it) { var r = rowOf(parsed, it); return { app: parsed.files[it.file].app, cp: r.cp, desc: r.desc, kind: r.kind, io: it.io }; }),
+    var cl = C.classify(toClass.map(function (it) { var r = rowOf(parsed, it); return { app: parsed.files[it.file].app, cp: r.cp, desc: r.desc, kind: r.kind, io: it.io, time: r.time, fen: r.fen }; }),   // 1024-X：带时间、金额（认工作日中午付给个人的午饭）
       { cats: cats, rules: ctx.rules, learned: learned, borrowRows: aliRows, merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps, history: ctx.hist, remarks: ctx.rmk, aliHist: ctx.aliHist });
     toClass.forEach(function (it, i) { it.rec = cl.recs[i]; });
 

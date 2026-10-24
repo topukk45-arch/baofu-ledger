@@ -1036,7 +1036,7 @@
         // 导入简化第 1 版：导入记录上的导入量度 m（只有数字，不存对方名和金额）：总笔数、自动定了、要人看（按原因分）、
         //   每种里改了推荐的几件、分类是哪一层给的、从选文件到点导入几分钟、走的是「导入」还是「逐项看看」。形状不对的整个不要
         const IMP_M_WHY=['match','refund','amount','type','cat'], IMP_M_LAYER=['rule','learned','history','borrow','builtin','alipay','none'];
-        const IMP_M_NONE=['shop','qr','transfer','redpack','other','person'], IMP_M_LOW=['desc','plat','person','game','other'], IMP_M_REST=['newcat','merged','other'];   // 1024-V：分类拿不准的拆开数；1024-W：其余的
+        const IMP_M_NONE=['shop','qr','transfer','redpack','other','person'], IMP_M_LOW=['desc','plat','person','game','other'], IMP_M_REST=['newcat','merged','other'], IMP_M_GRP=['add','merge','pending','refund','neutral','skip','error','excluded'];   // 1024-V：分类拿不准的拆开数；1024-W：其余的
         function impCleanMeasure(m){
             if(!m || typeof m!=='object' || Array.isArray(m)) return null;
             const int=v=>Number.isInteger(v) && v>=0 && v<=1e7 ? v : 0;
@@ -1044,7 +1044,7 @@
             const min=Number(m.min);
             return { v:1, n:int(m.n), auto:int(m.auto), look:int(m.look), why:pick(m.why, IMP_M_WHY), chg:pick(m.chg, IMP_M_WHY), layer:pick(m.layer, IMP_M_LAYER),
                      min:isFinite(min) && min>=0 && min<=1e5 ? Math.round(min*10)/10 : 0, path:m.path==='quick' ? 'quick' : 'step',
-                     ...(m.none && typeof m.none==='object' ? { none:pick(m.none, IMP_M_NONE) } : {}), ...(m.low && typeof m.low==='object' ? { low:pick(m.low, IMP_M_LOW) } : {}), ...(m.rest && typeof m.rest==='object' ? { rest:pick(m.rest, IMP_M_REST) } : {}) };
+                     ...(m.none && typeof m.none==='object' ? { none:pick(m.none, IMP_M_NONE) } : {}), ...(m.low && typeof m.low==='object' ? { low:pick(m.low, IMP_M_LOW) } : {}), ...(m.rest && typeof m.rest==='object' ? { rest:pick(m.rest, IMP_M_REST) } : {}), ...(m.grp && typeof m.grp==='object' ? { grp:pick(m.grp, IMP_M_GRP) } : {}) };
         }
         function impCleanLog(list, mapId, cats, cpsLen, pmsLen){
             if(!Array.isArray(list)) return [];
@@ -1082,7 +1082,8 @@
                 }).filter(Boolean);
                 // 新增的记录 id 和指纹（1016-K 起，一一对应）一起换编号、一起丢
                 const add0=Array.isArray(x.add) ? x.add : [], withH=Array.isArray(x.h) && x.h.length===add0.length;
-                const addPairs=add0.map((id, k)=>[mapId(id), withH && typeof x.h[k]==='string' ? x.h[k].slice(0, 16) : '']).filter(p=>p[0]);
+                const withBk=Array.isArray(x.bk) && x.bk.length===add0.length;   // 1024-X：分类依据（短代码，和 add 一一对应）
+                const addPairs=add0.map((id, k)=>[mapId(id), withH && typeof x.h[k]==='string' ? x.h[k].slice(0, 16) : '', withBk && typeof x.bk[k]==='string' && /^[a-z.]{0,12}$/.test(x.bk[k]) ? x.bk[k] : '']).filter(p=>p[0]);
                 const endOk=(v, from, max)=>Number.isInteger(v) && v>=from && v<=max;
                 const ra=impCleanRules(x.rulesAdded, cats) || { cat:[], type:[] };
                 const o={ b:x.b, at:str(x.at, 16),
@@ -1090,6 +1091,7 @@
                          from:str(x.from, 10), to:str(x.to, 10),
                          add:addPairs.map(p=>p[0]) };
                 if(withH) o.h=addPairs.map(p=>p[1]);
+                if(withBk) o.bk=addPairs.map(p=>p[2]);
                 o.chg=chg; o.cpLen=len(x.cpLen, cpsLen); o.pmLen=len(x.pmLen, pmsLen);
                 if(endOk(x.cpEnd, o.cpLen, cpsLen)) o.cpEnd=x.cpEnd;
                 if(endOk(x.pmEnd, o.pmLen, pmsLen)) o.pmEnd=x.pmEnd;
@@ -1493,6 +1495,7 @@
             if(pendTaken.length) lg.pendTaken=pendTaken;
             if(rulesChanged.length) lg.rulesChanged=rulesChanged;
             if(hs) lg.h=hs;
+            { const bk=ws.records.map(x=>typeof x.bk==='string' ? x.bk.slice(0, 12) : ''); if(bk.some(Boolean)) lg.bk=bk; }   // 1024-X：每条新记录的分类依据（和 add 一一对应）
             logs.push(lg);
             const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
             pairs.push([impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:cleanLog })]);
@@ -1634,6 +1637,7 @@
                 const lg=logs.find(l=>l.b===b); if(!lg) return;
                 const x=P.logs[b], ids=x.add.map(tmp=>idOf[tmp]);
                 const hadH=Array.isArray(lg.h) && lg.h.length===(lg.add||[]).length;
+                if(Array.isArray(lg.bk) && lg.bk.length===(lg.add||[]).length) lg.bk=lg.bk.concat(ids.map(()=>'pend'));   // 1024-X：分类依据（待处理里作为新增的）
                 lg.add=(lg.add||[]).concat(ids);
                 if(hadH && W && W.recHash){ const byId=new Map(made.map(r=>[r.id, r])); lg.h=lg.h.concat(ids.map(id=>W.recHash(byId.get(id)))); }
                 lg.chg=(lg.chg||[]).concat(x.chg.map(id=>chgOf[id]));
@@ -1810,16 +1814,39 @@
                 return ((log && log.list) || []).filter(l=>l && l.kind!=='ai').slice(-(Number.isInteger(n) && n>0 ? n : 10)).reverse().map(l=>{
                     const tries=Array.from(new Set(['未分类'].concat(a.cats||[], l.catsAdded||[])));
                     let catChg=0, otherChg=0, gone=0;
-                    (l.add||[]).forEach((id, k)=>{
+                    // 1024-X：按分类依据分桶，数导入后改了分类的（导入记录有 bk 就用它；没有的（1024-X 以前导入的）主页面载入了分类推荐时按账单原文重推一遍，近似）
+                    const add=l.add||[], bks=Array.isArray(l.bk) && l.bk.length===add.length ? l.bk : guessBk(l, add), acc=bks ? { src:l.bk ? 'log' : 'guess', by:{}, a:[0, 0], l:[0, 0] } : null;
+                    add.forEach((id, k)=>{
                         const r=byId.get(id), h=Array.isArray(l.h) ? l.h[k] : '';
                         if(!r){ gone++; return; }
-                        if(!h || impRecHash(r)===h) return;
-                        const cat=r.cat||'未分类';
-                        if(tries.some(c=>c!==cat && impRecHash(Object.assign({}, r, { cat:c }))===h)) catChg++; else otherChg++;
+                        let ch=0;
+                        if(h && impRecHash(r)!==h){
+                            const cat=r.cat||'未分类';
+                            if(tries.some(c=>c!==cat && impRecHash(Object.assign({}, r, { cat:c }))===h)){ catChg++; ch=1; } else { otherChg++; ch=-1; }
+                        }
+                        if(!acc || !h || ch<0) return;   // 改了别的的不知道分类改没改，不算
+                        const code=String(bks[k]||''), i=code.indexOf('.'), b=i<0 ? code : code.slice(0, i), f=code.slice(i+1);
+                        if(!b || i<0) return;            // 退款、几笔合成的、待处理里补的不算
+                        const o=acc.by[b]||(acc.by[b]=[0, 0]); o[0]++; o[1]+=ch;
+                        if(f==='a' || f==='l'){ acc[f][0]++; acc[f][1]+=ch; }
                     });
+                    function guessBk(lg, ids){
+                        const C=window.JiwenImportClassify, MS=window.JiwenImportMerchants, PL=window.JiwenImportPlan;
+                        if(!C || !MS || !PL || !PL.bucketOf) return null;
+                        const rs=ids.map(id=>byId.get(id)), xs=[], at=[];
+                        rs.forEach((r, k)=>{ if(r && r.raw && !r.refundOf){ xs.push({ app:r.raw.app, cp:r.raw.cp||'', desc:r.raw.desc||'', kind:r.raw.kind||'', io:r.type, time:r.time, fen:Math.round(safeNum(r.money)*100) }); at.push(k); } });
+                        if(!xs.length) return null;
+                        try{
+                            const cats=Array.from(new Set((a.cats||[]).concat(lg.catsAdded||[])));
+                            const recs0=C.classify(xs, { cats, rules:[], borrowRows:xs.filter(x=>x.app==='alipay').map(x=>({ cp:x.cp, kind:x.kind })), merchants:MS }).recs;
+                            const out=ids.map(()=>'');
+                            at.forEach((k, j)=>{ out[k]=PL.bucketOf(recs0[j]); });
+                            return out;
+                        }catch(e){ return null; }
+                    }
                     const at=typeof l.at==='string' ? Date.parse(l.at) : NaN;
                     return { b:l.b, at:l.at||'', apps:(l.apps||[]).slice(), from:l.from||'', to:l.to||'', only:!!l.only, m:l.m||null,
-                             catChg, otherChg, gone, days:isFinite(at) ? Math.max(0, Math.floor((now-at)/86400000)) : null };
+                             catChg, otherChg, gone, acc, days:isFinite(at) ? Math.max(0, Math.floor((now-at)/86400000)) : null };
                 });
             },
             // 记下这一批交给 AI 时的导出时间（最近 5 次；AI 回复里的导出时间要对得上才认）。只改导入记录这一项
@@ -1973,6 +2000,7 @@
                 lg.chg=lg.chg.filter((_, k)=>k!==ci);
                 if(made.length){
                     const hadH=Array.isArray(lg.h) && lg.h.length===(lg.add||[]).length;
+                    if(Array.isArray(lg.bk) && lg.bk.length===(lg.add||[]).length) lg.bk=lg.bk.concat(made.map(()=>'split'));   // 1024-X：拆开合并另记的
                     lg.add=(lg.add||[]).concat(made.map(r=>r.id));
                     if(hadH) lg.h=lg.h.concat(made.map(r=>impRecHash(r)));
                 }

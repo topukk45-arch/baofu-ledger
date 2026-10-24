@@ -69,7 +69,7 @@ const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
     ok(mq2.low.person === 1 && mq2.why.cat === 4 && JSON.stringify(mq2.rest) === JSON.stringify({ newcat: 2, merged: 1, other: 0 }), '1 1024-W：rest 数新建分类 2、并进其他 1（推不出 / 把握低的不重复数）：' + JSON.stringify(mq2.rest) + ' ' + JSON.stringify(mq2.low));
   }
   const flat = JSON.stringify(m);
-  ok(!/某|餐饮|水果|[a-i]"/.test(flat.replace(/"(v|n|auto|look|why|chg|layer|min|path|match|refund|amount|type|cat|rule|learned|history|borrow|builtin|alipay|none|step|low|shop|qr|transfer|redpack|other|person|desc|plat|game|rest|newcat|merged)"/g, '')), '1 量度里只有数字，没有对方名、分类名、键（1024-V 起多 none / low 两组数，1024-W 起多 rest）');
+  ok(!/某|餐饮|水果|[a-i]"/.test(flat.replace(/"(v|n|auto|look|why|chg|layer|min|path|match|refund|amount|type|cat|rule|learned|history|borrow|builtin|alipay|none|step|low|shop|qr|transfer|redpack|other|person|desc|plat|game|rest|newcat|merged|grp|add|merge|pending|neutral|skip|error|excluded)"/g, '')), '1 量度里只有数字，没有对方名、分类名、键（1024-V 起多 none / low 两组数，1024-W 起多 rest，1024-X 起多 grp）');
 
   // 2. 真导：手记合并后带上对方编号，下次同一对方推手记的分类；导入记录里有 m
   const html = fs.readFileSync(htmlFile, 'utf8'), WWW = path.dirname(htmlFile);
@@ -127,7 +127,7 @@ const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
   $('devMeasureBtn').click();
   await t.until(() => t.d.getElementById('measureList'));
   const txt = t.d.getElementById('measureList').textContent;
-  ok(/3 笔，自动定了/.test(txt) && /2 笔，自动定了/.test(txt) && /导入后改了分类 1 笔，改了别的 1 笔/.test(txt) && /分类来自：.*账本历史 1/.test(txt) && /逐项看看/.test(txt), '4 列出最近几次的量度：' + txt);
+  ok(/3 笔，自动定了/.test(txt) && /2 笔，自动定了/.test(txt) && /导入后改了分类 1 笔，改了别的 1 笔/.test(txt) && /分类来自（只数新建的 \d+ 笔）：.*账本历史 1/.test(txt) && /逐项看看/.test(txt), '4 列出最近几次的量度：' + txt);
   ok(!/某面馆|某虚构书店|25\.00|31\.00|42\.00|吃饭/.test(txt), '4 不带对方名、金额、分类名');
   ok(/推不出的 \d+：商户消费 \d+、扫码付款 \d+、转账 \d+、红包 \d+、别的 \d+；其中对方是个人 \d+/.test(txt) && /把握低的 \d+：只在商品说明里认出 \d+、平台或综合商超 \d+、和个人之间的 \d+、礼包 \d+、别的 \d+/.test(txt) && /分类里其余的 \d+：新建分类的 \d+、不到 3 笔并进「其他」的 \d+、别的 \d+/.test(txt), '4 1024-V：分类拿不准的拆开写（推不出的按类型、把握低的按原因；1024-W 其余的按新建分类 / 并进其他）');
   ok(t.d.getElementById('measureCopy') && t.d.getElementById('measureClose'), '4 有「复制全部」「关闭」');

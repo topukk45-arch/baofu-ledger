@@ -257,7 +257,9 @@
         // 「893 笔，自动定了 812，要你看 81（分类 60、手记 12、退款 6、金额 3）」（导入页导入记录详情里有一份一样的，import/ui.js 的 measureLine）
         function measureLine(m){
             const parts=[['cat','分类'],['match','手记'],['refund','退款'],['amount','金额'],['type','类型']].filter(x=>m.why && m.why[x[0]]).map(x=>x[1]+' '+m.why[x[0]]);
-            return `${m.n} 笔，自动定了 ${m.auto}，要你看 ${m.look}`+(parts.length ? '（'+parts.join('、')+'）' : '');
+            // 1024-X：有 grp 的（这次每一笔去了哪）：跳过的单列，自动定了只算没跳过的
+            const sk=m.grp ? (m.grp.skip||0) : 0;
+            return `${m.n} 笔，`+(sk ? `跳过 ${sk}（导入过 / 不导入的），其余 ${m.n-sk} 笔里 ` : '')+`自动定了 ${Math.max(0, m.auto-sk)}，要你看 ${m.look}`+(parts.length ? '（'+parts.join('、')+'）' : '');
         }
         function measureText(x){
             const APPN={ wechat:'微信', alipay:'支付宝' }, m=x.m;
@@ -270,19 +272,35 @@
                 const cg=[['cat','分类'],['match','手记'],['refund','退款'],['amount','金额'],['type','类型']].filter(k=>m.chg && m.chg[k[0]]).map(k=>k[1]+' '+m.chg[k[0]]);
                 L.push('  改了推荐：'+(cg.length ? cg.join('、') : '没改'));
                 const LY=[['rule','你的规则'],['learned','合并里学'],['history','账本历史'],['borrow','两家互借'],['builtin','词表'],['alipay','支付宝分类'],['none','没推出']];
-                L.push('  分类来自：'+LY.map(k=>k[1]+' '+((m.layer && m.layer[k[0]])||0)).join('、'));
+                // 1024-X：分类来自只数新建的（合并的手记、退款、不计、待处理、跳过的不在里面），写明数的是哪些
+                const G=m.grp, GN=[['merge','和手记合并'],['refund','退款'],['neutral','不计'],['pending','待处理'],['skip','跳过'],['excluded','勾掉的'],['error','出错']];
+                L.push('  分类来自'+(G ? '（只数新建的 '+(G.add||0)+' 笔）' : '')+'：'+LY.map(k=>k[1]+' '+((m.layer && m.layer[k[0]])||0)).join('、'));
+                if(G){ const o=GN.filter(k=>G[k[0]]).map(k=>k[1]+' '+G[k[0]]); if(o.length) L.push('  不是新建的：'+o.join('、')); }
                 // 1024-V：分类拿不准的拆开数（老记录没有就不写）
-                const sum=o=>Object.keys(o).filter(k=>k!=='person').reduce((s, k)=>s+(o[k]||0), 0);
+                const sum=o=>Object.keys(o).filter(k=>k!=='person').reduce((s, k)=>s+(o[k]||0), 0), all=o=>Object.keys(o).reduce((s, k)=>s+(o[k]||0), 0);
                 if(m.none) L.push('  推不出的 '+sum(m.none)+'：商户消费 '+m.none.shop+'、扫码付款 '+m.none.qr+'、转账 '+m.none.transfer+'、红包 '+m.none.redpack+'、别的 '+m.none.other+'；其中对方是个人 '+m.none.person);
-                if(m.low) L.push('  把握低的 '+sum(m.low)+'：只在商品说明里认出 '+m.low.desc+'、平台或综合商超 '+m.low.plat+'、和个人之间的 '+m.low.person+'、礼包 '+m.low.game+'、别的 '+m.low.other);
+                if(m.low) L.push('  把握低的 '+all(m.low)+'：只在商品说明里认出 '+m.low.desc+'、平台或综合商超 '+m.low.plat+'、和个人之间的 '+m.low.person+'、礼包 '+m.low.game+'、别的 '+m.low.other);
                 if(m.rest) L.push('  分类里其余的 '+sum(m.rest)+'：新建分类的 '+m.rest.newcat+'、不到 3 笔并进「其他」的 '+m.rest.merged+'、别的 '+m.rest.other);   // 1024-W
+            }
+            // 1024-X：按分类依据看导入后改了多少（改了分类的 / 这一类共几笔；改了别的字段的不算进去）
+            if(x.acc){
+                const A=x.acc, pc=v=>'改了 '+v[1]+' / '+v[0]+(v[0] ? '（'+Math.round(v[1]*100/v[0])+'%）' : '');
+                const BN=[['rule','你的规则'],['learned','合并里学'],['history','账本历史'],['borrow','两家互借'],['cp','词表认出对方'],['desc','只靠商品说明'],['plat','平台或综合商超'],['game','礼包'],['ali','支付宝分类'],['person','和个人之间的'],['none','没推出']];
+                L.push('  导入后改了多少'+(A.src==='guess' ? '（这次导入时没存依据，按账单原文重推的，近似）' : '')+'：自动定了的 '+pc(A.a)+'；要你看的 '+pc(A.l));
+                L.push('    '+BN.filter(k=>A.by[k[0]]).map(k=>k[1]+' '+pc(A.by[k[0]])).join('；'));
             }
             L.push('  导入后改了分类 '+x.catChg+' 笔，改了别的 '+x.otherChg+' 笔，删了 '+x.gone+' 笔'+(x.days===null ? '' : '（导入 '+x.days+' 天了）'));
             return L.join('\n');
         }
+        function measureScripts(){
+            const one=src=>new Promise(res=>{ const sc=document.createElement('script'); sc.src=src; sc.onload=()=>res(true); sc.onerror=()=>{ sc.remove(); res(false); }; document.head.appendChild(sc); });
+            const need=[['JiwenImportMerchants','import/merchants.js'], ['JiwenImportClassify','import/classify.js'], ['JiwenImportPlan','import/plan.js']];
+            return need.reduce((p, [g, src])=>p.then(()=>window[g] ? true : one(src)), Promise.resolve(true)).catch(()=>false);
+        }
         async function openMeasurePage(){
             const S=window.JiwenImportStore;
             let list=[];
+            await measureScripts();   // 1024-X：以前导入的没存分类依据，载入分类推荐按账单原文重推（载不上就不写那几行）
             try{ list=S && S.measureList ? await S.measureList(MEASURE_N) : []; }catch(e){ customAlert('读导入记录出错了：'+(e && e.message || e)); return; }
             const text=['记问导入量度（只有数字）'].concat(list.map(measureText)).join('\n');
             window.JiwenSheet.open({ title:'导入量度（开发中）', sub:list.length ? `最近 ${list.length} 次导入，新的在上（只有数字，不带对方名和金额）` : '还没有导入过：导入一次账单，这里就有了。',

@@ -197,7 +197,7 @@ GitHub Actions 每次打包前都会先跑 `npm test`，不通过就不出包（
 | `zZzZzT-merchants-8.test.js` | 1024-M（8）：内置词表一条一个对象，新老格式推出来逐字一样 |
 | `zZzZzU-rule-desc-9.test.js` | 1024-N（9）：认商品说明的规则（on:'desc'）、关键词收短、确认页改关键词、撤销 / 备份带 on |
 | `zZzZzV-learn-10.test.js` | 1024-O（10）：从手记备注学（整句、至少 2 次、八成）、两家互借借账本里的支付宝记录、量度算账本历史 |
-| `zZzZzW-classify-1024w.test.js` | 1024-W：普通商户只在商品说明里认出 → 把握中（平台、个人照旧低）；和个人之间的转账 / 红包 / 扫收钱码 → 转账（把握低、person）、存档里没有转账分类时不推荐；确认页合成一组「（和个人之间的…）」不带规则关键词；量度 low.person、rest。（老测试跟着改：`zZzZm` 第 3 段、`v-import-match` 第 10 段奶茶改成把握中，`y-import-fixes` 第 6 段投票里商品说明认出的两笔把握中、16-1 某同事在个人那组里，`zL-import-pattern` 对方 `小**` 换成普通商户名；`zZzZzI` 多 rest 和「和个人之间的」；`zz-import-golden` 只多了 m.rest） |
+| `zZzZzW-person-bucket-1024x.test.js` | 1024-X：撤回 1024-W（商品说明认出的照旧低、个人不默认转账）；和个人之间的按种类分 transfer / redpack / qr / lunch（工作日 11:00–13:30、10–30 元，建议餐饮，周末、35 元、14 点不算）；确认页各成一组、不存规则；量度 grp、和个人之间的算把握低；`bucketOf` 代码；jsdom 真导：导入记录 bk 和 add 一一对应、记录上不带、改了分类按依据算改了多少、量度页写「导入后改了多少」「分类来自（只数新建的 N 笔）」，导入备份 bk 照带，去掉 bk 的按账单原文重推（近似）。（1024-W 改过的老测试改回去：`zZzZm`、`v-import-match`、`y-import-fixes` 第 6 段；`y-import-fixes` 16-1 某同事在「（和个人之间的转账）」那组；`zZzZzI` 多 grp、「分类来自（只数新建的 N 笔）」；`zZzZzR` 锁的 store.js 读账本次数 +1 / +1（写入清单的 ws.records、分类推荐结果的 .recs，都不是账本）；`zz-import-golden` 只多了导入记录的 bk 和 m.grp） |
 | `zZzZzW-gap-11.test.js` | 1024-P（11）：没记账的日子一行细字、点开小面板、今天那条直接记一笔、很早的月份照样有 |
 | `zZzZzX-nospend-12.test.js` | 1024-Q（12）：「这几天没花钱」存进 noSpend、那一行不再显示、撤销、一周详情里取消、备份 / 云备份带、导入备份洗 |
 | `zZzZzY-orders-cloud-13.test.js` | 1024-R（13）：单号表那一行不藏在开发开关后面、连主云备份时顺带问、导入备份后问恢复单号表；验收：恢复到新存档再导以前的文件全部被拦下 |

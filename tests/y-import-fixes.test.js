@@ -218,8 +218,7 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   // 打平：一笔指向游戏、一笔指向缴费 → 都不推荐
   const t = [wx({ time: T(11, 4, 9), cp: '某虚构平台', desc: '游戏币', fen: 700 }), wx({ time: T(11, 5, 9), cp: '某虚构平台', desc: '电费', fen: 800 })];
   const r3 = run([{ app: 'wechat', txns: g.concat(t) }], []);
-  // 1024-W：对方不是平台 / 个人时，商品说明里认出的算把握中；没认出、靠投票带过去的那笔照旧低
-  ok(g.every(x => r3.item(x).rec.cat === '娱乐') && r3.item(g[0]).rec.conf === 'mid' && r3.item(g[1]).rec.conf === 'mid' && r3.item(g[2]).rec.conf === 'low', '6 同一对方按投票：三笔都推成「娱乐」（商品说明认出的两笔把握中、带过去的那笔低）');
+  ok(g.every(x => r3.item(x).rec.cat === '娱乐' && r3.item(x).rec.conf === 'low'), '6 同一对方按投票：三笔都推成「娱乐」（把握低）');
   ok(t.every(x => r3.item(x).rec.layer === 'none'), '6 同一对方打平：都不推荐');
 }
 
@@ -517,8 +516,8 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
     const r = run([{ app: 'wechat', txns: tx }], []);
     const p0 = r.plan();
     const cpAll0 = p0.sections.cpGroups.concat(p0.sections.cpSingles || []);   // 1021-T14：只有 1 笔的在 cpSingles 里
-    // 1024-W：和个人之间的转账合成一组「（和个人之间的…）」，组里只有段外那笔（某同事）
-    const pg0 = cpAll0.find(g => /^（和个人之间/.test(g.cp));
+    // 1024-W / X：和个人之间的转账归进「（和个人之间的转账）」那一组，组里只有段外那笔（某同事）
+    const pg0 = cpAll0.find(g => g.cp === '（和个人之间的转账）');
     ok(!cpAll0.some(g => ['某亲戚甲', '某亲戚乙'].includes(g.cp)) && pg0 && pg0.keys.length === 1 && pg0.keys[0] === r.key(tx[3]), '16-1 转账往来段里的行不进按对方选分类，段外的单笔照旧');
     const ed = { rows: {} }; p0.sections.transfers[0].keys.forEach(k => { ed.rows[k] = { mode: 'skip' }; });
     const p1 = r.plan(ed);

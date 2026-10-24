@@ -26,7 +26,7 @@ const FILE = () => [['微信.csv', B.bill('wechat', TX, { range: RANGE }).bytes]
   const cnt = (f, re) => (fs.readFileSync(path.join(WWW, f), 'utf8').match(re) || []).length;
   // 文件：[ .records 次数, .recs 次数 ]。store.js 里读的有：存储 / 备份 / 撤销 / 恢复（要原样带上 rp）、
   //   archiveInfo / ledgerFor / refundTargets / rvRows / aiExportRows / 待处理候选（用 liveRecs 跳过）；cats.js 数用着的记录（跳过 rp）
-  const LOCK = { 'app/store.js': [62, 35],   // 第 10 版 archiveInfo 多两处（读的是已经去掉 rp 的 st.recs）
+  const LOCK = { 'app/store.js': [63, 36],   // 第 10 版 archiveInfo 多两处（读的是已经去掉 rp 的 st.recs）；1024-X 多两处：写入清单的 ws.records、分类推荐结果的 .recs（都不是账本）
                 'app/cats.js': [6, 0], 'app/tabs.js': [3, 0], 'app/login.js': [2, 0], 'app/import-entry.js': [3, 0] };
   const files = fs.readdirSync(path.join(WWW, 'app')).filter(f => f.endsWith('.js')).map(f => 'app/' + f);
   files.forEach(f => {

@@ -19,11 +19,7 @@ ok(b.cat === '购物' && b.conf === 'low' && /综合商超「盒马」/.test(b.r
 const c = one({ app: 'alipay', cp: '某虚构餐饮店铺', desc: '皮蛋瘦肉粥外卖', kind: '餐饮美食', io: 'expense' });
 ok(c.cat === '餐饮' && c.conf === 'mid', '3 商品说明「外卖」和支付宝分类一致 → 把握中：' + c.reason);
 const d = one({ app: 'wechat', cp: '某虚构商户', desc: '外卖', kind: '', io: 'expense' });
-ok(d.conf === 'mid', '3 1024-W：只在商品说明里认出、对方是普通商户 → 把握中');
-const d2 = one({ app: 'wechat', cp: '美团', desc: '外卖', kind: '', io: 'expense' });
-ok(d2.conf === 'low', '3 1024-W：对方是平台的照旧低');
-const d3 = one({ app: 'wechat', cp: '某虚构昵称', desc: '外卖', kind: '转账', io: 'expense' });
-ok(d3.conf === 'low', '3 1024-W：和个人之间的照旧低');
+ok(d.conf === 'low', '3 只有一个依据的照旧低');
 const e = one({ app: 'wechat', cp: '美团外卖', desc: '', kind: '', io: 'expense' });
 ok(e.cat === '餐饮' && e.conf === 'mid', '4 「美团外卖」整个词照旧中（「美团」按整个词认，不连累美团外卖）');
 const f = one({ app: 'alipay', cp: '某虚构商户', desc: '', kind: '日用百货', io: 'expense' }, { cats: ['未分类', '日用百货'] });

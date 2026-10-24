@@ -88,6 +88,8 @@
       var r = rowOf(d);
       var o = { time: d.time, money: money(d.fen), type: d.type, cat: d.cat || '未分类', remark: remarkOf(d),
                 src: { app: d.app }, oc: String(r.kind || '').slice(0, 32), batch: batch, raw: rawOf(d) };
+      // 1024-X：分类是哪一类依据给的（短代码，主页面写进导入记录的 bk，和 add 一一对应；不存在记录上）
+      if (PL.bucketOf) o.bk = PL.bucketOf(d.rec || (d.item && d.item.rec), d.cat);
       var c = cpIdx(r.cp), m = pmIdx(r.pm);
       if (c !== undefined) o.cp = c;
       if (m !== undefined) o.pm = m;
@@ -115,6 +117,7 @@
         var o = base(mem[0]);
         o.time = last; o.money = money(fen); o.remark = '';
         delete o.raw;     // 几笔合成的一条：没有单独一行原文
+        o.bk = 'sum';
         o.src = { app: g.app || mem[0].app, sum: g.kind };
         var sameCp = mem.every(function (d) { return d.cp === mem[0].cp; });
         if (!sameCp) delete o.cp;
@@ -203,7 +206,7 @@
     rows.forEach(function (d) {
       if (d.group !== 'refund') return;
       var o = base(d);
-      o.type = 'income';
+      o.type = 'income'; o.bk = 'refund';
       var to = d.refundTo;
       if (to && to.record) o.refundOf = { id: to.record };
       else if (to && to.row) {

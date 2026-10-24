@@ -2825,7 +2825,8 @@
   function measureLine(m) {
     if (!m || !m.why) return '';
     var parts = [['cat', '分类'], ['match', '手记'], ['refund', '退款'], ['amount', '金额'], ['type', '类型']].filter(function (x) { return m.why[x[0]]; }).map(function (x) { return x[1] + ' ' + m.why[x[0]]; });
-    return m.n + ' 笔，自动定了 ' + m.auto + '，要你看 ' + m.look + (parts.length ? '（' + parts.join('、') + '）' : '');
+    var sk = m.grp ? (m.grp.skip || 0) : 0;     // 1024-X：跳过的单列，自动定了只算没跳过的
+    return m.n + ' 笔，' + (sk ? '跳过 ' + sk + '（导入过 / 不导入的），其余 ' + (m.n - sk) + ' 笔里 ' : '') + '自动定了 ' + Math.max(0, m.auto - sk) + '，要你看 ' + m.look + (parts.length ? '（' + parts.join('、') + '）' : '');
   }
   // 1017-UI2：导入确认面板：数字都从写入清单里数（和真正写进去的一样）；没有的项不显示
   function confirmLines(ws, p) {
