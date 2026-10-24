@@ -201,7 +201,7 @@
             if(f.error){ customAlert(f.error==='too_big' ? '这个文件太大了（超过 8MB），读不了。' : '这个文件读不出来，换个方式选文件试试（导入页里点「选账单文件」）。', '用记问打开'); return; }
             let bytes;
             try{ const bin=atob(f.data||''); bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); }
-            catch(_){ customAlert('这个文件读不出来。', '用记问打开'); return; }
+            catch(_){ customAlert('这个文件读不出来，换个方式选文件试试（导入页里点「选账单文件」）。', '用记问打开'); return; }
             const file=new File([bytes], f.name || '账单文件');
             loadImportUI().then(ui=>ui.openWith([file])).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
         }
@@ -301,7 +301,7 @@
             const S=window.JiwenImportStore;
             let list=[];
             await measureScripts();   // 1024-X：以前导入的没存分类依据，载入分类推荐按账单原文重推（载不上就不写那几行）
-            try{ list=S && S.measureList ? await S.measureList(MEASURE_N) : []; }catch(e){ customAlert('读导入记录出错了：'+(e && e.message || e)); return; }
+            try{ list=S && S.measureList ? await S.measureList(MEASURE_N) : []; }catch(e){ customAlert('读导入记录出错了：'+(e && e.message || e)+'\n\n关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。'); return; }
             const text=['记问导入量度（只有数字）'].concat(list.map(measureText)).join('\n');
             window.JiwenSheet.open({ title:'导入量度（开发中）', sub:list.length ? `最近 ${list.length} 次导入，新的在上（只有数字，不带对方名和金额）` : '还没有导入过：导入一次账单，这里就有了。',
                 body(box){ const pre=document.createElement('pre'); pre.id='measureList'; pre.className='perf-list'; pre.textContent=list.map(measureText).join('\n\n'); box.appendChild(pre); },

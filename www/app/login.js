@@ -26,7 +26,7 @@
                 // 同时把「条数过多」单独识别出来，给出对症提示（与主界面导入区分 toomany 保持一致）。
                 let arr;
                 try{ const t=JSON.parse(text); arr=Array.isArray(t)?t:t.data; if(!Array.isArray(arr)) throw 0; }
-                catch(_){ customAlert('导入失败：文件格式不正确'); $('loginImportFile').value=''; return; }
+                catch(_){ customAlert('导入失败：这不是记问的存档文件。\n\n请选在「设置 → 导出存档（备份）」存下来的那个 .json 文件。'); $('loginImportFile').value=''; return; }
                 if(arr.length > MAX_IMPORT_RECORDS){
                     customAlert('导入失败：记录条数过多（上限 5 万条），请拆分后再导入');
                     $('loginImportFile').value=''; return;

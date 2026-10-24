@@ -611,7 +611,7 @@
     }).catch(function (e) {
       if (!alive() || (e && e.cancelled)) return;
       dom.prog.style.display = 'none';
-      alertMsg('导入出错了：' + (e && e.message || e));
+      alertMsg('导入出错了：' + (e && e.message || e) + '\n\n账本没有改动。可以重新选文件再试一次；还不行的话，把这段话截图发给开发者。');
       S.phase = 'pick'; renderPick();
     });
   }
@@ -723,7 +723,7 @@
   }
   function rerun() {
     var my = ++runId;
-    compute(my).catch(function (e) { if (my !== runId || (e && e.cancelled)) return; dom.prog.style.display = 'none'; alertMsg('重新计算出错了：' + (e && e.message || e)); });
+    compute(my).catch(function (e) { if (my !== runId || (e && e.cancelled)) return; dom.prog.style.display = 'none'; alertMsg('重新计算出错了：' + (e && e.message || e) + '\n\n账本没有改动。可以退出这次导入、重新选文件；还不行的话，把这段话截图发给开发者。'); });
   }
 
   // ---------- 方案 → 页面 ----------
@@ -3226,7 +3226,7 @@
           openLogs('已按新规则重新分类了 ' + w.changed + ' 条记录。改错了可以在下面「重新分类」那一次点「撤销」（你后来又改过的不会动）。');
         }, function (e) { window.customAlert('没改成：' + (e && (e.code || e.message) || e) + '。账本没有动。'); });
       }, '重新分类', { okText: '改这 ' + ch.length + ' 条的分类', danger: true });
-    }, function (e) { window.customAlert('读不出这次导入：' + (e && (e.code || e.message) || e)); });
+    }, function (e) { window.customAlert('读不出这次导入：' + (e && (e.code || e.message) || e) + '\n\n账本没有改动。关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。'); });
   }
   // ---------- 1017-H：交给 AI 检查（导出）----------
   function stamp(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
@@ -3561,7 +3561,7 @@
     runId++;
     S = { phase: 'rules', view: {} };
     hideSteps(); closePicker();
-    var info; try { info = store().archiveInfo(); } catch (e) { alertMsg('读不出存档：' + (e && (e.code || e.message) || e)); return; }
+    var info; try { info = store().archiveInfo(); } catch (e) { alertMsg('读不出存档：' + (e && (e.code || e.message) || e) + '\n\n账本没有改动。关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。'); return; }
     S.info = info;
     dom.archive.textContent = '存档「' + info.name + '」';
     setHead('管理导入规则', '‹ 返回');
@@ -3879,7 +3879,7 @@
     var J = window.JiwenSheet; if (!J) return Promise.resolve();
     return ensureClassify().then(function (okk) {
       if (!okk) { alertMsg('分类推荐没载入上，稍后再试一次。', '一键优化分类'); return; }
-      var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e), '一键优化分类'); return; }
+      var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e) + '\n\n账本没有改动。关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。', '一键优化分类'); return; }
       if (!rows.length) { alertMsg('没有待确认分类的记录。', '一键优化分类'); return; }
       var ch = optPlan(rows, info);
       if (!ch.length) { alertMsg('按现在的规则看了一遍 ' + rows.length + ' 条待确认分类的，没有能改得更准的。\n\n可以在账单页「待确认分类」里逐条确认。', '一键优化分类'); return; }
@@ -3953,7 +3953,7 @@
   function aiStamp() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
   function openAiGroups() {
     var J = window.JiwenSheet, AI = window.JiwenImportAI; if (!J || !AI) return;
-    var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e), 'AI 按组整理'); return; }
+    var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e) + '\n\n账本没有改动。关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。', 'AI 按组整理'); return; }
     var gs = aiGroupsOf(rows);
     if (!gs.length) { alertMsg('没有待确认分类的记录。', 'AI 按组整理'); return; }
     AIG = { at: aiStamp(), groups: gs, cats: info.cats, off: {} };
