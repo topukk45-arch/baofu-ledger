@@ -576,7 +576,7 @@ const rowOf = (p, k) => p.rows.find(d => d.key === k);
   ok([c1, c2, c3].every(x => r7.item(x).rec.want === '充值缴费' && r7.item(x).rec.conf === 'mid' && r7.item(x).rec.cat === '通讯'), '17-7 运营商对方：充值缴费（把握中），落到存档的「通讯」');
   const r8 = run([{ app: 'alipay', txns: [ali({ time: T(10, 3, 9), cp: '某省联通', kind: '充值缴费', desc: '手机充值', fen: 5000 })] }], [], { cats: ['未分类', '吃饭', '购物', '其他'] });
   const it8 = r8.matched.items[0];
-  ok(it8.rec.want === '充值缴费' && it8.rec.cat === '未分类' && r8.matched.newCats.some(c => c.name === '充值缴费'), '17-7 存档里没有对得上的分类：推荐还是充值缴费，落「未分类」并建议新建（老用户默认不勾）');
+  ok(it8.rec.want === '充值缴费' && it8.rec.cat === '其他' && r8.matched.newCats.some(c => c.name === '充值缴费' && !c.defaultOn), '17-7 存档里没有对得上的分类：推荐还是充值缴费，只有 1 笔，并进「其他」并建议新建（不到 3 笔默认不建，2b）');
 }
 
 // ===== 12. 性质测试：随机账单 + 随机手记 + 随机改动 =====

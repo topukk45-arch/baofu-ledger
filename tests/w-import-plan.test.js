@@ -70,7 +70,7 @@ const p = r.plan();
   ok(p.files[2].fatal && p.files[2].fatal.header.join(',') === '交易时间,收/支,金额,说明', '1 认不出的文件：带上读到的表头');
   ok(p.canImport === true && p.blocking.length === 0, '1 有认不出的文件也能导入其它的（那一份不导入）');
   ok(p.sections.unknownTypes.length === 1 && p.sections.unknownTypes[0].type === '群收款', '1 没见过的交易类型：群收款');
-  ok(p.sections.newCats.some(c => c.name === '交通出行' && c.count === 4 && c.on === false), '1 老用户：交通出行 4 笔，新建默认不勾');
+  ok(p.sections.newCats.some(c => c.name === '交通出行' && c.count === 4 && c.on === true), '1 交通出行 4 笔（至少 3 笔）：新建默认勾上（2b 起新老用户一样）');
   // 1021-T14：只有 1 笔的对方不成组（不列出来），算进「其余 N 笔照推荐入账、标待确认」（cpSingles / cpRest）
   ok(!p.sections.cpGroups.some(g => g.cp === '某某') && p.sections.cpSingles.some(g => g.cp === '某某' && g.n === 1) && p.sections.cpRest.n >= 1, '1 未分类按对方归组：某某只有 1 笔，不列组、算进其余');
   ok(p.sections.notes.neutralVsNormal.length === 1 && p.groups.neutral.some(d => d.tags.includes('neutralVsNormal')), '1 提现 200 和同一天 200 元的普通手记撞上了：提示一句，不合并');

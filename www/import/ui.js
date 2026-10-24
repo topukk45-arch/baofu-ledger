@@ -1252,7 +1252,7 @@
   }
   // 后果句：「导入 821 条；3 笔先放进待处理；60 笔分类待确认，导完再整理」，数为 0 的分句不写
   function rvCount(p) {
-    return p.rows.filter(function (d) { return d.src === 'row' && d.group === 'add' && !d.summary && d.mode !== 'skip' && d.catFrom === 'rec' && (d.cat === '未分类' || (d.rec && d.rec.conf === 'low')); })
+    return p.rows.filter(function (d) { return d.src === 'row' && d.group === 'add' && !d.summary && d.mode !== 'skip' && d.catFrom === 'rec' && (d.cat === '未分类' || (d.rec && d.rec.conf === 'low') || d.ncAuto); })
       .reduce(function (s0, d) { return s0 + (d.units || 1); }, 0);
   }
   function conseqText(p) {
@@ -2900,6 +2900,16 @@
         : (nmr.n - nmr.payN) + ' 笔手记比实付多 ' + yuan(nmr.fen - nmr.payFen) + ' 元，多半是立减。' + (nmr.payN ? '另外 ' + nmr.payN + ' 笔已改成实付金额。' : '')));
     }
     wrap.appendChild(card);
+    // 导入简化 2b：新建了哪几个分类，点一个能并到已有分类（改这次导入里这个分类的记录，照「重新分类」那套写，能撤销）
+    var catsAdd = only ? [] : (res.ws.catsAdded || []);
+    if (catsAdd.length) {
+      var ncr = el('div', 'imp-card'); ncr.id = 'impResNewCats';
+      ncr.appendChild(el('div', 'imp-line', '新建了 ' + catsAdd.length + ' 个分类：' + catsAdd.join('、')));
+      ncr.appendChild(el('div', 'imp-soft', '不想要哪个，点它并到已有的分类（这次导进来的那几笔一起改）。'));
+      var ncl = el('div', 'imp-nc-links');
+      catsAdd.forEach(function (name) { var b0 = btn('「' + name + '」并到… ›', 'imp-link imp-res-nc', function () { mergeNewCat(res.ws.batch, name); }); b0.dataset.cat = name; ncl.appendChild(b0); });
+      ncr.appendChild(ncl); wrap.appendChild(ncr);
+    }
     // 2a：提醒收进完成页一行「有 N 条提醒 ›」，点开看（大额排第一）
     var rl0 = only ? [] : remindLines(S.plan);
     if (rl0.length) {
@@ -2943,6 +2953,22 @@
     go.id = 'impBackToLedger';
     barSet([go]);
     dom.page.scrollTop = 0;
+  }
+  // 2b：完成页把这次新建的分类并到已有分类：这次导入里这个分类的记录（导入后没改过的、不是退款）改成选的分类
+  function mergeNewCat(batch, name) {
+    var info = null; try { info = store().archiveInfo(); } catch (_) {}
+    if (!info || !window.JiwenSheet) return;
+    var opts = info.cats.filter(function (c) { return c !== name && c !== '未分类'; }).map(function (c) { return { value: c, label: c }; });
+    window.JiwenSheet.pick({ title: '「' + name + '」并到哪个分类', sub: '这次导进来、分类是「' + name + '」的几笔一起改', options: opts, value: '', chips: true,
+      onPick: function (to) {
+        store().aiExportRows(batch).then(function (d) {
+          var rows = (d.rows || []).filter(function (r) { return !r.gone && !r.edited && !r.refund && r.cat === name; });
+          if (!rows.length) { window.customAlert('这次导进来的记录里已经没有「' + name + '」了（可能你已经改过）。', '并到已有分类'); return; }
+          return store().aiApply({ of: batch, by: 'rec', changes: rows.map(function (r) { return { id: r.id, set: { cat: to } }; }) }).then(function (w) {
+            window.customAlert('「' + name + '」的 ' + w.changed + ' 笔并到了「' + to + '」。「' + name + '」现在没有这次的记录了，不要的话可以在分类管理里删掉。\n\n改错了可以在「导入记录」里那一次「重新分类」点「撤销」。', '并到已有分类');
+          });
+        }).catch(function (e) { window.customAlert('没改成：' + (e && (e.code || e.message) || e) + '。账本没有动。'); });
+      } });
   }
   // 2a：提醒一条一行（大额排第一）。→ [{ k, t }]
   var MODE_WORD = { normal: '算进支出', flow: '算往来', skip: '不计' };

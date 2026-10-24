@@ -252,8 +252,9 @@
     var other = land('其他', cats);
     var newCats = Object.keys(need).map(function (name) {
       var n = need[name];
-      // 新用户默认建；不到 3 笔的归「其他」。老用户默认不建，落「未分类」
-      return { name: name, count: n, defaultOn: !!ctx.isNewUser && n >= NEW_CAT_MIN,
+      // 导入简化 2b：新老用户统一：这次至少 3 笔落进去的直接建；不到 3 笔的并进「其他」这类已有分类（没有就未分类），导进去标「待确认分类」
+      //   （原来老用户默认不建、落「未分类」）
+      return { name: name, count: n, defaultOn: n >= NEW_CAT_MIN,
                mergeInto: n >= NEW_CAT_MIN ? null : (other || '未分类') };
     }).sort(function (a, b) { return b.count - a.count; });
     var plan = {}; newCats.forEach(function (c) { plan[c.name] = c; });
@@ -263,7 +264,7 @@
       if (!x.cat) {
         var p = plan[x.want];
         o.newCat = x.want;
-        o.cat = p.defaultOn ? x.want : (p.mergeInto && ctx.isNewUser ? p.mergeInto : '未分类');
+        o.cat = p.defaultOn ? x.want : (p.mergeInto || '未分类');
       }
       return o;
     });

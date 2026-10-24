@@ -92,7 +92,7 @@ function norm(t) {
   t.w.JiwenImportUI._goStep('check');
   ok(!$('impRecon') || !$('impRecon').isConnected, '1 核对页没有「只对账」');
   // 点「导入」：不弹确认面板，直接到完成页
-  const want = t.S().plan, wantRv = (() => { let n = 0; want.rows.forEach(d => { if (d.src === 'row' && d.group === 'add' && !d.summary && d.mode !== 'skip' && d.catFrom === 'rec' && (d.cat === '未分类' || (d.rec && d.rec.conf === 'low'))) n += d.units || 1; }); return n; })();
+  const want = t.S().plan, wantRv = (() => { let n = 0; want.rows.forEach(d => { if (d.src === 'row' && d.group === 'add' && !d.summary && d.mode !== 'skip' && d.catFrom === 'rec' && (d.cat === '未分类' || (d.rec && d.rec.conf === 'low') || d.ncAuto)) n += d.units || 1; }); return n; })();
   const cq2 = $('impConseq').textContent;
   const D0 = await t.dump();
   const pend0 = (await t.st().pendingRead()).length;

@@ -20,8 +20,8 @@ const rows = [
 {
   const r = C.classify(rows, { cats: DEF, merchants: M, isNewUser: false });
   ok(r.recs.every(x => x.cat !== '工资'), '1 支付宝「收入」一笔都不落工资：' + r.recs.map(x => x.cat).join('、'));
-  ok(r.recs.slice(0, 3).every(x => x.newCat === '收款' && x.cat === '未分类'), '1 收钱码 / 闲鱼 / 转账 → 新建分类建议「收款」，老用户默认不建、落未分类');
-  ok(r.recs[3].newCat === '收入' && r.recs[3].cat === '未分类', '1 其余收入 → 建议「收入」、落未分类');
+  ok(r.recs.slice(0, 3).every(x => x.newCat === '收款' && x.cat === '收款'), '1 收钱码 / 闲鱼 / 转账 → 新建分类建议「收款」，3 笔直接建（2b 起新老用户一样）');
+  ok(r.recs[3].newCat === '收入' && r.recs[3].cat === '其他', '1 其余收入 → 建议「收入」，只有 1 笔、并进「其他」');
   ok(/收钱码/.test(r.recs[0].reason), '1 理由写明收钱码 / 转账收款：' + r.recs[0].reason);
 }
 // 2. 新用户：3 笔以上的「收款」默认建

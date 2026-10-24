@@ -138,7 +138,7 @@ const before = await t.snapshot();
   ok(cp.includes('表头：交易时间 | 收/支 | 金额 | 说明') && cp.includes('群收款') && !/\d+\.\d\d|青禾|某超市|4200000|看不懂/.test(cp), '1 复制给开发者：只有表头、类型、状态，不带金额、对方、单号、文件名');
   if (t.$('askMask').style.display === 'flex') t.$('askOk').click();
   ok(t.$('impTypes') && t.$('impTypes').textContent.includes('群收款'), '1 没见过的交易类型：问一次');
-  ok(t.$('impNewCats') && t.$('impNewCats').textContent.includes('交通出行') && !t.$('impNewCats').querySelector('input').checked, '1 新建分类：老用户默认不勾');
+  ok(t.$('impNewCats') && t.$('impNewCats').textContent.includes('交通出行') && t.$('impNewCats').querySelector('input').checked, '1 新建分类：交通出行 4 笔（至少 3 笔），默认勾上（2b 起新老用户一样）');
   // 1021-T14：只有 1 笔的对方不列组，写一句「其余 N 笔照推荐入账、标「待确认分类」」
   ok(t.$('impCpRest') && /照推荐入账、标「待确认分类」/.test(t.$('impCpRest').textContent), '1 未分类按对方归组：一笔的不列组，写去处');
   ok(t.$('impNotes') && t.$('impNotes').textContent.includes('撞上了'), '1 提个醒：不计的提现和同金额的普通手记撞上了');
@@ -172,9 +172,9 @@ const before = await t.snapshot();
   ok(pickBtn && pickBtn.textContent === '选这个', '2 待你确认的详情里列出候选手记（1017-UI8 起按钮统一叫「选这个」）');
   pickBtn.click(); t.$('impSheetOk').click();
   ok(t.S().plan.mergeM === M0 + 1 && t.chip('merge') === M0 + 1 && t.go().endsWith(`合并 ${M0 + 1} 笔`), '2 选了合并对象：合并 +1');
-  // 新建分类勾上
-  const nc = t.$('impNewCats').querySelector('input'); nc.click();
-  ok(t.S().plan.groups.add.filter(d => d.cat === '交通出行').length === 4, '2 勾上新建「交通出行」：那 4 笔跟着变');
+  // 新建分类：2b 起至少 3 笔默认就勾上；勾掉再勾上，那 4 笔跟着变
+  const nc = t.$('impNewCats').querySelector('input'); nc.click(); t.$('impNewCats').querySelector('input').click();
+  ok(t.S().plan.groups.add.filter(d => d.cat === '交通出行').length === 4, '2 新建「交通出行」勾着：那 4 笔跟着变');
   // 没见过的类型：选「当转账」→ 重算，群收款挪到不计
   const nb = t.S().plan.counts.neutral;
   t.w.JiwenImportUI._goStep('overview');      // 2a：没见过的类型收进总览的「提醒」

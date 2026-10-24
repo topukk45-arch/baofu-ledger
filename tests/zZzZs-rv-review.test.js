@@ -23,7 +23,7 @@ const CATS = ['未分类', '吃饭', '购物', '娱乐', '其他'];
   const { $, d } = t;
   await t.importFiles(F);
   const rvs = () => t.recs().filter(r => r.rv === 1);
-  ok(rvs().length === 2 && rvs().every(r => r.cat === '未分类'), '1 两笔电影票（落不到已有分类、未分类）带 rv，午饭（吃饭，把握中）不带');
+  ok(rvs().length === 2 && rvs().every(r => r.cat === '其他'), '1 两笔电影票（落不到已有分类，不到 3 笔并进「其他」，2b）带 rv，午饭（吃饭，把握中）不带');
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await t.idle();
   const chip = () => $('rvChip');
   ok(chip() && /待确认分类 2 条/.test(chip().textContent), '2 账单页顶上「待确认分类 2 条」');
@@ -40,7 +40,7 @@ const CATS = ['未分类', '吃饭', '购物', '娱乐', '其他'];
   t.w.JiwenDetail.openDetail(id0); await t.idle();
   ok($('detailRvOk'), '4 详情里有「分类没问题」');
   $('detailRvOk').click(); await t.idle();
-  ok(!t.recs().find(r => r.id === id0).rv && t.recs().find(r => r.id === id0).cat === '未分类', '4 只去掉标记、分类不动');
+  ok(!t.recs().find(r => r.id === id0).rv && t.recs().find(r => r.id === id0).cat === '其他', '4 只去掉标记、分类不动');
   try { t.w.JiwenDetail.closeDetail(); } catch (_) {}
   // 去掉标记不算「导入后你改过」
   const [lg] = await t.st().importsRead();
@@ -49,7 +49,7 @@ const CATS = ['未分类', '吃饭', '购物', '娱乐', '其他'];
   // 修改账单改分类：去掉
   const id1 = rvs()[0].id;
   t.w.openEdit(id1); await t.idle();
-  t.w.JiwenForms.pickEditCat ? t.w.JiwenForms.pickEditCat('其他') : null;
+  t.w.JiwenForms.pickEditCat ? t.w.JiwenForms.pickEditCat('吃饭') : null;
   $('saveEdit').click(); await t.idle(); if (t.ask()) await t.askOk();
   ok(!t.recs().find(r => r.id === id1).rv, '6 修改账单改了分类：标记去掉');
   ok(!chip() && t.w.JiwenSearch.isOpen() && $('searchCount').textContent === '0 笔' && $('searchTags').textContent.includes('待确认分类'), '6 都改完了：账单页的胶囊收掉；结果页条件还在、0 笔（1023-G）');

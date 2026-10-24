@@ -25,7 +25,8 @@ const CATS = ['未分类', '吃饭', '购物', '其他'];
   ok(!r1.ok && r1.why === 'nohead', '0 老的 v1 回复不认（号对不上了）');
   const t = await A.boot({ html, www: WWW, seed: A.seedOf([], CATS), now: '2026-10-20T10:00:00' });
   const { $ } = t;
-  await t.importFiles(F, null, { stay: true });
+  // 2b 起 3 笔「交通出行」默认就建了；这里要测「推荐新建、没建的」，确认页选「不建」
+  await t.importFiles(F, S => { S.edits.newCats['交通出行'] = { on: false, into: null, picked: false }; }, { stay: true });
   $('impNextAi').click(); await t.until(() => $('impAiText'));
   const txt = $('impAiText').value, D = t.S().ai.data;
   ok(D.newCats.includes('交通出行') && /也可以用的新分类（这次推荐新建、还没建的，选了记问会先建好）：交通出行/.test(txt), '1 导出里写「也可以用的新分类：交通出行」');

@@ -38,20 +38,20 @@ const CATS = ['未分类', '吃饭', '购物', '转账', '工资', '红包', '�
   ];
   const borrowRows = [{ cp: '某虚构诊所', kind: '医疗健康' }];
   const r0 = cls(rows, { borrowRows });
-  ok(r0.recs.slice(0, 3).every(x => x.cat === '未分类' && x.newCat) && r0.newCats.map(n => n.name).sort().join() === '交通出行,充值缴费,医疗健康,文化休闲'.split(',').sort().join(),
+  ok(r0.recs.slice(0, 3).every(x => x.cat === '其他' && x.newCat) && r0.newCats.map(n => n.name).sort().join() === '交通出行,充值缴费,医疗健康,文化休闲'.split(',').sort().join(),
     '一 没有对照：三种来源都落不到，进新建分类 ' + r0.newCats.map(n => n.name).join());
   const r1 = cls(rows, { borrowRows, maps: MAPS });
   ok(r1.recs[0].cat === '杂项' && r1.recs[0].layer === 'builtin' && !r1.recs[0].newCat && r1.recs[0].reason.indexOf('你的对照：交通出行 → 杂项') === 0, '一 内置词表来源：直接落对照的分类，理由写对照 ' + r1.recs[0].reason);
   ok(r1.recs[1].cat === '其他' && r1.recs[1].layer === 'alipay' && /^你的对照：充值缴费 → 其他（支付宝分类：充值缴费）$/.test(r1.recs[1].reason), '一 支付宝分类来源：落对照 ' + r1.recs[1].reason);
   ok(r1.recs[2].cat === '杂项' && r1.recs[2].layer === 'borrow' && /^你的对照：医疗健康 → 杂项/.test(r1.recs[2].reason), '一 两家互借来源：落对照 ' + r1.recs[2].reason);
-  ok(r1.newCats.length === 1 && r1.newCats[0].name === '文化休闲' && r1.recs[3].cat === '未分类', '一 新建分类里只剩没对照的那一项');
+  ok(r1.newCats.length === 1 && r1.newCats[0].name === '文化休闲' && r1.recs[3].cat === '其他', '一 新建分类里只剩没对照的那一项（只有 1 笔，并进「其他」）');
   // 同名、同义优先
   const r2 = cls(rows.slice(0, 2), { maps: MAPS, cats: CATS.concat(['交通出行', '缴费']) });
   ok(r2.recs[0].cat === '交通出行' && r2.recs[0].reason.indexOf('你的对照') < 0, '一 存档后来建了同名分类：同名优先，不查对照');
   ok(r2.recs[1].cat === '缴费' && r2.recs[1].reason.indexOf('你的对照') < 0, '一 存档后来建了同义分类：同义优先，不查对照');
   // 目标分类不在存档里（删了）的对照不算
   const r3 = cls(rows.slice(0, 1), { maps: [{ from: '交通出行', cat: '已删的分类' }] });
-  ok(r3.recs[0].cat === '未分类' && r3.newCats.length === 1, '一 对照的目标分类不在存档里：当没对照，照样问');
+  ok(r3.recs[0].cat === '其他' && r3.newCats.length === 1, '一 对照的目标分类不在存档里：当没对照，照样问');
   // 你的规则、从合并里学的不被对照盖掉
   const r4 = cls([rows[0], { app: 'wechat', cp: '某虚构打车', desc: '打车', kind: '商户消费', io: 'expense' }],
     { maps: MAPS, rules: [{ kw: '滴滴', cat: '购物' }], learned: new Map([['某虚构打车', '吃饭']]) });

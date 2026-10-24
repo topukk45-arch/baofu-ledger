@@ -104,7 +104,7 @@
     newCatsIn.forEach(function (c) {
       var e = ncE[c.name] || {};
       ncPlan[c.name] = { on: e.on !== undefined ? !!e.on : !!c.defaultOn,
-                         into: e.into !== undefined ? e.into : (info.isNewUser ? c.mergeInto : null) };
+                         into: e.into !== undefined ? e.into : (c.mergeInto || null) };      // 导入简化 2b：新老用户一样，不到 3 笔的并进「其他」
       var np = ncPlan[c.name]; np.picked = !np.on && !!np.into && np.into !== '未分类' && e.into !== undefined && !!e.picked;
     });
     function recCat(rec) {
@@ -219,6 +219,8 @@
       if (e.cat) { d.cat = e.cat; d.catFrom = 'edit'; return; }
       if (d.splitFrom) { var sm = manualById[d.splitFrom]; d.cat = sm ? sm.cat : '未分类'; d.catFrom = 'split'; return; }
       d.cat = recCat(it.rec); d.catFrom = 'rec'; d.rec = it.rec || null;
+      // 导入简化 2b：推荐的新分类没建、照默认并进了已有分类（你没在确认页定过）→ 写进去标「待确认分类」
+      if (it.rec && it.rec.newCat && ncPlan[it.rec.newCat] && !ncPlan[it.rec.newCat].on && !(it.rec.newCat in ncE)) d.ncAuto = true;
       if (it.rec && it.rec.layer === 'rule' && it.rec.kw && ruleFixE[it.rec.kw]) { d.cat = ruleFixE[it.rec.kw]; d.catFrom = 'rulefix'; }
       // 1021-T12（实测 10-20）：不计的行（余额宝、花呗还款、提现……）推不出分类时，存档里有「转账」就落「转账」，账单页能按分类筛出来；
       //   确认页照旧不显示分类（1017-UI11）
@@ -278,7 +280,7 @@
     };
     rows.forEach(function (d) {
       if (d.src !== 'row' || d.catFrom !== 'rec') return;
-      if (d.cat !== '未分类' && !(d.rec && d.rec.conf === 'low')) return;
+      if (d.cat !== '未分类' && !(d.rec && d.rec.conf === 'low') && !d.ncAuto) return;     // 2b：照默认并进「其他」的也进组（逐项看看时能定）
       // 1016-H：待你确认的不进，等选成新增（「都不是」或被自动作为新增）再进；不计的、转账往来里的也不用选
       if (['add', 'refund'].indexOf(d.group) < 0 || d.mode === 'skip' || trKeys[d.key]) return;
       var k = groupKeyOf(d);

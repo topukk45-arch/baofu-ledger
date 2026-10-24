@@ -173,8 +173,8 @@ const intoUnique = res => { const s = new Set(); return res.items.every(it => it
   ok(r6.layer === 'borrow' && r6.cat === '吃饭', '10 两家互借：支付宝里同一个对方是餐饮美食，微信跟着用');
   ok(by[rows[6].no].rec.layer === 'none' && by[rows[6].no].rec.cat === '未分类', '10 都没有依据：未分类');
   const ra = by[alis[1].no].rec;
-  ok(ra.layer === 'alipay' && ra.newCat === '酒店旅游' && ra.cat === '未分类', '10 支付宝分类「酒店旅游」，老用户存档里没有同义的：先落未分类，带上新建建议');
-  ok(res.newCats.some(c => c.name === '酒店旅游' && c.defaultOn === false), '10 老用户：新建分类默认不勾');
+  ok(ra.layer === 'alipay' && ra.newCat === '酒店旅游' && ra.cat === '其他', '10 支付宝分类「酒店旅游」，存档里没有同义的：只有 1 笔（不到 3 笔），并进「其他」，带上新建建议（2b 起新老用户一样）');
+  ok(res.newCats.some(c => c.name === '酒店旅游' && c.defaultOn === false && c.mergeInto === '其他'), '10 不到 3 笔：新建分类默认不勾，并进「其他」');
   // 打平不学
   const t2 = [wx({ time: T(12, 10), cp: '某面馆', fen: 1000 }), wx({ time: T(12, 11), cp: '某面馆', fen: 1100 }), wx({ time: T(12, 12), cp: '某面馆', fen: 1200 })];
   const r2 = pipeline([{ app: 'wechat', txns: t2 }], [man('b1', 12, 10, 1000, { cat: '吃饭' }), man('b2', 12, 11, 1100, { cat: '午饭' })], { cats });
