@@ -415,6 +415,12 @@
         }
         window.addEventListener('scroll', statStripWake, { passive:true });
         window.addEventListener('resize', statStripWake, { passive:true });
+        // 1023-P 后：页面高度后来又变了也重新看要不要一直显示浮条（同账单页）
+        if(window.ResizeObserver) new ResizeObserver(()=>{
+            if(JiwenBase.currentTab!=='stats') return;
+            const H=window.innerHeight||0, de=document.documentElement;
+            stStrip.pin(de.scrollHeight>0 && de.scrollHeight <= H+1);
+        }).observe($('pageStats'));
 
         // 读取 CSS 变量当前值，让 SVG 颜色跟着外观走
         function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }

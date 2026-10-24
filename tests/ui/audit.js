@@ -783,7 +783,15 @@ async function run(cfg, port, browser) {
     const DAYS = [{ name: '虚构的纪念日', date: '2026-12-01', pin: true }, { name: '虚构的生日', date: '2026-11-11' }, { name: '虚构的考试', date: '2026-10-01' }];
     const TPLS = [{ id: 't1', type: 'expense', cat: '吃饭', remark: '早餐', money: 8, mode: 'normal' }, { id: 't2', type: 'expense', cat: '出行', remark: '地铁', money: 4, mode: 'normal' },
       { id: 't3', type: 'expense', cat: '吃饭', remark: '午饭', money: null, mode: 'normal' }, { id: 't4', type: 'expense', cat: '其他', remark: '信用卡还款', money: null, mode: 'skip' }];
-    const ls11 = seedOf({ dev: true, recs: oldRecords(60), cats: BASE_CATS.slice(0, 16), tpls: TPLS, extra: id => ({ ['days_' + id]: JSON.stringify(DAYS) }) });
+    // 1023-P 后（用户 10-24 建议）：样例数据补几种平时少见的记录，截图检查每次都覆盖到：
+    //   往来、标了期初余额的往来、不计、超预算的月份（吃饭每月预算 60）、不满一屏的月份（5 月只有月底一笔）
+    const EXTRA11 = [
+      { id: 'x-ob', time: '2026-10-01T08:00', money: 3000, type: 'income', cat: '其他', remark: '虚构的期初余额', flow: true, ob: 1 },
+      { id: 'x-fl', time: '2026-10-07T09:30', money: 500, type: 'expense', cat: '其他', remark: '存进银行卡', flow: true },
+      { id: 'x-sk', time: '2026-10-12T20:00', money: 1200, type: 'expense', cat: '其他', remark: '信用卡还款', skip: true },
+      { id: 'x-may', time: '2026-05-28T12:00', money: 18, type: 'expense', cat: '吃饭', remark: '午饭' },
+    ];
+    const ls11 = seedOf({ dev: true, recs: oldRecords(60).concat(EXTRA11), cats: BASE_CATS.slice(0, 16), tpls: TPLS, budgets: { '吃饭': 60 }, extra: id => ({ ['days_' + id]: JSON.stringify(DAYS) }) });
     async function page11(w, h, extraLs) {
       const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: 'zh-CN' });
       const page = await ctx.newPage(); page.errs = []; page.on('pageerror', e => page.errs.push(e.message));
@@ -950,6 +958,16 @@ async function run(cfg, port, browser) {
         document.querySelectorAll('.lg-wk, .lg-dh, .lg-gap, #billHead').forEach(e => { const r = e.getBoundingClientRect(); [...e.children].forEach(c => { const q = c.getBoundingClientRect(); if (q.width && (q.right > r.right + 0.5 || q.left < r.left - 0.5)) bad.push((e.className || e.id) + ' 里「' + c.textContent.slice(0, 12) + '」出了框'); }); });
         return { bad: bad.slice(0, 6), ok: !bad.length };
       })));
+      // 不满一屏的月份：浮条一直显示（停 1.5 秒以后也不收）
+      await page.evaluate(() => { window.JiwenLedger.setYM('2026-05'); window.scrollTo(0, 0); window.JiwenLedger.stripWake(); }); await page.waitForTimeout(2200);
+      await shot(page, size, '账单页', '不满一屏的月份（浮条常驻）');
+      results.push(Object.assign({ name: 'ledger-short-month', cfg: size, clip: true }, await page.evaluate(() => {
+        const bad = [], de = document.documentElement, short = de.scrollHeight <= innerHeight + 1, st = document.getElementById('lgStrip');
+        if (short && !st.classList.contains('show')) bad.push('不满一屏的月份，停 2 秒后浮条收起了（应当常驻）');
+        if (!short) bad.push('样例 5 月不是不满一屏（' + de.scrollHeight + ' > ' + innerHeight + '），这条没测到');
+        return { bad, ok: !bad.length };
+      })));
+      await page.evaluate(() => { window.JiwenLedger.setYM('2026-10'); window.scrollTo(0, 0); }); await page.waitForTimeout(300);
       await page.evaluate(() => document.querySelector('#billList .bl-row').click()); await page.waitForTimeout(700);
       await shot(page, size, '账单详情', '平时'); if (meas) await CLIP(page, '账单详情', '#detailMask');
       await closeAll(page);
@@ -1008,6 +1026,15 @@ async function run(cfg, port, browser) {
         document.querySelectorAll('#statCal .wk-sum').forEach(w => { const r = w.getBoundingClientRect(); if (r.right > innerWidth - 8) bad.push('周合计那一格贴边 / 出了屏幕'); const v = w.querySelector('.wk-v'); if (v && v.scrollWidth > w.clientWidth + 0.5) bad.push('周合计「' + v.textContent + '」放不下'); });
         document.querySelectorAll('.st-cells .st-cell, .st-cells > *').forEach(c => { [...c.children].forEach(x => { if (x.scrollWidth > c.clientWidth + 0.5) bad.push('两格里「' + x.textContent.slice(0, 12) + '」放不下'); }); });
         return { bad: [...new Set(bad)].slice(0, 6), ok: !bad.length };
+      })));
+      // 超预算的月份有小红点，选中的深色格子上也看得见（白圈）；只有往来 / 不计的日子格换底色、有标签
+      results.push(Object.assign({ name: 'stats-dot-flow', cfg: size, clip: true }, await page.evaluate(() => {
+        const bad = [], dots = [...document.querySelectorAll('#stStrip .ms-dot')];
+        if (!dots.length) bad.push('样例里吃饭超了预算，月份浮条却没有小红点');
+        dots.forEach(d => { const c = getComputedStyle(d), r = d.getBoundingClientRect(); if (r.width < 5) bad.push('小红点太小'); if (!/255, 255, 255/.test(c.boxShadow + c.borderColor)) bad.push('小红点没有白圈'); });
+        const cell = [...document.querySelectorAll('#statCal .day')].find(c => c.querySelector('.dn') && c.querySelector('.dn').textContent === '7');
+        if (!cell || !cell.querySelector('.dtag.flow')) bad.push('10 月 7 日有往来记录，日历格子里没有「往来」标签');
+        return { bad, ok: !bad.length };
       })));
       await page.evaluate(() => { const w = document.querySelector('#statCal .wk-sum.cur') || document.querySelector('#statCal .wk-sum'); w.click(); }); await page.waitForTimeout(700);
       await shot(page, size, '一周详情', '统计页点周合计');

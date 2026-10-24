@@ -1,0 +1,1581 @@
+[
+ {
+  "name": "kp-记一笔",
+  "cfg": "412x970",
+  "kp": true,
+  "kTop": 668,
+  "keyH": 56.8,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 668,
+   "keyH": 56.8,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-修改账单",
+  "cfg": "412x970",
+  "kp": true,
+  "kTop": 658,
+  "keyH": 59.3,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 658,
+   "keyH": 59.3,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-筛选金额",
+  "cfg": "412x970",
+  "kp": true,
+  "kTop": 661,
+  "keyH": 58.4,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 662,
+   "keyH": 58.4,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-模板固定金额",
+  "cfg": "412x970",
+  "kp": true,
+  "kTop": 661,
+  "keyH": 58.4,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 662,
+   "keyH": 58.4,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-退款金额",
+  "cfg": "412x970",
+  "kp": true,
+  "kTop": 667,
+  "keyH": 57,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 667,
+   "keyH": 57,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-设预算",
+  "cfg": "412x970",
+  "kp": true,
+  "kTop": 667,
+  "keyH": 57,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 667,
+   "keyH": 57,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-日子管理条数",
+  "cfg": "412x970",
+  "kp": true,
+  "kTop": 667,
+  "keyH": 57,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 667,
+   "keyH": 57,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-记一笔",
+  "cfg": "360x780",
+  "kp": true,
+  "kTop": 478,
+  "keyH": 56.8,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 478,
+   "keyH": 56.8,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-修改账单",
+  "cfg": "360x780",
+  "kp": true,
+  "kTop": 471,
+  "keyH": 58.6,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 471,
+   "keyH": 58.6,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-筛选金额",
+  "cfg": "360x780",
+  "kp": true,
+  "kTop": 453,
+  "keyH": 63.1,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 452,
+   "keyH": 63.1,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-模板固定金额",
+  "cfg": "360x780",
+  "kp": true,
+  "kTop": 471,
+  "keyH": 58.4,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 472,
+   "keyH": 58.4,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-退款金额",
+  "cfg": "360x780",
+  "kp": true,
+  "kTop": 446,
+  "keyH": 64.8,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 446,
+   "keyH": 64.8,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-设预算",
+  "cfg": "360x780",
+  "kp": true,
+  "kTop": 477,
+  "keyH": 57,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 477,
+   "keyH": 57,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-日子管理条数",
+  "cfg": "360x780",
+  "kp": true,
+  "kTop": 477,
+  "keyH": 57,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 477,
+   "keyH": 57,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-记一笔",
+  "cfg": "412x915",
+  "kp": true,
+  "kTop": 613,
+  "keyH": 56.8,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 613,
+   "keyH": 56.8,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-修改账单",
+  "cfg": "412x915",
+  "kp": true,
+  "kTop": 603,
+  "keyH": 59.3,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 603,
+   "keyH": 59.3,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-筛选金额",
+  "cfg": "412x915",
+  "kp": true,
+  "kTop": 606,
+  "keyH": 58.4,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 607,
+   "keyH": 58.4,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-模板固定金额",
+  "cfg": "412x915",
+  "kp": true,
+  "kTop": 606,
+  "keyH": 58.4,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 607,
+   "keyH": 58.4,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-退款金额",
+  "cfg": "412x915",
+  "kp": true,
+  "kTop": 522,
+  "keyH": 76,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 522,
+   "keyH": 76,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-设预算",
+  "cfg": "412x915",
+  "kp": true,
+  "kTop": 612,
+  "keyH": 57,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 612,
+   "keyH": 57,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-日子管理条数",
+  "cfg": "412x915",
+  "kp": true,
+  "kTop": 612,
+  "keyH": 57,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 612,
+   "keyH": 57,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-记一笔",
+  "cfg": "360x640",
+  "kp": true,
+  "kTop": 332,
+  "keyH": 58.3,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 332,
+   "keyH": 58.3,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-修改账单",
+  "cfg": "360x640",
+  "kp": true,
+  "kTop": 332,
+  "keyH": 58.3,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 332,
+   "keyH": 58.3,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-筛选金额",
+  "cfg": "360x640",
+  "kp": true,
+  "kTop": 357,
+  "keyH": 52,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 357,
+   "keyH": 52,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-模板固定金额",
+  "cfg": "360x640",
+  "kp": true,
+  "kTop": 320,
+  "keyH": 61.3,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 320,
+   "keyH": 61.3,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-退款金额",
+  "cfg": "360x640",
+  "kp": true,
+  "kTop": 342,
+  "keyH": 55.7,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 342,
+   "keyH": 55.7,
+   "scrolled": 27
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-设预算",
+  "cfg": "360x640",
+  "kp": true,
+  "kTop": 251,
+  "keyH": 76,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 251,
+   "keyH": 76,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "kp-日子管理条数",
+  "cfg": "360x640",
+  "kp": true,
+  "kTop": 301,
+  "keyH": 66,
+  "cut": [],
+  "fieldShown": true,
+  "fit": {
+   "top": 301,
+   "keyH": 66,
+   "scrolled": 0
+  },
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→常用列表",
+  "cfg": "412x970",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 291
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 549
+   }
+  ],
+  "diffs": [
+   258
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→常用列表",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→常用列表",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→分类抽屉",
+  "cfg": "412x970",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 291
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 376
+   }
+  ],
+  "diffs": [
+   85
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→分类抽屉",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→分类抽屉",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→统计面板",
+  "cfg": "412x970",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 291
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 631
+   }
+  ],
+  "diffs": [
+   340
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→统计面板",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→统计面板",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→备注小面板",
+  "cfg": "412x970",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 291
+   },
+   {
+    "id": "txtMask",
+    "top": 705
+   }
+  ],
+  "diffs": [
+   414
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→备注小面板",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→备注小面板",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→日期选择",
+  "cfg": "412x970",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 291
+   },
+   {
+    "id": "dtMask",
+    "top": 280
+   }
+  ],
+  "diffs": [
+   -11
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→日期选择",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→日期选择",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "foot-修改账单",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [
+   {
+    "m": "editMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "editMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-修改账单",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-修改账单→分类抽屉",
+  "cfg": "412x970",
+  "stack": true,
+  "tops": [
+   {
+    "id": "editMask",
+    "top": 281
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 376
+   }
+  ],
+  "diffs": [
+   95
+  ],
+  "ok": true
+ },
+ {
+  "name": "stack-外观→选色面板",
+  "cfg": "412x970",
+  "stack": true,
+  "tops": [
+   {
+    "id": "themeMask",
+    "top": 488
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 292
+   }
+  ],
+  "diffs": [
+   -196
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-选色面板",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "cp-bars",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-日子页",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-first",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-rows",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true,
+  "n": 15
+ },
+ {
+  "name": "clip-账单页列表",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-strip",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-short-month",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-账单详情",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-账单详情（往来）",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "detail-ob-1023p",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "foot-筛选面板",
+  "cfg": "412x970",
+  "foot": true,
+  "rows": [],
+  "ok": true
+ },
+ {
+  "name": "clip-筛选面板",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-搜一笔结果页",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "search-page",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-1023h",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-dot-flow",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-1023o",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-账单页",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-统计页",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-设置页",
+  "cfg": "412x970",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "sysnum",
+  "cfg": "412x970",
+  "sysnum": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "theme-#3f6f6b",
+  "cfg": "412x970",
+  "theme": true,
+  "html": "rgb(241, 249, 248)",
+  "body": "rgb(241, 249, 248)",
+  "ok": true
+ },
+ {
+  "name": "theme-#6b7245",
+  "cfg": "412x970",
+  "theme": true,
+  "html": "rgb(248, 249, 241)",
+  "body": "rgb(248, 249, 241)",
+  "ok": true
+ },
+ {
+  "name": "theme-#a8553f",
+  "cfg": "412x970",
+  "theme": true,
+  "html": "rgb(249, 242, 241)",
+  "body": "rgb(249, 242, 241)",
+  "ok": true
+ },
+ {
+  "name": "theme-#000000",
+  "cfg": "412x970",
+  "theme": true,
+  "html": "rgb(241, 249, 248)",
+  "body": "rgb(241, 249, 248)",
+  "ok": true
+ },
+ {
+  "name": "theme-#ffffff",
+  "cfg": "412x970",
+  "theme": true,
+  "html": "rgb(241, 249, 248)",
+  "body": "rgb(241, 249, 248)",
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→常用列表",
+  "cfg": "360x780",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 101
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 359
+   }
+  ],
+  "diffs": [
+   258
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→常用列表",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→常用列表",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→分类抽屉",
+  "cfg": "360x780",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 101
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 218
+   }
+  ],
+  "diffs": [
+   117
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→分类抽屉",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 32,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 32,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→分类抽屉",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→统计面板",
+  "cfg": "360x780",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 101
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 435
+   }
+  ],
+  "diffs": [
+   334
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→统计面板",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→统计面板",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→备注小面板",
+  "cfg": "360x780",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 101
+   },
+   {
+    "id": "txtMask",
+    "top": 515
+   }
+  ],
+  "diffs": [
+   414
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→备注小面板",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→备注小面板",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-记一笔→日期选择",
+  "cfg": "360x780",
+  "stack": true,
+  "tops": [
+   {
+    "id": "addMask",
+    "top": 101
+   },
+   {
+    "id": "dtMask",
+    "top": 94
+   }
+  ],
+  "diffs": [
+   -7
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-记一笔→日期选择",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   },
+   {
+    "m": "addMask",
+    "scroll": 0,
+    "gap": 0
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-记一笔→日期选择",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "foot-修改账单",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [
+   {
+    "m": "editMask",
+    "scroll": 3,
+    "gap": 0.4
+   },
+   {
+    "m": "editMask",
+    "scroll": 3,
+    "gap": 0.4
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "clip-修改账单",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stack-修改账单→分类抽屉",
+  "cfg": "360x780",
+  "stack": true,
+  "tops": [
+   {
+    "id": "editMask",
+    "top": 94
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 218
+   }
+  ],
+  "diffs": [
+   124
+  ],
+  "ok": true
+ },
+ {
+  "name": "stack-外观→选色面板",
+  "cfg": "360x780",
+  "stack": true,
+  "tops": [
+   {
+    "id": "themeMask",
+    "top": 298
+   },
+   {
+    "id": "uiSheetMask",
+    "top": 94
+   }
+  ],
+  "diffs": [
+   -204
+  ],
+  "ok": true
+ },
+ {
+  "name": "foot-选色面板",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [
+   {
+    "m": "uiSheetMask",
+    "scroll": 88,
+    "gap": 0.8
+   },
+   {
+    "m": "uiSheetMask",
+    "scroll": 88,
+    "gap": 0.8
+   }
+  ],
+  "ok": true
+ },
+ {
+  "name": "cp-bars",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-日子页",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-first",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-rows",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true,
+  "n": 12
+ },
+ {
+  "name": "clip-账单页列表",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-strip",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-short-month",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-账单详情",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-账单详情（往来）",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "detail-ob-1023p",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "foot-筛选面板",
+  "cfg": "360x780",
+  "foot": true,
+  "rows": [],
+  "ok": true
+ },
+ {
+  "name": "clip-筛选面板",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-搜一笔结果页",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "search-page",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-1023h",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-dot-flow",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-1023o",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-账单页",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-统计页",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "clip-设置页",
+  "cfg": "360x780",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "sysnum",
+  "cfg": "360x780",
+  "sysnum": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "theme-#3f6f6b",
+  "cfg": "360x780",
+  "theme": true,
+  "html": "rgb(241, 249, 248)",
+  "body": "rgb(241, 249, 248)",
+  "ok": true
+ },
+ {
+  "name": "theme-#6b7245",
+  "cfg": "360x780",
+  "theme": true,
+  "html": "rgb(248, 249, 241)",
+  "body": "rgb(248, 249, 241)",
+  "ok": true
+ },
+ {
+  "name": "theme-#a8553f",
+  "cfg": "360x780",
+  "theme": true,
+  "html": "rgb(249, 242, 241)",
+  "body": "rgb(249, 242, 241)",
+  "ok": true
+ },
+ {
+  "name": "theme-#000000",
+  "cfg": "360x780",
+  "theme": true,
+  "html": "rgb(241, 249, 248)",
+  "body": "rgb(241, 249, 248)",
+  "ok": true
+ },
+ {
+  "name": "theme-#ffffff",
+  "cfg": "360x780",
+  "theme": true,
+  "html": "rgb(241, 249, 248)",
+  "body": "rgb(241, 249, 248)",
+  "ok": true
+ },
+ {
+  "name": "cp-bars",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-first",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-rows",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true,
+  "n": 14
+ },
+ {
+  "name": "ledger-strip",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "ledger-short-month",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "detail-ob-1023p",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "search-page",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-1023h",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-dot-flow",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ },
+ {
+  "name": "stats-1023o",
+  "cfg": "412x915",
+  "clip": true,
+  "bad": [],
+  "ok": true
+ }
+]

@@ -111,6 +111,12 @@
         }
         window.addEventListener('scroll', stripWake, { passive:true });
         window.addEventListener('resize', stripWake, { passive:true });
+        // 1023-P 后：页面高度后来又变了（排版晚一拍、分批画完、日卡片从估的高度变成真的）也重新看要不要一直显示；只改钉不钉，不另外叫出来
+        if(window.ResizeObserver) new ResizeObserver(()=>{
+            if(JiwenBase.currentTab!=='ledger' || $('pageLedger').style.display==='none') return;
+            const H=window.innerHeight||0, de=document.documentElement;
+            lgStrip.pin(de.scrollHeight>0 && de.scrollHeight <= H+1);
+        }).observe($('pageLedger'));
         function resetYM(){ lgYM=null; ymVer++; }   // 换账号 / 存档：回到这个月（不重画，后面会整页刷新）
         function ovOff(){ return lgYM!=null; }   // 首屏快照：看的不是这个月就不存（名字是 1023-A 留下来的）
         function gapHtml(a, b, today){

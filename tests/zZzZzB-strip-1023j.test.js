@@ -24,6 +24,7 @@ const R = (id, time, money, cat, remark) => ({ id, time, money, type: 'expense',
   ];
   const t = await A.boot({ html, www: WWW, now: '2026-10-23T10:00:00', seed: A.seedOf(recs, null, { budgets: { '吃饭': 50 } }), before(w) {
     w.__y = 0; w.__sh = 3000;
+    w.__ro = []; w.ResizeObserver = class { constructor(cb) { this.cb = cb; w.__ro.push(this); } observe(el) { this.el = el; } disconnect() {} };   // jsdom 没有，装一个能手动触发的
     Object.defineProperty(w, 'scrollY', { get: () => w.__y, configurable: true });
     Object.defineProperty(w.HTMLHtmlElement.prototype, 'scrollHeight', { get: () => w.__sh, configurable: true });   // 整页多高（jsdom 没有排版）
     w.scrollTo = (x, y) => { w.__y = typeof x === 'object' ? x.top : y; };
@@ -72,6 +73,16 @@ const R = (id, time, money, cat, remark) => ({ id, time, money, type: 'expense',
   w.__sh = 3000; w.JiwenLedger.stripWake();
   await sleep(1700);
   ok(!on('lgStrip'), '3 又变长了：照常停 1.5 秒收起');
+  // 1023-Q：页面后来自己变矮了（排版晚一拍、日卡片从估的高度变成真的），没有滚动也要钉住
+  const ro = id => w.__ro.find(x => x.el && x.el.id === id);
+  ok(ro('pageLedger') && ro('pageStats'), '3 账单页、统计页都盯着页面高度');
+  w.__sh = w.innerHeight - 100; ro('pageLedger').cb([]);
+  ok(on('lgStrip'), '3 页面自己变矮了：浮条马上出来');
+  await sleep(1700);
+  ok(on('lgStrip'), '3 不满一屏：一直显示（没有滚动、没有重画也一样）');
+  w.__sh = 3000; ro('pageLedger').cb([]);
+  await sleep(1700);
+  ok(!on('lgStrip'), '3 又变长了：停 1.5 秒收起');
 
   // 4. 按下反馈
   const row = $('billList').querySelector('.bl-row');
