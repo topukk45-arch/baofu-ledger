@@ -144,7 +144,7 @@
       var bs = bills.filter(function (b) { return !b.done && !b.neutral; });
       if (!bs.length) return;
       var rs = C.classify(bs.map(function (b) { return { app: parsed.files[b.it.file].app, cp: b.r.cp, desc: b.r.desc, kind: b.r.kind, io: b.it.io }; }),
-        { cats: cats, rules: ctx.rules, learned: lr, borrowRows: [], merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps, history: ctx.hist }).recs;
+        { cats: cats, rules: ctx.rules, learned: lr, borrowRows: [], merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps, history: ctx.hist, remarks: ctx.rmk, aliHist: ctx.aliHist }).recs;
       bs.forEach(function (b, i) { b.preRec = rs[i]; });
     };
 
@@ -185,7 +185,7 @@
     var combos0 = { combos: [], skipped: [] };
     if (cand0.length >= 2) {
       var recs0 = C.classify(cand0.map(function (b) { return { app: parsed.files[b.it.file].app, cp: b.r.cp, desc: b.r.desc, kind: b.r.kind, io: b.it.io }; }),
-        { cats: cats, rules: ctx.rules, learned: new Map(), borrowRows: [], merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps, history: ctx.hist }).recs;
+        { cats: cats, rules: ctx.rules, learned: new Map(), borrowRows: [], merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps, history: ctx.hist, remarks: ctx.rmk, aliHist: ctx.aliHist }).recs;
       combos0 = findCombos(cand0, idx, free, function (b) { var r = recs0[cand0.indexOf(b)]; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; });
     }
     var comboList = combos0.combos, comboBill = new Set(), comboM = new Set(), sameDay = [];
@@ -301,7 +301,7 @@
     var aliRows = [];
     rowItems.forEach(function (it) { if (it.bucket !== 'error') { var r = rowOf(parsed, it); if (parsed.files[it.file].app === 'alipay') aliRows.push({ cp: r.cp, kind: r.kind }); } });
     var cl = C.classify(toClass.map(function (it) { var r = rowOf(parsed, it); return { app: parsed.files[it.file].app, cp: r.cp, desc: r.desc, kind: r.kind, io: it.io }; }),
-      { cats: cats, rules: ctx.rules, learned: learned, borrowRows: aliRows, merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps, history: ctx.hist });
+      { cats: cats, rules: ctx.rules, learned: learned, borrowRows: aliRows, merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps, history: ctx.hist, remarks: ctx.rmk, aliHist: ctx.aliHist });
     toClass.forEach(function (it, i) { it.rec = cl.recs[i]; });
 
 

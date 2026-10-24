@@ -2082,6 +2082,14 @@
                 const cpHist={}, cpsA=a.cps||[];
                 (st ? st.recs : []).forEach(r=>{ if(!Number.isInteger(r.cp) || r.refundOf || !r.cat || r.cat==='未分类') return; const nm=cpsA[r.cp]; if(!nm) return;
                     const io=r.type==='income' ? 'i' : 'e', h=cpHist[nm]||(cpHist[nm]={ e:{}, i:{} }); h[io][r.cat]=(h[io][r.cat]||0)+1; });
+                // 导入简化第 10 版：从手记备注学：你自己记的（没有导入来源的，合并过账单的也算）每句备注（整句，2～30 个字）× 收支 × 分类的次数；退款、未分类的不算
+                const remarkHist={};
+                (st ? st.recs : []).forEach(r=>{ if((r.src && !r.src.merged) || r.refundOf || !r.cat || r.cat==='未分类') return; const k=String(r.remark||'').trim(); if(k.length<2 || k.length>30) return;
+                    const io=r.type==='income' ? 'i' : 'e', h=Object.prototype.hasOwnProperty.call(remarkHist, k) ? remarkHist[k] : (remarkHist[k]={ e:{}, i:{} }); h[io][r.cat]=(h[io][r.cat]||0)+1; });
+                // 导入简化第 10 版：两家互借也借账本：以前导进来的支付宝记录，对方（名单原文）→ 原始分类的次数
+                const aliHist={};
+                (st ? st.recs : []).forEach(r=>{ if(!r.src || r.src.app!=='alipay' || r.src.merged || r.refundOf || !Number.isInteger(r.cp) || !r.oc) return; const nm=cpsA[r.cp]; if(!nm) return;
+                    const h=Object.prototype.hasOwnProperty.call(aliHist, nm) ? aliHist[nm] : (aliHist[nm]={}); h[r.oc]=(h[r.oc]||0)+1; });
                 // 1021-T23：存档里有几条手记（没有导入来源的；合并过账单的手记也算），没有手记时确认页不提「只对账」「漏记」
                 const manualN=(st ? st.recs : []).filter(r=>!r.src || r.src.merged).length;
                 // 导入简化 2a：每个月账本里已有的支出 / 收入（分，和统计页同一口径 statContrib），核对页「大额，先定算不算收支」算门槛、写影响用
@@ -2089,7 +2097,7 @@
                 (st ? st.recs : []).forEach(r=>{ const ym=String(r.time||'').slice(0, 7); if(!/^\d{4}-\d{2}$/.test(ym)) return; const c=statContrib(r); if(!c.exp && !c.inc) return;
                     const x=monthIO[ym]||(monthIO[ym]={ e:0, i:0 }); x.e+=Math.round(c.exp*100); x.i+=Math.round(c.inc*100); });
                 return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(), bigRules:(rules.big||[]).slice(), sumRules:(rules.sum||[]).slice(),
-                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, manualN, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist, monthIO };
+                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, manualN, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist, monthIO, remarkHist, aliHist };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）
             async knownFor(lk, archive){

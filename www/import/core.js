@@ -79,7 +79,7 @@
       if (!ctx || !ctx.match) throw new Error('配对模块没有载入');
       data = data || {};
       var r = ctx.match.match(data.routed, data.parsed, { manual: data.manual, refundCands: data.refundCands, cats: data.cats,
-        rules: data.rules, maps: data.maps, isNewUser: data.isNewUser, merchants: ctx.merchants, trace: !!data.trace, hist: data.hist || null });   // hist：1021-T8 账本历史
+        rules: data.rules, maps: data.maps, isNewUser: data.isNewUser, merchants: ctx.merchants, trace: !!data.trace, hist: data.hist || null, rmk: data.rmk || null, aliHist: data.aliHist || null });   // hist：1021-T8 账本历史；rmk、aliHist：导入简化第 10 版（手记备注、账本里的支付宝分类）
       if (onProgress) onProgress(1, 1);
       return r;
     },

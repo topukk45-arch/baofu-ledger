@@ -670,7 +670,7 @@
       S.ledger = store().ledgerFor(r.result);
       progress('和手记配对、推荐分类…', 0, 1);
       return J().run('match', { routed: S.routed, parsed: S.parsed, manual: S.ledger.manual, refundCands: S.ledger.refundCands,
-                                cats: S.info.cats, rules: S.info.catRules, maps: S.info.catMaps || [], isNewUser: S.info.isNewUser, trace: true, hist: S.info.cpHist || null });
+                                cats: S.info.cats, rules: S.info.catRules, maps: S.info.catMaps || [], isNewUser: S.info.isNewUser, trace: true, hist: S.info.cpHist || null, rmk: S.info.remarkHist || null, aliHist: S.info.aliHist || null });
     }).then(function (r) {
       if (!alive() || !r) return;
       S.matched = r.result;
@@ -3800,7 +3800,7 @@
       var info = null; try { info = store().archiveInfo(); } catch (_) {}
       if (!info) return '';
       var rec = window.JiwenImportClassify.classify([{ app: (r.src && r.src.app) || 'wechat', cp: cpName || '', desc: String(r.remark || '').split('\n')[0], kind: r.oc || '', io: r.type }],
-        { cats: info.cats, rules: info.catRules, maps: info.catMaps, merchants: window.JiwenImportMerchants, isNewUser: false, history: info.cpHist || null }).recs[0];
+        { cats: info.cats, rules: info.catRules, maps: info.catMaps, merchants: window.JiwenImportMerchants, isNewUser: false, history: info.cpHist || null, remarks: info.remarkHist || null, aliHist: info.aliHist || null }).recs[0];
       if (!rec) return '';
       var w = confWord(rec);
       return rec.reason ? plainReason(rec) + (w ? '（' + w + '）' : '') : '推不出分类，按导入时的默认放的';
@@ -3816,7 +3816,7 @@
     var xs = rows.filter(function (r) { return !r.skip; });
     if (!xs.length) return [];
     var recs = C.classify(xs.map(function (r) { return { app: r.app || 'wechat', cp: r.cp, desc: r.remark, kind: r.oc, io: r.type }; }),
-      { cats: cats, rules: info.catRules, maps: info.catMaps, merchants: window.JiwenImportMerchants, isNewUser: false, history: info.cpHist || null }).recs;
+      { cats: cats, rules: info.catRules, maps: info.catMaps, merchants: window.JiwenImportMerchants, isNewUser: false, history: info.cpHist || null, remarks: info.remarkHist || null, aliHist: info.aliHist || null }).recs;
     var out = [];
     xs.forEach(function (r, i) {
       var x = recs[i]; if (!x || x.newCat || !x.cat || x.cat === '未分类' || cats.indexOf(x.cat) < 0 || x.cat === r.cat) return;

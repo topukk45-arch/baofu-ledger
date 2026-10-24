@@ -26,6 +26,7 @@
 
   var VERSION = '1021-T24';
   var HIST_MIN = 3, HIST_SHARE = 0.8;   // 1021-T8 从账本历史里学：同一个对方以前至少 3 条、八成以上同一类
+  var REMARK_MIN = 2;   // 导入简化第 10 版：从手记备注学：同一句备注至少 2 次
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
 
   // ---------- 交易对方清洗 ----------
@@ -143,6 +144,20 @@
       if (tot < HIST_MIN || bn < tot * HIST_SHARE || cats.indexOf(best) < 0) return null;
       return { cat: best, layer: 'history', conf: 'mid', reason: '你以前 ' + tot + ' 次' + (bn === tot ? '都' : '里 ' + bn + ' 次') + '记成「' + best + '」' };
     }
+    // 导入简化第 10 版：从手记备注学：你自己记的（没有导入来源的，合并过账单的也算）备注整句 × 收支 × 分类的次数（主页面 archiveInfo().remarkHist 数好），
+    //   账单的商品说明或清洗后的对方和某句备注一模一样、这句备注同收支至少 REMARK_MIN（2）次、八成以上同一类、分类还在 → 把握中。只认整句，不分词
+    var rmk = ctx.remarks && typeof ctx.remarks === 'object' ? ctx.remarks : {};
+    function fromRemark(texts, io) {
+      if (io !== 'income' && io !== 'expense') return null;
+      for (var t = 0; t < texts.length; t++) {
+        var k = String(texts[t] || '').trim(), m = k && Object.prototype.hasOwnProperty.call(rmk, k) ? rmk[k] : null; if (!m) continue;
+        var x = m[io === 'income' ? 'i' : 'e'] || {}, tot = 0, best = null, bn = 0;
+        Object.keys(x).forEach(function (c) { var v = +x[c] || 0; tot += v; if (v > bn) { bn = v; best = c; } });
+        if (tot < REMARK_MIN || bn < tot * HIST_SHARE || cats.indexOf(best) < 0) continue;
+        return { cat: best, layer: 'remark', conf: 'mid', reason: '你记账时备注「' + k + '」的 ' + tot + ' 次' + (bn === tot ? '都' : '里 ' + bn + ' 次') + '记成「' + best + '」' };
+      }
+      return null;
+    }
     var mapOf = {};
     (Array.isArray(ctx.maps) ? ctx.maps : []).forEach(function (m) {
       if (m && typeof m.from === 'string' && m.from && cats.indexOf(m.cat) >= 0 && !(m.from in mapOf)) mapOf[m.from] = m.cat;
@@ -160,6 +175,11 @@
       var w = aliWant(r.kind); if (!w) return;
       var k = cleanCp(r.cp); if (!k) return;
       var m = borrow.get(k); if (!m) borrow.set(k, m = {}); m[w] = (m[w] || 0) + 1;
+    });
+    // 导入简化第 10 版：两家互借也借账本：以前导进账本的支付宝记录（对方名单原文 → 原始分类的次数，主页面 archiveInfo().aliHist 数好）一起算
+    Object.keys(ctx.aliHist && typeof ctx.aliHist === 'object' ? ctx.aliHist : {}).forEach(function (nm) {
+      var k = cleanCp(nm), h = ctx.aliHist[nm]; if (!k || !h) return;
+      Object.keys(h).forEach(function (oc) { var w = aliWant(oc), v = +h[oc] || 0; if (!w || !(v > 0)) return; var m = borrow.get(k); if (!m) borrow.set(k, m = {}); m[w] = (m[w] || 0) + v; });
     });
     function majority(m) {
       var best = null, n = 0, tie = false;
@@ -185,6 +205,9 @@
       // 2.5（1021-T8）从账本历史里学：同一个对方以前导进账本的（同收支）至少 3 条、八成以上同一类 → 把握中
       var hx = cc ? fromHist(cc, r.io) : null;
       if (hx) return hx;
+      // 2.6（导入简化第 10 版）从手记备注学：商品说明或对方和你哪句备注一模一样
+      var rx = fromRemark([r.desc, cc], r.io);
+      if (rx) return rx;
       // 3. 两家互借（只给微信借；支付宝自己有分类，走第 5 层）
       if (r.app === 'wechat' && cc && borrow.has(cc)) {
         var bw = majority(borrow.get(cc));

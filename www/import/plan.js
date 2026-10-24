@@ -792,7 +792,7 @@
     });
     rows.forEach(function (d) {
       if (d.src !== 'row' || d.group !== 'add') return;
-      var r = d.rec || (d.item && d.item.rec), l = r && M_LAYER.indexOf(r.layer) >= 0 ? r.layer : 'none';
+      var r = d.rec || (d.item && d.item.rec), l = r && r.layer === 'remark' ? 'history' : r && M_LAYER.indexOf(r.layer) >= 0 ? r.layer : 'none';     // 第 10 版：从手记备注学的算「账本历史」
       layer[l] += units(d);
     });
     var n = Number.isInteger(o.total) && o.total >= 0 ? o.total : rows.reduce(function (s0, d) { return s0 + (d.src === 'row' ? units(d) : 0); }, 0);
