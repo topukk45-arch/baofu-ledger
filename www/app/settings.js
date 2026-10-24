@@ -395,13 +395,14 @@
                         paint();
                     },
                     foot(box, done){
-                        const st=document.createElement('div'); st.className='ui-stack';
-                        const ok=document.createElement('button'); ok.type='button'; ok.className='ui-btn primary block'; ok.id='cpApply'; ok.textContent='应用';
+                        // 1024-Y：「取消 | 应用」左右并排（左退右进），原来上下摞两行，360×780 下把色值框挡住半截
+                        const st=document.createElement('div'); st.className='ui-pair';
+                        const ok=document.createElement('button'); ok.type='button'; ok.className='ui-btn primary'; ok.id='cpApply'; ok.textContent='应用';
                         ok.addEventListener('click', ()=>{ done(); if(raf){ cancelAnimationFrame(raf); raf=0; } applyPrimary(cur, hsl.h); const p=loadPrefs(); p.primary=cur; p.hue=Math.round(hsl.h*10)/10; p.hueOf=cur; savePrefs(p);
                             $('customColor').value=cur; paintCustomRow(); renderPresets(cur); });
-                        const no=document.createElement('button'); no.type='button'; no.className='ui-btn block'; no.id='cpCancel'; no.textContent='取消';
+                        const no=document.createElement('button'); no.type='button'; no.className='ui-btn'; no.id='cpCancel'; no.textContent='取消';
                         no.addEventListener('click', ()=>{ done(); restore(); });
-                        st.appendChild(ok); st.appendChild(no); box.appendChild(st);
+                        st.appendChild(no); st.appendChild(ok); box.appendChild(st);
                     } });
             }
             $('customColorBtn').addEventListener('click', openColorPicker);
