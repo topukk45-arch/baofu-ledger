@@ -1995,9 +1995,15 @@
         .sp-title { flex:1 1 auto; font-size:18px; font-weight:bold; color:var(--c-text); }
         .sp-count { padding-right:8px; font-size:14px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
         .sp-body { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:4px 16px calc(250px + env(safe-area-inset-bottom)); }   /* 1023-M：底下让出条件卡 + 按钮 */
+        /* 1024-Y：卡片带「逐条确认」那排按钮时更高，固定 250 让不够；按量出来的卡片和按钮排的高让（search.js 的 fitCard，量不到时照旧 250） */
+        .search-page.sp-fit .sp-body { padding-bottom:calc(var(--sp-bar-h) + 8px + var(--sp-card-h) + 16px); }
         /* 1023-M：条件卡浮在底部按钮上面（一直显示，不自己收起）：条件一行横着滑；找到几笔 · 合计；其中几笔不计 / 往来（0 不写）；右边「批量改」 */
         .sp-card { position:absolute; left:12px; right:12px; bottom:calc(84px + env(safe-area-inset-bottom)); z-index:2; display:flex; flex-direction:column; gap:6px;
             padding:10px 12px; border:1px solid var(--c-border-mid); border-radius:18px; background:var(--c-surface); box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.2); }
+        /* 1024-Y：卡片贴在按钮排上面 8px；卡片下沿到按钮排之间垫一条页面底色，列表不从缝里露出半条 */
+        .search-page.sp-fit .sp-card { bottom:calc(var(--sp-bar-h) + 8px); }
+        .sp-card::after { content:''; position:absolute; left:-13px; right:-13px; top:100%; height:calc(84px + env(safe-area-inset-bottom)); background:var(--c-bg); pointer-events:none; }
+        .search-page.sp-fit .sp-card::after { height:calc(8px + 2px); }
         .sp-tags { display:flex; flex-wrap:nowrap; gap:8px; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; touch-action:pan-x; overscroll-behavior:contain; }
         .sp-tags::-webkit-scrollbar { display:none; }
         .sp-tag { flex:none; display:flex; align-items:center; height:36px; border-radius:18px; background:var(--c-primary-dark); color:var(--c-on-primary); font-size:14px; }

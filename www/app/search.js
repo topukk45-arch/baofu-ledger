@@ -68,6 +68,15 @@
         //   列表（和账单页同一份画法，不显示没记账的日子）；底部「回到账单 | 改条件」。没条件时列全部记录；没结果时缺省页
         const page=$('pageSearch'), list=$('searchList'), painter=makePainter(list);
         let pageOpen=false, closeT=null;
+        // 1024-Y：量条件卡和底部按钮排的高，列表底下按真的高让、卡片贴着按钮排（量不到的老 WebView / jsdom 照旧固定 250）
+        function fitCard(){
+            const card=$('searchCard'), bar=page.querySelector('.sp-bar');
+            const ch=card ? card.offsetHeight : 0, bh=bar ? bar.offsetHeight : 0;
+            if(!ch || !bh){ page.classList.remove('sp-fit'); return; }
+            page.style.setProperty('--sp-card-h', ch+'px'); page.style.setProperty('--sp-bar-h', bh+'px');
+            page.classList.add('sp-fit');
+        }
+        try{ if(window.ResizeObserver){ const ro=new ResizeObserver(()=>{ if(pageOpen) fitCard(); }); ro.observe($('searchCard')); ro.observe(page.querySelector('.sp-bar')); } }catch(_){}
         function spNoMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){ return false; } }
         function isOpen(){ return pageOpen; }
         function openSearch(o){
@@ -234,6 +243,7 @@
                 $('searchEmpty').querySelector('.sp-empty-s').textContent = any ? '点下面的条件把它去掉，或者改条件' : '记了账以后，在这里按条件找';
                 painter.paint([]);
             } else painter.paint(listHtml(asc, {}));
+            fitCard();
             paintSheet();
         }
         function searchFlush(){ painter.flush(); }
