@@ -1817,14 +1817,19 @@
         .lg-dc .bl-sub { display:block; margin-top:0; font-size:12px; line-height:17px; color:var(--c-text-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .bl-amt { font-weight:500; }
         .bl-amt.out { color:var(--c-text); }
-        /* 没记账的日子：虚线框，右边「补一笔 / 记一笔」 */
-        .lg-gap { display:flex; align-items:center; gap:10px; min-height:var(--ui-tap); margin-top:12px; padding:0 6px 0 14px;
-            border:1.5px dashed var(--c-border-mid); border-radius:16px; font-size:14px; color:var(--c-text-soft); }
-        .lg-gap-t { flex:1 1 auto; min-width:0; }
+        /* 没记账的日子（导入简化第 11 版）：一行细字，不装框，整行能点（48 高，按下整行浅底）；今天那条右边「记一笔」 */
+        button.lg-gap { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); margin-top:4px; padding:0 6px 0 14px;
+            border:none; border-radius:12px; background:none; font:inherit; font-size:13px; color:var(--c-text-soft); text-align:left; cursor:pointer; }
+        button.lg-gap.pressed { background:color-mix(in srgb, var(--c-text) 6%, transparent); }
+        .lg-gap-t { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .lg-gap-go { flex:none; padding:0 12px; color:var(--c-primary); font-weight:bold; }
+        .lg-gap .lg-chev { opacity:.6; }
+        .lg-gap-opt { display:flex; flex-direction:column; align-items:flex-start; gap:2px; text-align:left; margin-bottom:8px; }
+        .lg-gap-opt em { font-style:normal; font-size:13px; color:var(--c-text-soft); font-weight:normal; }
         button.lg-gap-btn { flex:none; min-height:36px; padding:0 14px; border:none; border-radius:18px; position:relative;
             background:color-mix(in srgb, var(--c-primary) 16%, var(--c-bg)); color:var(--c-text); font-size:13px; font-weight:bold; font-family:inherit; cursor:pointer; }
         button.lg-gap-btn::after { content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%, var(--ui-tap)); height:var(--ui-tap); }
-        .lg-gap-today { border-style:solid; border-color:var(--c-border); background:var(--c-surface); color:var(--c-text); }
+        button.lg-gap-today { color:var(--c-text); }
         /* 底栏：「筛选（1023-G 起搜一笔）| 记一笔」两个一样大 */
         .act-btn { height:56px; border-radius:16px; }
         .clear-filter-fab { bottom:calc(200px + env(safe-area-inset-bottom)); }

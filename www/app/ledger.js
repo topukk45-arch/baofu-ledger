@@ -161,11 +161,24 @@
         }).observe($('pageLedger'));
         function resetYM(){ lgYM=null; ymVer++; }   // 换账号 / 存档：回到这个月（不重画，后面会整页刷新）
         function ovOff(){ return lgYM!=null; }   // 首屏快照：看的不是这个月就不存（名字是 1023-A 留下来的）
+        // 导入简化第 11 版：没记账的日子是一行细字（不装框）：「10月7日 周三 · 没记账」/ 连着几天「10月13日–18日 · 6 天没记账」；
+        //   整行点了开一个小面板（补一笔……）；今天还没记的那条点了直接记一笔。只在按月显示时有，不按远近藏
+        function gapText(a, b){ const C=cal; return a===b ? `${C.mdText(a)} ${C.wdText(a)} · 没记账` : `${C.rangeText(a, b)} · ${Math.round((C.kd(b)-C.kd(a))/86400000)+1} 天没记账`; }
         function gapHtml(a, b, today){
             const C=cal;
-            if(a===b && a===today) return `<div class="lg-gap lg-gap-today" data-a="${a}" data-b="${b}"><span class="lg-gap-t">今天 · ${C.mdText(a)} ${C.wdText(a)}，还没记账</span><button type="button" class="lg-gap-btn" data-add="${a}">记一笔</button></div>`;
-            const t = a===b ? `${C.mdText(a)} ${C.wdText(a)}，没记账` : `${C.rangeText(a, b)}，${Math.round((C.kd(b)-C.kd(a))/86400000)+1} 天没记`;
-            return `<div class="lg-gap" data-a="${a}" data-b="${b}"><span class="lg-gap-t">${t}</span><button type="button" class="lg-gap-btn" data-add="${b}">补一笔</button></div>`;
+            if(a===b && a===today) return `<button type="button" class="lg-gap lg-gap-today" data-a="${a}" data-b="${b}" data-add="${a}"><span class="lg-gap-t">今天 · ${C.mdText(a)} ${C.wdText(a)} · 还没记账</span><span class="lg-gap-go">记一笔</span></button>`;
+            return `<button type="button" class="lg-gap" data-a="${a}" data-b="${b}"><span class="lg-gap-t">${gapText(a, b)}</span>${CHEV}</button>`;
+        }
+        // 点了没记账的那一行：小面板「补一笔（记在 X）」（以后加「这几天没花钱」「导入这几天的账单」）
+        function openGap(a, b){
+            const C=cal;
+            if(!window.JiwenSheet){ openAddModal({ day:b }); return; }
+            window.JiwenSheet.open({ title:gapText(a, b),
+                body(box, done){
+                    const mk=(id, t, sub, fn)=>{ const x=document.createElement('button'); x.type='button'; x.id=id; x.className='ui-btn block lg-gap-opt'; x.innerHTML=`<span>${escapeHtml(t)}</span>${sub ? `<em>${escapeHtml(sub)}</em>` : ''}`; x.addEventListener('click', ()=>{ done(); fn(); }); box.appendChild(x); return x; };
+                    mk('gapAdd', '补一笔', '记在 '+C.mdText(b)+(a===b ? '' : '（这几天的最后一天，记的时候能改）'), ()=>openAddModal({ day:b }));
+                },
+                foot(box, done){ const c=document.createElement('button'); c.type='button'; c.id='gapClose'; c.className='ui-btn ui-full'; c.textContent='关闭'; c.addEventListener('click', done); box.appendChild(c); } });
         }
         // 1023-K：周是一条分隔线「── 本周 10.19–25 ▂▅▃█▁·· ──── 312.38 ›」，不加底色、不装框（可点的地方照旧 48 高，按下整行浅底）；
         //   7 根小柱子是周一到周日每天的支出（按这一周里最多的那天算高度），这个月以外、还没到的日子是一个点；
@@ -243,6 +256,7 @@
         billList.addEventListener('click', e=>{
             const add=e.target.closest('[data-add]');
             if(add){ e.stopPropagation(); openAddModal({ day:add.dataset.add }); return; }
+            const gp=e.target.closest('.lg-gap[data-a]'); if(gp){ openGap(gp.dataset.a, gp.dataset.b); return; }
             const wk=e.target.closest('.lg-wk[data-mon]'); if(wk){ openWeek(wk.dataset.mon); return; }
             const dh=e.target.closest('.lg-dh[data-day]'); if(dh){ openDay(dh.dataset.day); return; }
         });

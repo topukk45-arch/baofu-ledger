@@ -38,7 +38,7 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   const first = list.firstElementChild;
   ok(first.classList.contains('lg-wk') && first.classList.contains('cur') && txt(first).startsWith('本周10.19–25'), '1 第一条是本周的分隔线（1023-K）' + txt(first));
   const today = list.querySelector('.lg-gap-today');
-  ok(today && first.nextElementSibling === today && txt(today) === '今天 · 10月23日 周五，还没记账记一笔', '1 今天还没记：单独一条「记一笔」 ' + (today && txt(today)));
+  ok(today && first.nextElementSibling === today && txt(today) === '今天 · 10月23日 周五 · 还没记账记一笔' && today.dataset.add === '2026-10-23', '1 今天还没记：单独一条，点了记一笔（导入简化第 11 版：一行细字） ' + (today && txt(today)));
   // 2. 周小计
   const wks = [...list.querySelectorAll('.lg-wk')].map(txt);
   ok(wks.length === 4 && wks[1].startsWith('第 42 周10.12–18') && wks[2].startsWith('第 41 周10.5–11'), '2 本周 / 别的周写一年里的第几周（1023-K）' + wks.join(' | '));
@@ -50,9 +50,9 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   ok([...wkEls[3].querySelectorAll('.lg-wk-bars i')].map(i => i.classList.contains('lg-wk-dot') ? '.' : 'i').join('') === '...iiii', '2 10.1–4 那周：9 月那三天（不在这个月）是点');
   // 3. 没记账的日子
   const gaps = [...list.querySelectorAll('.lg-gap')].map(txt);
-  ok(gaps.includes('10月20日–21日，2 天没记补一笔') && gaps.includes('10月13日–18日，6 天没记补一笔'), '3 连着没记的几天合成一条 ' + gaps.join(' | '));
-  ok(gaps.includes('10月7日 周三，没记账补一笔') && gaps.includes('10月4日 周日，没记账补一笔'), '3 单独一天没记');
-  ok(list.querySelector('.lg-gap[data-a="2026-10-13"] [data-add]').dataset.add === '2026-10-18', '3 「补一笔」的日子是那段的最后一天');
+  ok(gaps.includes('10月20日–21日 · 2 天没记账') && gaps.includes('10月13日–18日 · 6 天没记账'), '3 连着没记的几天合成一行（第 11 版：一行细字，不装框） ' + gaps.join(' | '));
+  ok(gaps.includes('10月7日 周三 · 没记账') && gaps.includes('10月4日 周日 · 没记账') && list.querySelector('.lg-gap[data-a="2026-10-07"]').tagName === 'BUTTON', '3 单独一天没记；整行是按钮');
+  ok(list.querySelector('.lg-gap[data-a="2026-10-13"]').dataset.b === '2026-10-18', '3 那段的最后一天是 10月18日');
   // 4. 日卡片和每笔两行
   const dh = list.querySelector('.lg-dh[data-day="2026-10-22"]');
   ok(dh && txt(dh).startsWith('昨天 · 10月22日 周四') && txt(dh).includes('支出 36.50'), '4 日卡片抬头：日期 + 当天支出 ' + (dh && txt(dh)));
@@ -64,7 +64,9 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   const inc = list.querySelector('.bl-row[data-id="inc"] .bl-amt');
   ok(inc.classList.contains('pos') && inc.textContent === '+5000.00', '4 收入：绿色、带 +');
   // 5. 补一笔：打开记一笔，日子设成那天
-  list.querySelector('.lg-gap[data-a="2026-10-13"] [data-add]').click();
+  list.querySelector('.lg-gap[data-a="2026-10-13"]').click();
+  ok(d.getElementById('uiSheetTitle').textContent === '10月13日–18日 · 6 天没记账' && /记在 10月18日/.test($('gapAdd').textContent), '5 点那一行：小面板「补一笔（记在 10月18日）」');
+  $('gapAdd').click();
   ok($('addMask').style.display === 'flex' && ($('billTime').dataset.value || '').startsWith('2026-10-18T'), '5 补一笔：记一笔的日子是 10月18日 ' + $('billTime').dataset.value);
   $('closeAdd').click();
   // 6. 月份浮条：账本第一笔的月份到这个月；点 9 月切过去
@@ -76,12 +78,12 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   ok(w.JiwenLedger.ovOff(), '6 看的不是这个月（首屏快照不存）');
   const sw = [...list.querySelectorAll('.lg-wk')].map(txt);
   ok(sw.some(x => x === '第 37 周9.7–13没记'), '6 一整周没记：分隔线右边写「没记」 ' + sw.join(' | '));
-  ok([...list.querySelectorAll('.lg-gap')].map(txt).includes('9月7日–13日，7 天没记补一笔') && !list.querySelector('.lg-gap-today'), '6 下面只一条合并的虚线框；过去的月份没有「今天」那条');
+  ok([...list.querySelectorAll('.lg-gap')].map(txt).includes('9月7日–13日 · 7 天没记账') && !list.querySelector('.lg-gap-today'), '6 下面只一行合并的；过去的月份没有「今天」那条');
   ok(sw[0].startsWith('第 40 周9.28–30'), '6 月底那周截在 9 月里');
   // 7. 8 月：不早于账本第一笔（8月5日）
   w.JiwenLedger.setYM('2026-08');
   const ag = [...list.querySelectorAll('.lg-gap')].map(txt);
-  ok(!ag.some(x => /8月[1-4]日/.test(x)) && ag.some(x => x.startsWith('8月21日–23日，3 天没记')) && ag.some(x => x.startsWith('8月24日–30日，7 天没记')), '7 账本第一笔之前的空白日子不显示 ' + ag.join(' | '));
+  ok(!ag.some(x => /8月[1-4]日/.test(x)) && ag.some(x => x.startsWith('8月21日–23日 · 3 天没记账')) && ag.some(x => x.startsWith('8月24日–30日 · 7 天没记账')), '7 账本第一笔之前的空白日子不显示 ' + ag.join(' | '));
   w.JiwenLedger.setYM(null);
   ok(txt(bar).startsWith('10月') && !w.JiwenLedger.ovOff(), '7 回到这个月');
   // 8. 搜一笔（1023-G 起是单独的结果页）：全部月份里命中的，同样的周小计 / 日卡片，不显示没记账的日子；账单页不动
