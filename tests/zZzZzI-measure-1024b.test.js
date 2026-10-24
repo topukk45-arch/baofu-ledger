@@ -41,8 +41,26 @@ const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
   ok(JSON.stringify(m.chg) === JSON.stringify({ match: 1, refund: 0, amount: 0, type: 1, cat: 1 }), '1 每种里改了推荐的几件（转账往来改了不算）：' + JSON.stringify(m.chg));
   ok(JSON.stringify(m.layer) === JSON.stringify({ rule: 1, learned: 3, history: 1, borrow: 0, builtin: 2, alipay: 1, none: 1 }), '1 分类是哪一层给的（只数新增组，按笔数）：' + JSON.stringify(m.layer));
   ok(P.measure(p, {}, { path: 'quick' }).path === 'quick' && P.measure(p, {}, {}).n === 11, '1 走「导入」记 quick；没给总笔数按方案里的行数');
+  // 1024-V：分类拿不准的新增拆开数：推不出的按交易类型、个人；把握低的按原因
+  {
+    const q = { rows: [
+      row('n1', 'add', { layer: 'none', cat: '未分类' }, { kind: '商户消费', cp: '某虚构小店' }),
+      row('n2', 'add', { layer: 'none', cat: '未分类' }, { kind: '转账', cp: '张*' }),
+      row('n3', 'add', { layer: 'none', cat: '未分类' }, { kind: '扫二维码付款', cp: '某虚构摊', desc: '收钱码收款' }),
+      row('n4', 'add', { layer: 'none', cat: '未分类' }, { kind: '微信红包', cp: '李*', units: 2 }),
+      row('l1', 'add', { layer: 'builtin', conf: 'low', cat: '餐饮', descOnly: true, reason: '内置（商品说明里的「果切」）→ 餐饮美食' }),
+      row('l2', 'add', { layer: 'builtin', conf: 'low', cat: '购物', reason: '内置（平台「淘宝」，卖什么的都有）→ 日用百货' }),
+      row('l3', 'add', { layer: 'alipay', conf: 'low', cat: '转账', reason: '付给个人的（收钱码 / 转账），支付宝写的「商业服务」不算数 → 转账红包' }),
+      row('l4', 'add', { layer: 'builtin', conf: 'mid', cat: '餐饮' }),
+      row('l5', 'neutral', { layer: 'none', cat: '未分类' }, { kind: '转账' }),
+      row('l6', 'add', { layer: 'none', cat: '未分类' }, { kind: '转账', mode: 'skip' })
+    ], sections: {} };
+    const mq = P.measure(q, {}, {});
+    ok(JSON.stringify(mq.none) === JSON.stringify({ shop: 1, qr: 1, transfer: 1, redpack: 2, other: 0, person: 4 }), '1 推不出的按交易类型数、对方是个人的另数（不计的、不是新增的不算）：' + JSON.stringify(mq.none));
+    ok(JSON.stringify(mq.low) === JSON.stringify({ desc: 1, plat: 1, person: 1, game: 0, other: 0 }), '1 把握低的按原因数：' + JSON.stringify(mq.low));
+  }
   const flat = JSON.stringify(m);
-  ok(!/某|餐饮|水果|[a-i]"/.test(flat.replace(/"(v|n|auto|look|why|chg|layer|min|path|match|refund|amount|type|cat|rule|learned|history|borrow|builtin|alipay|none|step)"/g, '')), '1 量度里只有数字，没有对方名、分类名、键');
+  ok(!/某|餐饮|水果|[a-i]"/.test(flat.replace(/"(v|n|auto|look|why|chg|layer|min|path|match|refund|amount|type|cat|rule|learned|history|borrow|builtin|alipay|none|step|low|shop|qr|transfer|redpack|other|person|desc|plat|game)"/g, '')), '1 量度里只有数字，没有对方名、分类名、键（1024-V 起多 none / low 两组数）');
 
   // 2. 真导：手记合并后带上对方编号，下次同一对方推手记的分类；导入记录里有 m
   const html = fs.readFileSync(htmlFile, 'utf8'), WWW = path.dirname(htmlFile);
@@ -102,6 +120,7 @@ const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
   const txt = t.d.getElementById('measureList').textContent;
   ok(/3 笔，自动定了/.test(txt) && /2 笔，自动定了/.test(txt) && /导入后改了分类 1 笔，改了别的 1 笔/.test(txt) && /分类来自：.*账本历史 1/.test(txt) && /逐项看看/.test(txt), '4 列出最近几次的量度：' + txt);
   ok(!/某面馆|某虚构书店|25\.00|31\.00|42\.00|吃饭/.test(txt), '4 不带对方名、金额、分类名');
+  ok(/推不出的 \d+：商户消费 \d+、扫码付款 \d+、转账 \d+、红包 \d+、别的 \d+；其中对方是个人 \d+/.test(txt) && /把握低的 \d+：只在商品说明里认出 \d+、平台或综合商超 \d+、付给个人 \d+、礼包 \d+、别的 \d+/.test(txt), '4 1024-V：分类拿不准的拆开写（推不出的按类型、把握低的按原因）');
   ok(t.d.getElementById('measureCopy') && t.d.getElementById('measureClose'), '4 有「复制全部」「关闭」');
   // 1024-T 后修（手机上「复制全部」弹出系统框、框里看不到字）：安卓 WebView 拒了剪贴板时不再退到系统 prompt
   {

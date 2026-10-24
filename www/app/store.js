@@ -1036,13 +1036,15 @@
         // 导入简化第 1 版：导入记录上的导入量度 m（只有数字，不存对方名和金额）：总笔数、自动定了、要人看（按原因分）、
         //   每种里改了推荐的几件、分类是哪一层给的、从选文件到点导入几分钟、走的是「导入」还是「逐项看看」。形状不对的整个不要
         const IMP_M_WHY=['match','refund','amount','type','cat'], IMP_M_LAYER=['rule','learned','history','borrow','builtin','alipay','none'];
+        const IMP_M_NONE=['shop','qr','transfer','redpack','other','person'], IMP_M_LOW=['desc','plat','person','game','other'];   // 1024-V：分类拿不准的拆开数
         function impCleanMeasure(m){
             if(!m || typeof m!=='object' || Array.isArray(m)) return null;
             const int=v=>Number.isInteger(v) && v>=0 && v<=1e7 ? v : 0;
             const pick=(src, keys)=>{ const o={}; const ok=src && typeof src==='object' && !Array.isArray(src); keys.forEach(k=>{ o[k]=ok ? int(src[k]) : 0; }); return o; };
             const min=Number(m.min);
             return { v:1, n:int(m.n), auto:int(m.auto), look:int(m.look), why:pick(m.why, IMP_M_WHY), chg:pick(m.chg, IMP_M_WHY), layer:pick(m.layer, IMP_M_LAYER),
-                     min:isFinite(min) && min>=0 && min<=1e5 ? Math.round(min*10)/10 : 0, path:m.path==='quick' ? 'quick' : 'step' };
+                     min:isFinite(min) && min>=0 && min<=1e5 ? Math.round(min*10)/10 : 0, path:m.path==='quick' ? 'quick' : 'step',
+                     ...(m.none && typeof m.none==='object' ? { none:pick(m.none, IMP_M_NONE) } : {}), ...(m.low && typeof m.low==='object' ? { low:pick(m.low, IMP_M_LOW) } : {}) };
         }
         function impCleanLog(list, mapId, cats, cpsLen, pmsLen){
             if(!Array.isArray(list)) return [];

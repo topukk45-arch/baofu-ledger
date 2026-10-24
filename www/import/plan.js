@@ -797,9 +797,30 @@
       var r = d.rec || (d.item && d.item.rec), l = r && r.layer === 'remark' ? 'history' : r && M_LAYER.indexOf(r.layer) >= 0 ? r.layer : 'none';     // 第 10 版：从手记备注学的算「账本历史」
       layer[l] += units(d);
     });
+    // 1024-V：分类拿不准的新增，拆开数一下是哪种（只有数字，不带对方名、金额）：
+    //   none 推不出的：按交易类型归成 商户消费 shop / 扫码付款 qr / 转账 transfer / 红包 redpack / 别的 other，另数对方是个人的 person；
+    //   low 推出了但把握低的：只在商品说明里认出 desc / 平台或综合商超 plat / 付给个人 person / 礼包 game / 别的 other
+    var none = { shop: 0, qr: 0, transfer: 0, redpack: 0, other: 0, person: 0 }, low = { desc: 0, plat: 0, person: 0, game: 0, other: 0 };
+    var kindOf = function (d) {
+      var k = String(d.kind || '');
+      if (/转账/.test(k)) return 'transfer';
+      if (/红包/.test(k)) return 'redpack';
+      if (/二维码|扫码/.test(k)) return 'qr';
+      if (/消费|商户/.test(k) || (d.app === 'alipay' && k)) return 'shop';
+      return 'other';
+    };
+    var personal = function (d) { return /\*/.test(String(d.cp || '')) || /转账|红包/.test(String(d.kind || '')) || /收钱码|收款码|二维码收款/.test(String(d.desc || '')); };
+    rows.forEach(function (d) {
+      if (d.src !== 'row' || d.group !== 'add' || d.mode === 'skip') return;
+      var r = d.rec || (d.item && d.item.rec), u = units(d);
+      if (!r || r.layer === 'none' || d.cat === '未分类') { none[kindOf(d)] += u; if (personal(d)) none.person += u; return; }
+      if (r.conf !== 'low') return;
+      var rs = String(r.reason || '');
+      low[r.descOnly || /商品说明/.test(rs) ? 'desc' : /平台|综合商超/.test(rs) ? 'plat' : /付给个人/.test(rs) ? 'person' : /礼包/.test(rs) ? 'game' : 'other'] += u;
+    });
     var n = Number.isInteger(o.total) && o.total >= 0 ? o.total : rows.reduce(function (s0, d) { return s0 + (d.src === 'row' ? units(d) : 0); }, 0);
     var ms = Number(o.ms), min = isFinite(ms) && ms > 0 ? Math.round(ms / 6000) / 10 : 0;
-    return { v: 1, n: n, auto: Math.max(0, n - look), look: look, why: why, chg: chg, layer: layer, min: min, path: o.path === 'quick' ? 'quick' : 'step' };
+    return { v: 1, n: n, auto: Math.max(0, n - look), look: look, why: why, chg: chg, layer: layer, min: min, path: o.path === 'quick' ? 'quick' : 'step', none: none, low: low };
   }
 
   function devText(p) {
