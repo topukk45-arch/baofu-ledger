@@ -213,7 +213,7 @@
       // 单号表去重
       var k = known[it.key];
       if (k && k.st === 1) { put(it, 'skip', 'ignored', '以前点过「不要了」'); return; }
-      if (k && k.st === 0 && k.rec) { put(it, 'skip', 'imported', k.fp ? '以前导入过（没有单号表，按时间、金额、对方认出来的）' : '以前导入过'); it.recId = k.id; return; }
+      if (k && k.st === 0 && k.rec) { put(it, 'skip', 'imported', k.fp ? '以前导入过（没有单号表，按时间、金额、对方认出来的）' : '以前导入过'); it.recId = k.id; if (k.rec.rawFill) it.rawFill = true; return; }   // 第 15 版：那条记录还没有账单原文 → 写入时补上
       // 1016-F：已经在待处理池里（同一份文件导第二次）；没有单号表时只有日期和金额对得上的
       // 1016-O：已经在待处理池里的，用这次的文件重新判断（照常往下走）；配对完还是拿不准的才跳过、不重复列出（见 match.js）
       if (k && k.pend) it.wasPend = true;
@@ -533,6 +533,7 @@
         if (it.fx !== undefined) o.fx = it.fx;
         if (it.multi) o.multi = it.multi;
         if (it.recId) o.recId = it.recId;
+        if (it.rawFill) o.rawFill = true;   // 第 15 版：那条记录要补账单原文
         if (it.fullOf) o.fullOf = it.fullOf;
         if (it.refundRec) o.refundRec = it.refundRec;
         if (it.toTime) o.toTime = it.toTime;

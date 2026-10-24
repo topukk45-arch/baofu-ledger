@@ -710,7 +710,9 @@
 
     sec.days = dayList;     // 导入简化 7a：按天对账
     return { version: VERSION, summaries: sumList, files: files, counts: counts, sums: sums, importN: importN, mergeM: mergeM, records: records, grouped: grouped, orders: orders,
-             ignoreOrders: ignoreOrders, canImport: canImport, blocking: blocking.map(function (f) { return f.name; }), sections: sec, groups: groups,
+             ignoreOrders: ignoreOrders, canImport: canImport,
+             rawFillN: rows.filter(function (d) { return d.src === 'row' && d.group === 'skip' && d.why === 'imported' && d.item && d.item.rawFill; }).length,     // 第 15 版：要补账单原文的老记录
+             blocking: blocking.map(function (f) { return f.name; }), sections: sec, groups: groups,
              groupNames: GROUP_NAME, rows: rows };
   }
 

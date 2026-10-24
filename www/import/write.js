@@ -77,10 +77,17 @@
       if (t && t === r.cp) t = '';
       return [t, cleanDesc(r.remark)].filter(Boolean).join(' ').slice(0, 5000);
     }
+    // 导入简化第 15 版：账单原文（raw）：这笔账单原来那一行里的几样（单号、交易类型、对方、商品说明、状态、支付方式、账单里的备注），
+    //   存在记录上（只在这台手机和自己的备份里；给 AI 的导出、分享不带），以后按新规则重新推荐、拆开合并、核对时用。指纹 recHash 不含它
+    function rawOf(d) {
+      var r = rowOf(d), o = { app: d.app }, put = function (k, v, n) { v = String(v == null ? '' : v).trim(); if (v) o[k] = v.slice(0, n || 64); };
+      put('no', noOf(d.key)[1]); put('kind', r.kind); put('cp', r.cp); put('desc', r.desc, 200); put('status', r.status); put('pm', r.pm); put('note', r.remark, 200);
+      return o;
+    }
     function base(d) {
       var r = rowOf(d);
       var o = { time: d.time, money: money(d.fen), type: d.type, cat: d.cat || '未分类', remark: remarkOf(d),
-                src: { app: d.app }, oc: String(r.kind || '').slice(0, 32), batch: batch };
+                src: { app: d.app }, oc: String(r.kind || '').slice(0, 32), batch: batch, raw: rawOf(d) };
       var c = cpIdx(r.cp), m = pmIdx(r.pm);
       if (c !== undefined) o.cp = c;
       if (m !== undefined) o.pm = m;
@@ -107,6 +114,7 @@
       } else {
         var o = base(mem[0]);
         o.time = last; o.money = money(fen); o.remark = '';
+        delete o.raw;     // 几笔合成的一条：没有单独一行原文
         o.src = { app: g.app || mem[0].app, sum: g.kind };
         var sameCp = mem.every(function (d) { return d.cp === mem[0].cp; });
         if (!sameCp) delete o.cp;
@@ -134,7 +142,7 @@
       // 1.1（1016-Z4）：零钱提现的服务费单独记一笔支出（计入），跟着这笔提现的批次；不另登记单号（提现那笔登记了，再导时一起跳过）
       if (d.feeFen > 0 && d.group === 'neutral') {
         var fo = base(d);
-        fo.money = money(d.feeFen); fo.type = 'expense'; fo.cat = (p.sections && p.sections.feeCat) || '未分类'; fo.remark = '零钱提现服务费';
+        fo.money = money(d.feeFen); fo.type = 'expense'; fo.cat = (p.sections && p.sections.feeCat) || '未分类'; fo.remark = '零钱提现服务费'; delete fo.raw;
         newRec(fo);
       }
       // 以前导入的退款 + 这批的原单（1016-D）：旧退款挂到新原单上
@@ -174,6 +182,11 @@
         order(d.key, d.time, 0, { id: d.item.nettedInto });
         change(d.item.nettedInto, 'merge').nos.push(noOf(d.key));
       }
+    });
+
+    // 导入简化第 15 版：老记录补全：以前导入的记录（单号表认出来、不是合并进手记的、不是几笔合成的）还没有原文的，这次再导到同一笔时补上（原值记进导入记录，撤销时拿掉）
+    rows.forEach(function (d) {
+      if (d.group === 'skip' && d.why === 'imported' && d.item && d.item.recId && d.item.rawFill) change(d.item.recId, 'raw').set.raw = rawOf(d);
     });
 
     // 导入简化 7a：按天对账「以手记为准」的账单：只登记单号（指到这天金额最近的那条手记），不入账、不改手记
@@ -378,7 +391,7 @@
     return '{' + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(v[k]); }).join(',') + '}';
   }
   function recHash(r) {
-    var o = {}; Object.keys(r || {}).forEach(function (k) { if (k !== 'id' && k !== 'refundOf' && k !== 'rv' && r[k] !== undefined) o[k] = r[k]; });   // 1021-T13：待确认分类标记 rv 不算（去掉标记不算「导入后你改过」）
+    var o = {}; Object.keys(r || {}).forEach(function (k) { if (k !== 'id' && k !== 'refundOf' && k !== 'rv' && k !== 'raw' && r[k] !== undefined) o[k] = r[k]; });   // 1021-T13：待确认分类标记 rv 不算（去掉标记不算「导入后你改过」）；第 15 版：账单原文 raw 也不算（补上原文不算你改过）
     var str = canon(o), h1 = 0xdeadbeef, h2 = 0x41c6ce57;
     for (var i = 0; i < str.length; i++) { var ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
     h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);

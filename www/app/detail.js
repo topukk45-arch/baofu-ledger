@@ -86,6 +86,15 @@
             const v=document.createElement('div'); v.className='detail-src'; v.id='detailSrc';
             v.textContent = rec.src.merged ? `已和${app}账单合并（你记的这条，补上了来源）` : rec.src.sum ? `来自${app}账单（几笔合成的一条）` : `来自${app}账单`;
             f.appendChild(v);
+            // 导入简化第 15 版：账单原文（导入时存的那一行），点了展开
+            if(rec.raw && typeof rec.raw==='object'){
+                const R=rec.raw, parts=[['交易类型', R.kind], ['对方', R.cp], ['商品说明', R.desc], ['状态', R.status], ['支付方式', R.pm], ['备注', R.note], ['单号', R.no]].filter(x=>x[1]);
+                const b=document.createElement('button'); b.type='button'; b.className='link-btn'; b.id='detailRawBtn'; b.textContent='看账单原文 ›';
+                const box=document.createElement('div'); box.className='detail-raw'; box.id='detailRaw'; box.hidden=true;
+                box.textContent=parts.map(x=>x[0]+'：'+x[1]).join('\n');
+                b.addEventListener('click', ()=>{ box.hidden=!box.hidden; b.textContent=box.hidden ? '看账单原文 ›' : '收起账单原文'; });
+                f.appendChild(b); f.appendChild(box);
+            }
             if(rec.src.merged && devImportOn()){
                 const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='detailSplit'; b.textContent='拆开'; b.style.marginTop='6px';
                 b.addEventListener('click', ()=>{

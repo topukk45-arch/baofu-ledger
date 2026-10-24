@@ -2178,3 +2178,6 @@
         .io-flow.io-ob { color:var(--c-primary-dark); border-color:var(--c-primary-mid); }
         /* 导入简化第 12 版：没记账那一行点开的选项（补一笔 / 这几天没花钱），一周详情里标过「没花钱」的那天 */
         .dw-day-ns .dw-day-n { color:var(--c-pos); }
+        /* 导入简化第 15 版：账单详情里的「账单原文」 */
+        .detail-raw { white-space:pre-wrap; font-size:13px; color:var(--c-text-soft); line-height:1.6; margin-top:6px; word-break:break-all; }
+        #detailRawBtn { min-height:var(--ui-tap); padding:0; font-size:14px; }

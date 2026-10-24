@@ -1166,6 +1166,13 @@
             if(next.length) a.noSpend=next; else delete a.noSpend;
             return saveStoreSafe(store);
         }
+        // 导入简化第 15 版：账单原文 raw 洗一遍：只留这几样字符串（截长），一样都没有就不要
+        const IMP_RAW_KEYS={ app:16, no:64, kind:64, cp:64, desc:200, status:64, pm:64, note:200 };
+        function impCleanRaw(x){
+            if(!x || typeof x!=='object' || Array.isArray(x)) return null;
+            const o={}; Object.keys(IMP_RAW_KEYS).forEach(k=>{ if(typeof x[k]==='string' && x[k].trim()) o[k]=x[k].trim().slice(0, IMP_RAW_KEYS[k]); });
+            return Object.keys(o).filter(k=>k!=='app').length ? o : null;
+        }
         function impArchFields(a){
             const o={};
             if(Array.isArray(a.noSpend) && a.noSpend.length) o.noSpend=cleanNoSpend(a.noSpend);
@@ -1366,6 +1373,7 @@
                 if(Number.isInteger(x.pm)) r.pm=x.pm;
                 if(typeof x.oc==='string' && x.oc) r.oc=x.oc.slice(0, 32);
                 if(x.rv===1) r.rv=1;   // 1021-T13：待确认分类
+                { const rw=impCleanRaw(x.raw); if(rw) r.raw=rw; }   // 导入简化第 15 版：账单原文
                 if(x.ob===1 && r.flow===true) r.ob=1;   // 导入简化 2a：大额选了往来、标了期初余额
                 if(x.refundOf) r.refundOf=res(x.refundOf);
                 made.push(r); madeBy[r.id]=r;
@@ -1489,7 +1497,8 @@
             if(window.__impFailAt==='beforeSave') throw impErr('test');
             store.last=store.last || t.name;
             await saveStoreDurable(store, user, ()=>pairs);
-            return { added:made.length, changed:chg.length, ids:made.map(r=>r.id) };
+            const rawN=chg.filter(c=>Object.keys(c.was).join()==='raw').length;   // 第 15 版：只补了账单原文的不算「改了以前的记录」
+            return { added:made.length, changed:chg.length-rawN, rawFilled:rawN, ids:made.map(r=>r.id) };
         }
         // 恢复一份备份：原地替换（不重新编号），账本、存档设置、单号表、待处理池、导入记录和做那份备份时逐字节一样。
         //   1017-O：用过的那份不删（还能再恢复一次）；恢复前先备份一份「恢复前」（恢复错了能回来，放不下就不恢复）；
@@ -2133,7 +2142,9 @@
                     if(r.refundOf) refunded.set(r.refundOf, (refunded.get(r.refundOf)||0)+Math.round(safeNum(r.money)*100));
                 });
                 blocks.forEach(list=>list.forEach(x=>{ if(x.st===0) nOf.set(x.id, (nOf.get(x.id)||0)+1); }));
-                const info=id=>{ const r=byId.get(id); return r ? { type:r.type, fen:Math.round(safeNum(r.money)*100), refunded:refunded.get(id)||0, mode:recMode(r), time:r.time, cat:r.cat } : null; };
+                // 导入简化第 15 版：rawFill：是以前导入的记录（不是合并进手记的、不是几笔合成的）、还没有账单原文 → 这次补上
+                const info=id=>{ const r=byId.get(id); return r ? Object.assign({ type:r.type, fen:Math.round(safeNum(r.money)*100), refunded:refunded.get(id)||0, mode:recMode(r), time:r.time, cat:r.cat },
+                    r.src && IMP_APPS.includes(r.src.app) && !r.src.merged && !r.src.sum && !r.raw ? { rawFill:true } : {}) : null; };
                 const known={};
                 (lk && lk.orders || []).forEach(key=>{
                     const i=key.indexOf('|'); if(i<0) return;
@@ -2991,7 +3002,7 @@
                 if(Array.isArray(v)) return '['+v.map(canon).join(',')+']';
                 return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}';
             };
-            const o={}; Object.keys(r||{}).forEach(k=>{ if(k!=='id' && k!=='refundOf' && k!=='rv' && r[k]!==undefined) o[k]=r[k]; });   // 1021-T13：rv 不算（和 write.js 的 recHash 一样）
+            const o={}; Object.keys(r||{}).forEach(k=>{ if(k!=='id' && k!=='refundOf' && k!=='rv' && k!=='raw' && r[k]!==undefined) o[k]=r[k]; });   // 1021-T13：rv 不算；第 15 版：raw 不算（和 write.js 的 recHash 一样）
             const str=canon(o); let h1=0xdeadbeef, h2=0x41c6ce57;
             for(let i=0;i<str.length;i++){ const ch=str.charCodeAt(i); h1=Math.imul(h1^ch, 2654435761); h2=Math.imul(h2^ch, 1597334677); }
             h1=Math.imul(h1^(h1>>>16), 2246822507) ^ Math.imul(h2^(h2>>>13), 3266489909);
@@ -3225,6 +3236,7 @@
                 const af=impCleanAiFlag(r.aiFlag, null); if(af) rec.aiFlag=af;
                 if(r.rv===1) rec.rv=1;   // 1021-T13：待确认分类标记照搬
                 if(r.rp===1) rec.rp=1;   // 导入简化 7b：已被账单替换的手记照搬（还是藏着）
+                { const rw=impCleanRaw(r.raw); if(rw) rec.raw=rw; }   // 导入简化第 15 版：账单原文照搬（洗过）
                 if(r.ob===1 && rec.flow===true) rec.ob=1;   // 1023-P：期初余额（只在往来的记录上）
                 if(r.id!=null) idMap.set(String(r.id), rec);
                 if(type==='income' && r.refundOf!=null && r.refundOf!=='') pend.push([rec, String(r.refundOf)]);

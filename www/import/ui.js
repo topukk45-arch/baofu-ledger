@@ -1221,7 +1221,11 @@
       var quick = btn('导入', 'ui-btn primary ui-full', function () { onImport(null, true); }); quick.id = 'impQuick';
       quick.disabled = !p.canImport;
       if (p.blocking.length) next.disabled = quick.disabled = true;
-      barSet([quick, cancel, next]);
+      // 导入简化第 15 版：全部导过、有以前导入的记录还没有账单原文：给一个「补上账单原文」（照导入那套写、能撤销）
+      if (!p.canImport && p.rawFillN && !p.blocking.length) {
+        var rf = btn('给以前导入的 ' + p.rawFillN + ' 条补上账单原文', 'ui-btn primary ui-full', function () { onImport(null, true, true); }); rf.id = 'impRawFill';
+        barSet([rf, cancel, next]);
+      } else barSet([quick, cancel, next]);
     } else {
       barSet(i > 0 ? [prevB, next] : [cancel, next]);
     }
@@ -2776,8 +2780,9 @@
   // ---------- 底部按钮、复制 ----------
   var BUCKET_LINE = [['add', '支出和收入'], ['merge', '和手记合并'], ['neutral', '不计'], ['refund', '退款'], ['pending', '待处理'],
                      ['skip', '跳过'], ['error', '出错'], ['excluded', '你勾掉的']];
-  function onImport(onlyKeys, quick) {
-    if (!S || !S.plan || !S.plan.canImport || S.phase !== 'confirm') return;
+  function onImport(onlyKeys, quick, rawOnly) {
+    if (!S || !S.plan || S.phase !== 'confirm') return;
+    if (!S.plan.canImport && !(rawOnly && S.plan.rawFillN && !S.plan.blocking.length)) return;     // 第 15 版：全部导过、只补账单原文
     if (quick ? S.view.recon || S.view.step !== 'check' || S.plan.blocking.length : !S.view.recon && S.view.step !== 'overview') return;      // 1017-UI2：只在总览（和只对账清单）能导入；2a：核对页的「导入」
     if (onlyKeys && !onlyKeys.length) return;
     var p = S.plan, my = runId;
@@ -2960,6 +2965,7 @@
           : '合计 ' + sum + ' 笔，文件里共 ' + res.ws.total + ' 笔（对不上，请截图发给开发者）');
       card.appendChild(tl);
       if (res.r.changed) card.appendChild(el('div', 'imp-soft', '改了 ' + res.r.changed + ' 条以前的记录（合并的手记、追加的合并记录）。'));
+      if (res.r.rawFilled) { var rf0 = el('div', 'imp-soft imp-res-raw', '给以前导入的 ' + res.r.rawFilled + ' 条补上了账单原文（账单详情里能看）。'); rf0.id = 'impResRaw'; card.appendChild(rf0); }
       if (res.ws.learnedN) card.appendChild(el('div', 'imp-soft imp-res-learned', '从合并里学到了 ' + res.ws.learnedN + ' 条规则（同一个对方合并上 2 次以上、分类一致），以后直接用。'));
       if (res.ws.rulesChange && res.ws.rulesChange.length) card.appendChild(el('div', 'imp-soft imp-res-rulefix', '改了你的 ' + res.ws.rulesChange.length + ' 条规则：' + res.ws.rulesChange.map(function (x) { return x.kw + ' → ' + x.to; }).join('，')));
       var nmr = S.plan && S.plan.sections && S.plan.sections.nearMerged;
