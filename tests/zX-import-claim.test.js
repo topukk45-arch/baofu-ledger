@@ -23,6 +23,8 @@ async function pick(t, files) {
   Object.defineProperty(input, 'files', { value: files.map(([name, bytes]) => new t.w.File([bytes], name)), configurable: true });
   input.dispatchEvent(new t.w.Event('change'));
   await t.until(() => t.S() && t.S().phase === 'confirm' && t.S().plan, 30000);
+  // 7a 起有手记的天按天对账、不选的留在待处理；这里测一笔一笔的配对，那几天先选「逐笔看」（照原来一笔一笔）
+  const S0 = t.S(); (S0.plan.sections.days || []).forEach(x => { if (!x.auto) S0.edits.days[x.day] = 'each'; }); t.w.JiwenImportUI._replan();
 }
 const MANUAL = [r('a', 4, '12:30', 35), r('b', 5, '12:15', 30), r('c', 7, '12:00', 30)];
 const X1 = wx({ time: T(4, 11, 58), cp: '某虚构食堂', desc: '套餐', fen: 3000 }), X2 = wx({ time: T(4, 11, 59), cp: '某虚构食堂', desc: '饮料', fen: 500 });

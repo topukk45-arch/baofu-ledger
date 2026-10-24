@@ -261,6 +261,8 @@ const before = await t.snapshot();
   const many = []; for (let i = 0; i < 120; i++) many.push(wx({ time: T(3, 1 + i % 28, 9 + i % 12, i % 60), cp: '某商户' + (i % 7), fen: 100 + i }));
   await t.openImport();
   await t.pick([['多.csv', B.bill('wechat', many, { range: RANGE }).bytes]]);
+  // 7a 起有手记的天按天对账、不选的留在待处理；这一段测明细分页，那几天选「逐笔看」（照原来一笔一笔）
+  { const S6 = t.S(); (S6.plan.sections.days || []).forEach(x => { if (!x.auto) S6.edits.days[x.day] = 'each'; }); t.w.JiwenImportUI._replan(); t.w.JiwenImportUI._goStep('overview'); }
   t.$('impDetailsToggle').click(); t.$('impG-add').click();
   const rows = () => t.d.querySelectorAll('.imp-list[data-group="add"] .al-row').length;
   const total = t.S().plan.counts.add;

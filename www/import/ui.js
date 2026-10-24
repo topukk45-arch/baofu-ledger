@@ -330,7 +330,7 @@
   // ---------- 打开 / 关掉 ----------
   function open() {
     build(); setTokens(); stashResult(null);   // 1021-T23：开始新的一次导入，「回到导入结果」就不要了
-    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {} }, types: {}, statuses: {},
+    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {}, seen: {}, more: {}, step: null } };
     try { dom.archive.textContent = '导入到存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
     dom.page.style.display = 'block'; barSet([]);
@@ -392,7 +392,7 @@
   function resume(d) {
     if (!S || S.phase !== 'pick') return;
     var e = d.edits || {};
-    S.edits = Object.assign({ rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {} }, e);
+    S.edits = Object.assign({ rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {} }, e);
     S.types = d.types || {}; S.statuses = d.statuses || {};
     var v = d.view || {};
     S.view.step = v.step || null; S.view.seen = v.seen || {}; if (v.reconPick) S.view.reconPick = v.reconPick;
@@ -437,7 +437,7 @@
     runId++;
     if (J()) try { J().cancel(); } catch (_) {}
     dom.prog.style.display = 'none'; closeSheet(); closePicker();
-    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {} }, types: {}, statuses: {},
+    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {}, seen: {}, more: {}, step: null } };
     hideSteps();
     renderPick();
@@ -463,7 +463,7 @@
     if (!S || !S.edits) return 0;
     var e = S.edits, n = 0;
     Object.keys(e.rows || {}).forEach(function (k) { n += Object.keys(e.rows[k]).length; });
-    ['cpCats', 'newCats', 'petty', 'sums', 'ruleFix'].forEach(function (k) { n += Object.keys(e[k] || {}).length; });
+    ['cpCats', 'newCats', 'petty', 'sums', 'ruleFix', 'days'].forEach(function (k) { n += Object.keys(e[k] || {}).length; });
     n += Object.keys(S.types || {}).length + Object.keys(S.statuses || {}).length;
     if (e.nearPay) n++;
     if (e.receipt !== undefined) n++;
@@ -728,7 +728,7 @@
 
   // ---------- 方案 → 页面 ----------
   function replan() {
-    S.plan = Plan.plan({ parsed: S.parsed, matched: S.matched, info: S.info, manualById: S.manualById, overlaps: S.overlaps }, S.edits);
+    S.plan = Plan.plan({ parsed: S.parsed, matched: S.matched, info: S.info, manualById: S.manualById, overlaps: S.overlaps, manual: (S.ledger && S.ledger.manual) || [] }, S.edits);
     render();
   }
   // ---------- 1017-UI2：分步确认页 ----------
@@ -886,6 +886,7 @@
   function pendSingles(p) {
     var inG = {};
     p.sections.pendGroups.forEach(function (g) { if (g.kind !== 'byBill') g.keys.forEach(function (k) { inG[k] = 1; }); });
+    dayKeys(p).forEach(function (k) { inG[k] = 1; });      // 7a：在「按天对账」里、没选「逐笔看」的，不再单列
     return p.rows.filter(function (d) { return d.src === 'row' && d.bucket0 === 'pending' && !inG[d.key] && !(d.item && d.item.msum); });
   }
   // 推荐要你看一眼：把握低的推荐（已经在「按对方选分类」里的不重复列）
@@ -903,6 +904,34 @@
     return { t: Object.keys(S.seenTypes).filter(function (k) { return S.types[k] || s.unknownTypes.some(function (t) { return t.app + '|' + t.type === k; }); }),
              s: Object.keys(S.seenStatuses).filter(function (k) { return S.statuses[k] || s.unknownStatuses.some(function (t) { return t.app + '|' + t.status === k; }); }) };
   }
+  // 7a：按天对账里、没选「逐笔看」的那几天的账单（这几笔不在别处一笔一笔列）
+  function dayKeys(p) { var out = []; ((p.sections && p.sections.days) || []).forEach(function (x) { if (x.choice !== 'each') out = out.concat(x.keys); }); return out; }
+  function dayTitle(x) { return (+x.day.slice(5, 7)) + '月' + (+x.day.slice(8, 10)) + '日：你记了 ' + x.mN + ' 笔 ' + yuan(x.mFen) + '，账单 ' + x.bN + ' 笔 ' + yuan(x.bFen) + (x.diff ? '，差 ' + yuan(Math.abs(x.diff)) : ''); }
+  var DAY_CHOICES = [['manual', '以手记为准', '账单这几笔只登记单号，不入账'], ['each', '逐笔看', '一笔一笔对（配对卡），对不上的作为新增或留着']];
+  function dayCard(p) {
+    var list = (p.sections.days || []).filter(function (x) { return !x.auto; }), autoN = (p.sections.days || []).filter(function (x) { return x.auto; }).length;
+    var everDay = Object.keys(((S.view.ever || {}).match) || {}).some(function (id) { return id.indexOf('day:') === 0; });
+    if (!list.length && !everDay) return null;
+    var c = el('div', 'imp-card'); c.id = 'impDays';
+    c.appendChild(el('h4', null, '按天对账'));
+    c.appendChild(el('div', 'imp-soft', '手记和账单本来就不是一笔对一笔，按天对钱数：选以哪边为准；不选的这几笔账单留在待处理，不进账本。'));
+    list.forEach(function (x) {
+      var r = el('div', 'imp-row-opt imp-day-row'); r.dataset.item = 'day:' + x.day; r.dataset.day = x.day; r.style.display = 'block';
+      var hd = el('div', 'imp-pc-head'); hd.appendChild(el('span', 'grow imp-line', dayTitle(x))); hd.appendChild(mk(x.choice !== null)); r.appendChild(hd);
+      var seg = el('div', 'imp-big-seg imp-day-seg');
+      DAY_CHOICES.forEach(function (ch) {
+        var b0 = btn(ch[1], 'imp-btn imp-day-m' + (x.choice === ch[0] ? ' gold on' : ''), function () { S.edits.days = S.edits.days || {}; if (x.choice === ch[0]) delete S.edits.days[x.day]; else S.edits.days[x.day] = ch[0]; replan(); });
+        b0.dataset.v = ch[0]; seg.appendChild(b0);
+      });
+      r.appendChild(seg);
+      r.appendChild(el('div', 'imp-soft', x.choice ? '→ ' + DAY_CHOICES.filter(function (ch) { return ch[0] === x.choice; })[0][2] : '没选：这 ' + x.bN + ' 笔账单留在待处理'));
+      var lk = btn('看这天的 ' + x.bN + ' 笔账单 ›', 'imp-link imp-day-rows', function () { openRows({ title: (+x.day.slice(5, 7)) + '月' + (+x.day.slice(8, 10)) + '日的账单', keys: x.keys, id: 'day:' + x.day }); });
+      lk.dataset.of = 'day:' + x.day; r.appendChild(lk);
+      c.appendChild(r);
+    });
+    if (autoN) { var an = el('div', 'imp-soft imp-day-auto', '另有 ' + autoN + ' 天手记和账单的钱数正好对得上，按手记为准（账单只登记单号）。'); an.id = 'impDaysAuto'; c.appendChild(an); }
+    return c;
+  }
   // 每一步有几件、定了几件（只看方案和改动，不看页面）
   // 1017-UI9：每件带上名字（label）、它那几行（keys）和是不是「只看就行」（look）：挪走的、定了的能写明去处
   function stepItems(p) {
@@ -910,6 +939,8 @@
     var picked = function (k) { return !!(E.rows[k] && E.rows[k].pick) || !!V['keep:' + k]; };     // 明确点了「还是待确认」也算定了
     var add = function (step, id, done, label, keys, o) { var x = { id: id, done: done, label: label, keys: keys || [] }; if (o) Object.keys(o).forEach(function (k) { x[k] = o[k]; }); it[step].push(x); };
     var rl = function (k) { return rowLabel(rowByKey(k)); };
+    // 7a：按天对账：一天一件（差 0 的天直接按手记为准，不列）
+    (s.days || []).forEach(function (x) { if (!x.auto) add('match', 'day:' + x.day, x.choice !== null, dayTitle(x), x.keys); });
     s.sums.forEach(function (g) { add('match', 'sum:' + g.id, g.chosen !== null, '几笔加起来：' + g.keys.map(rl).join('、'), g.keys); });
     // 1017-D：金额差一点的一笔一件：自己定了改不改成实付（或「全部改成实付」）算已选，点开看过算看过；「分开记」的挪走、留在已处理
     if (s.nearMerged) s.nearMerged.keys.forEach(function (k) {
@@ -934,7 +965,7 @@
   // ---------- 1017-UI9：页面上的记录不能凭空消失 ----------
   //   每一步记住出现过的每一件（S.view.ever）；重算以后不见了的照样留着，算进这一块的「已处理」，去处按它那几行现在的样子写。
   //   每一块标题写「待选 x / 共 y」，底部「✓ 已处理 N 件 ▸」默认收起；挪走的每一行写去处，带「改 / 撤回」，跨步的点了跳过去
-  var CARD_OF = { sum: 'impSums', near: 'impNear', pg: 'impPendGroups', tr: 'impTransfers', rh: 'impRefundHints', receipt: 'impReceipt', petty: 'impPetty',
+  var CARD_OF = { day: 'impDays', sum: 'impSums', near: 'impNear', pg: 'impPendGroups', tr: 'impTransfers', rh: 'impRefundHints', receipt: 'impReceipt', petty: 'impPetty',
                   nc: 'impNewCats', cp: 'impCpGroups', lc: 'impLowConf', ty: 'impTypes', st: 'impTypes', am: 'impAmounts' };
   var TAP_KINDS = { cp: 1, lc: 1, am: 1, ps: 1, rh: 1 };
   function cardOf(id, step) { var k = id.slice(0, id.indexOf(':') < 0 ? id.length : id.indexOf(':')); return k === 'ps' ? (step === 'refund' ? 'impPendRefunds' : 'impPendSingles') : CARD_OF[k]; }
@@ -976,6 +1007,7 @@
   // 这一件能直接撤回的改动（没有就是 null）
   function undoOf(id) {
     var E = S.edits, k = id.slice(id.indexOf(':') + 1), kind = id.slice(0, id.indexOf(':'));
+    if (kind === 'day' && E.days && E.days[k]) return function () { delete E.days[k]; };
     if (kind === 'sum' && E.sums[k] !== undefined) return function () { delete E.sums[k]; };
     if (kind === 'cp' && E.cpCats[k]) return function () { delete E.cpCats[k]; delete S.view.seen['cp:' + k]; };
     if (kind === 'nc' && (E.newCats[k] || S.view.seen['nc:' + k])) return function () { delete E.newCats[k]; delete S.view.seen['nc:' + k]; };
@@ -1316,7 +1348,7 @@
   function stepCards(step, p, cards) {
     var out = [];
     var push = function (c) { if (c) out.push(c); };
-    if (step === 'match') { push(cards.sums); push(cards.near); push(cards.pendGroups); push(pendCard(p, false)); }
+    if (step === 'match') { push(dayCard(p)); push(cards.sums); push(cards.near); push(cards.pendGroups); push(pendCard(p, false)); }
     else if (step === 'refund') { push(cards.transfers); push(pendCard(p, true)); push(incomeHint(p)); }
     else if (step === 'cat') { push(cards.newCats); push(cards.cpGroups); push(cpRestNote(p)); }
     else if (step === 'remind') { push(cards.refundHints); push(cards.receipt); push(cards.petty); push(cards.types); push(cards.amounts); }
@@ -2469,6 +2501,7 @@
         if (x.done) { S.view.fold = S.view.fold || {}; S.view.fold[cardOf(x.id, ds.step === 'overview' ? S.view.inline : ds.step)] = true; }
       }
       goStep(ds.step);
+      if (x && x.id.indexOf('day:') === 0) { flashItem(x.id); return; }     // 7a：在「按天对账」里的：那一天闪一下
     } else {
       S.view.details = true; S.view.tag = null; S.view.open[d.group] = true;
       // 1021-T17：明细按分类分了一层：展开它在的那一类、翻到它在的那一页
@@ -2750,6 +2783,7 @@
   //   第 2a 版之前只有分步确认，都记成「逐项看看」（path 'step'）
   function itemChanged(x) {
     var E = S.edits, i = x.id.indexOf(':'), kind = i < 0 ? x.id : x.id.slice(0, i), k = i < 0 ? '' : x.id.slice(i + 1);
+    if (kind === 'day') return !!(E.days && E.days[k]);
     if (kind === 'sum') return E.sums[k] !== undefined;
     if (kind === 'nc') return k in E.newCats;
     if (kind === 'cp') return k in E.cpCats;
@@ -2917,6 +2951,13 @@
         : (nmr.n - nmr.payN) + ' 笔手记比实付多 ' + yuan(nmr.fen - nmr.payFen) + ' 元，多半是立减。' + (nmr.payN ? '另外 ' + nmr.payN + ' 笔已改成实付金额。' : '')));
     }
     wrap.appendChild(card);
+    // 导入简化 7a：按天对账「以手记为准」的几天：一行「N 天按手记为准（这 M 笔账单只登记了单号）」，点开逐笔看
+    var dm = only ? [] : ((S.plan && S.plan.sections.days) || []).filter(function (x) { return x.choice === 'manual'; });
+    if (dm.length) {
+      var dk = []; dm.forEach(function (x) { dk = dk.concat(x.keys); });
+      var dmb = btn(dm.length + ' 天按手记为准（' + dk.length + ' 笔账单只登记了单号，没入账） ›', 'ui-btn block imp-res-days', function () { openRows({ title: '按手记为准的 ' + dm.length + ' 天', keys: dk, view: true, id: 'resdays' }); });
+      dmb.id = 'impResDays'; var dmc = el('div', 'imp-card'); dmc.appendChild(dmb); wrap.appendChild(dmc);
+    }
     // 导入简化 2b：新建了哪几个分类，点一个能并到已有分类（改这次导入里这个分类的记录，照「重新分类」那套写，能撤销）
     var catsAdd = only ? [] : (res.ws.catsAdded || []);
     if (catsAdd.length) {

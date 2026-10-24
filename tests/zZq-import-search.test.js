@@ -57,7 +57,7 @@ const F = [['微信.csv', B.bill('wechat', TX, { range: RANGE }).bytes]];
   const k16 = r16[0].dataset.key;
   res()[0].click();
   ok(!q('#uiSheetMask.open') && S().view.step === 'match', '2 点一下：面板关掉，跳到第 2 步');
-  const n16 = qa('[data-item],[data-key]').find(n => n.dataset.key === k16 || (n.dataset.item || '').endsWith(':' + k16));
+  const n16 = qa('[data-item],[data-key]').find(n => n.dataset.key === k16 || (n.dataset.item || '').endsWith(':' + k16) || (/^day:/.test(n.dataset.item || '') && n.classList.contains('imp-flash')));   // 7a：在「按天对账」里的是那一天闪
   ok(n16 && n16.classList.contains('imp-flash'), '2 那一行闪一下');
   // 3. 一笔已合并的：按对方、按手记备注
   btn.click(); await search('面馆');

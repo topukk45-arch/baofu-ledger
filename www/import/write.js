@@ -175,6 +175,11 @@
       }
     });
 
+    // 导入简化 7a：按天对账「以手记为准」的账单：只登记单号（指到这天金额最近的那条手记），不入账、不改手记
+    rows.forEach(function (d) {
+      if (d.group === 'skip' && d.why === 'daymanual' && d.dayInto) order(d.key, d.time, 0, { id: d.dayInto });
+    });
+
     // ---- 退款 ----
     rows.forEach(function (d) {
       if (d.group !== 'refund') return;

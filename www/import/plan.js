@@ -205,6 +205,46 @@
       if (pendRows.indexOf(d) < 0 || d.group !== 'pending') return;
       if (d.cands.every(function (c) { return pickedRecords[c.record]; })) { d.group = 'add'; d.reason = '同组里别的账单和手记合并了，这笔作为新增'; d.autoNew = true; }
     });
+    // ---- 导入简化 7a：按天对账（以手记为准、逐笔看）----
+    //   范围：现有配对（精确、金额相近、几笔加起来）做完后还剩下的支出账单（新增 / 待处理，计入的，不在汇总里），而且这一天还有没配上的手记（支出、计入）。
+    //   一天一项：「你记了 N 笔 x，账单 M 笔 y，差 z」。差 0 的天直接按手记为准（不列出来）；别的天你选：
+    //     manual 以手记为准：手记不动，这几笔账单只登记单号（指到这天金额最近的那条手记）、不入账；each 逐笔看：照原来一笔一笔（配对卡、新增）；
+    //     不选：这几笔留在待处理（候选是这天没配上的手记），不进账本。edits.days[日子] = 'manual' | 'each'
+    var daysE = edits.days || {}, dayList = [];
+    (function () {
+      // 「几笔加起来」那一组（现有配对的一种）自己选：组里的账单和它候选的手记都不按天对
+      var inSum = {}; msums.forEach(function (g) { g.options.forEach(function (o) { inSum[o.record] = 1; }); });
+      var mans = (input.manual || []).filter(function (m) { return m && m.type === 'expense' && (m.mode || 'normal') === 'normal' && !pickedRecords[m.id] && !inSum[m.id] && typeof m.time === 'string'; });
+      if (!mans.length) return;
+      var mBy = {}; mans.forEach(function (m) { var k = m.time.slice(0, 10); (mBy[k] = mBy[k] || []).push(m); });
+      var rBy = {};
+      rows.forEach(function (d) {
+        if (d.src !== 'row' || (d.group !== 'add' && d.group !== 'pending') || d.mode !== 'normal' || !d.time || inGroup0[d.file + ':' + d.row] || dirOf0(d) !== 'expense' || refundish(d.item)) return;
+        // 你在别处一笔一笔定过的（作为新增、分开记、勾掉、当作退款、改了口径 / 分类）、几笔加起来那组定过的、因为别处的选择自动成了新增的：不再按天对
+        var e0 = E[d.key] || {};
+        if (e0.pick || e0.split || e0.exclude || e0.asRefund || e0.mode || e0.cat || d.autoNew || d.splitFrom || d.item.msum) return;
+        var k = d.time.slice(0, 10); if (!mBy[k]) return;
+        (rBy[k] = rBy[k] || []).push(d);
+      });
+      Object.keys(rBy).sort().forEach(function (k) {
+        var R = rBy[k], M = mBy[k], bFen = R.reduce(function (s0, d) { return s0 + d.fen; }, 0), mFen = M.reduce(function (s0, m) { return s0 + m.fen; }, 0);
+        var diff = mFen - bFen, choice = diff === 0 ? 'manual' : (daysE[k] === 'manual' || daysE[k] === 'each' ? daysE[k] : null);
+        dayList.push({ day: k, mN: M.length, mFen: mFen, bN: R.reduce(function (s0, d) { return s0 + d.units; }, 0), bFen: bFen, diff: diff, auto: diff === 0,
+                       choice: choice, keys: R.map(function (d) { return d.key; }), records: M.map(function (m) { return m.id; }) });
+        if (choice === 'each') return;
+        R.forEach(function (d) {
+          if (choice === 'manual') {
+            var best = M.slice().sort(function (a, b) { return Math.abs(a.fen - d.fen) - Math.abs(b.fen - d.fen); })[0];
+            d.group = 'skip'; d.why = 'daymanual'; d.dayInto = best.id;
+            d.reason = diff === 0 ? '这天手记和账单的钱数对得上，按手记为准（账单只登记单号，不入账）' : '这天你选了以手记为准（账单只登记单号，不入账）';
+          } else {
+            d.group = 'pending'; d.why = d.why || 'dayrecon'; d.dayPend = true;
+            if (!(d.cands && d.cands.length)) d.cands = M.map(function (m) { return { record: m.id }; });
+            d.reason = '这天账单和你记的对不上（差 ' + yuan(Math.abs(diff)) + ' 元），留在待处理';
+          }
+        });
+      });
+    })();
     // 退款挂到以前导入的那笔：写明是哪天的（1016-F）
     rows.forEach(function (d) {
       if (d.src === 'row' && d.group === 'refund' && d.refundTo && d.refundTo.record && d.item.toTime && !(E[d.key] && E[d.key].pick)) d.reason = '退款挂到 ' + md(d.item.toTime) + '那笔';
@@ -586,7 +626,7 @@
     var orders = 0;
     rows.forEach(function (d) {
       if (d.src !== 'row') return;
-      if (['add', 'neutral', 'refund', 'merge'].indexOf(d.group) >= 0 || (d.group === 'skip' && d.item.register)) orders += d.units;
+      if (['add', 'neutral', 'refund', 'merge'].indexOf(d.group) >= 0 || (d.group === 'skip' && (d.item.register || d.why === 'daymanual'))) orders += d.units;
     });
 
     // ---- 要登记成「忽略」的单号（1016-C，⑥b 写入时用）：全额退款跳过的一对；已全额退款、退款不在文件里、你选了「不要了」的原单
@@ -622,6 +662,7 @@
     });
     GROUPS.forEach(function (g) { groups[g].sort(function (a, b) { return (b.time || '') < (a.time || '') ? -1 : (b.time || '') > (a.time || '') ? 1 : 0; }); });
 
+    sec.days = dayList;     // 导入简化 7a：按天对账
     return { version: VERSION, summaries: sumList, files: files, counts: counts, sums: sums, importN: importN, mergeM: mergeM, records: records, grouped: grouped, orders: orders,
              ignoreOrders: ignoreOrders, canImport: canImport, blocking: blocking.map(function (f) { return f.name; }), sections: sec, groups: groups,
              groupNames: GROUP_NAME, rows: rows };
