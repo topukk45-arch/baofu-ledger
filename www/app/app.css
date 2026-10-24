@@ -2023,8 +2023,9 @@
             background:transparent; font-family:inherit; font-size:14px; font-weight:bold; color:var(--c-primary-dark); cursor:pointer; }
         button.sp-batch svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
         /* 导入简化第 5 版：待确认分类的逐条确认 / 成组确认 */
-        .sp-rv-acts { display:flex; gap:8px; flex:1 1 100%; margin-top:8px; }
-        button.sp-rv-b { flex:1 1 0; min-height:var(--ui-tap); border:1px solid var(--c-primary-dark); border-radius:12px; background:transparent; font-family:inherit; font-size:14px; font-weight:bold; color:var(--c-primary-dark); cursor:pointer; }
+        /* 1024-Y：三个按钮按字宽排、字不折行；一行放不下时最后一个单独占一整行（原来平分一行，「交给 AI 按组整理 ›」折成两行） */
+        .sp-rv-acts { display:flex; flex-wrap:wrap; gap:8px; flex:1 1 100%; margin-top:8px; }
+        button.sp-rv-b { flex:1 1 auto; padding:0 12px; white-space:nowrap; min-height:var(--ui-tap); border:1px solid var(--c-primary-dark); border-radius:12px; background:transparent; font-family:inherit; font-size:14px; font-weight:bold; color:var(--c-primary-dark); cursor:pointer; }
         .rvr-card { background:var(--c-surface); border:1px solid var(--c-border); border-radius:12px; padding:12px; margin-bottom:12px; }
         .rvr-top { display:flex; gap:8px; align-items:baseline; } .rvr-cp { flex:1; min-width:0; font-size:17px; font-weight:bold; color:var(--c-text); overflow-wrap:anywhere; } .rvr-amt { font-variant-numeric:tabular-nums; font-weight:bold; }
         .rvr-sub, .rvr-why { font-size:13px; color:var(--c-text-soft); margin-top:4px; line-height:1.5; } .rvr-rec { margin-top:8px; font-size:15px; }
