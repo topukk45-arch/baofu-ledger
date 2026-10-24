@@ -810,7 +810,7 @@
             const kw=String((info.cps||[])[rec.cp]||'').trim().slice(0, 32);
             if(kw.length<2 || (info.catRules||[]).some(r=>r.kw===kw && r.cat===cat)){ done(); return; }
             customConfirm(`以后「${kw}」的账单都记成「${cat}」吗？\n\n选了以后，导入时直接照这个分类（在「管理导入规则」里能改、能删）。`, ()=>{
-                const rules={ cat:(info.catRules||[]).filter(r=>r.kw!==kw).concat([{ kw, cat }]), type:info.typeRules||[], map:info.catMaps||[], big:info.bigRules||[] };
+                const rules={ cat:(info.catRules||[]).filter(r=>r.kw!==kw).concat([{ kw, cat }]), type:info.typeRules||[], map:info.catMaps||[], big:info.bigRules||[], sum:info.sumRules||[] };
                 S.rulesSave(rules).then(()=>done(), ()=>done());
             }, '以后也这么记？', { okText:'以后都这样记', cancelText:'只改这一条', onCancel:done });
         }

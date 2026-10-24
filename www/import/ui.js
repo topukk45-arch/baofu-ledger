@@ -1944,7 +1944,9 @@
           // 1017-UI7：已选的组收成一行「✓ 已选：…… · 改」
           var ch = el('div', 'imp-chosen'); var cg = el('span', 'grow');
           cg.appendChild(el('span', 'imp-ok-ico', '✓ 已选：')); cg.appendChild(document.createTextNode(g.chosen === 'none' ? '都不是，这几笔分开记（作为新增）' : g.options[g.chosen].text));
-          ch.appendChild(cg); ch.appendChild(btn('改', 'imp-redo imp-sum-undo', function () { delete S.edits.sums[g.id]; replan(); }));
+          if (g.habit) cg.appendChild(el('div', 'imp-soft imp-sum-habit', '照你以前的习惯：' + cpShow(g.habit) + ' 同一天的几笔合成一条手记'));
+          // 7c：照习惯配的，「改」= 这次不照习惯（记成 null：没选）
+          ch.appendChild(cg); ch.appendChild(btn('改', 'imp-redo imp-sum-undo', function () { if (g.habit) S.edits.sums[g.id] = null; else delete S.edits.sums[g.id]; replan(); }));
           box.appendChild(ch);
         } else {
           if (same && m0) box.appendChild(meBlock(m0));
@@ -2838,6 +2840,7 @@
     if (ws.mapsAdd.length) rp.push('存 ' + ws.mapsAdd.length + ' 条分类对照');
     if (ws.typesAdd.length) rp.push('存 ' + ws.typesAdd.length + ' 条交易类型规则');
     if (ws.bigAdd && ws.bigAdd.length) rp.push('记住 ' + ws.bigAdd.length + ' 笔大额的选法');
+    if (ws.sumAdd && ws.sumAdd.length) rp.push('记住 ' + ws.sumAdd.length + ' 个对账习惯（' + ws.sumAdd.map(function (x) { return cpShow(x.cp); }).join('、') + ' 几笔合成一条手记）');
     if (rp.length) L.push([rp.join('、'), '以后导入时直接照办']);
     var pend = ws.pending.length, skip = (ws.counts && ws.counts.skip) || 0, excl = (ws.counts && ws.counts.excluded) || 0;
     var ps = [];
@@ -3502,7 +3505,7 @@
     dom.page.style.display = 'block'; barSet([closeBtn()]); dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none';
     var b = dom.body; b.innerHTML = '';
     if (notice) { var nt = el('div', 'imp-card imp-line imp-ok', notice); nt.id = 'impRulesNotice'; b.appendChild(nt); }
-    var rules = { cat: (info.catRules || []).slice(), type: (info.typeRules || []).slice(), map: (info.catMaps || []).slice(), big: (info.bigRules || []).slice() };
+    var rules = { cat: (info.catRules || []).slice(), type: (info.typeRules || []).slice(), map: (info.catMaps || []).slice(), big: (info.bigRules || []).slice(), sum: (info.sumRules || []).slice() };
     var catSel = function (val, fn, cls) {
       var se = el('select', cls || '');
       info.cats.filter(function (c) { return c !== '未分类'; }).forEach(function (c) { var o = el('option', null, c); o.value = c; se.appendChild(o); });
@@ -3572,6 +3575,17 @@
       c5.appendChild(row);
     });
     b.appendChild(c5);
+    // 导入简化 7c：对账习惯（「几笔加起来」里你把同一对方的几笔合成过一条手记）
+    var c6 = el('div', 'imp-card'); c6.id = 'impRulesSum';
+    c6.appendChild(el('h4', null, '对账习惯（' + rules.sum.length + '）'));
+    if (!rules.sum.length) c6.appendChild(el('div', 'imp-soft', '还没有。导入时「几笔加起来」里把同一个对方的几笔合成过一条手记的会记在这里，下次同一个对方同一天的几笔直接照这样配。'));
+    rules.sum.forEach(function (r, i) {
+      var row = el('div', 'imp-row-opt imp-sum-rule');
+      row.appendChild(el('span', 'grow', cpShow(r.cp) + ' · 同一天的几笔合成一条手记'));
+      row.appendChild(btn('删除', 'imp-btn imp-sum-del', function () { save(Object.assign({}, rules, { sum: rules.sum.filter(function (_, k) { return k !== i; }) }), '已删这条，下次遇到会再问'); }));
+      c6.appendChild(row);
+    });
+    b.appendChild(c6);
     // 1016-UI2：「加一条分类规则」单独一块放在最下面（拇指够得着）
     // 1017-R：一条规则都没有（空状态）时跟在上面几块后面往下排，不硬顶到底
     var c4 = el('div', rules.cat.length || rules.map.length || rules.type.length ? 'imp-card imp-push' : 'imp-card'); c4.id = 'impRuleAddCard';

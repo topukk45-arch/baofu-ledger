@@ -1004,9 +1004,16 @@
                 if(big.some(b=>b.cp===cp && impBigNear(b.fen, fen))) return;
                 const o={ cp, fen, mode:x.mode }; if(x.ob===1 && x.mode==='flow') o.ob=1; big.push(o);
             });
-            if(!cat.length && !type.length && !map.length && !big.length) return null;
+            // 导入简化 7c：对账习惯（某个对方的几笔你合成过一条手记）：cp 是清洗后的对方；下次同一对方同一天的「几笔加起来」照这个配
+            const sum=[];
+            (Array.isArray(r.sum) ? r.sum : []).slice(0, 500).forEach(x=>{
+                const cp=x && typeof x.cp==='string' ? x.cp.trim().slice(0, 64) : '';
+                if(cp && !sum.some(s=>s.cp===cp)) sum.push({ cp });
+            });
+            if(!cat.length && !type.length && !map.length && !big.length && !sum.length) return null;
             const out=map.length ? { cat, type, map } : { cat, type };
             if(big.length) out.big=big;
+            if(sum.length) out.sum=sum;
             return out;
         }
         // 两笔金额算不算「相近」（大额的选法用；和 import/plan.js 的 bigNear 同一算法）：差不超过那次金额的 20%
@@ -1139,7 +1146,7 @@
             const o={};
             if(Array.isArray(a.cps) && a.cps.length) o.cps=a.cps;
             if(Array.isArray(a.pms) && a.pms.length) o.pms=a.pms;
-            if(a.importRules && ((a.importRules.cat||[]).length || (a.importRules.type||[]).length || (a.importRules.map||[]).length || (a.importRules.big||[]).length)) o.importRules=a.importRules;
+            if(a.importRules && ((a.importRules.cat||[]).length || (a.importRules.type||[]).length || (a.importRules.map||[]).length || (a.importRules.big||[]).length || (a.importRules.sum||[]).length)) o.importRules=a.importRules;
             return o;
         }
         // 单独存的那几样（导出备份 / 云同步时读）。withOrders：要不要带单号表（云同步不带，见 odSyncNow）
@@ -1412,6 +1419,15 @@
                 bigAdd0.forEach(x=>{ if(have.concat(bigDone).some(b=>b.cp===x.cp && impBigNear(b.fen, x.fen))) return; const o={ cp:x.cp.slice(0, 64), fen:x.fen, mode:x.mode }; if(x.ob===1 && x.mode==='flow') o.ob=1; bigDone.push(o); });
                 if(bigDone.length) a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]), type:(r0.type||[]), big:have.concat(bigDone) });
             }
+            // 导入简化 7c：对账习惯：同一对方已有一条就不重复存
+            let sumDone=[];
+            (Array.isArray(ws.sumAdd) ? ws.sumAdd : []).forEach(x=>{
+                const cp=x && typeof x.cp==='string' ? x.cp.trim().slice(0, 64) : '';
+                const r0=a.importRules||{};
+                if(!cp || (r0.sum||[]).concat(sumDone).some(s=>s.cp===cp)) return;
+                sumDone.push({ cp });
+            });
+            if(sumDone.length){ const r0=a.importRules||{}; a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]), type:(r0.type||[]), sum:(r0.sum||[]).concat(sumDone) }); }
             prog && prog('write', 0, 1);
             // 单号表、待处理池、导入记录
             const orders=ws.orders.map(x=>impCleanOrder({ app:x.app, no:x.no, time:x.time, id:res(x.ref)||'', batch:ws.batch, st:x.st })).filter(Boolean);
@@ -1434,7 +1450,7 @@
             const curLog=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
             const logs=((curLog && curLog.list) || []).slice();
             const ra0=(ws.log && ws.log.rulesAdded) || { cat:[], type:[] };
-            const ra={ cat:ra0.cat||[], type:typesDone }; if(mapsDone.length) ra.map=mapsDone; if(bigDone.length) ra.big=bigDone;   // 1016-M：类型规则也只记真存进去的   // 导入记录里只记真存进去的对照（给 ⑦ 撤销）
+            const ra={ cat:ra0.cat||[], type:typesDone }; if(mapsDone.length) ra.map=mapsDone; if(bigDone.length) ra.big=bigDone; if(sumDone.length) ra.sum=sumDone;   // 1016-M：类型规则也只记真存进去的   // 导入记录里只记真存进去的对照（给 ⑦ 撤销）
             // 1016-K：新增记录的指纹（撤销时认「导入后你改过没有」）、导完时名单多长
             const W=window.JiwenImportWrite, hs=W && W.recHash ? made.map(r=>W.recHash(r)) : null;
             const lg=Object.assign({}, ws.log, { add:made.map(r=>r.id), chg, rulesAdded:ra, cpEnd:(a.cps||[]).length, pmEnd:(a.pms||[]).length });
@@ -2070,7 +2086,7 @@
                 const monthIO={};
                 (st ? st.recs : []).forEach(r=>{ const ym=String(r.time||'').slice(0, 7); if(!/^\d{4}-\d{2}$/.test(ym)) return; const c=statContrib(r); if(!c.exp && !c.inc) return;
                     const x=monthIO[ym]||(monthIO[ym]={ e:0, i:0 }); x.e+=Math.round(c.exp*100); x.i+=Math.round(c.inc*100); });
-                return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(), bigRules:(rules.big||[]).slice(),
+                return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(), bigRules:(rules.big||[]).slice(), sumRules:(rules.sum||[]).slice(),
                          cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, manualN, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist, monthIO };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）

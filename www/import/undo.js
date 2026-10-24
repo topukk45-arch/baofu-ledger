@@ -151,12 +151,13 @@
     // 规则、类型规则、分类对照：按 rulesAdded 从后往前删一条
     var ra = log.rulesAdded || {}, ir = S.importRules;
     if (ir) {
-      var o = Object.assign({}, ir), cat = (o.cat || []).slice(), type = (o.type || []).slice(), map = (o.map || []).slice(), big = (o.big || []).slice();
+      var o = Object.assign({}, ir), cat = (o.cat || []).slice(), type = (o.type || []).slice(), map = (o.map || []).slice(), big = (o.big || []).slice(), hab = (o.sum || []).slice();
       var dropLast = function (arr, eq) { for (var x = arr.length - 1; x >= 0; x--) if (eq(arr[x])) { arr.splice(x, 1); return true; } return false; };
       (ra.cat || []).forEach(function (q) { if (dropLast(cat, function (r) { return r.kw === q.kw && r.cat === q.cat; })) sum.rulesRemoved++; });
       (ra.type || []).forEach(function (q) { if (dropLast(type, function (r) { return r.app === q.app && r.type === q.type && r.status === q.status && r.as === q.as; })) sum.typesRemoved++; });
       (ra.map || []).forEach(function (q) { if (dropLast(map, function (m) { return m.from === q.from && m.cat === q.cat; })) sum.mapsRemoved++; });
       (ra.big || []).forEach(function (q) { if (dropLast(big, function (b) { return b.cp === q.cp && b.fen === q.fen && b.mode === q.mode; })) sum.bigRemoved = (sum.bigRemoved || 0) + 1; });   // 导入简化第 3 版：大额的选法
+      (ra.sum || []).forEach(function (q) { if (dropLast(hab, function (b) { return b.cp === q.cp; })) sum.habitRemoved = (sum.habitRemoved || 0) + 1; });   // 7c：对账习惯
       // 1016-Y：这批改过的你的规则：现在还是改成的那个分类，就改回原来的（原来的分类已经没了就不动）
       (log.rulesChanged || []).slice().reverse().forEach(function (q) {
         for (var x = cat.length - 1; x >= 0; x--) if (cat[x].kw === q.kw && cat[x].cat === q.to) {
@@ -164,8 +165,8 @@
           return;
         }
       });
-      if (!cat.length && !type.length && !map.length && !big.length) S.importRules = undefined;
-      else { o.cat = cat; o.type = type; if (map.length) o.map = map; else delete o.map; if (big.length) o.big = big; else delete o.big; S.importRules = o; }
+      if (!cat.length && !type.length && !map.length && !big.length && !hab.length) S.importRules = undefined;
+      else { o.cat = cat; o.type = type; if (map.length) o.map = map; else delete o.map; if (big.length) o.big = big; else delete o.big; if (hab.length) o.sum = hab; else delete o.sum; S.importRules = o; }
     }
     // 这批新建的分类：没人用才删
     (log.catsAdded || []).forEach(function (c) {

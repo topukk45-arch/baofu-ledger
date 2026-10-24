@@ -148,11 +148,23 @@
     var msums = matched.multiSums || [], byKeyRef = {};
     rows.forEach(function (d) { if (d.src === 'row') byKeyRef[d.file + ':' + d.row] = d; });
     var inGroup0 = {}; (matched.summaries || []).forEach(function (g) { (g.items || []).forEach(function (r) { inGroup0[r.file + ':' + r.row] = true; }); });
+    // 导入简化 7c：对账习惯（importRules.sum，info.sumRules）：你没选过的组，有一种同一天的选法是同一个对方的几笔、这个对方在习惯里 → 默认照它配
+    var sumRules = (input.info && input.info.sumRules) || [], habitOf = {};
+    if (sumRules.length) msums.forEach(function (g) {
+      if (sumsE[g.id] !== undefined) return;
+      g.options.some(function (o, i) {
+        if (o.kind === 'far' || o.bills.length < 2) return false;
+        var cs = o.bills.map(function (b) { var x = byKeyRef[b.file + ':' + b.row]; return x ? clean(x.cp) : ''; });
+        if (!cs[0] || cs.some(function (c) { return c !== cs[0]; }) || !sumRules.some(function (r) { return r.cp === cs[0]; })) return false;
+        habitOf[g.id] = { i: i, cp: cs[0] }; return true;
+      });
+    });
     msums.forEach(function (g) {
       var e = sumsE[g.id];
+      if (e === undefined && habitOf[g.id]) e = habitOf[g.id].i;
       if (e === undefined || e === null) return;
       var opt = typeof e === 'number' ? g.options[e] : null;
-      if (opt && pickedRecords[opt.record]) opt = null;
+      if (opt && pickedRecords[opt.record]) { opt = null; if (habitOf[g.id] && sumsE[g.id] === undefined) { habitOf[g.id].lost = true; return; } }
       var inOpt = {};
       if (opt) opt.bills.forEach(function (b) { inOpt[b.file + ':' + b.row] = true; });
       rows.forEach(function (d) {
@@ -524,11 +536,14 @@
     // ---- 多笔合一 ----
     sec.sums = msums.map(function (g) {
       var e = sumsE[g.id];
-      return { id: g.id, suggest: g.suggest, chosen: e === undefined ? null : e,
+      var hb = e === undefined && habitOf[g.id] && !habitOf[g.id].lost ? habitOf[g.id] : null;
+      return { id: g.id, suggest: g.suggest, chosen: hb ? hb.i : (e === undefined ? null : e), habit: hb ? hb.cp : null,
                keys: rows.filter(function (d) { return d.src === 'row' && d.item.msum === g.id; }).map(function (d) { return d.key; }),
                options: g.options.map(function (o) {
                  var m = manualById[o.record];
+                 var cs = o.bills.map(function (b) { var x = byKeyRef[b.file + ':' + b.row]; return x ? clean(x.cp) : ''; });     // 7c：几笔是不是同一个对方（清洗后）
                  return { record: o.record, fen: o.fen, kind: o.kind, days: o.days || 0, keys: o.bills.map(function (b) { var x = byKeyRef[b.file + ':' + b.row]; return x ? x.key : null; }),
+                          cp: cs[0] && cs.every(function (c) { return c === cs[0]; }) ? cs[0] : null,
                           manual: m ? { time: m.time, cat: m.cat, fen: m.fen } : null,
                           text: (o.bills.length === 1 ? '这笔 ' + yuan(o.fen) + ' 元正好是你记的那条' : '这 ' + o.bills.length + ' 笔加起来正好是你记的 ' + yuan(o.fen) + ' 元')
                                 + (m ? '（' + md(m.time) + ' ' + (m.cat || '未分类') + (o.bills.length === 1 ? ' · ' + yuan(m.fen) : '') + '）' : '') + (o.kind === 'far' ? '，差 ' + o.days + ' 天' : '') };

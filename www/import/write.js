@@ -292,6 +292,15 @@
       if (!bigAdd.some(function (b) { return b.cp === o.cp && Math.abs(b.fen - o.fen) <= Math.round(b.fen * 0.2); })) bigAdd.push(o);
     });
 
+    // 导入简化 7c：对账习惯：「几笔加起来」里你亲手选了同一个对方的几笔合成一条手记 → 记成 importRules.sum（下次同一对方同一天的照这样配）
+    var sumAdd = [];
+    ((p.sections && p.sections.sums) || []).forEach(function (g) {
+      if (g.habit || typeof g.chosen !== 'number') return;
+      var o = g.options[g.chosen]; if (!o || o.kind === 'far' || o.keys.length < 2 || !o.cp) return;
+      if (o.keys.some(function (k) { var d = rows.filter(function (r) { return r.key === k; })[0]; return !d || d.group !== 'merge'; })) return;
+      if (!sumAdd.some(function (x) { return x.cp === o.cp; })) sumAdd.push({ cp: o.cp });
+    });
+
     // ---- 这一批的导入记录（新记录的编号由主页面填进 add）----
     var apps = [], from = '', to = '', rng = {};
     parsed.files.forEach(function (f) {
@@ -311,7 +320,7 @@
       version: VERSION, batch: batch, at: ctx.at || '',
       records: recs, changes: chgList, orders: orders, pending: pending, pendTaken: pendTaken,
       cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd, typesAdd: typesAdd, rulesChange: rulesChange, learnedN: learnedN,
-      bigAdd: bigAdd, log: log,
+      bigAdd: bigAdd, sumAdd: sumAdd, log: log,
       counts: counts, total: total
     };
   }
@@ -351,7 +360,7 @@
     var booked = {}; orders.forEach(function (o) { booked[o.app + '|' + o.no] = true; });
     var pendTaken = (ws.pendTaken || []).filter(function (k) { return booked[k]; });
     return { version: ws.version, batch: ws.batch, at: ws.at, records: recs, changes: [], orders: orders, pending: [], pendTaken: pendTaken,
-             cps: cps, pms: pms, cpLen: ws.cpLen, pmLen: ws.pmLen, catsAdded: catsAdded, rulesAdd: [], mapsAdd: [], typesAdd: [], bigAdd: [],
+             cps: cps, pms: pms, cpLen: ws.cpLen, pmLen: ws.pmLen, catsAdded: catsAdded, rulesAdd: [], mapsAdd: [], typesAdd: [], bigAdd: [], sumAdd: [],
              log: log, counts: counts, total: ws.total, only: true };
   }
 
