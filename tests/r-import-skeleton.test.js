@@ -45,8 +45,8 @@ const NOW = '2026-10-15T10:00:00';
   ok(ue && ue.message.includes('不认识的命令'), '1 不认识的命令报错');
   ok(core.run('info', null, null, { merchants: m }).merchants === m.items.length, '1 info 报出词表条数');
   ok(Number.isInteger(m.version) && Array.isArray(m.items) && m.items.length > 0
-    && m.items.every(x => Array.isArray(x) && x.length === 2 && typeof x[0] === 'string' && x[0] && typeof x[1] === 'string' && x[1]),
-    '1 词表格式：[关键词, 分类]');
+    && m.items.every(x => x && !Array.isArray(x) && typeof x.kw === 'string' && x.kw && typeof x.cat === 'string' && x.cat && (x.kind === 'brand' || x.kind === 'word')),
+    '1 词表格式：{ kw 关键词, cat 分类, kind }（导入简化第 8 版起）');
   // 纯计算文件里不许碰页面和存储
   ['core.js', 'merchants.js'].forEach(f => {
     const src = fs.readFileSync(path.join(IMP, f), 'utf8').replace(/\/\/.*$/gm, '');

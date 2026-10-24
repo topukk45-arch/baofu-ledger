@@ -103,7 +103,9 @@
 
   // ---------- 内置词表：长词优先 ----------
   function builtinIndex(merchants) {
-    var items = (merchants && merchants.items || []).filter(function (x) { return Array.isArray(x) && x[0] && x[1]; });
+    // 导入简化第 8 版：词表一条一个对象 { kw, cat, kind }；里面还是排成 [关键词, 分类] 找（老格式 [关键词, 分类] 也认）
+    var items = (merchants && merchants.items || []).map(function (x) { return Array.isArray(x) ? x : (x && typeof x === 'object' ? [x.kw, x.cat] : null); })
+      .filter(function (x) { return Array.isArray(x) && x[0] && x[1]; });
     return items.slice().sort(function (a, b) { return b[0].length - a[0].length; });
   }
   function findIn(list, text) {
