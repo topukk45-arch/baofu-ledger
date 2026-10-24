@@ -4,7 +4,8 @@ on:
   # 1021-T1 的体验版分支 10-21 已快进合进 main，那一段「发布到体验版」删掉了
   # 1021-T26 的启动画面体验版分支 10-23 已快进合进 main，那一段「发布到体验版」删掉了
   push:
-    branches: [main]
+    # 1024-Y 临时：界面修补分支推上去也打包（发到单独的预发布版，见最后两段）。合回 main 之前必须删掉这条分支名
+    branches: [main, claude/ecstatic-brown-dc9g03]
   workflow_dispatch:
 jobs:
   build:
@@ -125,3 +126,60 @@ jobs:
           APK="$RUNNER_TEMP/jiwen-${REL#v}.apk"
           cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
           gh release create "$REL" "$APK" --title "$TITLE" --notes-file "$NOTES_FILE" --latest --target "$GITHUB_SHA"
+
+      # 1024-Y 临时（合回 main 之前必须删掉这一段）：界面修补分支发「1024-Y 界面版」预发布。
+      #   docs/release/branch-publish 第一行写标签（比如 1024-Y），标题读 <标签>.title、说明读 <标签>.md；
+      #   没有这个文件就不发。只发到这个单独的标签，绝不碰「最新测试版」latest-build 和正式版
+      - name: 发布界面修补版（1024-Y 临时，只在界面修补分支上）
+        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/ecstatic-brown-dc9g03'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          [ -f docs/release/branch-publish ] || { echo "没有要发的界面修补版"; exit 0; }
+          REL=$(head -1 docs/release/branch-publish | tr -d '[:space:]')
+          [ -n "$REL" ] || { echo "没有要发的界面修补版"; exit 0; }
+          case "$REL" in latest-build|v*|trial-build|modules-build) echo "不许发到 $REL"; exit 1;; esac
+          NOTES_FILE="docs/release/$REL.md"; TITLE_FILE="docs/release/$REL.title"
+          test -f "$NOTES_FILE" || { echo "没有说明文件 $NOTES_FILE"; exit 1; }
+          TITLE=$(cat "$TITLE_FILE" 2>/dev/null || echo "$REL")
+          APK="$RUNNER_TEMP/jiwen-$REL.apk"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          git push -f origin "$GITHUB_SHA:refs/tags/$REL"
+          if gh release view "$REL" >/dev/null 2>&1; then
+            gh release edit "$REL" --title "$TITLE" --notes-file "$NOTES_FILE" --prerelease --latest=false
+            gh release upload "$REL" "$APK" --clobber
+          else
+            gh release create "$REL" "$APK" --title "$TITLE" --notes-file "$NOTES_FILE" --prerelease --latest=false --target "$GITHUB_SHA"
+          fi
+
+  # 1024-Y 临时（合回 main 之前必须删掉这一段）：「1024-X 稳妥版」= 把「最新测试版」里 main #306 打的 1024-X 安装包原样复制一份，
+  #   发成单独的预发布版 1024-X-safe（标签打在 1547b86）。不重新打包、不改 latest-build；已经发过就跳过
+  safe-copy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/claude/ecstatic-brown-dc9g03'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: 复制 1024-X 安装包，发「1024-X 稳妥版」
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          REL=1024-X-safe; SHA=1547b86736d0354507361d723c1559b4d48286d0
+          if gh release view "$REL" >/dev/null 2>&1; then echo "$REL 已经发过了，跳过"; exit 0; fi
+          T=$(gh release view latest-build --json name -q .name)
+          [ "$T" = "最新测试版 1024-X" ] || { echo "最新测试版现在是「$T」，不是 1024-X，不复制"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/safe" && cd "$RUNNER_TEMP/safe"
+          gh release download latest-build -p jiwen-latest.apk -R "$GITHUB_REPOSITORY"
+          echo "cf792a916d50e6290e72b412445fc8ea9abbaa24f4c0362e89ac838dd6a8466a  jiwen-latest.apk" | sha256sum -c
+          mv jiwen-latest.apk jiwen-1024-X-safe.apk
+          cd "$GITHUB_WORKSPACE"
+          git push -f origin "$SHA:refs/tags/$REL"
+          gh release create "$REL" "$RUNNER_TEMP/safe/jiwen-1024-X-safe.apk" --title "1024-X 稳妥版" --prerelease --latest=false --verify-tag --notes "1024-X 原样的安装包（main 打包 #306，提交 1547b86），和「最新测试版 1024-X」是同一个文件（sha256 cf792a91…）。
+
+          不含 10-24 晚上的界面修补；那些在「1024-Y 界面版」里。界面版有问题就装这个，签名不变、安卓版本号一样，直接覆盖安装，手机上的账本不动。"
