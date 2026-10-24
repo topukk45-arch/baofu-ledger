@@ -16,6 +16,14 @@
         let txtTarget=null;
         const txtIn=()=>$(TXT_FIELDS[txtTarget.id].multi ? 'txtArea' : 'txtInput');
         function txtCount(){ const el=txtIn(), mx=txtTarget && txtTarget.maxLength>0 ? txtTarget.maxLength : 0; $('txtCount').textContent = mx && mx<200 ? `${charLen(el.value)} 字` : ''; }
+        // 1024-Y：多行框（备注）随字长高，最高到看得见的屏幕的 40%（键盘弹起时按键盘上面那块算），再多框里滚；原来固定 96px，长备注只露三行
+        function txtFit(){
+            const ta=$('txtArea'); if(!txtTarget || !TXT_FIELDS[txtTarget.id].multi || ta.style.display==='none') return;
+            const vh=(window.visualViewport && window.visualViewport.height) || window.innerHeight || 700;
+            ta.style.height='auto';
+            const h=ta.scrollHeight; if(!h) { ta.style.height=''; return; }   // 量不到（还没排版）就照旧
+            ta.style.height=Math.min(h+2, Math.max(96, Math.round(vh*0.4)))+'px';
+        }
         function openTextPanel(el){
             const cfg=TXT_FIELDS[el.id]; if(!cfg) return;
             txtTarget=el;
@@ -27,6 +35,7 @@
             if(el.maxLength>0) inp.maxLength=el.maxLength; else inp.removeAttribute('maxlength');
             txtCount();
             $('txtMask').style.display='flex';
+            txtFit();
             afterOpenAnim($('txtMask'), ()=>{ if($('txtMask').style.display!=='flex' || txtTarget!==el) return; try{ inp.focus(); const n=inp.value.length; inp.setSelectionRange(n, n); }catch(_){} });
         }
         function closeText(){ $('txtMask').style.display='none'; try{ txtIn().blur(); }catch(_){} txtTarget=null; }
@@ -42,6 +51,7 @@
         $('txtCancel').addEventListener('click', closeText);
         $('txtInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); txtOk(); } });
         ['txtInput','txtArea'].forEach(id=>$(id).addEventListener('input', txtCount));
+        $('txtArea').addEventListener('input', txtFit);
         Object.keys(TXT_FIELDS).forEach(id=>{
             const el=$(id); if(!el) return;
             el.readOnly=true; el.setAttribute('inputmode', 'none'); el.classList.add('txt-field');

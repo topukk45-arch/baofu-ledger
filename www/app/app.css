@@ -912,7 +912,7 @@
         #txtMask { z-index:1036; }
         .txt-sheet .txt-input { width:100%; margin:4px 0 2px; padding:12px; border:1px solid var(--c-primary); border-radius:8px;
             outline:none; background:var(--c-surface); font-size:16px; font-family:inherit; color:var(--c-text); }
-        .txt-sheet textarea.txt-input { min-height:96px; resize:none; line-height:1.6; }
+        .txt-sheet textarea.txt-input { min-height:96px; resize:none; line-height:1.6; overflow-y:auto; }   /* 1024-Y：高度由 text.js 的 txtFit 随字长高 */
         .txt-sheet .txt-count { font-size:12px; color:var(--c-text-soft); text-align:right; }
         .txt-field { cursor:pointer; caret-color:transparent; }
         /* 1019-P：数字键盘：照微信转账，左边三列 1–9、最下一行 0（两列宽）和小数点，最右一列退格 + 占三行高的主色大按钮；按键 56px 高 */
