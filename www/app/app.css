@@ -1304,6 +1304,10 @@
         .detail-row .rec-row-v { white-space:normal; }
         .detail-row.detail-block { flex-direction:column; align-items:stretch; gap:4px; padding-top:12px; padding-bottom:12px; }
         .detail-block .rec-row-k { width:auto; }
+        /* 导入简化第 5 版：待确认分类的确认挪到列表卡第一行，两个按钮 */
+        .detail-row.detail-rv { flex-wrap:wrap; gap:8px; padding-top:8px; padding-bottom:8px; }
+        .detail-rv .detail-rv-t { flex:1 1 100%; width:auto; color:var(--c-text-soft); }
+        .detail-rv .detail-rv-b { flex:1 1 0; min-height:48px; }
         .detail-block .detail-remark { white-space:pre-wrap; word-break:break-word; line-height:1.5; max-height:160px; overflow-y:auto; color:var(--c-text); font-size:15px; }
         .detail-block .detail-src { color:var(--c-text-soft); font-size:13px; }
         .detail-block .mini-btn { align-self:flex-start; min-height:var(--ui-tap); }
@@ -1995,7 +1999,7 @@
         button.sp-tag-x { width:34px; height:44px; padding:0 8px 0 4px; border:none; background:transparent; color:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; }
         button.sp-tag-x svg { width:12px; height:12px; fill:none; stroke:currentColor; stroke-width:2.6; stroke-linecap:round; opacity:.85; }
         .sp-nocond { font-size:13px; line-height:36px; color:var(--c-text-soft); }
-        .sp-sum { display:flex; align-items:center; gap:10px; font-variant-numeric:tabular-nums; }
+        .sp-sum { display:flex; flex-wrap:wrap; align-items:center; gap:10px; font-variant-numeric:tabular-nums; }
         .sp-sum[hidden] { display:none; }
         .sp-sumtx { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; line-height:20px; }
         .sp-n { font-size:15px; font-weight:bold; color:var(--c-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -2006,6 +2010,19 @@
         button.sp-batch { flex:none; display:flex; align-items:center; gap:6px; min-height:var(--ui-tap); padding:0 14px; border:1px solid var(--c-primary-dark); border-radius:12px;
             background:transparent; font-family:inherit; font-size:14px; font-weight:bold; color:var(--c-primary-dark); cursor:pointer; }
         button.sp-batch svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        /* 导入简化第 5 版：待确认分类的逐条确认 / 成组确认 */
+        .sp-rv-acts { display:flex; gap:8px; flex:1 1 100%; margin-top:8px; }
+        button.sp-rv-b { flex:1 1 0; min-height:var(--ui-tap); border:1px solid var(--c-primary-dark); border-radius:12px; background:transparent; font-family:inherit; font-size:14px; font-weight:bold; color:var(--c-primary-dark); cursor:pointer; }
+        .rvr-card { background:var(--c-surface); border:1px solid var(--c-border); border-radius:12px; padding:12px; margin-bottom:12px; }
+        .rvr-top { display:flex; gap:8px; align-items:baseline; } .rvr-cp { flex:1; min-width:0; font-size:17px; font-weight:bold; color:var(--c-text); overflow-wrap:anywhere; } .rvr-amt { font-variant-numeric:tabular-nums; font-weight:bold; }
+        .rvr-sub, .rvr-why { font-size:13px; color:var(--c-text-soft); margin-top:4px; line-height:1.5; } .rvr-rec { margin-top:8px; font-size:15px; }
+        .rvr-h { font-size:13px; color:var(--c-text-soft); margin:4px 2px 6px; }
+        .rvg { border:1px solid var(--c-border); border-radius:12px; padding:4px 10px 10px; margin-bottom:10px; background:var(--c-surface); }
+        button.rvg-head { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; width:100%; min-height:48px; border:0; background:none; padding:4px 0; font-family:inherit; text-align:left; color:var(--c-text); cursor:pointer; }
+        .rvg-t { font-weight:bold; font-size:15px; } .rvg-s { flex:1 1 auto; min-width:0; font-size:12.5px; color:var(--c-text-soft); } .rvg-go { font-size:13px; color:var(--c-primary-dark); }
+        .rvg-ok { width:100%; }
+        .rvg-list { margin-top:8px; } label.rvg-row { display:flex; align-items:center; gap:10px; min-height:48px; border-top:1px dashed var(--c-border); font-size:14px; }
+        .rvg-row input { width:22px; height:22px; flex:0 0 22px; } .rvg-r { flex:1; min-width:0; overflow-wrap:anywhere; } .rvg-a { font-variant-numeric:tabular-nums; }
         /* 1023-N：最近搜过：结果页没条件时卡片里 3 条（点了套用、× 删一条、清空），抽屉顶上 5 条（点了套用） */
         .sp-hist { display:flex; flex-direction:column; width:100%; }
         .sp-hist-head { display:flex; align-items:center; min-height:32px; font-size:14px; font-weight:bold; color:var(--c-text); }

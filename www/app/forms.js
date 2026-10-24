@@ -799,6 +799,21 @@
             const what=moneyChg && timeChg ? '金额和时间' : moneyChg ? '金额' : '时间', app=EDIT_WARN_APP[s.app];
             return (s.merged ? `这笔已经和${app}账单对过账` : `这笔是${app}账单导入的`) + `，改了${what}以后和账单对不上（下次导入同一段账单时不会再导一遍，但核对会差这一笔）。\n\n确定要改吗？`;
         }
+        // 导入简化第 5 版（原方案三-3）：改了导入的记录的分类，问一句「以后「某某」的都记成「X」吗？」：选了存一条分类规则（importRules.cat，
+        //   同一个关键词已有的改掉），以后导入直接照办；「只改这一条」什么都不存。关键词先用对方名（名单里的原文，最多 32 字）。开发开关开着才问
+        function askCatRule(rec, cat, done){
+            done=done||(()=>{});
+            const S=window.JiwenImportStore;
+            let dev=false; try{ dev=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            if(!dev || !S || !S.archiveInfo || !rec || !rec.src || isRefund(rec) || !Number.isInteger(rec.cp) || !cat || cat==='未分类'){ done(); return; }
+            let info; try{ info=S.archiveInfo(); }catch(_){ done(); return; }
+            const kw=String((info.cps||[])[rec.cp]||'').trim().slice(0, 32);
+            if(kw.length<2 || (info.catRules||[]).some(r=>r.kw===kw && r.cat===cat)){ done(); return; }
+            customConfirm(`以后「${kw}」的账单都记成「${cat}」吗？\n\n选了以后，导入时直接照这个分类（在「管理导入规则」里能改、能删）。`, ()=>{
+                const rules={ cat:(info.catRules||[]).filter(r=>r.kw!==kw).concat([{ kw, cat }]), type:info.typeRules||[], map:info.catMaps||[], big:info.bigRules||[] };
+                S.rulesSave(rules).then(()=>done(), ()=>done());
+            }, '以后也这么记？', { okText:'以后都这样记', cancelText:'只改这一条', onCancel:done });
+        }
         saveEdit.addEventListener('click', () => doSaveEdit(false));
         function doSaveEdit(force){
             const time=getDtInput(editTime), money=editMoney.value;
@@ -856,6 +871,7 @@
                 // 避免「提示失败但弹窗已关、看似已保存」的不一致。
                 if(!saveUserData(data)) return;
                 closeEditModal({ refresh:true });
+                if(cat!==(old.cat||'未分类')) askCatRule(next, cat);   // 第 5 版：改了导入的记录的分类，问以后要不要也这么记
             } else {
                 // 找不到原记录（例如保存前存档被切换/记录已被删）：先复位关闭，再明确提示。
                 closeEditModal({ refresh:true });
@@ -878,5 +894,5 @@
             m.querySelectorAll('.cc, .day-switch').forEach(e=>parts.push(e.className));
             return JSON.stringify(parts);
         }
-        window.JiwenForms = { get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, openRefund, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenForms = { askCatRule, get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, openRefund, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();

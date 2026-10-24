@@ -1,9 +1,9 @@
 (function(){
         const { $, escapeHtml, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
-        const { IMP_APPS, balContrib, getUserData, isOpening, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { IMP_APPS, balContrib, getUserData, isOpening, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData, statContrib, syncRefunds } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { devImportOn } = window.JiwenImportEntry;   // 用到前面模块的
-        const { openAddModal, openRefund, refundLineHtml } = window.JiwenForms;   // 用到前面模块的
+        const { askCatRule, openAddModal, openRefund, refundLineHtml } = window.JiwenForms;   // 用到前面模块的
 
         // 清单行 → 只读详情。批量确认还没执行，此时允许改记录会让清单和即将执行的范围对不上，
         // 所以从这里进的详情隐藏「修改」按钮，只看不改。
@@ -138,15 +138,17 @@
             f.appendChild(b);
         }
         // 1021-T13：待确认分类（导入时推荐把握低 / 未分类、确认页没定过的，记录上 rv:1）：详情里一行「分类没问题」只去掉标记
+        // 导入简化第 5 版：确认挪到分类旁边：列表卡第一行「分类是导入时推荐的　[没问题]　[改分类]」（原来是最底下一个小按钮）
         function paintDetailRv(rec){
             let f=$('detailRvField');
             if(rec.rv!==1){ if(f) f.remove(); return; }
-            if(!f){ f=document.createElement('div'); f.className='rec-row detail-row detail-block'; f.id='detailRvField'; $('detailList').appendChild(f); }
+            if(!f){ f=document.createElement('div'); f.className='rec-row detail-row detail-rv'; f.id='detailRvField'; }
+            const list=$('detailList'); if(list.firstChild!==f) list.insertBefore(f, list.firstChild);
             f.textContent='';
-            const lab=document.createElement('span'); lab.className='rec-row-k'; lab.textContent='待确认'; f.appendChild(lab);
-            const v=document.createElement('div'); v.textContent='分类是导入时推荐的，还没确认。改了分类就不再提示。'; v.style.color='var(--c-text-soft)'; f.appendChild(v);
-            const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='detailRvOk'; b.textContent='分类没问题'; b.style.marginTop='6px';
-            b.addEventListener('click', ()=>{
+            const v=document.createElement('span'); v.className='rec-row-k detail-rv-t'; v.textContent='分类是导入时推荐的'; f.appendChild(v);
+            const mk=(id, t, cls)=>{ const b=document.createElement('button'); b.type='button'; b.className='ui-btn '+cls; b.id=id; b.textContent=t; return b; };
+            const ok=mk('detailRvOk', '没问题', 'primary detail-rv-b'), ch=mk('detailRvEdit', '改分类', 'detail-rv-b');
+            ok.addEventListener('click', ()=>{
                 const data=getUserData(), i=data.findIndex(r=>r.id===rec.id);
                 if(i<0){ customAlert('这条记录不存在了'); return; }
                 const next=Object.assign({}, data[i]); delete next.rv;
@@ -155,7 +157,18 @@
                 try{ window.JiwenTabs.refreshAllViews(); }catch(_){}
                 openDetail(rec.id);
             });
-            f.appendChild(b);
+            ch.addEventListener('click', ()=>{
+                if(!window.JiwenSheet) return;
+                window.JiwenSheet.cats({ title:'改成哪个分类', type:rec.type, value:rec.cat, onCancel:()=>openDetail(rec.id), onPick:cat=>{
+                    const data=getUserData(), i=data.findIndex(r=>r.id===rec.id); if(i<0) return;
+                    const next=Object.assign({}, data[i], { cat }); delete next.rv; data[i]=next;
+                    syncRefunds(data, next);
+                    if(!saveUserData(data)) return;
+                    try{ window.JiwenTabs.refreshAllViews(); }catch(_){}
+                    askCatRule(next, cat, ()=>openDetail(rec.id));
+                } });
+            });
+            f.appendChild(ok); f.appendChild(ch);
         }
         // 1023-P：期初余额：只给「往来」的记录（退款不算）一行开关「这笔是期初余额」，记录上 ob:1；可以几笔都标，总结余里期初余额是它们的合计、往来那一行不算它们
         function paintDetailOb(rec, opts, ro){

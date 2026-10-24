@@ -1,11 +1,13 @@
 (function(){
         const { $, MODE_HINT, escapeHtml, isFlow, isSkip, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
-        const { getCats, getUserData, isRefund, recentCats, saveUserData } = window.JiwenStore;   // 用到前面模块的
+        const { getCats, getUserData, isRefund, recentCats, saveUserData, syncRefunds } = window.JiwenStore;   // 用到前面模块的
         const { bindSheetDrag } = window.JiwenPanel;   // 用到前面模块的
         const { askCancel, customAlert, customChoose, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { openDtPickerDate } = window.JiwenDate;   // 用到前面模块的
         const { cal, openDay, openDetail, openWeek, sumFen } = window.JiwenDetail;   // 用到前面模块的
         const { listHtml, makePainter } = window.JiwenLedger;   // 用到前面模块的
+        const { askCatRule } = window.JiwenForms;   // 用到前面模块的
+        const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
 
         // ===== 搜索状态：备注 / 金额 / 日期 / 收支 / 统计 / 分类（1023-F 定的口径，1023-G 从账单页搬到搜一笔）=====
         // 金额存数字（null 表示不限）；日期存 'YYYY-MM-DD'（null 表示不限）；关键词存小写串，按空白分成几个词，都要包含。
@@ -218,6 +220,8 @@
                     + (ex.length ? `<span class="sp-ex">其中 ${ex.join('、')}</span>` : '') + `</span>`
                     // 批量：有条件、搜到了才有（没条件就等于全部记录，一不小心就改了整本账）；范围 = 这里列出来的全部
                     + (any ? `<button type="button" class="sp-batch" id="batchBar" data-act="batch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>批量改</button>` : '')
+                    // 导入简化第 5 版：看的是待确认分类：「逐条确认 ›」「成组确认 ›」
+                    + (searchState.rv && asc.some(r=>r.rv===1) ? `<span class="sp-rv-acts"><button type="button" class="sp-rv-b" id="rvOneBtn" data-act="rvone">逐条确认 ›</button><button type="button" class="sp-rv-b" id="rvGroupBtn" data-act="rvgroup">成组确认 ›</button></span>` : '')
                 : '';
             sum.hidden=!asc.length;
             // 底部按钮：有条件「清空条件 | 改条件」，没条件只有一个「设条件」
@@ -247,7 +251,11 @@
             if(e.target.closest('[data-act="drop"]')){ x.drop(); render(); return; }
             if(e.target.closest('[data-act="edit"]')) openSheet({ focus:x.sec });
         });
-        $('summaryFilter').addEventListener('click', e=>{ if(e.target.closest('[data-act="batch"]')) openBatchMenu(); });
+        $('summaryFilter').addEventListener('click', e=>{
+            if(e.target.closest('[data-act="batch"]')) openBatchMenu();
+            else if(e.target.closest('[data-act="rvone"]')) openRvOne(0);
+            else if(e.target.closest('[data-act="rvgroup"]')) openRvGroups();
+        });
         list.addEventListener('click', e=>{
             const row=e.target.closest('.bl-row[data-id]'); if(row){ openDetail(row.dataset.id); return; }
             const wk=e.target.closest('.lg-wk[data-mon]'); if(wk){ openWeek(wk.dataset.mon); return; }
@@ -409,13 +417,22 @@
             const list=hit.filter(r=>!isRefund(r));
             const rfN=hit.length-list.length;
             if(!list.length){ customAlert(`命中的 ${rfN} 条都是退款记录。退款的分类和统计跟着原账单走，请改原账单。`); return; }
+            const rvN=list.filter(r=>r.rv===1).length;
             customChoose(`这 ${list.length} 笔是这次搜到的全部记录。先选怎么改，下一步会再让你确认：${rfN?`\n另有 ${rfN} 条退款记录不参与，会跟着各自的原账单一起变。`:''}`, [
+                // 导入简化第 5 版：确认分类（不改）：只去掉「待确认分类」标记（有待确认的才有这一项）
+                ...(rvN ? [{ value:'rvok', label:'确认分类（不改）', desc:`这里面 ${rvN} 条待确认分类的，分类没问题：只去掉标记，分类不动` }] : []),
                 // 说明文字与记一笔里的口径说明（MODE_HINT）同源，两处永远一致
                 { value:'cat',    label:'改分类',       desc:'把这些记录统一改到同一个分类，比如把「永劫无间」归到「游戏」' },
                 { value:'normal', label:'恢复计入',     desc:'取消「不计」「往来」：'+MODE_HINT.normal },
                 { value:'skip',   label:'标为不计',     desc:MODE_HINT.skip },
                 { value:'flow',   label:'标为往来',     desc:MODE_HINT.flow }
             ], (act)=>{
+                if(act==='rvok'){
+                    const targets=list.filter(r=>r.rv===1);
+                    customConfirm(`确认下面这 ${targets.length} 条的分类没问题（只去掉「待确认分类」，分类不动）。改完可以马上「撤销这次操作」。`,
+                        ()=>applyBatch(targets.map(r=>r.id), { rvOk:true }), '确认分类', { okText:`确认这 ${targets.length} 条`, list:targets, onCancel:openBatchMenu });
+                    return;
+                }
                 if(act==='cat'){
                     const onCat=(cat)=>{
                         const targets=list.filter(r=>r.cat!==cat);
@@ -447,6 +464,7 @@
                 prev.push({ id:r.id, cat:r.cat, mode:recMode(r) });
                 const n=Object.assign({}, r);
                 if(change.cat!==undefined){ n.cat=change.cat; if(n.rv){ prev[prev.length-1].rv=1; delete n.rv; } }   // 1021-T13：改了分类就去掉「待确认分类」，撤销时放回
+                if(change.rvOk && n.rv){ prev[prev.length-1].rv=1; delete n.rv; }   // 第 5 版：确认分类（不改），撤销时放回
                 if(change.mode!==undefined) setRecMode(n, change.mode);
                 data[i]=n;
                 byId.set(n.id, n);
@@ -469,7 +487,7 @@
             }
             window.JiwenTabs.refreshAllViews(); render();
             batchUndo={ prev, prevFilter, archive:JiwenBase.currentArchive };
-            customConfirm(`已处理 ${mainN} 条记录。`, null, '批量操作完成',
+            customConfirm(change.rvOk ? `已确认 ${mainN} 条的分类。` : `已处理 ${mainN} 条记录。`, null, change.rvOk ? '确认分类' : '批量操作完成',
                 { okText:'好的', extra:{ text:'撤销这次操作', onClick:undoBatch } });
             askCancel.style.display='none';      // 「好的」「取消」意思一样，只留一个
         }
@@ -491,5 +509,88 @@
             window.JiwenTabs.refreshAllViews(); render();
             customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
         }
-        window.JiwenSearch = { srcOf, applyBatch, closeSearch, filterMatch, isOpen, openBatchMenu, openSearch, openSheet, render, renderFilterChips, resetSearch, searchFlush, searchNow, undoBatch };   // search 模块对外只有这一个入口
+        // ===== 导入简化第 5 版：待确认分类的确认 =====
+        //   逐条确认：顶上「待确认 3 / 60」，一条一张：对方、商品说明（备注）、推荐的分类和理由（打开时按现在的规则再推一遍，载入导入模块）；
+        //   「没问题」（去掉标记）、「改成…」（常用分类小标签，点一下就改，改了问一句以后也这么记吗）、「跳过」；处理完自动到下一条。
+        //   成组确认：按分类分组「餐饮 · 42 笔（瑞幸 18、果切 9…）[这组都没问题]」，点开看每一笔、勾掉个别的；确认走批量那套，能撤销
+        function rvList(){ return getUserData().filter(r=>r.rv===1 && filterMatch(r)).map((r, i)=>({ r, i, ts:parseRecTime(r.time).getTime() })).sort((a, b)=>(b.ts-a.ts) || (b.i-a.i)).map(x=>x.r); }
+        function cpName(r){ try{ const a=window.JiwenStore.loadStore(JiwenBase.currentUser).archives[JiwenBase.currentArchive]; return Number.isInteger(r.cp) ? ((a.cps||[])[r.cp]||'') : ''; }catch(_){ return ''; } }
+        let rvIds=null;
+        function setRec(id, fn){
+            const data=getUserData(), i=data.findIndex(r=>r.id===id); if(i<0) return null;
+            const n=Object.assign({}, data[i]); fn(n); data[i]=n;
+            syncRefunds(data, n);      // 挂在上面的退款跟着改分类
+            if(!saveUserData(data)) return null;
+            return n;
+        }
+        function openRvOne(k){
+            if(!window.JiwenSheet) return;
+            if(!k || !rvIds) rvIds=rvList().map(r=>r.id);
+            const ids=rvIds, total=ids.length;
+            let i=k||0;
+            while(i<total){ const r=getUserData().find(x=>x.id===ids[i]); if(r && r.rv===1) break; i++; }
+            if(i>=total){ rvIds=null; window.JiwenTabs.refreshAllViews(); render(); customAlert(total ? `这 ${total} 条都看完了。` : '没有待确认分类的记录了。', '逐条确认'); return; }
+            const r=getUserData().find(x=>x.id===ids[i]), nm=cpName(r), next=()=>openRvOne(i+1);
+            const quick=recentCats(r.type, 5).filter(c=>c!==r.cat).slice(0, 4);
+            window.JiwenSheet.open({ title:`待确认 ${i+1} / ${total}`, sub:'分类没问题就点「没问题」，处理完自动到下一条',
+                onDismiss:()=>{ rvIds=null; window.JiwenTabs.refreshAllViews(); render(); },
+                body(box){
+                    const amt=safeNum(r.money).toFixed(2), d=String(r.time||'').slice(5, 16).replace('T', ' ');
+                    box.innerHTML=`<div class="rvr-card" id="rvOneCard"><div class="rvr-top"><span class="rvr-cp">${escapeHtml(nm || '（没有对方）')}</span><span class="rvr-amt">${r.type==='expense' ? '−' : '+'}${amt}</span></div>`
+                        + `<div class="rvr-sub">${escapeHtml(d)}${r.remark ? ' · '+escapeHtml(String(r.remark).split('\n')[0]) : ''}</div>`
+                        + `<div class="rvr-rec">推荐的分类：<b>${escapeHtml(r.cat||'未分类')}</b></div><div class="rvr-why" id="rvOneWhy"></div></div>`
+                        + `<div class="rvr-h">改成…</div><div class="cat-chips cat-grid4" id="rvOneCats">${quick.map(c=>`<button type="button" class="cc" data-cat="${escapeHtml(c)}"><span class="cc-t">${escapeHtml(c)}</span></button>`).join('')}<button type="button" class="cc" data-cat="" id="rvOneMore"><span class="cc-t">更多…</span></button></div>`;
+                    // 理由：按现在的规则再推一遍（要载入导入模块，载不上就不写）
+                    loadImportUI().then(ui=>ui.reasonFor ? ui.reasonFor(r, nm) : null).then(w=>{ const e=$('rvOneWhy'); if(e && w) e.textContent=w; }).catch(()=>{});
+                    box.querySelector('#rvOneCats').addEventListener('click', e=>{
+                        const b=e.target.closest('[data-cat]'); if(!b) return;
+                        const go=cat=>{ const n=setRec(r.id, x=>{ x.cat=cat; delete x.rv; }); if(n) askCatRule(n, cat, next); };
+                        if(b.dataset.cat){ window.JiwenSheet.close(); go(b.dataset.cat); }
+                        else window.JiwenSheet.cats({ title:'改成哪个分类', type:r.type, value:r.cat, onCancel:()=>openRvOne(i), onPick:go });
+                    });
+                },
+                foot(box, done){
+                    const mk=(id, t, cls)=>{ const b=document.createElement('button'); b.type='button'; b.id=id; b.className='ui-btn '+(cls||''); b.textContent=t; return b; };
+                    const ok=mk('rvOneOk', '没问题', 'primary'), skip=mk('rvOneSkip', '跳过'), cl=mk('rvOneClose', '关闭', 'block');
+                    ok.addEventListener('click', ()=>{ done(); setRec(r.id, x=>{ delete x.rv; }); next(); });
+                    skip.addEventListener('click', ()=>{ done(); next(); });
+                    cl.addEventListener('click', ()=>{ done(); rvIds=null; window.JiwenTabs.refreshAllViews(); render(); });
+                    const pair=document.createElement('div'); pair.className='ui-pair'; pair.appendChild(skip); pair.appendChild(ok);
+                    const col=document.createElement('div'); col.className='ui-stack'; col.appendChild(pair); col.appendChild(cl); box.appendChild(col);
+                } });
+        }
+        let rvGroupOpen=null, rvGroupOff=null;
+        function openRvGroups(keep){
+            if(!window.JiwenSheet) return;
+            if(!keep){ rvGroupOpen=null; rvGroupOff=new Set(); }
+            const list=rvList(); if(!list.length){ customAlert('没有待确认分类的记录了。', '成组确认'); render(); return; }
+            const by=new Map(); list.forEach(r=>{ const c=r.cat||'未分类'; if(!by.has(c)) by.set(c, []); by.get(c).push(r); });
+            const groups=[...by.entries()].sort((a, b)=>b[1].length-a[1].length);
+            window.JiwenSheet.open({ title:'成组确认', tall:true, sub:`按推荐的分类分组 · 共 ${list.length} 条`,
+                body(box, done){
+                    groups.forEach(([cat, rs])=>{
+                        const cps=new Map(); rs.forEach(r=>{ const n=cpName(r)||'（没有对方）'; cps.set(n, (cps.get(n)||0)+1); });
+                        const top=[...cps.entries()].sort((a, b)=>b[1]-a[1]).slice(0, 3).map(([n, c])=>`${n} ${c}`).join('、') + (cps.size>3 ? '…' : '');
+                        const on=rs.filter(r=>!rvGroupOff.has(r.id));
+                        const g=document.createElement('div'); g.className='rvg'; g.dataset.cat=cat;
+                        g.innerHTML=`<button type="button" class="rvg-head" data-act="open"><span class="rvg-t">${escapeHtml(cat)} · ${rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${rvGroupOpen===cat ? '收起 ▴' : '看每一笔 ▸'}</span></button>`
+                            + `<button type="button" class="ui-btn primary rvg-ok" data-act="ok"${on.length ? '' : ' disabled'}>${on.length===rs.length ? '这组都没问题' : `勾上的 ${on.length} 笔没问题`}</button>`;
+                        if(rvGroupOpen===cat){
+                            const ul=document.createElement('div'); ul.className='rvg-list';
+                            rs.forEach(r=>{ const row=document.createElement('label'); row.className='rvg-row'; row.innerHTML=`<input type="checkbox"${rvGroupOff.has(r.id) ? '' : ' checked'} data-id="${escapeHtml(r.id)}"><span class="rvg-r">${escapeHtml(String(r.time||'').slice(5, 10))} ${escapeHtml(cpName(r)||r.remark||'—')}</span><span class="rvg-a">${safeNum(r.money).toFixed(2)}</span>`; ul.appendChild(row); });
+                            g.appendChild(ul);
+                        }
+                        g.addEventListener('click', e=>{
+                            const cb=e.target.closest('input[type=checkbox]');
+                            if(cb){ if(cb.checked) rvGroupOff.delete(cb.dataset.id); else rvGroupOff.add(cb.dataset.id); openRvGroups(true); return; }
+                            const a=e.target.closest('[data-act]'); if(!a) return;
+                            if(a.dataset.act==='open'){ rvGroupOpen = rvGroupOpen===cat ? null : cat; openRvGroups(true); }
+                            else if(a.dataset.act==='ok'){ const ids=on.map(r=>r.id); done(); applyBatch(ids, { rvOk:true }); }
+                        });
+                        box.appendChild(g);
+                    });
+                },
+                foot(box, done){ const b=document.createElement('button'); b.type='button'; b.id='rvGroupClose'; b.className='ui-btn block'; b.textContent='关闭'; b.addEventListener('click', ()=>done()); box.appendChild(b); } });
+        }
+        window.JiwenSearch = { openRvGroups, openRvOne, srcOf, applyBatch, closeSearch, filterMatch, isOpen, openBatchMenu, openSearch, openSheet, render, renderFilterChips, resetSearch, searchFlush, searchNow, undoBatch };   // search 模块对外只有这一个入口
 })();

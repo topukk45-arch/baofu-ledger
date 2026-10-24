@@ -3721,7 +3721,20 @@
     try { var ta = el('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand && document.execCommand('copy'); ta.remove(); } catch (_) {}
   }
 
-  var UI = { undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  // 导入简化第 5 版：账单页逐条确认待确认分类时写理由：按现在的规则（你的规则、分类对照、内置词表、支付宝分类）给这一条再推一遍，写成一句话
+  function reasonFor(r, cpName) {
+    return ensureClassify().then(function (okk) {
+      if (!okk || !r) return '';
+      var info = null; try { info = store().archiveInfo(); } catch (_) {}
+      if (!info) return '';
+      var rec = window.JiwenImportClassify.classify([{ app: (r.src && r.src.app) || 'wechat', cp: cpName || '', desc: String(r.remark || '').split('\n')[0], kind: r.oc || '', io: r.type }],
+        { cats: info.cats, rules: info.catRules, maps: info.catMaps, merchants: window.JiwenImportMerchants, isNewUser: false, history: info.cpHist || null }).recs[0];
+      if (!rec) return '';
+      var w = confWord(rec);
+      return rec.reason ? plainReason(rec) + (w ? '（' + w + '）' : '') : '推不出分类，按导入时的默认放的';
+    });
+  }
+  var UI = { reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _plainReason: function (r) { return plainReason(r); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();
