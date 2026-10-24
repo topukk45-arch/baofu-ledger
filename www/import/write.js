@@ -122,6 +122,7 @@
       if ((d.group !== 'add' && d.group !== 'neutral') || sumDone[d.key]) return;
       var o = base(d);
       setMode(o, d.mode);
+      if (d.dayRemark && d.dayRemark.length) o.remark = d.dayRemark.concat(o.remark ? [o.remark] : []).join('；').slice(0, 5000);     // 7b：以账单为准，手记的备注带过来
       if (d.ob && d.mode === 'flow') o.ob = 1;     // 导入简化 2a：大额选了往来、标了期初余额
       // 1021-T13（实测 10-20）：待确认分类：推荐把握低或未分类、你没在确认页定过（还是推荐的）、不是不计的 → rv:1，
       //   到账单页「待确认分类」里慢慢改（改了分类就去掉）。指纹 recHash 不含它
@@ -178,6 +179,11 @@
     // 导入简化 7a：按天对账「以手记为准」的账单：只登记单号（指到这天金额最近的那条手记），不入账、不改手记
     rows.forEach(function (d) {
       if (d.group === 'skip' && d.why === 'daymanual' && d.dayInto) order(d.key, d.time, 0, { id: d.dayInto });
+    });
+
+    // 导入简化 7b：按天对账「以账单为准」：这天没配上的手记标「已被账单替换」（rp:1，原值记进导入记录，撤销时去掉）
+    ((p.sections && p.sections.days) || []).forEach(function (x) {
+      if (x.choice === 'bill') (x.replaced || []).forEach(function (id) { change(id, 'replace').set.rp = 1; });
     });
 
     // ---- 退款 ----

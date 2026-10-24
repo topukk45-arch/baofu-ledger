@@ -6,6 +6,26 @@
         // 存成 income 是为了向下兼容：旧版本不认识 refundOf，会把它当普通收入——
         //   正好等于以前手动「退款记成收入」的效果，结余也对；存成 expense 则旧版本会把退款再算一遍支出。
         function isRefund(r){ return !!(r && r.type==='income' && typeof r.refundOf==='string' && r.refundOf); }
+        // 导入简化 7b：按天对账选了「以账单为准」，这天的手记被账单替换（rp:1）：记录还留在账本里（撤销时按逐字段还原去掉标记），
+        //   不显示、不进统计。读账本的地方都走 getUserData()（这里统一去掉它们），存的时候 saveUserData() 把它们放回原来的位置；
+        //   导入那边直接读缓存的几个只读查询（archiveInfo、ledgerFor、refundTargets、rvRows、aiExportRows、待处理候选）各自跳过
+        function isReplaced(r){ return !!(r && r.rp===1); }
+        function liveRecs(recs){ return recs.some(isReplaced) ? recs.filter(r=>!isReplaced(r)) : recs; }
+        // 把 orig 里藏着的（rp）放回 data：每条接在它前面那条（还在 data 里的）后面，前面没有的放最前
+        function keepReplaced(orig, data){
+            if(!orig || !orig.some(isReplaced)) return data;
+            const ids=new Set(data.map(r=>r && r.id)), after=new Map();
+            let anchor=null;
+            orig.forEach(r=>{
+                if(isReplaced(r) && !ids.has(r.id)){ if(!after.has(anchor)) after.set(anchor, []); after.get(anchor).push(r); return; }
+                if(ids.has(r.id)) anchor=r.id;
+            });
+            if(!after.size) return data;
+            const out=(after.get(null)||[]).slice();
+            data.forEach(r=>{ out.push(r); const xs=r && after.get(r.id); if(xs) out.push(...xs); });
+            if(data.__aid!==undefined) Object.defineProperty(out, '__aid', { value:data.__aid, enumerable:false, writable:true, configurable:true });
+            return out;
+        }
         // 「支出」口径下的带符号金额：支出 +a，退款 −a，其他 0。只算金额，口径由调用方判断。
         function expSigned(r){
             if(!r) return 0;
@@ -1512,7 +1532,7 @@
             const out={};
             if(!want.size) return out;
             ((t.e.archs.get(t.aid)||{ recs:[] }).recs).forEach(r=>{
-                if(want.has(r.id)) out[r.id]={ id:r.id, time:r.time||'', money:r.money, type:r.type, cat:r.cat||'', src:r.src ? { app:r.src.app } : null };
+                if(want.has(r.id) && !isReplaced(r)) out[r.id]={ id:r.id, time:r.time||'', money:r.money, type:r.type, cat:r.cat||'', src:r.src ? { app:r.src.app } : null };
             });
             return out;
         }
@@ -1700,7 +1720,7 @@
                 const lg=((log && log.list) || []).filter(l=>l.kind!=='ai' && l.b===batch).pop();
                 if(!lg) throw impErr('nolog');
                 const a=ledgerAssembleArchive(t.e, t.aid), cps=a.cps||[];
-                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, byId=new Map(recs.map(r=>[r.id, r]));
+                const recs=liveRecs((t.e.archs.get(t.aid)||{ recs:[] }).recs), byId=new Map(recs.map(r=>[r.id, r]));
                 const ids=[], kind={};
                 (lg.add||[]).forEach(id=>{ if(!(id in kind)){ ids.push(id); kind[id]={ add:true }; } });
                 (lg.chg||[]).forEach(c=>{ if(!(c.id in kind)){ ids.push(c.id); kind[c.id]={ chg:c }; } });
@@ -1832,7 +1852,7 @@
             // ---- 导入简化第 6 版：一键优化分类要的（只读）：带「待确认分类」的记录，不含退款、有退款挂着的 ----
             rvRows(archive){
                 const t=impTarget(archive);
-                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, cps=(ledgerAssembleArchive(t.e, t.aid).cps)||[];
+                const recs=liveRecs((t.e.archs.get(t.aid)||{ recs:[] }).recs), cps=(ledgerAssembleArchive(t.e, t.aid).cps)||[];
                 const hasRf=new Set(recs.filter(r=>r.refundOf).map(r=>r.refundOf));
                 return recs.filter(r=>r.rv===1 && !r.refundOf && !hasRf.has(r.id))
                     .map(r=>({ id:r.id, time:r.time, fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', app:(r.src && r.src.app) || '', oc:r.oc||'', remark:(r.remark||'').split('\n')[0].slice(0, 60), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', skip:!!r.skip }));
@@ -1840,7 +1860,7 @@
             // ---- 1016-Z2：「当作退款，挂到某一笔」的候选（只读）：账本里的支出，时间不晚于这笔、180 天以内、还没退完的够挂；新的在前，最多 50 条
             refundTargets(q, archive){
                 const t=impTarget(archive);
-                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, cps=(ledgerAssembleArchive(t.e, t.aid).cps)||[];
+                const recs=liveRecs((t.e.archs.get(t.aid)||{ recs:[] }).recs), cps=(ledgerAssembleArchive(t.e, t.aid).cps)||[];
                 const refunded=new Map(); recs.forEach(r=>{ if(r.refundOf) refunded.set(r.refundOf, (refunded.get(r.refundOf)||0)+Math.round(safeNum(r.money)*100)); });
                 const tq=String(q && q.time || ''), fen=Number(q && q.fen)||0;
                 const from=new Date(parseRecTime(tq).getTime()-180*86400000), fromStr=`${from.getFullYear()}-${pad(from.getMonth()+1)}-${pad(from.getDate())}`;
@@ -2032,7 +2052,7 @@
             // 存档的分类、规则、对方名单，是不是新用户（记录少于 30 条、分类还是默认那 7 个）
             archiveInfo(archive){
                 const t=impTarget(archive);
-                const a=ledgerAssembleArchive(t.e, t.aid), st=t.e.archs.get(t.aid), n=st ? st.recs.length : 0;
+                const a=ledgerAssembleArchive(t.e, t.aid), st0=t.e.archs.get(t.aid), n=st0 ? st0.recs.length : 0, st=st0 ? { recs:liveRecs(st0.recs) } : st0;
                 const cats=(a.cats||[]).slice(), rules=a.importRules||{};
                 const isDefault=cats.length===DEFAULT_CATS.length && DEFAULT_CATS.every(c=>cats.includes(c));
                 // 1016-Z：每个分类以前的支出（计入、不是退款）有几笔、第 80 百分位多少分（异常金额提醒用）
@@ -2135,7 +2155,7 @@
             ledgerFor(q, archive){
                 const t=impTarget(archive);
                 const a=ledgerAssembleArchive(t.e, t.aid), cps=a.cps||[];
-                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, refunded=new Map();
+                const recs=liveRecs((t.e.archs.get(t.aid)||{ recs:[] }).recs), refunded=new Map();
                 recs.forEach(r=>{ if(r.refundOf) refunded.set(r.refundOf, (refunded.get(r.refundOf)||0)+Math.round(safeNum(r.money)*100)); });
                 const fen=r=>Math.round(safeNum(r.money)*100);
                 const manual=[], cands=[], seen=new Set();
@@ -2144,7 +2164,7 @@
                     if(typeof r.time!=='string') return;
                     if(m && !r.src && !r.refundOf){
                         const d=r.time.slice(0,10);
-                        if(d>=m.from && d<=m.to) manual.push({ id:r.id, time:r.time, type:r.type, fen:fen(r), cat:r.cat, mode:recMode(r), remark:r.remark||'' });   // 1017-UI8：备注只给确认页显示（配对卡、为什么没配上），配对不看它
+                        if(d>=m.from && d<=m.to) manual.push(Object.assign({ id:r.id, time:r.time, type:r.type, fen:fen(r), cat:r.cat, mode:recMode(r), remark:r.remark||'' }, refunded.has(r.id) ? { rf:1 } : {}));   // 1017-UI8：备注只给确认页显示（配对卡、为什么没配上），配对不看它
                     }
                     if(r.src && r.type==='expense' && Number.isInteger(r.cp)){
                         (q && q.refunds || []).forEach(x=>{
@@ -3155,6 +3175,7 @@
                 // 1017-G：AI 标记照搬（ref 等全部记录编好号再换，见下面）
                 const af=impCleanAiFlag(r.aiFlag, null); if(af) rec.aiFlag=af;
                 if(r.rv===1) rec.rv=1;   // 1021-T13：待确认分类标记照搬
+                if(r.rp===1) rec.rp=1;   // 导入简化 7b：已被账单替换的手记照搬（还是藏着）
                 if(r.ob===1 && rec.flow===true) rec.ob=1;   // 1023-P：期初余额（只在往来的记录上）
                 if(r.id!=null) idMap.set(String(r.id), rec);
                 if(type==='income' && r.refundOf!=null && r.refundOf!=='') pend.push([rec, String(r.refundOf)]);
@@ -3332,14 +3353,14 @@
             const e=__ledger.get(storeKey());
             const aid=e && e.has ? e.names.get(JiwenBase.currentArchive) : undefined;
             const st=aid ? e.archs.get(aid) : undefined;
-            if(!st) return curArchive(loadStore()).records;
-            return ledgerTagRecords(st.recs.slice(), aid);
+            if(!st) return liveRecs(curArchive(loadStore()).records);
+            return ledgerTagRecords(st.recs.filter(r=>!isReplaced(r)), aid);
         }
         // silent=true 时不弹通用失败提示，由调用方自行给出对症提示（避免同一次失败连弹两个弹窗）
         //   【1013-D】saveStore 改成先改内存、再异步写库，这里不会再同步拿到失败；
         //   写库失败由 ledgerWriteSoon 统一提示一次，修改留在内存里，下次保存 / 切后台时再写。
         function saveUserData(data, silent){
-            const store=loadStore(); curArchive(store).records=data;
+            const store=loadStore(); curArchive(store).records=keepReplaced(curArchive(store).records, data);
             store.last=JiwenBase.currentArchive;
             let ok;
             if(silent){
@@ -3436,5 +3457,5 @@
             const dt=new Date(y, mo-1, d);
             return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d;
         }
-        window.JiwenStore = { RECENT_DAYS, recentCats, IMPORT_MAX_BYTES, IMP_APPS, MAX_IMPORT_RECORDS, TPL_MAX, TPL_NAME_MAX, __LEDGER_STRICT, __corruptedStores, __ledger, __ledgerKeys, __ledgerMergeNotes, __ledgerPending, accountById, accountNameError, balContrib, budgetPhrase, budgetSpentIn, catSigned, charLen, charSlice, createAccount, curArchive, daysKey, expSigned, genId, getAccounts, getBudgets, getCats, getUserData, idbBatch, idbKeys, impArchFields, impBkPrefix, impBlkDecode, impCleanAiFlag, impDraftExpire, impExportFields, impGetJson, impLogKey, impMakeBackup, impOrdersRestoreFromCloud, impPendKey, impRecHash, impRulesDropCat, impRulesRenameCat, impTarget, importArchiveFromText, isAccountId, isOpening, isRefund, isValidDay, ledgerAcceptDamage, ledgerDamageNotice, ledgerDropAccount, ledgerEvictExcept, ledgerExists, ledgerGet, ledgerIdle, ledgerLoad, loadDays, loadStore, mergeImportedDays, migrateAccounts, migrateLedgersToBlocks, migrateLedgersToIdb, modeAmtCls, modeTag, nameOf, nameTaken, odBuildPayload, odClearLink, odGetLink, odGetOrdLink, odMoveLink, odOrdersSync, odPlugin, odRefreshStatusUI, odScheduleSync, odSetLink, odSetOrdLink, odSyncNow, recoverAccountsIfBroken, refundedMap, refundedTag, refundedTotal, refundsOf, sanitizeTpls, saveAccounts, saveStore, saveStoreDurable, saveStoreSafe, saveUserData, setAccountHidden, stampAccountName, statContrib, storeKey, syncRefunds, touchAccount, tplName, tplSame, trackBusy };   // store 模块对外只有这一个入口
+        window.JiwenStore = { RECENT_DAYS, recentCats, IMPORT_MAX_BYTES, IMP_APPS, MAX_IMPORT_RECORDS, TPL_MAX, TPL_NAME_MAX, __LEDGER_STRICT, __corruptedStores, __ledger, __ledgerKeys, __ledgerMergeNotes, __ledgerPending, accountById, accountNameError, balContrib, budgetPhrase, budgetSpentIn, catSigned, charLen, charSlice, createAccount, curArchive, daysKey, expSigned, genId, getAccounts, getBudgets, getCats, getUserData, idbBatch, idbKeys, impArchFields, impBkPrefix, impBlkDecode, impCleanAiFlag, impDraftExpire, impExportFields, impGetJson, impLogKey, impMakeBackup, impOrdersRestoreFromCloud, impPendKey, impRecHash, impRulesDropCat, impRulesRenameCat, impTarget, importArchiveFromText, isAccountId, isOpening, isRefund, isReplaced, isValidDay, ledgerAcceptDamage, ledgerDamageNotice, ledgerDropAccount, ledgerEvictExcept, ledgerExists, ledgerGet, ledgerIdle, ledgerLoad, loadDays, loadStore, mergeImportedDays, migrateAccounts, migrateLedgersToBlocks, migrateLedgersToIdb, modeAmtCls, modeTag, nameOf, nameTaken, odBuildPayload, odClearLink, odGetLink, odGetOrdLink, odMoveLink, odOrdersSync, odPlugin, odRefreshStatusUI, odScheduleSync, odSetLink, odSetOrdLink, odSyncNow, recoverAccountsIfBroken, refundedMap, refundedTag, refundedTotal, refundsOf, sanitizeTpls, saveAccounts, saveStore, saveStoreDurable, saveStoreSafe, saveUserData, setAccountHidden, stampAccountName, statContrib, storeKey, syncRefunds, touchAccount, tplName, tplSame, trackBusy };   // store 模块对外只有这一个入口
 })();

@@ -194,7 +194,7 @@
         function openCatActions(c){
             const a=curArchive(loadStore());
             if(!a.cats.includes(c)) return;
-            const used=a.records.filter(r=>r.cat===c).length;
+            const used=a.records.filter(r=>r.cat===c && r.rp!==1).length;   // 导入简化 7b：已被账单替换的不算
             const bv=(a.budgets && a.budgets[c]>0) ? a.budgets[c] : null;
             const sub=(bv!=null ? `每月预算 ${safeNum(bv).toFixed(0)} · ` : '') + (used ? `${used} 条记录` : '还没有记录');
             const btn=(id, text, cls, fn)=>{ const b=document.createElement('button'); b.type='button'; b.id=id; b.className='ui-btn block '+(cls||''); b.textContent=text; b.addEventListener('click', fn); return b; };
@@ -268,7 +268,7 @@
             if(name==='未分类'){ customAlert('「未分类」是保留分类，不能删除哦～'); return; }
             const store=loadStore(); const a=curArchive(store);
             if(a.cats.length<=1){ customAlert('至少保留一个分类！'); return; }
-            const used=a.records.filter(r=>r.cat===name).length;
+            const used=a.records.filter(r=>r.cat===name && r.rp!==1).length;
             const nTpl=(Array.isArray(a.tpls) ? a.tpls : []).filter(t=>t.cat===name).length;
             const hasBudget=!!(a.budgets && a.budgets[name]>0);
             const lines=[used>0 ? `有 ${used} 条记录用着这个分类，删了以后这些记录会变成「未分类」，金额和备注都不动。` : '没有记录用着这个分类。'];

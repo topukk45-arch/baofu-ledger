@@ -32,7 +32,8 @@ const FC = [['微信2.csv', B.bill('wechat', [shared, wx({ time: T(14, 12), cp: 
 const FILES = [FA, FB, FC];
 const MAN = [{ id: 'm1', time: '2026-10-06T09:30', money: 36, type: 'expense', cat: '购物', remark: '买书' },
              { id: 'm2', time: '2026-10-01T08:30', money: 50, type: 'expense', cat: '吃饭', remark: '聚餐' },
-             { id: 'm3', time: '2026-10-14T12:20', money: 28, type: 'expense', cat: '吃饭', remark: '面' }];
+             { id: 'm3', time: '2026-10-14T12:20', money: 28, type: 'expense', cat: '吃饭', remark: '面' },
+             { id: 'm4', time: '2026-10-12T13:00', money: 90, type: 'expense', cat: '吃饭', remark: '虚构的一天' }];   // 7b：12 日和支付宝那两笔按天对不上
 const CATS = ['未分类', '吃饭', '购物', '零食', '其他'];
 function rng(seed) { let x = seed >>> 0 || 1; return () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; }; }
 
@@ -68,6 +69,8 @@ async function check(t, arch, tag, strict, capped) {
   ((a.importRules || {}).cat || []).forEach(x => { if (!a.cats.includes(x.cat)) bad.push('规则指向不在的分类 ' + x.cat); });
   ((a.importRules || {}).map || []).forEach(x => { if (!a.cats.includes(x.cat)) bad.push('对照指向不在的分类 ' + x.cat); });
   if (new Set(recs.map(r => r.id)).size !== recs.length) bad.push('记录编号重复');
+  // 7b：已被账单替换的（rp:1）哪里都看不到
+  if (arch === t.w.JiwenBase.currentArchive) { const vis = new Set(t.w.JiwenStore.getUserData().map(r => r.id)); recs.forEach(r => { if ((r.rp === 1) === vis.has(r.id)) bad.push('「已被账单替换」和看不看得到对不上 ' + r.id); }); }
   ok(!bad.length, tag + '：对得上 ' + bad.slice(0, 3).join('；'));
   return !bad.length;
 }
@@ -118,6 +121,20 @@ async function round(seed, mode) {
       trace.push('AI修改');
       try { await t.st().aiApply({ of: lg.b, changes: [{ id, set }] }, {}); } catch (e) { if (e.code !== 'nothing') throw e; }
     },
+    // 7b：按天对账，对不上的天都选「以账单为准」（手记标 rp:1）
+    async dayBill() {
+      await t.importFiles(pick(FILES), null, { noGo: true, stay: true });
+      const days = ((t.S().plan && t.S().plan.sections.days) || []).filter(x => !x.auto);
+      if (!days.length || !t.w.JiwenImportUI._goStep) { A.clickCancel(t.w); await t.idle(); return; }
+      t.w.JiwenImportUI._goStep('match');
+      days.forEach(x => { const b = t.d.querySelector('#impDays .imp-day-row[data-day="' + x.day + '"] .imp-day-m[data-v="bill"]'); if (b) b.click(); });
+      trace.push('以账单为准' + days.length + '天'); if (process.env.PROP_SHOW_DAYS) console.log('以账单为准', days.length);
+      A.clickGo(t.w);
+      await t.until(() => t.$('impResult') || t.ask(), 30000);
+      if (t.ask()) await t.askOk();
+      if (t.$('impResult')) t.$('impBackToLedger').click();
+      await t.idle();
+    },
     // 第 6 版：一键优化分类（of '*'）：改一条待确认分类的记录
     async opt() {
       const rs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].records.filter(x => x.rv === 1 && !x.refundOf); if (!rs.length) return;
@@ -160,7 +177,7 @@ async function round(seed, mode) {
     async delCat() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); if (cs.length < 2) return; const c = pick(cs); trace.push('删分类'); manual = true; t.w.JiwenCats.deleteCat(c); if (t.ask()) t.$('askOk').click(); await t.idle(); },
     async rules() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); trace.push('改规则'); manual = true; await t.st().rulesSave({ cat: [{ kw: '某虚构超市', cat: pick(cs) }], type: [] }); },
   };
-  const W = mode === 1 ? { imp: 5, ai: 3, opt: 1, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, opt: 1, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1 };
+  const W = mode === 1 ? { imp: 5, ai: 3, opt: 1, dayBill: 1, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, opt: 1, dayBill: 1, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1 };
   const bag = []; Object.keys(W).forEach(k => { for (let i = 0; i < W[k]; i++) bag.push(k); });
   let good = true;
   for (let s = 0; s < STEPS && good; s++) {

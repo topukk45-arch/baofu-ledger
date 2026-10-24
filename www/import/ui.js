@@ -905,9 +905,9 @@
              s: Object.keys(S.seenStatuses).filter(function (k) { return S.statuses[k] || s.unknownStatuses.some(function (t) { return t.app + '|' + t.status === k; }); }) };
   }
   // 7a：按天对账里、没选「逐笔看」的那几天的账单（这几笔不在别处一笔一笔列）
-  function dayKeys(p) { var out = []; ((p.sections && p.sections.days) || []).forEach(function (x) { if (x.choice !== 'each') out = out.concat(x.keys); }); return out; }
+  function dayKeys(p) { var out = []; ((p.sections && p.sections.days) || []).forEach(function (x) { if (x.choice !== 'each' && x.choice !== 'bill') out = out.concat(x.keys); }); return out; }
   function dayTitle(x) { return (+x.day.slice(5, 7)) + '月' + (+x.day.slice(8, 10)) + '日：你记了 ' + x.mN + ' 笔 ' + yuan(x.mFen) + '，账单 ' + x.bN + ' 笔 ' + yuan(x.bFen) + (x.diff ? '，差 ' + yuan(Math.abs(x.diff)) : ''); }
-  var DAY_CHOICES = [['manual', '以手记为准', '账单这几笔只登记单号，不入账'], ['each', '逐笔看', '一笔一笔对（配对卡），对不上的作为新增或留着']];
+  var DAY_CHOICES = [['manual', '以手记为准', '账单这几笔只登记单号，不入账'], ['bill', '以账单为准', '账单入账，你记的那几条的分类和备注带过去；那几条标「已被账单替换」、不再显示（撤销导入时回来）'], ['each', '逐笔看', '一笔一笔对（配对卡），对不上的作为新增或留着']];
   function dayCard(p) {
     var list = (p.sections.days || []).filter(function (x) { return !x.auto; }), autoN = (p.sections.days || []).filter(function (x) { return x.auto; }).length;
     var everDay = Object.keys(((S.view.ever || {}).match) || {}).some(function (id) { return id.indexOf('day:') === 0; });

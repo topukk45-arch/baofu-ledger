@@ -209,12 +209,15 @@
     //   范围：现有配对（精确、金额相近、几笔加起来）做完后还剩下的支出账单（新增 / 待处理，计入的，不在汇总里），而且这一天还有没配上的手记（支出、计入）。
     //   一天一项：「你记了 N 笔 x，账单 M 笔 y，差 z」。差 0 的天直接按手记为准（不列出来）；别的天你选：
     //     manual 以手记为准：手记不动，这几笔账单只登记单号（指到这天金额最近的那条手记）、不入账；each 逐笔看：照原来一笔一笔（配对卡、新增）；
-    //     不选：这几笔留在待处理（候选是这天没配上的手记），不进账本。edits.days[日子] = 'manual' | 'each'
+    //     不选：这几笔留在待处理（候选是这天没配上的手记），不进账本。edits.days[日子] = 'manual' | 'bill' | 'each'
+    //   7b：bill 以账单为准：这几笔账单照常新增，这天没配上的手记标「已被账单替换」（rp:1，不真删，撤销时去掉标记）；
+    //     每条手记的分类和备注带到时间最近的那笔账单上（一笔账单只接一条手记的分类；手记比账单多时，多的那几条只把备注接上去）
     var daysE = edits.days || {}, dayList = [];
     (function () {
       // 「几笔加起来」那一组（现有配对的一种）自己选：组里的账单和它候选的手记都不按天对
       var inSum = {}; msums.forEach(function (g) { g.options.forEach(function (o) { inSum[o.record] = 1; }); });
-      var mans = (input.manual || []).filter(function (m) { return m && m.type === 'expense' && (m.mode || 'normal') === 'normal' && !pickedRecords[m.id] && !inSum[m.id] && typeof m.time === 'string'; });
+      // 挂着退款的手记不按天对（7b 替换掉它，退款就没了原单）
+      var mans = (input.manual || []).filter(function (m) { return m && m.type === 'expense' && (m.mode || 'normal') === 'normal' && !m.rf && !pickedRecords[m.id] && !inSum[m.id] && typeof m.time === 'string'; });
       if (!mans.length) return;
       var mBy = {}; mans.forEach(function (m) { var k = m.time.slice(0, 10); (mBy[k] = mBy[k] || []).push(m); });
       var rBy = {};
@@ -222,16 +225,30 @@
         if (d.src !== 'row' || (d.group !== 'add' && d.group !== 'pending') || d.mode !== 'normal' || !d.time || inGroup0[d.file + ':' + d.row] || dirOf0(d) !== 'expense' || refundish(d.item)) return;
         // 你在别处一笔一笔定过的（作为新增、分开记、勾掉、当作退款、改了口径 / 分类）、几笔加起来那组定过的、因为别处的选择自动成了新增的：不再按天对
         var e0 = E[d.key] || {};
-        if (e0.pick || e0.split || e0.exclude || e0.asRefund || e0.mode || e0.cat || d.autoNew || d.splitFrom || d.item.msum) return;
+        if (e0.pick || e0.split || e0.exclude || e0.asRefund || e0.mode || (e0.cat && daysE[d.time.slice(0, 10)] !== 'bill') || d.autoNew || d.splitFrom || d.item.msum) return;
         var k = d.time.slice(0, 10); if (!mBy[k]) return;
         (rBy[k] = rBy[k] || []).push(d);
       });
       Object.keys(rBy).sort().forEach(function (k) {
         var R = rBy[k], M = mBy[k], bFen = R.reduce(function (s0, d) { return s0 + d.fen; }, 0), mFen = M.reduce(function (s0, m) { return s0 + m.fen; }, 0);
-        var diff = mFen - bFen, choice = diff === 0 ? 'manual' : (daysE[k] === 'manual' || daysE[k] === 'each' ? daysE[k] : null);
+        var diff = mFen - bFen, choice = diff === 0 ? 'manual' : (daysE[k] === 'manual' || daysE[k] === 'bill' || daysE[k] === 'each' ? daysE[k] : null);
         dayList.push({ day: k, mN: M.length, mFen: mFen, bN: R.reduce(function (s0, d) { return s0 + d.units; }, 0), bFen: bFen, diff: diff, auto: diff === 0,
                        choice: choice, keys: R.map(function (d) { return d.key; }), records: M.map(function (m) { return m.id; }) });
         if (choice === 'each') return;
+        if (choice === 'bill') {
+          var bs = R.slice().sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; }), took = {};
+          var near = function (m, free) { var c = bs.filter(function (d) { return !free || !took[d.key]; }); var tm = Date.parse(m.time); return c.sort(function (a, b) { return Math.abs(Date.parse(a.time) - tm) - Math.abs(Date.parse(b.time) - tm); })[0]; };
+          R.forEach(function (d) { d.group = 'add'; d.dayBill = true; d.cands = []; d.dayPend = false; if (d.why === 'dayrecon') d.why = undefined; d.reason = '这天你选了以账单为准（你记的那几条标成「已被账单替换」）'; d.dayRemark = []; });
+          M.slice().sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; }).forEach(function (m) {
+            var d = near(m, true), first = !!d;
+            if (!d) d = near(m, false);
+            if (!d) return;
+            if (first) { took[d.key] = 1; if (m.cat && m.cat !== '未分类' && cats.indexOf(m.cat) >= 0) d.dayCat = m.cat; }
+            if (m.remark) d.dayRemark.push(m.remark);
+          });
+          dayList[dayList.length - 1].replaced = M.map(function (m) { return m.id; });
+          return;
+        }
         R.forEach(function (d) {
           if (choice === 'manual') {
             var best = M.slice().sort(function (a, b) { return Math.abs(a.fen - d.fen) - Math.abs(b.fen - d.fen); })[0];
@@ -263,6 +280,7 @@
       if (d.group === 'merge') { var m = manualById[d.into]; d.cat = m ? m.cat : '未分类'; d.catFrom = 'manual'; return; }
       if (d.group === 'refund' && d.refundTo && d.refundTo.row) { d.catFrom = 'orig'; return; }      // 下面跟着原单
       if (e.cat) { d.cat = e.cat; d.catFrom = 'edit'; return; }
+      if (d.dayCat) { d.cat = d.dayCat; d.catFrom = 'day'; d.rec = it.rec || null; return; }     // 7b：以账单为准，接手记的分类
       if (d.splitFrom) { var sm = manualById[d.splitFrom]; d.cat = sm ? sm.cat : '未分类'; d.catFrom = 'split'; return; }
       d.cat = recCat(it.rec); d.catFrom = 'rec'; d.rec = it.rec || null;
       // 导入简化 2b：推荐的新分类没建、照默认并进了已有分类（你没在确认页定过）→ 写进去标「待确认分类」
