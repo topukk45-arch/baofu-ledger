@@ -312,7 +312,8 @@
             const st=srcText(r);
             return `<div class="bl-row" data-act="detail" data-id="${escapeHtml(r.id)}" role="button">`
                 + `<div class="bl-main"><div class="bl-t"><span class="bl-t-x">${escapeHtml(remark || cat)}</span>${tags}</div>`
-                + `<div class="bl-sub"><span class="bl-cat-t">${escapeHtml(cat)}</span> · <span class="bl-time">${escapeHtml(when)}</span>${st ? ` · <span class="bl-src">${st}</span>` : ''}</div></div>`
+                // 1024-Y：没备注时上面一行已经写了分类，下面一行不再写一遍（只写时间 · 来源）
+                + `<div class="bl-sub">${remark ? `<span class="bl-cat-t">${escapeHtml(cat)}</span> · ` : ''}<span class="bl-time">${escapeHtml(when)}</span>${st ? ` · <span class="bl-src">${st}</span>` : ''}</div></div>`
                 + `<span class="bl-amt ${isExp ? 'out' : 'pos'}${modeAmtCls(r)}">${isExp ? '−' : '+'}${amt}</span></div>`;
         }
         function recsOfDays(a, b){ return getUserData().filter(r=>{ const k=(r.time||'').slice(0,10); return k>=a && k<=b; }); }

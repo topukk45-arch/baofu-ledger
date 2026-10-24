@@ -60,6 +60,7 @@ const txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   ok(rows.length === 2 && rows[0].dataset.id === 'o22b', '4 当天的记录新的在上');
   ok(txt(rows[0].querySelector('.bl-t')) === '绿茶' && txt(rows[0].querySelector('.bl-sub')) === '购物 · 20:30', '4 每笔两行：备注 / 分类 · 时间');
   ok(txt(rows[1].querySelector('.bl-t')) === '吃饭', '4 没备注的写分类');
+  ok(txt(rows[1].querySelector('.bl-sub')) === '12:00' && !rows[1].querySelector('.bl-cat-t'), '4 没备注的：下面一行不再写一遍分类（1024-Y）' + txt(rows[1].querySelector('.bl-sub')));
   ok(rows[0].querySelector('.bl-amt').classList.contains('out') && rows[0].querySelector('.bl-amt').textContent === '−4.50', '4 支出：深色、带 −');
   const inc = list.querySelector('.bl-row[data-id="inc"] .bl-amt');
   ok(inc.classList.contains('pos') && inc.textContent === '+5000.00', '4 收入：绿色、带 +');
