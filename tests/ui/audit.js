@@ -1062,6 +1062,44 @@ async function run(cfg, port, browser) {
       await tab(page, 'settings'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(300);
       await shot(page, size, '设置页', '顶上');
       await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
+      // 导入简化（1024-C～1024-T）：没记账那一行点开；导入核对页（直接导入、大额问收支）；按天对账；完成页；账单页刚导入的横幅；
+      //   待确认分类结果页（逐条 / 成组 / 交给 AI 按组整理）；AI 按组整理面板。账单全是虚构的
+      {
+        await page.evaluate(() => { const g = [...document.querySelectorAll('#billList .lg-gap[data-a]')].find(x => !x.classList.contains('lg-gap-today')); if (g) g.click(); }); await page.waitForTimeout(600);
+        await shot(page, size, '账单页', '没记账那一行点开'); if (meas) await FOOT(page, '没记账那一行');
+        await closeAll(page);
+        const T = (d, h) => ({ y: 2026, mo: 10, d, h: h || 12, mi: 0, s: 0 }); let sq = 0;
+        const wx = o => B.txn(Object.assign({ kind: '商户消费', cp: '某虚构小店', desc: '/', io: 'expense', fen: 1500, pm: '零钱', status: '支付成功', mno: '', no: '4200000000' + String(++sq + 9000).padStart(19, '0') }, o));
+        const tx = [wx({ time: T(12, 9), cp: '某虚构房东', kind: '转账', fen: 300000 }), wx({ time: T(13), cp: '某虚构甲店', fen: 2300 }), wx({ time: T(14), cp: '某虚构甲店', fen: 2100 }),
+          wx({ time: T(15), cp: '某虚构乙店', fen: 1800 }), wx({ time: T(16), cp: '某虚构丙店', fen: 900 }), wx({ time: T(16, 19), cp: '某虚构丁店', fen: 4600 })];
+        const b64 = Buffer.from(B.bill('wechat', tx, { range: { from: '2026-10-12 00:00:00', to: '2026-10-19 23:59:59' } }).bytes).toString('base64');
+        await page.evaluate(async b => { const u = Uint8Array.from(atob(b), c => c.charCodeAt(0)); const ui = await window.JiwenImportEntry.loadImportUI(); ui.openWith([new File([u], '微信账单（虚构）.csv')]); }, b64);
+        await page.waitForSelector('#impQuick, #impRawFill', { timeout: 20000 }).catch(() => {}); await page.waitForTimeout(600);
+        await shot(page, size, '导入核对页', '直接导入、大额问收支'); if (meas) { await FOOT(page, '导入核对页'); await CLIP(page, '导入核对页', '#impPage'); }
+        await page.evaluate(() => { const x = document.getElementById('impNext'); if (x && !x.disabled) x.click(); }); await page.waitForTimeout(600);
+        await shot(page, size, '导入逐项看看', '第一步（看了 N 件 / 共 M 件）');
+        await page.evaluate(() => { try { window.JiwenImportUI._goStep('check'); } catch (_) {} }); await page.waitForTimeout(400);
+        await page.evaluate(() => { const q = document.getElementById('impQuick'); if (q && !q.disabled) q.click(); }); await page.waitForSelector('#impResult', { timeout: 20000 }).catch(() => {}); await page.waitForTimeout(600);
+        await shot(page, size, '导入完成页', '撤销在第一行'); if (meas) await CLIP(page, '导入完成页', '#impPage');
+        // 导入简化：真 Chromium 里真走了一遍（核对页 → 直接导入 → 完成页），完成页第一行是撤销
+        results.push(Object.assign({ name: 'import-quick', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], res = document.getElementById('impResult'), u = document.getElementById('impResUndo');
+          if (!res) bad.push('没走到导入完成页');
+          else if (!u || res.firstElementChild !== u && !res.contains(u)) bad.push('完成页没有「撤销这次导入」那一行');
+          return { bad, ok: !bad.length };
+        })));
+        await page.evaluate(() => { const b = document.getElementById('impBackToLedger'); if (b) b.click(); }); await page.waitForTimeout(600);
+        await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(400);
+        await shot(page, size, '账单页', '刚导入的横幅');
+        await page.evaluate(() => { const c = document.getElementById('rvChip'); if (c) c.click(); }); await page.waitForTimeout(600);
+        await shot(page, size, '搜一笔', '待确认分类（逐条 / 成组 / 交给 AI）'); if (meas) await CLIP(page, '待确认分类结果页', '#pageSearch');
+        await page.evaluate(() => { const c = document.getElementById('rvAiBtn'); if (c) c.click(); }); await page.waitForTimeout(1200);
+        await shot(page, size, 'AI 按组整理', '复制给 AI'); if (meas) await FOOT(page, 'AI 按组整理');
+        await closeAll(page);
+        await page.evaluate(() => { const c = document.getElementById('rvOneBtn'); if (c) c.click(); }); await page.waitForTimeout(800);
+        await shot(page, size, '待确认分类', '逐条确认');
+        await closeAll(page); await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
+      }
       // 账单页、统计页、设置页：字被切
       if (meas) { await tab(page, 'ledger'); await CLIP(page, '账单页', '#pageLedger'); await tab(page, 'stats'); await CLIP(page, '统计页', '#pageStats'); await tab(page, 'settings'); await CLIP(page, '设置页', '#pageSettings'); }
       // e. 系统数字输入法（数字键盘开着的时候；提示框要金额的那种也打开看一眼）
