@@ -272,6 +272,15 @@
       typesAdd.push({ app: app, status: status, as: as });
     });
 
+    // 导入简化第 3 版：大额的选法：核对页「大额，先定算不算收支」里你点过的那几笔，记成 importRules.big（同一对方、金额相近的下次照办）
+    var bigAdd = [];
+    ((p.sections && p.sections.bigAsks) || []).forEach(function (x) {
+      if (!x.picked || !x.cpKey) return;
+      var d = rows.filter(function (r) { return r.key === x.key; })[0]; if (!d || (d.group !== 'add' && d.group !== 'neutral')) return;
+      var o = { cp: x.cpKey, fen: x.fen, mode: x.mode }; if (x.ob && x.mode === 'flow') o.ob = 1;
+      if (!bigAdd.some(function (b) { return b.cp === o.cp && Math.abs(b.fen - o.fen) <= Math.round(b.fen * 0.2); })) bigAdd.push(o);
+    });
+
     // ---- 这一批的导入记录（新记录的编号由主页面填进 add）----
     var apps = [], from = '', to = '', rng = {};
     parsed.files.forEach(function (f) {
@@ -291,7 +300,7 @@
       version: VERSION, batch: batch, at: ctx.at || '',
       records: recs, changes: chgList, orders: orders, pending: pending, pendTaken: pendTaken,
       cps: cps, pms: pms, cpLen: cpLen, pmLen: pmLen, catsAdded: catsAdded, rulesAdd: rulesAdd, mapsAdd: mapsAdd, typesAdd: typesAdd, rulesChange: rulesChange, learnedN: learnedN,
-      log: log,
+      bigAdd: bigAdd, log: log,
       counts: counts, total: total
     };
   }
@@ -331,7 +340,7 @@
     var booked = {}; orders.forEach(function (o) { booked[o.app + '|' + o.no] = true; });
     var pendTaken = (ws.pendTaken || []).filter(function (k) { return booked[k]; });
     return { version: ws.version, batch: ws.batch, at: ws.at, records: recs, changes: [], orders: orders, pending: [], pendTaken: pendTaken,
-             cps: cps, pms: pms, cpLen: ws.cpLen, pmLen: ws.pmLen, catsAdded: catsAdded, rulesAdd: [], mapsAdd: [], typesAdd: [],
+             cps: cps, pms: pms, cpLen: ws.cpLen, pmLen: ws.pmLen, catsAdded: catsAdded, rulesAdd: [], mapsAdd: [], typesAdd: [], bigAdd: [],
              log: log, counts: counts, total: ws.total, only: true };
   }
 

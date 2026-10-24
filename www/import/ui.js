@@ -1278,7 +1278,7 @@
     if (!list.length) return null;
     var c = el('div', 'imp-card'); c.id = 'impBigAsks';
     c.appendChild(el('h4', null, '大额，先定算不算收支（' + list.length + ' 笔）'));
-    c.appendChild(el('div', 'imp-soft', '大额多半不是消费（信用卡还款、转给家人、买大件也可能想单独看）。默认是推荐的，不点就照这样导入。'));
+    c.appendChild(el('div', 'imp-soft', '大额多半不是消费（信用卡还款、转给家人、买大件也可能想单独看）。默认是推荐的，不点就照这样导入；点过的会记住，同一个对方、金额差不多的下次不再问。'));
     list.forEach(function (x) {
       var r = el('div', 'imp-big-row'); r.dataset.key = x.key; r.dataset.item = 'bg:' + x.key;
       r.appendChild(el('div', 'imp-line', (cpShow(x.title || x.cp) || '—') + ' · ' + yuan(x.fen) + ' 元 · ' + mdhm(x.time)));
@@ -1287,7 +1287,8 @@
         var b0 = btn(mm[1] + (mm[0] === x.def ? '（推荐）' : ''), 'imp-btn imp-big-m' + (x.mode === mm[0] ? ' gold on' : ''), function () {
           S.view.seen['bg:' + x.key] = true;
           setModeEdit(x.key, mm[0]);
-          if (mm[0] !== 'flow' && S.edits.rows[x.key]) { delete S.edits.rows[x.key].ob; if (!Object.keys(S.edits.rows[x.key]).length) delete S.edits.rows[x.key]; }
+          if (mm[0] !== 'flow' && S.edits.rows[x.key]) delete S.edits.rows[x.key].ob;
+          S.edits.rows[x.key] = Object.assign(S.edits.rows[x.key] || {}, { bigPick: true });     // 第 3 版：你点过的，导入时记住这次的选法（同一对方、金额相近的下次不再问）
           replan();
         });
         b0.dataset.mode = mm[0]; seg.appendChild(b0);
@@ -2787,6 +2788,7 @@
     if (ws.rulesChange && ws.rulesChange.length) rp.push('改 ' + ws.rulesChange.length + ' 条分类规则');
     if (ws.mapsAdd.length) rp.push('存 ' + ws.mapsAdd.length + ' 条分类对照');
     if (ws.typesAdd.length) rp.push('存 ' + ws.typesAdd.length + ' 条交易类型规则');
+    if (ws.bigAdd && ws.bigAdd.length) rp.push('记住 ' + ws.bigAdd.length + ' 笔大额的选法');
     if (rp.length) L.push([rp.join('、'), '以后导入时直接照办']);
     var pend = ws.pending.length, skip = (ws.counts && ws.counts.skip) || 0, excl = (ws.counts && ws.counts.excluded) || 0;
     var ps = [];
@@ -2978,8 +2980,9 @@
     (s.bigAsks || []).forEach(function (x) {
       big[x.key] = 1;
       var e = S.edits.rows[x.key];
-      out.push({ k: 'big', t: '大额：' + (cpShow(x.title || x.cp) || '—') + ' ' + yuan(x.fen) + ' 元 → ' + MODE_WORD[x.mode] + (x.ob ? '（期初余额）' : '') + (e && e.mode ? '' : '（你没选，按推荐）') });
+      out.push({ k: 'big', t: '大额：' + (cpShow(x.title || x.cp) || '—') + ' ' + yuan(x.fen) + ' 元 → ' + MODE_WORD[x.mode] + (x.ob ? '（期初余额）' : '') + (e && (e.mode || e.bigPick) ? '' : '（你没选，按推荐）') });
     });
+    (s.bigKnown || []).forEach(function (x) { out.push({ k: 'big', t: '大额：' + (cpShow(x.title || x.cp) || '—') + ' ' + yuan(x.fen) + ' 元 → ' + MODE_WORD[x.mode] + (x.ob ? '（期初余额）' : '') + (x.edited ? '' : '（照你上次的选法）') }); });
     (s.refundHints || []).forEach(function (h) { out.push({ k: 'refund', t: '全额退款：' + h.text }); });
     if (s.receipt) out.push({ k: 'receipt', t: '收款按天合并：' + (s.receipt.on ? '合成了 ' + s.receipt.days + ' 条（共 ' + s.receipt.n + ' 笔）' : s.receipt.n + ' 笔逐条导入') });
     (s.petty || []).forEach(function (x) { out.push({ k: 'petty', t: '疑似零碎扣款：' + cpShow(x.cp) + ' · ' + x.month + ' · ' + x.n + ' 笔 ' + yuan(x.fen) + ' 元' + (x.on ? '，合成了一条' : '，一笔一条') }); });
@@ -3439,7 +3442,7 @@
     dom.page.style.display = 'block'; barSet([closeBtn()]); dom.prog.style.display = 'none'; dom.sheetMask.style.display = 'none';
     var b = dom.body; b.innerHTML = '';
     if (notice) { var nt = el('div', 'imp-card imp-line imp-ok', notice); nt.id = 'impRulesNotice'; b.appendChild(nt); }
-    var rules = { cat: (info.catRules || []).slice(), type: (info.typeRules || []).slice(), map: (info.catMaps || []).slice() };
+    var rules = { cat: (info.catRules || []).slice(), type: (info.typeRules || []).slice(), map: (info.catMaps || []).slice(), big: (info.bigRules || []).slice() };
     var catSel = function (val, fn, cls) {
       var se = el('select', cls || '');
       info.cats.filter(function (c) { return c !== '未分类'; }).forEach(function (c) { var o = el('option', null, c); o.value = c; se.appendChild(o); });
@@ -3498,6 +3501,17 @@
       c3.appendChild(row);
     });
     b.appendChild(c3);
+    // 导入简化第 3 版：大额的选法（核对页「大额，先定算不算收支」点过的）
+    var c5 = el('div', 'imp-card'); c5.id = 'impRulesBig';
+    c5.appendChild(el('h4', null, '大额的选法（' + rules.big.length + '）'));
+    if (!rules.big.length) c5.appendChild(el('div', 'imp-soft', '还没有。导入时「大额，先定算不算收支」点过的会记在这里，同一个对方、金额差不多的下次不再问。'));
+    rules.big.forEach(function (r, i) {
+      var row = el('div', 'imp-row-opt imp-big-rule');
+      row.appendChild(el('span', 'grow', cpShow(r.cp) + ' · ' + yuan(r.fen) + ' 元左右 → ' + MODE_WORD[r.mode] + (r.ob ? '（期初余额）' : '')));
+      row.appendChild(btn('删除', 'imp-btn imp-big-del', function () { save(Object.assign({}, rules, { big: rules.big.filter(function (_, k) { return k !== i; }) }), '已删这条，下次遇到会再问'); }));
+      c5.appendChild(row);
+    });
+    b.appendChild(c5);
     // 1016-UI2：「加一条分类规则」单独一块放在最下面（拇指够得着）
     // 1017-R：一条规则都没有（空状态）时跟在上面几块后面往下排，不硬顶到底
     var c4 = el('div', rules.cat.length || rules.map.length || rules.type.length ? 'imp-card imp-push' : 'imp-card'); c4.id = 'impRuleAddCard';

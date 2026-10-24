@@ -974,9 +974,23 @@
                 seenFrom.add(from);
                 return { from, cat:c };
             }).filter(Boolean);
-            if(!cat.length && !type.length && !map.length) return null;
-            return map.length ? { cat, type, map } : { cat, type };
+            // 导入简化第 3 版：大额的选法（同一对方、金额相近的，下次照这次的选法，不再问）：cp 是清洗后的对方，fen 那次的金额（分），
+            //   mode 计入 normal / 往来 flow / 不计 skip，ob 期初余额（只在往来上）。同一对方、金额相近的只留第一条
+            const big=[];
+            (Array.isArray(r.big) ? r.big : []).slice(0, 500).forEach(x=>{
+                if(!x || typeof x!=='object') return;
+                const cp=typeof x.cp==='string' ? x.cp.trim().slice(0, 64) : '', fen=Number(x.fen);
+                if(!cp || !Number.isInteger(fen) || fen<=0 || fen>1e10 || !['normal','flow','skip'].includes(x.mode)) return;
+                if(big.some(b=>b.cp===cp && impBigNear(b.fen, fen))) return;
+                const o={ cp, fen, mode:x.mode }; if(x.ob===1 && x.mode==='flow') o.ob=1; big.push(o);
+            });
+            if(!cat.length && !type.length && !map.length && !big.length) return null;
+            const out=map.length ? { cat, type, map } : { cat, type };
+            if(big.length) out.big=big;
+            return out;
         }
+        // 两笔金额算不算「相近」（大额的选法用；和 import/plan.js 的 bigNear 同一算法）：差不超过那次金额的 20%
+        function impBigNear(a, b){ return Math.abs(a-b)<=Math.round(a*0.2); }
         function impCleanPending(items, mapId){
             if(!Array.isArray(items)) return [];
             const str=(v, n)=>typeof v==='string' ? v.slice(0, n) : '';
@@ -1105,7 +1119,7 @@
             const o={};
             if(Array.isArray(a.cps) && a.cps.length) o.cps=a.cps;
             if(Array.isArray(a.pms) && a.pms.length) o.pms=a.pms;
-            if(a.importRules && ((a.importRules.cat||[]).length || (a.importRules.type||[]).length || (a.importRules.map||[]).length)) o.importRules=a.importRules;
+            if(a.importRules && ((a.importRules.cat||[]).length || (a.importRules.type||[]).length || (a.importRules.map||[]).length || (a.importRules.big||[]).length)) o.importRules=a.importRules;
             return o;
         }
         // 单独存的那几样（导出备份 / 云同步时读）。withOrders：要不要带单号表（云同步不带，见 odSyncNow）
@@ -1370,6 +1384,14 @@
                 mapsDone=add.map(m=>({ from:m.from, cat:m.cat }));
                 if(add.length) a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]), type:(r0.type||[]), map:(r0.map||[]).concat(add.map(m=>({ from:m.from, cat:m.cat }))) });
             }
+            // 导入简化第 3 版：大额的选法：同一对方、金额相近的已有一条就不重复存
+            const bigAdd0=(Array.isArray(ws.bigAdd) ? ws.bigAdd : []).filter(x=>x && typeof x.cp==='string' && x.cp && Number.isInteger(x.fen) && x.fen>0 && ['normal','flow','skip'].includes(x.mode));
+            let bigDone=[];
+            if(bigAdd0.length){
+                const r0=a.importRules||{}, have=(r0.big||[]).slice();
+                bigAdd0.forEach(x=>{ if(have.concat(bigDone).some(b=>b.cp===x.cp && impBigNear(b.fen, x.fen))) return; const o={ cp:x.cp.slice(0, 64), fen:x.fen, mode:x.mode }; if(x.ob===1 && x.mode==='flow') o.ob=1; bigDone.push(o); });
+                if(bigDone.length) a.importRules=Object.assign({}, r0, { cat:(r0.cat||[]), type:(r0.type||[]), big:have.concat(bigDone) });
+            }
             prog && prog('write', 0, 1);
             // 单号表、待处理池、导入记录
             const orders=ws.orders.map(x=>impCleanOrder({ app:x.app, no:x.no, time:x.time, id:res(x.ref)||'', batch:ws.batch, st:x.st })).filter(Boolean);
@@ -1392,7 +1414,7 @@
             const curLog=await impGetJson(t.e, impLogKey(t.e.id, t.aid));
             const logs=((curLog && curLog.list) || []).slice();
             const ra0=(ws.log && ws.log.rulesAdded) || { cat:[], type:[] };
-            const ra={ cat:ra0.cat||[], type:typesDone }; if(mapsDone.length) ra.map=mapsDone;   // 1016-M：类型规则也只记真存进去的   // 导入记录里只记真存进去的对照（给 ⑦ 撤销）
+            const ra={ cat:ra0.cat||[], type:typesDone }; if(mapsDone.length) ra.map=mapsDone; if(bigDone.length) ra.big=bigDone;   // 1016-M：类型规则也只记真存进去的   // 导入记录里只记真存进去的对照（给 ⑦ 撤销）
             // 1016-K：新增记录的指纹（撤销时认「导入后你改过没有」）、导完时名单多长
             const W=window.JiwenImportWrite, hs=W && W.recHash ? made.map(r=>W.recHash(r)) : null;
             const lg=Object.assign({}, ws.log, { add:made.map(r=>r.id), chg, rulesAdded:ra, cpEnd:(a.cps||[]).length, pmEnd:(a.pms||[]).length });
@@ -1997,7 +2019,7 @@
                 const monthIO={};
                 (st ? st.recs : []).forEach(r=>{ const ym=String(r.time||'').slice(0, 7); if(!/^\d{4}-\d{2}$/.test(ym)) return; const c=statContrib(r); if(!c.exp && !c.inc) return;
                     const x=monthIO[ym]||(monthIO[ym]={ e:0, i:0 }); x.e+=Math.round(c.exp*100); x.i+=Math.round(c.inc*100); });
-                return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(),
+                return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(), bigRules:(rules.big||[]).slice(),
                          cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, manualN, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist, monthIO };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）

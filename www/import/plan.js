@@ -94,6 +94,8 @@
     // 1017-D：金额差一点的，哪几笔改成实付：这一笔自己定过（rows[key].pay）就按它，没定过跟「全部改成实付」（edits.nearPay）走
     var payOf = function (d) { var e = E[d.key]; return e && e.pay !== undefined ? !!e.pay : !!edits.nearPay; };
     var ruleFixE = edits.ruleFix || {};
+    // 导入简化第 3 版：记住的大额选法（importRules.big，info.bigRules）：同一对方、金额相近（差不超过那次的 20%）的支出，默认照那次的选法、不再问
+    var bigRules = (input.info && input.info.bigRules) || [];
     // 1021-T9：收款按天合并默认不合；只有「一个月几百条」的（bulk）默认合。你点过的照你点的
     var receiptOn = edits.receipt === true || (edits.receipt === undefined && ((input.matched && input.matched.summaries) || []).some(function (g) { return g.kind === 'receipt' && g.bulk; }));
     var parsed = input.parsed, matched = input.matched, info = input.info || {}, manualById = input.manualById || {};
@@ -187,6 +189,10 @@
         d.reason = '你把它当作退款，挂到了一笔支出上';
       }
       if (e.exclude && (d.group === 'add' || d.group === 'neutral' || d.group === 'refund')) { d.group = 'excluded'; d.reason = '你勾掉了'; }
+      if (bigRules.length && (d.group === 'add' || d.group === 'neutral') && d.fen >= AMOUNT.ASK_MIN && dirOf0(d) === 'expense') {
+        var bk = clean(d.cp), br = bk ? bigRules.filter(function (b) { return b.cp === bk && bigNear(b.fen, d.fen); })[0] : null;
+        if (br) { d.bigRule = br; if (!e.mode) { d.mode = br.mode; if (br.ob && br.mode === 'flow') d.ob = true; } }
+      }
       if (e.mode && (d.group === 'add' || d.group === 'neutral')) d.mode = e.mode;
       if (e.ob && d.mode === 'flow' && (d.group === 'add' || d.group === 'neutral')) d.ob = true;     // 2a：大额选了往来，顺带标期初余额（ob:1）
       // 1016-G：口径改成不计的挪进「不计」组，不计改回计入 / 往来的挪回「新增」，顶上的笔数跟着变
@@ -541,14 +547,17 @@
       }
       if (d.group === 'refund' && d.mode === 'normal') batchNow[ym] = (batchNow[ym] || 0) - d.fen;
     });
-    sec.bigAsks = [];
+    sec.bigAsks = []; sec.bigKnown = [];
     rows.forEach(function (d) {
       if (d.src !== 'row' || (d.group !== 'add' && d.group !== 'neutral') || d.type !== 'expense' || inGroup[d.file + ':' + d.row] || !d.time) return;
+      // 第 3 版：照记住的选法的不再问（完成页提醒里写一句「照你上次的选法」）
+      if (d.bigRule) { sec.bigKnown.push({ key: d.key, fen: d.fen, cp: d.cp, title: d.title, time: d.time, mode: d.mode, ob: !!d.ob, edited: !!(E[d.key] && E[d.key].mode) }); return; }
       var ym = d.time.slice(0, 7), led = (mio[ym] && mio[ym].e) || 0, monthDef = led + (batchDef[ym] || 0);
       var line = Math.min(monthDef * AMOUNT.ASK_SHARE, AMOUNT.ASK_CAP);
       if (d.fen < AMOUNT.ASK_MIN || d.fen <= line) return;
       sec.bigAsks.push({ key: d.key, fen: d.fen, cp: d.cp, title: d.title, time: d.time, ym: ym, mode: d.mode, def: (d.item && d.item.mode) || 'normal',
-                         monthOut: led + (batchNow[ym] || 0) - (d.mode === 'normal' ? d.fen : 0), ob: !!d.ob });
+                         monthOut: led + (batchNow[ym] || 0) - (d.mode === 'normal' ? d.fen : 0), ob: !!d.ob,
+                         picked: !!(E[d.key] && E[d.key].bigPick), cpKey: clean(d.cp) });      // picked：你在核对页点过（导入时记住这次的选法）
     });
 
     // ---- 1.1（1016-Z4）提现服务费：微信「零钱提现」备注里写着「服务费¥2.20」的，零钱提现本身照旧不计，服务费单独记一笔支出 ----
@@ -637,6 +646,9 @@
 
   // 1016-Q：漏记报告 / 只对账。漏记 = 「新增」组（没和手记配上、要新建的），合并记录（分分捐等）算一项；
   //   往已有合并记录上追加的不算（只对账不改以前的记录）。→ { n:笔数, out:支出分, inc:收入分, items:[{ id, keys, title, time, fen, type, cat, units }] }
+  // 第 3 版：大额选法的「金额相近」：差不超过那次金额的 20%（store.js 的 impBigNear 同一算法）
+  function bigNear(a, b) { return Math.abs(a - b) <= Math.round(a * 0.2); }
+  function dirOf0(d) { var it = d.item || {}; return (it.io === 'income' || it.io === 'expense') ? it.io : (it.dir || (d.pio === 'income' ? 'income' : 'expense')); }
   function missed(p) {
     var out = { n: 0, out: 0, inc: 0, items: [] };
     ((p.groups && p.groups.add) || []).forEach(function (d) {
