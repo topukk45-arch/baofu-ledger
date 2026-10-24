@@ -84,10 +84,10 @@ function norm(t) {
   $('impNext').click();
   ok(t.S().view.step === steps[1] && /看了 \d+ 件 \/ 共 \d+ 件，不看的按默认/.test($('impIntro').textContent) && !/还剩/.test($('impIntro').textContent), '1 逐项看看：顶上「看了 N 件 / 共 M 件，不看的按默认」：' + $('impIntro').textContent);
   t.w.JiwenImportUI._goStep('overview');
-  ok($('impRemind') && /^提醒 \d+ 条/.test($('impRemindToggle').textContent) && $('impRemind').querySelector('.imp-remind-box').style.display === 'none', '1 总览：折叠块「提醒 N 条」，默认收起');
-  ok($('impRemind').contains($('impTypes')), '1 没见过的交易类型在提醒里，照旧能选');
+  ok($('impRemindFold') && /^提醒 \d+ 条/.test($('impRemindToggle').textContent) && $('impRemindFold').querySelector('.imp-remind-box').style.display === 'none', '1 总览：折叠块「提醒 N 条」，默认收起');
+  ok($('impRemindFold').contains($('impTypes')), '1 没见过的交易类型在提醒里，照旧能选');
   $('impRemindToggle').click();
-  ok($('impRemind').querySelector('.imp-remind-box').style.display === '', '1 点开看');
+  ok($('impRemindFold').querySelector('.imp-remind-box').style.display === '', '1 点开看');
   ok($('impReconCard') && $('impReconCard').contains($('impRecon')) && !$('impBar').contains($('impRecon')), '1 有手记：「只对账」在总览里，不在底部');
   t.w.JiwenImportUI._goStep('check');
   ok(!$('impRecon') || !$('impRecon').isConnected, '1 核对页没有「只对账」');

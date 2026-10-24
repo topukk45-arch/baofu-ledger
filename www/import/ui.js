@@ -1418,7 +1418,7 @@
     b.appendChild(renderSummary(p));
     // 2a：提醒类收进一个折叠块「提醒 N 条」（默认收起；里面照旧能改）
     if (info.remind.length) {
-      var rm = el('div', 'imp-card imp-remind'); rm.id = 'impRemind';
+      var rm = el('div', 'imp-card imp-remind'); rm.id = 'impRemindFold';
       var ro = !!S.view.remindOpen;
       var rt = btn('', 'imp-fold imp-remind-toggle', function () { S.view.remindOpen = !ro; render(); }); rt.id = 'impRemindToggle';
       rt.appendChild(el('span', 'grow', '提醒 ' + info.remind.length + ' 条（只是看一眼，不影响钱对不对）')); rt.appendChild(el('span', null, ro ? '收起 ▴' : '展开看 ▸'));
@@ -2542,11 +2542,26 @@
   }
   function sheetIsOpen() { return !!SH; }
   // 只看的详情：一行一项，底部只有「关闭」
-  function viewSheet(title, kvs, closeId, back) {
+  function viewSheet(title, kvs, closeId, back, more) {
     if (!window.JiwenSheet) return;
     window.JiwenSheet.open({ title: title, onDismiss: back || null,
       body: function (box) { kvs.forEach(function (x) { if (!x[1]) return; var r = el('div', 'kv'); r.appendChild(el('span', null, x[0])); r.appendChild(el('span', null, x[1])); box.appendChild(r); }); },
-      foot: function (box, done) { var b = btn('关闭', 'ui-btn block', function () { done(); if (back) back(); }); b.id = closeId || 'impViewClose'; box.appendChild(b); } });
+      foot: function (box, done) {
+        var b = btn('关闭', 'ui-btn block', function () { done(); if (back) back(); }); b.id = closeId || 'impViewClose';
+        if (more) { var col = el('div', 'ui-stack'); var m = btn(more.text, 'ui-btn primary block', function () { done(); more.fn(); }); if (more.id) m.id = more.id; col.appendChild(m); col.appendChild(b); box.appendChild(col); }   // 往前走的在上、关闭在最下面
+        else box.appendChild(b);
+      } });
+  }
+  // 导入简化 4a：在账单里看这一次导入的（打开搜一笔，条件是这个批次）
+  function viewBatchInLedger(b) {
+    close();
+    var tb = document.querySelector('.tab-btn[data-tab="ledger"]'); if (tb) tb.click();
+    if (window.JiwenSearch && window.JiwenSearch.openSearch) window.JiwenSearch.openSearch({ batch: b, noSheet: true });
+  }
+  // 导入简化 4a：账单页导入横幅的「撤销」：打开导入记录，再走同一个撤销（先确认）
+  function undoFromLedger(b) {
+    var p = openLogs();
+    if (p && p.then) p.then(function () { undoBatch(b); }); else undoBatch(b);
   }
   // ---------- 1021-T17：共用的「这几笔」面板 ----------
   //   凡是写了「N 笔 / 共 x 元」的地方都能点开它：按时间排、每页 50 笔、点一笔开完整详情（确认页能单独改分类，结果页只看），
@@ -3084,7 +3099,8 @@
         var ra = l.rulesAdded || {}, rn = ['cat', 'map', 'type'].reduce(function (n, k) { return n + ((ra[k] || []).length); }, 0);
         viewSheet('这一次导入', [['导入时间', String(l.at || '').replace('T', ' ')], ['来源', appNames(l.apps) + (l.only ? '（只对账）' : '')], ['账单', String(l.from || '').slice(0, 10) + ' 至 ' + String(l.to || '').slice(0, 10)],
           ['笔数', measureLine(l.m)], ['新建', (l.add || []).length + ' 条'], ['改了以前的记录', (l.chg || []).length ? (l.chg || []).length + ' 条' : ''], ['待处理', nb[l.b] ? nb[l.b] + ' 笔' : ''], ['存了规则', rn ? rn + ' 条' : ''],
-          ['改了规则', (l.rulesChanged || []).length ? (l.rulesChanged || []).length + ' 条' : ''], ['编号', l.b]], 'impLogDetailClose');
+          ['改了规则', (l.rulesChanged || []).length ? (l.rulesChanged || []).length + ' 条' : ''], ['编号', l.b]], 'impLogDetailClose', null,
+          (l.add || []).length ? { text: '在账单里看这一批 ›', id: 'impLogViewLedger', fn: function () { viewBatchInLedger(l.b); } } : null);
       });
       var u = btn('撤销', 'imp-btn imp-log-undo', function () { undoBatch(l.b); }); u.style.minWidth = '64px';
       // 1017-H：「AI 检查」（这时只导写进账本的那几笔）
@@ -3705,7 +3721,7 @@
     try { var ta = el('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand && document.execCommand('copy'); ta.remove(); } catch (_) {}
   }
 
-  var UI = { canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  var UI = { undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _plainReason: function (r) { return plainReason(r); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

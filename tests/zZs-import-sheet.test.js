@@ -90,7 +90,7 @@ const TX = () => [
   await t.w.JiwenImportUI.openLogs();
   await t.until(() => q('.imp-log-info'));
   q('.imp-log-info').click();
-  ok(q('#uiSheetMask').classList.contains('open') && raw('uiSheetTitle').textContent === '这一次导入' && raw('impLogDetailClose') && raw('uiSheetFoot').querySelectorAll('button').length === 1 && /新建/.test(raw('uiSheetBody').textContent), '5 导入记录详情：同一套面板，底部只有「关闭」');
+  ok(q('#uiSheetMask').classList.contains('open') && raw('uiSheetTitle').textContent === '这一次导入' && raw('impLogDetailClose') && [...raw('uiSheetFoot').querySelectorAll('button')].map(b => b.id).join() === 'impLogViewLedger,impLogDetailClose' && /新建/.test(raw('uiSheetBody').textContent), '5 导入记录详情：同一套面板，只看；底部「在账单里看这一批」（4a）在上、「关闭」在最下面');
   raw('impLogDetailClose').click();
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`\n${pass} 通过，${fail} 失败`);

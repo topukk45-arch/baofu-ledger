@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1024-E">
+    <link rel="stylesheet" href="app/app.css?v=1024-F">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1024-E</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1024-F</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -345,6 +345,9 @@
                     <div class="sf-grid" id="filterChips" hidden></div>
                     <button type="button" class="rec-row" id="filterModeRow" aria-expanded="false"><span class="rec-row-k">统计</span><span class="rec-row-v" id="filterModeVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
                     <div class="sf-grid sf-grid3" id="filterModeChips" hidden></div>
+                    <!-- 导入简化 4a：来源（手记 / 微信 / 支付宝 / 已对账），开发开关开着才有 -->
+                    <button type="button" class="rec-row" id="filterSrcRow" aria-expanded="false" hidden><span class="rec-row-k">来源</span><span class="rec-row-v" id="filterSrcVal"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+                    <div class="sf-grid" id="filterSrcChips" hidden></div>
                     <label class="rec-row rec-row-in"><span class="rec-row-k">备注</span><input type="text" id="searchKeyword" class="rec-row-input sf-kw" placeholder="备注里的字，空格隔开找多个"></label>
                     <button type="button" class="rec-row" id="filterRvRow" hidden><span class="rec-row-k">待确认分类</span><span class="rec-row-v" id="filterRvVal"></span><span class="sf-switch" id="filterRvSw" aria-hidden="true"></span></button>
                 </div>
@@ -817,29 +820,29 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1024-E"></script>
-    <script src="app/store.js?v=1024-E"></script>
-    <script src="app/select.js?v=1024-E"></script>
-    <script src="app/keypad.js?v=1024-E"></script>
-    <script src="app/text.js?v=1024-E"></script>
-    <script src="app/sheet.js?v=1024-E"></script>
-    <script src="app/ask.js?v=1024-E"></script>
-    <script src="app/date.js?v=1024-E"></script>
-    <script src="app/monthstrip.js?v=1024-E"></script>
-    <script src="app/ai-export.js?v=1024-E"></script>
-    <script src="app/import-entry.js?v=1024-E"></script>
-    <script src="app/forms.js?v=1024-E"></script>
-    <script src="app/detail.js?v=1024-E"></script>
-    <script src="app/ledger.js?v=1024-E"></script>
-    <script src="app/search.js?v=1024-E"></script>
-    <script src="app/cats.js?v=1024-E"></script>
-    <script src="app/stats.js?v=1024-E"></script>
-    <script src="app/days.js?v=1024-E"></script>
-    <script src="app/settings.js?v=1024-E"></script>
-    <script src="app/tabs.js?v=1024-E"></script>
-    <script src="app/login.js?v=1024-E"></script>
-    <script src="app/back.js?v=1024-E"></script>
-    <script src="app/boot.js?v=1024-E"></script>
+    <script src="app/base.js?v=1024-F"></script>
+    <script src="app/store.js?v=1024-F"></script>
+    <script src="app/select.js?v=1024-F"></script>
+    <script src="app/keypad.js?v=1024-F"></script>
+    <script src="app/text.js?v=1024-F"></script>
+    <script src="app/sheet.js?v=1024-F"></script>
+    <script src="app/ask.js?v=1024-F"></script>
+    <script src="app/date.js?v=1024-F"></script>
+    <script src="app/monthstrip.js?v=1024-F"></script>
+    <script src="app/ai-export.js?v=1024-F"></script>
+    <script src="app/import-entry.js?v=1024-F"></script>
+    <script src="app/forms.js?v=1024-F"></script>
+    <script src="app/detail.js?v=1024-F"></script>
+    <script src="app/ledger.js?v=1024-F"></script>
+    <script src="app/search.js?v=1024-F"></script>
+    <script src="app/cats.js?v=1024-F"></script>
+    <script src="app/stats.js?v=1024-F"></script>
+    <script src="app/days.js?v=1024-F"></script>
+    <script src="app/settings.js?v=1024-F"></script>
+    <script src="app/tabs.js?v=1024-F"></script>
+    <script src="app/login.js?v=1024-F"></script>
+    <script src="app/back.js?v=1024-F"></script>
+    <script src="app/boot.js?v=1024-F"></script>
 
 </body>
 </html>

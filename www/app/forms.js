@@ -758,7 +758,19 @@
             }, '删除记录', { danger:true, okText });
         });
         // 禁止点击遮罩外部关闭，仅按钮可关闭
-        saveEdit.addEventListener('click', () => {
+        // 导入简化 4a：改导入的（或已和账单对过账的）记录的金额 / 时间：先提醒一句「改了以后和账单对不上」，可以继续；能勾「以后不再提醒」
+        //   （只在这台手机上记住，localStorage 的 app_imp_edit_warn_off）。改分类、备注不提醒。开发开关开着才有
+        const IMP_EDIT_WARN_OFF='app_imp_edit_warn_off', EDIT_WARN_APP={ wechat:'微信', alipay:'支付宝' };
+        function impEditWarn(old, time, money){
+            const s=old && old.src; if(!s || typeof s!=='object' || !EDIT_WARN_APP[s.app]) return '';
+            try{ if(localStorage.getItem('app_dev_import')!=='1' || localStorage.getItem(IMP_EDIT_WARN_OFF)==='1') return ''; }catch(_){ return ''; }
+            const moneyChg=round2(safeNum(old.money))!==round2(money), timeChg=String(old.time||'')!==String(time||'');
+            if(!moneyChg && !timeChg) return '';
+            const what=moneyChg && timeChg ? '金额和时间' : moneyChg ? '金额' : '时间', app=EDIT_WARN_APP[s.app];
+            return (s.merged ? `这笔已经和${app}账单对过账` : `这笔是${app}账单导入的`) + `，改了${what}以后和账单对不上（下次导入同一段账单时不会再导一遍，但核对会差这一笔）。\n\n确定要改吗？`;
+        }
+        saveEdit.addEventListener('click', () => doSaveEdit(false));
+        function doSaveEdit(force){
             const time=getDtInput(editTime), money=editMoney.value;
             // 与记账弹窗同理：以 chips 选中态为准，避免隐藏 select 无空 option 时
             // 「未选」被误读成「已选第一项」。
@@ -771,6 +783,14 @@
             if(!m.ok){ customAlert(m.why); return; }
             const data=getUserData();
             const idx=data.findIndex(r=>r.id===editId);
+            if(idx>=0 && !force){
+                const w=impEditWarn(data[idx], time, m.val);
+                if(w){
+                    customConfirm(w, ()=>doSaveEdit(true), '改了导入的记录', { okText:'继续保存',
+                        extra:{ text:'继续保存，以后不再提醒', onClick:()=>{ try{ localStorage.setItem(IMP_EDIT_WARN_OFF, '1'); }catch(_){} doSaveEdit(true); } } });
+                    return;
+                }
+            }
             if(idx>=0){
                 const old=data[idx];
                 let next;
@@ -811,7 +831,7 @@
                 closeEditModal({ refresh:true });
                 customAlert('未找到要保存的记录，可能已被删除或切换了存档。');
             }
-        });
+        }
         // 一笔关联记录的一行：时间 / 备注 / 金额（详情与修改弹窗共用）
         function refundLineHtml(r, sign){
             return `<div class="dr-line"><span class="dr-when">${String(r.time).slice(5,16).replace('T',' ')}</span>`

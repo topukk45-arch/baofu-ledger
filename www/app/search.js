@@ -11,14 +11,19 @@
         // 金额存数字（null 表示不限）；日期存 'YYYY-MM-DD'（null 表示不限）；关键词存小写串，按空白分成几个词，都要包含。
         // 收支、统计、分类都能多选：ios（'expense' / 'income'，两个都选等于全部）、modes（'normal' / 'flow' / 'skip'）、cats（分类名）；空数组 = 不限
         // rv：1021-T13 只看待确认分类
-        const searchState={ keyword:'', min:null, max:null, from:null, to:null, modes:[], rv:false, ios:[], cats:[] };
+        // 导入简化 4a：srcs 来源（'manual' 手记 / 'wechat' 微信 / 'alipay' 支付宝 / 'merged' 已对账，多选），batch 某一次导入（批次号，从导入横幅 / 导入记录点进来）
+        const searchState={ keyword:'', min:null, max:null, from:null, to:null, modes:[], rv:false, ios:[], cats:[], srcs:[], batch:null };
+        const SRC_NAME={ manual:'手记', wechat:'微信', alipay:'支付宝', merged:'已对账' }, SRC_ORDER=['manual', 'wechat', 'alipay', 'merged'];
+        function srcOf(r){ const s=r.src; if(!s || typeof s!=='object') return 'manual'; if(s.merged) return 'merged'; return s.app==='alipay' ? 'alipay' : s.app==='wechat' ? 'wechat' : 'manual'; }
+        // 批次号 'b' + 时间（36 进制）：标签写「10月21日那次导入」
+        function batchLabel(b){ const t=parseInt(String(b||'').slice(1), 36), d=new Date(t); return isFinite(t) && !isNaN(d) ? `${d.getMonth()+1}月${d.getDate()}日那次导入` : '那次导入'; }
         const MODE_NAME={ normal:'计入', skip:'不计', flow:'往来' };
         const MODE_ORDER=['normal', 'skip', 'flow'];
         function searchWords(){ return (searchState.keyword||'').split(/\s+/).filter(Boolean); }
         // 有没有任何条件（含分类）。收支两个都选不算
         function hasFilter(){
             const s=searchState;
-            return !!(s.keyword || s.min!=null || s.max!=null || s.from || s.to || s.modes.length || s.rv || s.ios.length===1 || s.cats.length);
+            return !!(s.keyword || s.min!=null || s.max!=null || s.from || s.to || s.modes.length || s.rv || s.ios.length===1 || s.cats.length || s.srcs.length || s.batch);
         }
         // 单条记录是否命中当前搜索条件（分类不在这里，见 filterMatch）
         function searchMatch(r){
@@ -40,6 +45,8 @@
             if(searchState.modes.length && !searchState.modes.includes(recMode(r))) return false;
             if(searchState.rv && r.rv!==1) return false;
             if(searchState.ios.length===1 && r.type!==searchState.ios[0]) return false;   // 退款算收入；两个都选 = 全部
+            if(searchState.srcs.length && !searchState.srcs.includes(srcOf(r))) return false;
+            if(searchState.batch && r.batch!==searchState.batch) return false;
             return true;
         }
         // 「当前搜到的」的唯一判定：结果页列表、条数、「看这 N 笔」、批量操作都调它——两边各写一套，早晚会出现「列表显示 12 条，实际改了 13 条」
@@ -49,7 +56,7 @@
         }
         // 给外面（测试）看现在的条件，拿的是一份副本
         function searchNow(){ return JSON.parse(JSON.stringify(searchState)); }
-        function clearState(){ Object.assign(searchState, { keyword:'', min:null, max:null, from:null, to:null, modes:[], rv:false, ios:[], cats:[] }); }
+        function clearState(){ Object.assign(searchState, { keyword:'', min:null, max:null, from:null, to:null, modes:[], rv:false, ios:[], cats:[], srcs:[], batch:null }); }
         function toggleIn(arr, v){ const i=arr.indexOf(v); if(i<0) arr.push(v); else arr.splice(i, 1); }
 
         // ===== 1023-G：搜一笔的结果页 =====
@@ -64,6 +71,7 @@
         function openSearch(o){
             o=o||{};
             if(o.rv){ clearState(); searchState.rv=true; }   // 账单页「待确认分类 N 条 ›」：只看待确认分类
+            if(o.batch){ clearState(); searchState.batch=o.batch; }   // 4a：导入横幅 / 导入记录的「查看」：只看那一次导入的
             clearTimeout(closeT);
             pageOpen=true; page.hidden=false;
             page.classList.remove('sp-out'); page.classList.remove('sp-in');
@@ -108,9 +116,11 @@
             if(s.modes.length) h.modes=MODE_ORDER.filter(m=>s.modes.includes(m));
             if(s.keyword) h.keyword=s.keyword;
             if(s.rv) h.rv=true;
+            if(s.srcs.length) h.srcs=SRC_ORDER.filter(x=>s.srcs.includes(x));
+            if(s.batch) h.batch=s.batch;
             return h;
         }
-        function histSig(h){ return JSON.stringify(['q', 'from', 'to', 'min', 'max', 'ios', 'cats', 'modes', 'keyword', 'rv'].map(k=>h[k]===undefined ? null : h[k])); }
+        function histSig(h){ return JSON.stringify(['q', 'from', 'to', 'min', 'max', 'ios', 'cats', 'modes', 'keyword', 'rv', 'srcs', 'batch'].map(k=>h[k]===undefined ? null : h[k])); }
         function histAdd(){
             if(!hasFilter()) return;
             const h=histOf(), sig=histSig(h);
@@ -131,6 +141,8 @@
             (h.modes||[]).forEach(m=>out.push(MODE_NAME[m]));
             if(h.keyword) out.push('备注：'+h.keyword);
             if(h.rv) out.push('待确认分类');
+            (h.srcs||[]).forEach(x=>out.push(SRC_NAME[x]||x));
+            if(h.batch) out.push(batchLabel(h.batch));
             return out.join(' · ');
         }
         // 点一条：整组套用（换掉现在的条件）
@@ -141,6 +153,7 @@
             searchState.min = h.min!=null ? h.min : null; searchState.max = h.max!=null ? h.max : null;
             searchState.ios=(h.ios||[]).slice(); searchState.cats=(h.cats||[]).slice(); searchState.modes=(h.modes||[]).slice();
             searchState.keyword=h.keyword||''; searchState.rv=!!h.rv;
+            searchState.srcs=(h.srcs||[]).filter(x=>SRC_NAME[x]); searchState.batch=typeof h.batch==='string' ? h.batch : null;
             kw.value=searchState.keyword;
             min.value = searchState.min!=null ? String(searchState.min) : ''; max.value = searchState.max!=null ? String(searchState.max) : '';
             renderFilterChips();   // 分类后来被删了、改名了的去掉
@@ -176,6 +189,8 @@
             MODE_ORDER.filter(m=>s.modes.includes(m)).forEach(m=>out.push({ sec:'mode', t:MODE_NAME[m], drop(){ s.modes=s.modes.filter(x=>x!==m); } }));
             if(s.keyword) out.push({ sec:'kw', t:'备注：'+s.keyword, drop(){ s.keyword=''; } });
             if(s.rv) out.push({ sec:'rv', t:'待确认分类', drop(){ s.rv=false; } });
+            SRC_ORDER.filter(x=>s.srcs.includes(x)).forEach(x=>out.push({ sec:'src', t:'来源：'+SRC_NAME[x], drop(){ s.srcs=s.srcs.filter(y=>y!==x); } }));
+            if(s.batch) out.push({ sec:'src', t:batchLabel(s.batch), drop(){ s.batch=null; } });
             return out;
         }
         let tagList=[];
@@ -243,7 +258,10 @@
         $('searchEdit').addEventListener('click', ()=>openSheet());
         $('filterFab').addEventListener('click', ()=>openSearch());
         // 账单页的「待确认分类 N 条 ›」（ledger.js 画的）：打开结果页，只看待确认分类
-        $('pageLedger').addEventListener('click', e=>{ if(e.target.closest('#rvChip')) openSearch({ rv:true, noSheet:true }); });
+        $('pageLedger').addEventListener('click', e=>{
+            if(e.target.closest('#rvChip')) openSearch({ rv:true, noSheet:true });
+            const bv=e.target.closest('#impBannerView'); if(bv) openSearch({ batch:bv.dataset.b, noSheet:true });   // 4a：导入横幅「查看」：这一批
+        });
 
         // ===== 1023-G：筛选条件抽屉（样子照记一笔：拖动条 + 标题，最高约屏幕八成）=====
         //   日期范围（两个带日历图标的按钮 + 不限 / 本月 / 上月 / 近 7 天）、金额范围（大字，App 的数字键盘）、收入 | 支出（能都选）、
@@ -255,12 +273,13 @@
         let quickCats=[], catOpen=false, modeOpen=false;
         function sheetOpen(){ return mask.style.display==='flex'; }
         // opt.focus：从结果页点某个条件进来，翻到那一项（分类 / 统计顺便展开）、闪一下
-        const FOCUS_EL={ date:'filterDateQuick', money:'searchMin', io:'filterIoChips', cat:'filterCatRow', mode:'filterModeRow', kw:'searchKeyword', rv:'filterRvRow' };
+        const FOCUS_EL={ date:'filterDateQuick', money:'searchMin', io:'filterIoChips', cat:'filterCatRow', mode:'filterModeRow', kw:'searchKeyword', rv:'filterRvRow', src:'filterSrcRow' };
+        let srcOpen=false;
         function openSheet(opt){
             if(!pageOpen){ openSearch({ noSheet:true }); }
             quickCats=recentCats(searchState.ios.length===1 ? searchState.ios[0] : undefined, 4);   // 打开时定下来，开着时不挪位置
             const focus=opt && opt.focus;
-            catOpen=focus==='cat'; modeOpen=focus==='mode';
+            catOpen=focus==='cat'; modeOpen=focus==='mode'; srcOpen=focus==='src';
             kw.value=searchState.keyword;
             min.value = searchState.min!=null ? String(searchState.min) : '';
             max.value = searchState.max!=null ? String(searchState.max) : '';
@@ -317,6 +336,14 @@
             $('filterRvRow').hidden=!(searchState.rv || rvN);
             $('filterRvVal').textContent = `${rvN} 条`;
             $('filterRvSw').classList.toggle('on', !!searchState.rv);
+            // 4a：来源（开发开关开着，或者已经选了）
+            const sr=$('filterSrcRow');
+            sr.hidden=!(dev || searchState.srcs.length);
+            const sv=$('filterSrcVal'); sv.textContent = searchState.srcs.length ? SRC_ORDER.filter(x=>searchState.srcs.includes(x)).map(x=>SRC_NAME[x]).join('、') : '全部'; sv.classList.toggle('sf-ph', !searchState.srcs.length);
+            sr.setAttribute('aria-expanded', srcOpen ? 'true' : 'false'); sr.classList.toggle('open', srcOpen);
+            const sc=$('filterSrcChips'); sc.hidden=!srcOpen || sr.hidden;
+            if(!sc.children.length) sc.innerHTML=SRC_ORDER.map(x=>`<button type="button" class="sf-btn cc" data-v="${x}">${SRC_NAME[x]}</button>`).join('');
+            sc.querySelectorAll('[data-v]').forEach(b=>{ const on=searchState.srcs.includes(b.dataset.v); b.classList.toggle('sel', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
             $('sheetApply').textContent=`看这 ${hits().length} 笔`;
         }
         // 全部分类（点「分类 ›」展开），多选；分类改名 / 删掉以后不在分类表里的不再算条件
@@ -335,6 +362,8 @@
         $('filterCatRow').addEventListener('click', ()=>{ catOpen=!catOpen; paintSheet(); });
         $('filterModeRow').addEventListener('click', ()=>{ modeOpen=!modeOpen; paintSheet(); });
         $('filterRvRow').addEventListener('click', ()=>{ searchState.rv=!searchState.rv; changed(); });
+        $('filterSrcRow').addEventListener('click', ()=>{ srcOpen=!srcOpen; paintSheet(); });
+        $('filterSrcChips').addEventListener('click', e=>{ const b=e.target.closest('[data-v]'); if(!b) return; toggleIn(searchState.srcs, b.dataset.v); changed(); });
         $('filterDateQuick').addEventListener('click', e=>{
             const b=e.target.closest('[data-q]'); if(!b) return;
             const [a, z]=quickRange(b.dataset.q);
@@ -462,5 +491,5 @@
             window.JiwenTabs.refreshAllViews(); render();
             customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
         }
-        window.JiwenSearch = { applyBatch, closeSearch, filterMatch, isOpen, openBatchMenu, openSearch, openSheet, render, renderFilterChips, resetSearch, searchFlush, searchNow, undoBatch };   // search 模块对外只有这一个入口
+        window.JiwenSearch = { srcOf, applyBatch, closeSearch, filterMatch, isOpen, openBatchMenu, openSearch, openSheet, render, renderFilterChips, resetSearch, searchFlush, searchNow, undoBatch };   // search 模块对外只有这一个入口
 })();

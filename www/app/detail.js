@@ -271,14 +271,26 @@
         }
         // 每笔一行：上面备注（没备注写分类）+ 标签，下面小字「分类 · 时间」，右边金额（支出正文色带 −、收入绿色带 +）
         //   opt.date：时间前面带上日期（预算明细这种跨天的列表用）
+        // 导入简化 4a：列表第二行小字写来源（文字，不用两家的图标；圆角标签留给往来、不计、期初这些影响统计的）：
+        //   自己记的没对上账单不写；已和账单合并的「已对账」；导入的「微信 / 支付宝」；几笔合成的一条「微信 · 几笔合成」。开发开关开着才写
+        const SRC_APP={ wechat:'微信', alipay:'支付宝' };
+        function srcText(r){
+            const s=r && r.src; if(!s || typeof s!=='object') return '';
+            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            if(!on) return '';
+            if(s.merged) return '已对账';
+            const a=SRC_APP[s.app]; if(!a) return '';
+            return s.sum ? a+' · 几笔合成' : a;
+        }
         function rowHtml(r, rMap, opt){
             const isExp=r.type==='expense', amt=safeNum(r.money).toFixed(2);
             const tags=(isRefund(r) ? '<span class="io-tag io-refund">退款</span>' : '') + modeTag(r) + refundedTag(r, rMap);
             const remark=(r.remark||'').trim(), cat=r.cat||'未分类', k=(r.time||'').slice(0,10);
             const when=(opt && opt.date && /^\d{4}-\d{2}-\d{2}$/.test(k) ? cal.mdText(k)+' ' : '') + (r.time||'').slice(11,16);
+            const st=srcText(r);
             return `<div class="bl-row" data-act="detail" data-id="${escapeHtml(r.id)}" role="button">`
                 + `<div class="bl-main"><div class="bl-t"><span class="bl-t-x">${escapeHtml(remark || cat)}</span>${tags}</div>`
-                + `<div class="bl-sub"><span class="bl-cat-t">${escapeHtml(cat)}</span> · <span class="bl-time">${escapeHtml(when)}</span></div></div>`
+                + `<div class="bl-sub"><span class="bl-cat-t">${escapeHtml(cat)}</span> · <span class="bl-time">${escapeHtml(when)}</span>${st ? ` · <span class="bl-src">${st}</span>` : ''}</div></div>`
                 + `<span class="bl-amt ${isExp ? 'out' : 'pos'}${modeAmtCls(r)}">${isExp ? '−' : '+'}${amt}</span></div>`;
         }
         function recsOfDays(a, b){ return getUserData().filter(r=>{ const k=(r.time||'').slice(0,10); return k>=a && k<=b; }); }

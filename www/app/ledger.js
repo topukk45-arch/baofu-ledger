@@ -53,6 +53,41 @@
                 b.appendChild(tx); b.appendChild(go); b.appendChild(no);
             }).catch(()=>{ if(my===__remindSeq){ const x=$('impRemind'); if(x) x.remove(); } });
         }
+        // 导入简化 4a：导入后账单页顶上一条横幅「刚导入微信账单 821 条（10月1日–23日）· 查看 · 撤销 ✕」：
+        //   最近一次导入（只对账的、AI 修改不算）7 天以内、没点掉才有；「查看」打开搜一笔、条件是这一批（点击在 search.js 里委托）；
+        //   「撤销」和完成页的撤销是同一个；✕ 点掉只在这台手机上记住（localStorage 的 app_imp_banner_<账号>__<存档> = 批次号）。开发开关开着才有
+        const IMP_BANNER_DAYS=7, BANNER_APP={ wechat:'微信', alipay:'支付宝' };
+        var __bannerSeq=0;
+        function renderImpBanner(){
+            const my=++__bannerSeq;
+            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            let t=null; if(on){ try{ t=impTarget(); }catch(_){ t=null; } }
+            if(!t){ const x=$('impBanner'); if(x) x.remove(); return; }
+            const bk=`app_imp_banner_${JiwenBase.currentUser}__${JiwenBase.currentArchive}`;
+            impGetJson(t.e, impLogKey(t.e.id, t.aid)).then(o=>{
+                if(my!==__bannerSeq) return;
+                const logs=((o && o.list) || []).filter(l=>!l.only && l.kind!=='ai' && l.b);
+                const l=logs[logs.length-1];
+                let off=''; try{ off=localStorage.getItem(bk)||''; }catch(_){}
+                const at=l && l.at ? new Date(l.at) : null;
+                let b=$('impBanner');
+                if(!l || off===l.b || !at || isNaN(at) || Date.now()-at.getTime()>IMP_BANNER_DAYS*86400000){ if(b) b.remove(); return; }
+                if(!b){
+                    b=document.createElement('div'); b.id='impBanner'; b.className='stat-pend-banner imp-banner';
+                    const head=$('billHead'); head.parentNode.insertBefore(b, head);
+                }
+                b.textContent='';
+                const md=s=>s ? `${+s.slice(5,7)}月${+s.slice(8,10)}日` : '';
+                const apps=(l.apps||[]).map(x=>BANNER_APP[x]||x).join('、');
+                const tx=document.createElement('span'); tx.className='imp-banner-t';
+                tx.textContent=`刚导入${apps}账单 ${(l.add||[]).length} 条` + (l.from ? `（${md(l.from)}–${l.to && l.to.slice(0,7)===l.from.slice(0,7) ? +l.to.slice(8,10)+'日' : md(l.to)}）` : '');
+                const mk=(id, txt)=>{ const x=document.createElement('button'); x.type='button'; x.id=id; x.textContent=txt; x.dataset.b=l.b; return x; };
+                const view=mk('impBannerView', '查看'), undo=mk('impBannerUndo', '撤销'), close=mk('impBannerOff', '✕'); close.setAttribute('aria-label', '不再显示这条');
+                undo.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.undoFromLedger(l.b)).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '撤销导入')); });
+                close.addEventListener('click', ()=>{ try{ localStorage.setItem(bk, l.b); }catch(_){} const x=$('impBanner'); if(x) x.remove(); });
+                b.appendChild(tx); b.appendChild(view); b.appendChild(undo); b.appendChild(close);
+            }).catch(()=>{ if(my===__bannerSeq){ const x=$('impBanner'); if(x) x.remove(); } });
+        }
         // 1021-T13（实测 10-20）：账单页顶上「待确认分类 N」小胶囊（开发开关开着、有 rv 标记的记录时才有）：点了等于一个筛选，
         //   再用现成的多选、批量改分类慢慢改（改了分类就去掉标记）；开着时写「只看待确认分类 · N ✕」，再点回到全部
         // 1023-G 起点了打开搜一笔的结果页、条件是「待确认分类」（点击在 search.js 里委托绑定）
@@ -222,7 +257,7 @@
 
         function renderBill(){
             const raw=getUserData();
-            renderImpEmptyEntry(raw.length); renderImpRemind(); renderRvChip(raw);
+            renderImpEmptyEntry(raw.length); renderImpRemind(); renderImpBanner(); renderRvChip(raw);
             // 【为什么先算时间戳再排序】排序要做 O(n log n) 次比较，比较器里每次 parseRecTime 太贵：先给每条只解析一次（Schwartzian transform）
             //   同一分钟多笔按存储里的原始顺序（稳定且唯一）
             const allAsc=raw

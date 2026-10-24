@@ -99,7 +99,7 @@ const recs = [
   $('filterFab').click(); await wait(20);
   // 1023-G：日期两个带日历图标的按钮在最上面，金额大字，收入 | 支出，常用分类；列表卡：分类 ›、统计 ›、备注
   const fl = $('filterSheet').querySelector('.sf-list');
-  ok(fl && [...fl.querySelectorAll(':scope > .rec-row:not([hidden]) .rec-row-k')].map(x => x.textContent).join() === '分类,统计,备注' && fl.contains($('searchKeyword')) && $('searchFromBtn').querySelector('svg') && $('searchFromBtn').contains($('searchFrom')) && $('filterSheet').querySelector('.sf-money').contains($('searchMin')), '五 日期按钮、金额大字，列表卡：分类、统计、备注（1023-G）');
+  ok(fl && [...fl.querySelectorAll(':scope > .rec-row:not([hidden]) .rec-row-k')].map(x => x.textContent).join() === '分类,统计,来源,备注' && fl.contains($('searchKeyword')) && $('searchFromBtn').querySelector('svg') && $('searchFromBtn').contains($('searchFrom')) && $('filterSheet').querySelector('.sf-money').contains($('searchMin')), '五 日期按钮、金额大字，列表卡：分类、统计、来源（4a，开发开关开着）、备注（1023-G）');
   ok([...$('filterModeChips').querySelectorAll('.cc')].map(c => c.textContent).join() === '计入,不计,往来' && $('filterChips').classList.contains('sf-grid'), '五 统计按新叫法和顺序，分类是多选的块');
   $('searchMin').click(); await tick();
   ok(shown('kpMask') && w.JiwenKeypad.kpTarget === $('searchMin') && $('kpCaret'), '五 金额区间用数字键盘、有闪动光标');
