@@ -177,6 +177,7 @@ const before = await t.snapshot();
   ok(t.S().plan.groups.add.filter(d => d.cat === '交通出行').length === 4, '2 勾上新建「交通出行」：那 4 笔跟着变');
   // 没见过的类型：选「当转账」→ 重算，群收款挪到不计
   const nb = t.S().plan.counts.neutral;
+  t.w.JiwenImportUI._goStep('overview');      // 2a：没见过的类型收进总览的「提醒」
   t.select(t.d.querySelector('.imp-type-sel'), 'transfer');
   await until(() => t.S().plan && t.S().plan.counts.neutral === nb + 1);
   ok(t.S().plan.counts.neutral === nb + 1 && t.S().plan.groups.neutral.some(d => d.kind === '群收款'), '2 群收款选「当转账」：重新算，挪进不计');

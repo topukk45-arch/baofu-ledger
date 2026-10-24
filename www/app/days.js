@@ -5,24 +5,6 @@
         const { openDtPickerDate } = window.JiwenDate;   // 用到前面模块的
         const { calcDay, dayNumHtml, fmtDayDate, saveDays, sortedDays } = window.JiwenStats;   // 用到前面模块的
 
-        // ===== 入口卡显示条数（可配置）=====
-        // 【为什么有上限 99】需求是「上不封顶」，但输入框只允许两位数，所以实际天花板就是 99。
-        //   这没有削弱需求：入口卡是记账页顶部的一张小卡，真要展示 99 条也早就滚出屏幕了；
-        //   而且超出的条目在日子页里一条不少，纯粹是「露多少」的问题，不涉及丢数据。
-        const DAYS_CARD_MIN=3, DAYS_CARD_MAX=99, DAYS_CARD_DEFAULT=3;
-        function daysCardKey(user){ return `days_card_n_${user!==undefined ? user : JiwenBase.currentUser}`; }
-        // 读取时也钳一道：localStorage 是用户可改的，别信它写回来的值
-        function getDaysCardN(){
-            const raw=parseInt(localStorage.getItem(daysCardKey()), 10);
-            if(!isFinite(raw)) return DAYS_CARD_DEFAULT;
-            return Math.min(Math.max(raw, DAYS_CARD_MIN), DAYS_CARD_MAX);
-        }
-        function setDaysCardN(n){
-            const v=Math.min(Math.max(safeNum(n)|0, DAYS_CARD_MIN), DAYS_CARD_MAX);
-            localStorage.setItem(daysCardKey(), String(v));
-            return v;
-        }
-
         // ===== 记账页的入口卡（1023-E：竖排卡片）=====
         //   抬头「日子 · 全部 N 个 ›」，下面最多 DAYS_CARD_ROWS（3）条，顺序和日子页一样（置顶的排第一、浅底加粗）；
         //   每条：名字、日期小字、右边大号天数。点一条 → 这一条的详情（openDayItem）；点抬头或卡片空白处 → 全部日子页（绑定在外壳 tabs 里）
@@ -90,30 +72,10 @@
         $('daysAdd').addEventListener('click', ()=>openDayDialog(null));
 
         // ===== 日子管理弹窗 =====
-        const dayMgrMask=$('dayMgrMask'), dmCount=$('dmCount');
-
-        // 只放行数字。参照 sanitizeMoney 的做法：不用 <input type=number>
-        //  —— 它在安卓 WebView 上仍能通过键盘/粘贴塞进 'e'、'+'、'-'，而且拿到的 value 会是空串，
-        //     校验反而更难写。用 text + inputmode=numeric：手机照样弹数字键盘，
-        //     同时这里手工过滤，粘贴、长按输入法、物理键盘三条路径全都拦住。
-        function sanitizeCount(v){
-            return String(v||'').replace(/[^\d]/g, '').slice(0, 2);   // 只留数字，最多两位
-        }
-        dmCount.addEventListener('input', ()=>{
-            const s=sanitizeCount(dmCount.value);
-            if(dmCount.value!==s) dmCount.value=s;   // 只在真被改动时写回，避免打断光标
-        });
-        // 【不在 input 里钳到 3】用户想输 12，必然先经过「1」这个中间态；
-        //   当场纠正成 3 会让人根本没法往下打。钳制只在失焦和保存时做。
-        dmCount.addEventListener('blur', ()=>{ dmCount.value=String(clampCount(dmCount.value)); });
-        function clampCount(v){
-            const n=parseInt(sanitizeCount(v), 10);
-            if(!isFinite(n)) return DAYS_CARD_DEFAULT;
-            return Math.min(Math.max(n, DAYS_CARD_MIN), DAYS_CARD_MAX);
-        }
+        // 导入简化 2a：「入口卡显示几条」去掉了（日子卡 1023-E 起固定最多 3 条，这一项早就不起作用），管理里只剩「批量删除日子」
+        const dayMgrMask=$('dayMgrMask');
 
         function openDayMgr(){
-            dmCount.value=String(getDaysCardN());
             // 没有日子时，「批量删除」无意义，禁用掉而不是让人点进去看空列表
             const has=loadDays().length>0;
             $('dmBatch').disabled=!has;
@@ -124,18 +86,10 @@
             window.__openModalAfterKeyboard(dayMgrMask, null);
         }
         function closeDayMgr(){
-            dmCount.blur();               // 收键盘，避免弹窗关了键盘还杵着
             dayMgrMask.style.display='none';
         }
         $('daysManage').addEventListener('click', openDayMgr);
         $('dmClose').addEventListener('click', closeDayMgr);
-        $('dmSave').addEventListener('click', ()=>{
-            const n=clampCount(dmCount.value);
-            setDaysCardN(n);
-            closeDayMgr();
-            renderDaysCard();             // 入口卡立刻按新条数重绘
-            customAlert(`入口卡将显示最多 ${n} 条日子`);
-        });
         // 批量删除：先关掉弹窗，再把列表原地切成选择模式（不叠层）
         $('dmBatch').addEventListener('click', ()=>{
             closeDayMgr();

@@ -18,13 +18,13 @@
         html, body { background-color:#fdf8e8; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1024-B">
+    <link rel="stylesheet" href="app/app.css?v=1024-C">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1024-B</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1024-C</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -747,19 +747,16 @@
         </div>
     </div>
 
-    <!-- 日子管理弹窗：入口卡条数 + 批量删除入口 -->
+    <!-- 日子管理弹窗：批量删除入口（导入简化 2a 去掉了「入口卡显示几条」） -->
     <div class="mask sheet-mask form-mask" id="dayMgrMask">
         <div class="sheet edit-dialog" id="dayMgrSheet">
             <div class="sheet-grip" id="dayMgrGrip"><div class="sheet-handle" aria-hidden="true"></div><div class="sheet-head"><h3>日子管理</h3></div></div>
             <!-- 1020-I：「入口卡显示几条」「批量删除日子」做成列表行 -->
             <div class="rec-list dm-list">
-                <label class="rec-row rec-row-in"><span class="rec-row-k dm-k">入口卡显示</span><input type="text" id="dmCount" class="rec-row-input dm-num" inputmode="numeric" maxlength="2" placeholder="3"><span class="dm-unit">条</span></label>
                 <button type="button" class="rec-row" id="dmBatch"><span class="rec-row-k dm-k">批量删除日子</span><span class="rec-row-v"></span><svg class="rec-row-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
             </div>
-            <div class="dm-hint">入口卡最少 3 条，最多 99 条。超出的日子仍可在日子页看到，不会丢。</div>
             <div class="dialog-btn ui-stack form-btns">
-                <button class="ui-btn primary block" id="dmSave">保存</button>
-                <button class="ui-btn block" id="dmClose">取消</button>
+                <button class="ui-btn block" id="dmClose">关闭</button>
             </div>
         </div>
     </div>
@@ -820,29 +817,29 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1024-B"></script>
-    <script src="app/store.js?v=1024-B"></script>
-    <script src="app/select.js?v=1024-B"></script>
-    <script src="app/keypad.js?v=1024-B"></script>
-    <script src="app/text.js?v=1024-B"></script>
-    <script src="app/sheet.js?v=1024-B"></script>
-    <script src="app/ask.js?v=1024-B"></script>
-    <script src="app/date.js?v=1024-B"></script>
-    <script src="app/monthstrip.js?v=1024-B"></script>
-    <script src="app/ai-export.js?v=1024-B"></script>
-    <script src="app/import-entry.js?v=1024-B"></script>
-    <script src="app/forms.js?v=1024-B"></script>
-    <script src="app/detail.js?v=1024-B"></script>
-    <script src="app/ledger.js?v=1024-B"></script>
-    <script src="app/search.js?v=1024-B"></script>
-    <script src="app/cats.js?v=1024-B"></script>
-    <script src="app/stats.js?v=1024-B"></script>
-    <script src="app/days.js?v=1024-B"></script>
-    <script src="app/settings.js?v=1024-B"></script>
-    <script src="app/tabs.js?v=1024-B"></script>
-    <script src="app/login.js?v=1024-B"></script>
-    <script src="app/back.js?v=1024-B"></script>
-    <script src="app/boot.js?v=1024-B"></script>
+    <script src="app/base.js?v=1024-C"></script>
+    <script src="app/store.js?v=1024-C"></script>
+    <script src="app/select.js?v=1024-C"></script>
+    <script src="app/keypad.js?v=1024-C"></script>
+    <script src="app/text.js?v=1024-C"></script>
+    <script src="app/sheet.js?v=1024-C"></script>
+    <script src="app/ask.js?v=1024-C"></script>
+    <script src="app/date.js?v=1024-C"></script>
+    <script src="app/monthstrip.js?v=1024-C"></script>
+    <script src="app/ai-export.js?v=1024-C"></script>
+    <script src="app/import-entry.js?v=1024-C"></script>
+    <script src="app/forms.js?v=1024-C"></script>
+    <script src="app/detail.js?v=1024-C"></script>
+    <script src="app/ledger.js?v=1024-C"></script>
+    <script src="app/search.js?v=1024-C"></script>
+    <script src="app/cats.js?v=1024-C"></script>
+    <script src="app/stats.js?v=1024-C"></script>
+    <script src="app/days.js?v=1024-C"></script>
+    <script src="app/settings.js?v=1024-C"></script>
+    <script src="app/tabs.js?v=1024-C"></script>
+    <script src="app/login.js?v=1024-C"></script>
+    <script src="app/back.js?v=1024-C"></script>
+    <script src="app/boot.js?v=1024-C"></script>
 
 </body>
 </html>

@@ -72,10 +72,10 @@ const TX = () => [
     cb().checked = true; cb().dispatchEvent(new t.w.Event('change'));
     const m3 = tb().querySelector('.imp-mark');
     ok(m3.dataset.st === 'part' && /部分已定 1\/3/.test(m3.textContent) && m3.querySelector('svg path'), '3 只标了 1 笔不计入：◐ 部分已定 1/3（Lucide contrast）：' + m3.textContent);
-    ok(/还剩 1 件没定/.test(raw('impIntro').textContent), '3 顶上计数：部分已定的还算没定：' + raw('impIntro').textContent);
+    ok(/看了 0 件 \/ 共 1 件/.test(raw('impIntro').textContent), '3 顶上计数：部分已定的还算没定：' + raw('impIntro').textContent);
     ok(q('#impTransfers').classList.contains('st-part'), '3 卡片竖条：部分（st-part）');
     tb().querySelector('.imp-tr-keep').click();
-    ok(tb().querySelector('.imp-mark').dataset.st === 'ok' && /其余 2 笔保持计入/.test(tb().textContent) && /都定过了/.test(raw('impIntro').textContent), '3 点「其余都保持计入」：这段算定完，顶上「都定过了」');
+    ok(tb().querySelector('.imp-mark').dataset.st === 'ok' && /其余 2 笔保持计入/.test(tb().textContent) && /看了 1 件 \/ 共 1 件/.test(raw('impIntro').textContent), '3 点「其余都保持计入」：这段算定完，顶上「看了 1 件 / 共 1 件」');
     const k3 = cb().dataset.key;
     cb().checked = false; cb().dispatchEvent(new t.w.Event('change'));
     ok(!(S().edits.rows[k3] && S().edits.rows[k3].mode), '3 改回计入：改动去掉（不留一个「计入」的改动）');

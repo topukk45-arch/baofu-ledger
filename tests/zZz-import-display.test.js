@@ -37,9 +37,15 @@ const TX = () => [
   // ===== 1. 金额要你看一眼：不计的行不写分类 =====
   const ac = S().plan.sections.amountChecks.find(x => /某虚构银行/.test(x.cp));
   ok(ac, '1 零钱提现 3000 元进了「金额要你看一眼」（大额）');
-  UI._goStep(S().view.steps.indexOf('amount') >= 0 ? 'amount' : 'overview');
-  const ar = Array.from(t.d.querySelectorAll('.imp-amount-row')).find(r => /某虚构银行/.test(r.textContent));
-  ok(ar && /（不计）/.test(ar.textContent) && !/→ 未分类/.test(ar.textContent) && !/→/.test(ar.querySelector('.grow').textContent), '1 不计的行：写「（不计）」，不写「→ 未分类」：' + (ar ? ar.querySelector('.grow').textContent : ''));
+  // 导入简化 2a：大额在核对页「大额，先定算不算收支」里问（不写分类、默认选中「不计」），其余金额提醒在总览的「提醒」里
+  UI._goStep('check');
+  let ar = Array.from(t.d.querySelectorAll('.imp-big-row')).find(r => /某虚构银行|提现/.test(r.textContent));
+  if (ar) ok(ar.querySelector('.imp-big-m.on').dataset.mode === 'skip' && !/→/.test(ar.textContent) && !/未分类/.test(ar.textContent), '1 不计的大额：在核对页问，默认「不计」，不写分类：' + ar.textContent);
+  else {
+    UI._goStep('overview');
+    ar = Array.from(t.d.querySelectorAll('.imp-amount-row')).find(r => /某虚构银行/.test(r.textContent));
+    ok(ar && /（不计）/.test(ar.textContent) && !/→ 未分类/.test(ar.textContent) && !/→/.test(ar.querySelector('.grow').textContent), '1 不计的行：写「（不计）」，不写「→ 未分类」：' + (ar ? ar.querySelector('.grow').textContent : ''));
+  }
   // ===== 2. 对方名：多余空格、空括号显示前去掉；存的原文不动 =====
   ok(S().plan.rows.some(d => d.cp === ODD), '2 方案里这一行存的还是原文（带全角空格和空括号）');
   UI._goStep('cat');

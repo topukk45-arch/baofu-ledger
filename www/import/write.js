@@ -122,6 +122,7 @@
       if ((d.group !== 'add' && d.group !== 'neutral') || sumDone[d.key]) return;
       var o = base(d);
       setMode(o, d.mode);
+      if (d.ob && d.mode === 'flow') o.ob = 1;     // 导入简化 2a：大额选了往来、标了期初余额
       // 1021-T13（实测 10-20）：待确认分类：推荐把握低或未分类、你没在确认页定过（还是推荐的）、不是不计的 → rv:1，
       //   到账单页「待确认分类」里慢慢改（改了分类就去掉）。指纹 recHash 不含它
       if (d.group === 'add' && d.mode !== 'skip' && d.catFrom === 'rec' && (o.cat === '未分类' || (d.rec && d.rec.conf === 'low'))) o.rv = 1;

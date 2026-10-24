@@ -1300,6 +1300,7 @@
                 if(Number.isInteger(x.pm)) r.pm=x.pm;
                 if(typeof x.oc==='string' && x.oc) r.oc=x.oc.slice(0, 32);
                 if(x.rv===1) r.rv=1;   // 1021-T13：待确认分类
+                if(x.ob===1 && r.flow===true) r.ob=1;   // 导入简化 2a：大额选了往来、标了期初余额
                 if(x.refundOf) r.refundOf=res(x.refundOf);
                 made.push(r); madeBy[r.id]=r;
                 if(i%200===199){ prog && prog('build', i+1, ws.records.length); await impYield(); }
@@ -1992,8 +1993,12 @@
                     const io=r.type==='income' ? 'i' : 'e', h=cpHist[nm]||(cpHist[nm]={ e:{}, i:{} }); h[io][r.cat]=(h[io][r.cat]||0)+1; });
                 // 1021-T23：存档里有几条手记（没有导入来源的；合并过账单的手记也算），没有手记时确认页不提「只对账」「漏记」
                 const manualN=(st ? st.recs : []).filter(r=>!r.src || r.src.merged).length;
+                // 导入简化 2a：每个月账本里已有的支出 / 收入（分，和统计页同一口径 statContrib），核对页「大额，先定算不算收支」算门槛、写影响用
+                const monthIO={};
+                (st ? st.recs : []).forEach(r=>{ const ym=String(r.time||'').slice(0, 7); if(!/^\d{4}-\d{2}$/.test(ym)) return; const c=statContrib(r); if(!c.exp && !c.inc) return;
+                    const x=monthIO[ym]||(monthIO[ym]={ e:0, i:0 }); x.e+=Math.round(c.exp*100); x.i+=Math.round(c.inc*100); });
                 return { name:t.name, cats, catRules:(rules.cat||[]).slice(), typeRules:(rules.type||[]).slice(), catMaps:(rules.map||[]).slice(),
-                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, manualN, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist };
+                         cps:(a.cps||[]).slice(), pms:(a.pms||[]).slice(), records:n, manualN, isNewUser: n<30 && isDefault, ver:t.e.ver, aid:t.aid, catStats, cpHist, monthIO };
             },
             // 按定去向的 lookups() 查单号表和同月（同日）已有的合并记录，拼成 known（见 route.js 开头）
             async knownFor(lk, archive){

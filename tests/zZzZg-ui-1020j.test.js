@@ -118,10 +118,13 @@ const hueDiff = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 
   // 光标和数字之间留一点空
   ok(/KP_CARET_GAP=3/.test(fs.readFileSync(path.join(WWW, 'app', 'keypad.js'), 'utf8')), '二 闪动光标和数字之间留 3px');
 
-  // ===== 六、日子管理的条数：数字键盘（整数模式） =====
+  // ===== 六、数字键盘（整数模式）：导入简化 2a 去掉了日子管理的条数（dmCount），整数模式照旧留着，用 kpRegister 登记一个测试框来查 =====
   d.querySelector('.tab-btn[data-tab="ledger"]').click();
   $('daysManageBtn').click(); await wait(10); $('daysManage').click(); await wait(10);
-  const dm = $('dmCount');
+  ok(!$('dmCount') && !$('dmSave'), '六 日子管理里没有「入口卡显示几条」了');
+  const dmIn = d.createElement('input'); dmIn.type = 'text'; dmIn.id = 'kpIntTest'; $('dayMgrSheet').querySelector('.rec-list').appendChild(dmIn);
+  ok(w.JiwenKeypad.kpRegister('kpIntTest', { int: { len: 2, lo: 3, hi: 99 } }) === true, '六 kpRegister 登记一个整数框');
+  const dm = $('kpIntTest');
   ok(dm.readOnly && dm.getAttribute('inputmode') === 'none' && dm.classList.contains('kp-field'), '六 入口卡显示几条：不弹系统输入法');
   dm.click();
   const dot = $('kpGrid').querySelector('.kp-key[data-k="."]');
@@ -138,9 +141,8 @@ const hueDiff = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 
   dm.click(); key('<'); key('<'); w.kpClose();
   ok(dm.value === '3', '六 删空了关掉：按 3');
   dm.click(); key('<'); key('8'); w.kpClose();
-  $('dmSave').click(); await t.idle();
-  ok(w.localStorage.getItem('days_card_n_' + A.ID) === '8' || /8 条/.test(t.ask() ? t.ask().msg : ''), '六 点「保存」才存：8 ' + (t.ask() ? t.ask().msg : ''));
-  if (t.ask()) await t.askOk();
+  ok(dm.value === '8', '六 改成 8：' + dm.value);
+  $('dmClose').click(); await t.idle();
   // 设置里选了系统键盘：照旧弹系统的数字输入法
   w.localStorage.setItem('app_sys_money_kb', '1');
   d.querySelector('#sysMoneyKbSeg button[data-v="on"]').click();

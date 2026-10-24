@@ -91,7 +91,7 @@ const recs = [
   $('dayCancel').click(); await tick();
   if (shown('askMask')) $('askOk').click();
   $('daysManage').click(); await tick();
-  ok($('dmCount').closest('.rec-row') && $('dmBatch').classList.contains('rec-row'), '四 日子管理：入口卡显示几条、批量删除日子是列表行');
+  ok(!$('dmCount') && !$('dmSave') && $('dmBatch').classList.contains('rec-row'), '四 日子管理：批量删除日子是列表行（2a 起没有「入口卡显示几条」）');
   $('dmClose').click(); await tick();
   $('daysBack').click(); await tick();
 

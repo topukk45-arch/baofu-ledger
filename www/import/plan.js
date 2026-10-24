@@ -44,7 +44,9 @@
     NEW_CAPS: { '餐饮': 50000, '交通出行': 100000 },   // 没历史时用的单笔参考上限：餐饮 500、交通 1000（按内置大类名，待真实数据调）
     BIG_FEN: 200000,       // 不管哪类，单笔超过 2000 元单列出来（待真实数据调）
     BIG_TOP: 3,            // 本次最大的 3 笔也单列……（待真实数据调）
-    BIG_TOP_MIN: 50000     // ……但不到 500 元的不算「大额」（免得小账单也列出来，待真实数据调）
+    BIG_TOP_MIN: 50000,    // ……但不到 500 元的不算「大额」（免得小账单也列出来，待真实数据调）
+    // 导入简化 2a：核对页「大额，先定算不算收支」：单笔超过当月支出的 20% 或 1000 元（取较小的），而且至少 200 元
+    ASK_SHARE: 0.2, ASK_CAP: 100000, ASK_MIN: 20000
   };
   var GROUPS = ['add', 'merge', 'pending', 'refund', 'neutral', 'skip', 'error', 'excluded'];
   var GROUP_NAME = { add: '新增', merge: '和手记合并', pending: '待你确认', refund: '退款', neutral: '不计', skip: '跳过', error: '出错', excluded: '你勾掉的' };
@@ -186,6 +188,7 @@
       }
       if (e.exclude && (d.group === 'add' || d.group === 'neutral' || d.group === 'refund')) { d.group = 'excluded'; d.reason = '你勾掉了'; }
       if (e.mode && (d.group === 'add' || d.group === 'neutral')) d.mode = e.mode;
+      if (e.ob && d.mode === 'flow' && (d.group === 'add' || d.group === 'neutral')) d.ob = true;     // 2a：大额选了往来，顺带标期初余额（ob:1）
       // 1016-G：口径改成不计的挪进「不计」组，不计改回计入 / 往来的挪回「新增」，顶上的笔数跟着变
       if (d.group === 'add' && d.mode === 'skip') d.group = 'neutral';
       else if (d.group === 'neutral' && d.mode !== 'skip') d.group = 'add';
@@ -522,6 +525,29 @@
       if (d.tags.indexOf('big') < 0) d.tags.push('big');
     });
     sec.amountChecks = checks;
+    // ---- 导入简化 2a：大额先问算不算收支（核对页一小块，每笔「消费 / 往来 / 不计」，默认是推荐的）----
+    //   门槛：单笔超过当月支出的 ASK_SHARE 或 ASK_CAP（取较小的），而且至少 ASK_MIN。「当月」是这笔账单所在的月份，
+    //   支出 = 账本里那个月已有的（info.monthIO，统计页同一口径）+ 这一批按推荐算进支出的（门槛不跟着你的选择变）。
+    //   monthOut：那个月现在的支出（按你现在的选择，不含这一笔），写影响「10月支出会从 x 变成 y」用
+    var mio = info.monthIO || {}, batchDef = {}, batchNow = {};
+    rows.forEach(function (d) {
+      if (d.src !== 'row' || !d.time) return;
+      var ym = d.time.slice(0, 7), def = (d.item && d.item.mode) || 'normal';
+      if ((d.group === 'add' || d.group === 'neutral') && d.type === 'expense') {
+        if (def === 'normal' && d.bucket0 !== 'merge') batchDef[ym] = (batchDef[ym] || 0) + d.fen;
+        if (d.mode === 'normal') batchNow[ym] = (batchNow[ym] || 0) + d.fen;
+      }
+      if (d.group === 'refund' && d.mode === 'normal') batchNow[ym] = (batchNow[ym] || 0) - d.fen;
+    });
+    sec.bigAsks = [];
+    rows.forEach(function (d) {
+      if (d.src !== 'row' || (d.group !== 'add' && d.group !== 'neutral') || d.type !== 'expense' || inGroup[d.file + ':' + d.row] || !d.time) return;
+      var ym = d.time.slice(0, 7), led = (mio[ym] && mio[ym].e) || 0, monthDef = led + (batchDef[ym] || 0);
+      var line = Math.min(monthDef * AMOUNT.ASK_SHARE, AMOUNT.ASK_CAP);
+      if (d.fen < AMOUNT.ASK_MIN || d.fen <= line) return;
+      sec.bigAsks.push({ key: d.key, fen: d.fen, cp: d.cp, title: d.title, time: d.time, ym: ym, mode: d.mode, def: (d.item && d.item.mode) || 'normal',
+                         monthOut: led + (batchNow[ym] || 0) - (d.mode === 'normal' ? d.fen : 0), ob: !!d.ob });
+    });
 
     // ---- 1.1（1016-Z4）提现服务费：微信「零钱提现」备注里写着「服务费¥2.20」的，零钱提现本身照旧不计，服务费单独记一笔支出 ----
     //   分类：存档里有「手续费」「服务费」就用，没有用「其他」，再没有就「未分类」。只在这笔提现这次真要写进去时记（再导时提现跳过，服务费也不会再记）

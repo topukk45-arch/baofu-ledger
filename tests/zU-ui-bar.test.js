@@ -41,7 +41,7 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   ok(inBar('impCancel') && inBar('impNext') && !$('impBar').contains(t.d.getElementById('impGo')), '4 第 1 步：底部「取消 / 下一步」');
   t.w.JiwenImportUI._goStep('overview');
   const kids = [...$('impBar').children];
-  ok(kids[0] === $('impGo') && $('impGo').classList.contains('ui-full') && inBar('impPrev') && inBar('impRecon') && kids.indexOf($('impPrev')) > 0, '4 总览：主按钮单独一行在上，「上一步 / 只对账」在最下面');
+  ok(kids[0] === $('impGo') && $('impGo').classList.contains('ui-full') && inBar('impPrev') && !inBar('impRecon') && $('impReconCard') && $('impReconCard').contains($('impRecon')) && kids.indexOf($('impPrev')) > 0, '4 总览：主按钮单独一行在上，「上一步」在最下面；2a 起「只对账」在总览内容里');
   ok($('impBack').textContent === '‹ 取消', '4 确认页顶上还是「‹ 取消」');
   if (!$('impRecon').disabled) {
     $('impRecon').click();
@@ -61,7 +61,7 @@ const r = (id, d, h, money) => ({ id, time: `2026-10-${String(d).padStart(2, '0'
   // 结果页
   A.clickGo(t.w);
   await t.until(() => $('impResult'), 30000);
-  ok(inBar('impBackToLedger') && inBar('impUndoThis') && $('impResult').contains($('impResPending')), '7 结果页：「撤销这次导入」「回到账本」在底部操作栏，「还有 N 笔待处理」是按钮');
+  ok(inBar('impBackToLedger') && $('impResUndo').contains($('impUndoThis')) && $('impResult').contains($('impResPending')), '7 结果页：「回到账本」在底部操作栏，「撤销这次导入」在第一行（2a），「还有 N 笔待处理」是按钮');
   // 待处理页
   $('impResPending').click();
   await t.until(() => $('impPendHead'));

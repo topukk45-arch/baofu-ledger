@@ -48,7 +48,7 @@ const MANY = () => [
     const S = t.S(), steps = S.view.steps;
     ok(steps[0] === 'check' && steps[steps.length - 1] === 'overview' && S.view.step === 'check', '1 第 1 步是「核对」，最后一步是「总览」，一打开停在第 1 步：' + steps.join(' → '));
     const order = ['check', 'match', 'refund', 'cat', 'amount', 'overview'];
-    ok(steps.every((k, i) => i === 0 || order.indexOf(k) > order.indexOf(steps[i - 1])) && steps.includes('match') && steps.includes('refund') && steps.includes('cat') && steps.includes('amount'), '1 要你定的几步按顺序：和手记对不上的 → 退款和转账 → 分类 → 金额要你看一眼');
+    ok(steps.every((k, i) => i === 0 || order.indexOf(k) > order.indexOf(steps[i - 1])) && steps.includes('match') && steps.includes('refund') && steps.includes('cat') && !steps.includes('amount') && S.plan.sections.bigAsks.some(x => S.plan.rows.find(d => d.key === x.key).cp === '某虚构家电店'), '1 要你定的几步按顺序：和手记对不上的 → 退款和转账 → 分类（2a 起金额提醒不单独占一步：那笔大额在核对页问）');
     ok(raw('impStepTitle').textContent === `第 1 步 / 共 ${steps.length} 步 · 核对` && raw('impSteps').querySelectorAll('.imp-steps-bar i').length === steps.length, '1 顶上写「第 1 步 / 共 N 步 · 核对」，进度条按实际步数');
     ok(raw('impCancel') && raw('impNext') && !raw('impPrev') && !raw('impGo'), '1 第 1 步底部「取消 / 下一步」，没有导入按钮');
     // 1021-T6：「这次大概 … 新建约」改成一条能加起来的等式（不写「约」），等号两边相等
@@ -57,7 +57,7 @@ const MANY = () => [
     ok(/笔数和账单统计一致/.test(raw('impBody').textContent) && em && !/约/.test(eq) && nums.reduce((a, b) => a + b, 0) === +em[1], '1 第 1 步：笔数核对、等式加起来等于文件笔数：' + eq);
     raw('impNext').click();
     ok(t.S().view.step === steps[1] && raw('impPrev') && raw('impNext') && raw('impStepTitle').textContent.startsWith('第 2 步'), '1 下一步：到第 2 步，底部「上一步 / 下一步」');
-    ok(/还剩 \d+ 件没定/.test(raw('impIntro').textContent) && raw('impBody').querySelectorAll('.imp-mark').length > 0, '1 每步顶上一句话写有几件、还剩几件，每件标「待选 / 已选」');
+    ok(/看了 \d+ 件 \/ 共 \d+ 件，不看的按默认/.test(raw('impIntro').textContent) && raw('impBody').querySelectorAll('.imp-mark').length > 0, '1 每步顶上一句话写有几件、还剩几件，每件标「待选 / 已选」');
     raw('impPrev').click();
     ok(t.S().view.step === 'check', '1 上一步：回第 1 步');
     while (t.S().view.step !== 'overview') raw('impNext').click();
@@ -86,20 +86,20 @@ const MANY = () => [
     ok(/已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row[data-cp="某虚构平台甲"] .imp-mark').textContent) && /购物/.test(t.d.querySelector('#impCpGroups .imp-cp-row[data-cp="某虚构平台甲"]').textContent), '2 那一行标「已选」，写着「购物」');
     raw('impPrev').click(); raw('impPrev').click(); raw('impNext').click(); raw('impNext').click();
     ok(t.S().view.step === 'cat' && t.S().edits.cpCats['某虚构平台甲'] === '购物' && /已选/.test(t.d.querySelector('#impCpGroups .imp-cp-row[data-cp="某虚构平台甲"] .imp-mark').textContent), '2 回前一步再回来：改动和「已选」都还在');
-    // 重算后少了一步：把那笔大额勾掉（不导入），「金额要你看一眼」就没事了
-    const big = t.S().plan.rows.find(d => d.cp === '某虚构家电店');
+    // 重算后少了一步：把转账往来那两笔勾掉（不导入），「退款和转账」就没事了（2a 起金额提醒不占一步，改用这一步）
+    const trs = t.S().plan.rows.filter(d => d.cp === '*小玲');
     const n0 = t.S().view.steps.length;
-    t.S().edits.rows[big.key] = { exclude: true }; t.w.JiwenImportUI._replan();
-    ok(t.S().view.steps.length === n0 - 1 && !t.S().view.steps.includes('amount') && t.S().view.step === 'cat', '2 重算后少了一步：进度条跟着变，人留在原来那一步');
-    ok(raw('impStepNotice') && /少了一步：「金额要你看一眼」/.test(raw('impStepNotice').textContent), '2 提示一句「少了一步」');
-    delete t.S().edits.rows[big.key]; t.w.JiwenImportUI._replan();
-    ok(t.S().view.steps.includes('amount') && /多了一步：「金额要你看一眼」/.test(raw('impStepNotice').textContent) && t.S().view.step === 'cat', '2 改回去：多了一步，提示一句，人还在原地');
+    trs.forEach(d => { t.S().edits.rows[d.key] = { exclude: true }; }); t.w.JiwenImportUI._replan();
+    ok(t.S().view.steps.length === n0 - 1 && !t.S().view.steps.includes('refund') && t.S().view.step === 'cat', '2 重算后少了一步：进度条跟着变，人留在原来那一步');
+    ok(raw('impStepNotice') && /少了一步：「退款和转账」/.test(raw('impStepNotice').textContent), '2 提示一句「少了一步」');
+    trs.forEach(d => { delete t.S().edits.rows[d.key]; }); t.w.JiwenImportUI._replan();
+    ok(t.S().view.steps.includes('refund') && /多了一步：「退款和转账」/.test(raw('impStepNotice').textContent) && t.S().view.step === 'cat', '2 改回去：多了一步，提示一句，人还在原地');
     // 当前这一步的事没了：先留着，离开以后才不出现
-    t.w.JiwenImportUI._goStep('amount');
-    t.S().edits.rows[big.key] = { exclude: true }; t.w.JiwenImportUI._replan();
-    ok(t.S().view.step === 'amount' && t.S().view.steps.includes('amount') && /这一步没有要定的了/.test(raw('impIntro').textContent), '2 当前这一步没事了：不把人弹走，写「这一步没有要定的了」');
+    t.w.JiwenImportUI._goStep('refund');
+    trs.forEach(d => { t.S().edits.rows[d.key] = { exclude: true }; }); t.w.JiwenImportUI._replan();
+    ok(t.S().view.step === 'refund' && t.S().view.steps.includes('refund') && /这一步没有要定的了/.test(raw('impIntro').textContent), '2 当前这一步没事了：不把人弹走，写「这一步没有要定的了」');
     raw('impNext').click();
-    ok(t.S().view.step === 'overview' && !t.S().view.steps.includes('amount'), '2 离开以后这一步就不出现了');
+    ok(t.S().view.step === 'cat' && !t.S().view.steps.includes('refund'), '2 离开以后这一步就不出现了');
     ok(!t.errs.length, '2 无报错 ' + t.errs.join('|'));
   }
 
@@ -152,7 +152,7 @@ const MANY = () => [
     const rs = t.S().result, kids = [...raw('impBar').children];
     ok(raw('impResult').querySelector('.imp-res-ok') && /已写进账本/.test(raw('impResult').textContent) && raw('impResTiles') && raw('impResTiles').textContent.includes('新建' + rs.r.added + ' 条'), '4 成功页：大对勾、已写进账本、四格（新建 ' + rs.r.added + ' 条）');
     ok(/文件里共 \d+ 笔，都对上了/.test(raw('impResult').textContent) && raw('impResPending') && /还有 \d+ 笔待处理/.test(raw('impResPending').textContent), '4 成功页：写明都对上了，还有待处理单独一块');
-    ok(kids[0] === raw('impBackToLedger') && kids[1] === raw('impUndoThis') && raw('impUndoThis').className.includes('danger'), '4 成功页底部：「回到账本」在上，「撤销这次导入」在最下面（提醒色）');
+    ok(kids[0] === raw('impBackToLedger') && raw('impResult').firstElementChild === raw('impResUndo') && raw('impResUndo').contains(raw('impUndoThis')) && raw('impUndoThis').className.includes('warn'), '4 成功页：底部「回到账本」；2a 起「撤销这次导入」是页面第一行（提醒色）');
     // 结果页退出不问
     await t.back();
     ok(raw('impPage').style.display === 'none' && !sheetOpen(t), '4 结果页按返回：直接关，不问');

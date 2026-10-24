@@ -8,10 +8,10 @@
         //   已经有金额再打开：接着输（照微信转账），不整个替换——替换容易一碰就把原来的数清掉。
         //   设置里「用系统键盘输入金额」打开就照旧用系统输入法。
         const KP_INT_MAX=8;
-        const KP_FIELDS={ billMoney:'确定', editMoney:'确定', tplEditMoney:'确定', searchMin:'确定', searchMax:'确定', refundMoney:'确定', dmCount:'确定' };   // 1020-I：退款金额（部分退款时才弹，全额时 data-kp-lock）
+        const KP_FIELDS={ billMoney:'确定', editMoney:'确定', tplEditMoney:'确定', searchMin:'确定', searchMax:'确定', refundMoney:'确定' };   // 1020-I：退款金额（部分退款时才弹，全额时 data-kp-lock）
         // 1020-J：整数模式（个数用；同一个键盘，小数点那一格空着不能点）：最多 len 位、开头不能是 0；关键盘（确定 / 点外面 / 往下拉 / 返回键）时小于 lo 的按 lo、大于 hi 的按 hi。
         //   以后再加数字框都接这个键盘：金额用小数模式（KP_FIELDS），个数用整数模式（再在 KP_INT 里登记）。
-        const KP_INT={ dmCount:{ len:2, lo:3, hi:99 } };
+        const KP_INT={};      // 导入简化 2a：日子管理的条数（dmCount）去掉了，现在没有整数框；以后加的用 kpRegister(id, { int }) 登记
         const kpIntOf=el=>el && KP_INT[el.id];
         let kpTarget=null, kpOnOk=null, kpHost=null;
         function kpOn(){ try{ return localStorage.getItem('app_sys_money_kb')!=='1'; }catch(_){ return true; } }
@@ -266,13 +266,20 @@
         };
         if(window.PointerEvent) document.addEventListener('pointerdown', kpOutside, true);
         else document.addEventListener('touchstart', kpOutside, { capture:true, passive:true });
-        Object.keys(KP_FIELDS).forEach(id=>{
+        function kpBind(id){
             const el=$(id); if(!el) return;
             const go=e=>{ if(!kpOn() || el.dataset.kpLock==='1') return; if(e && e.type==='focus') el.blur(); kpOpen(el); };
             el.addEventListener('click', go);
             el.addEventListener('focus', go);
-        });
+        }
+        Object.keys(KP_FIELDS).forEach(kpBind);
         kpApply();
+        // 导入简化 2a：以后新加的数字框在这里登记（页面上已经有这个元素时）：o = { ok: 大按钮的字, int: { len, lo, hi }（个数用整数模式，不给就是金额） }
+        function kpRegister(id, o){
+            o=o||{}; if(!$(id) || KP_FIELDS[id]) return false;
+            KP_FIELDS[id]=o.ok || '确定'; if(o.int) KP_INT[id]=o.int;
+            kpBind(id); kpFieldSet($(id), kpOn()); return true;
+        }
         (function(){
             const seg=$('sysMoneyKbSeg'); if(!seg) return;
             function paint(){ const sys=!kpOn(); seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', (b.dataset.v==='on')===sys)); }
@@ -282,5 +289,5 @@
             }));
             paint();
         })();
-        window.JiwenKeypad = { kpClose, kpOn, kpOpen, kpFit, get kpTarget(){ return kpTarget; }, get kpFitInfo(){ return kpFitInfo; } };   // keypad 模块对外只有这一个入口（get 的是会变的，读的时候才取）
+        window.JiwenKeypad = { kpClose, kpOn, kpOpen, kpFit, kpRegister, get kpTarget(){ return kpTarget; }, get kpFitInfo(){ return kpFitInfo; } };   // keypad 模块对外只有这一个入口（get 的是会变的，读的时候才取）
 })();

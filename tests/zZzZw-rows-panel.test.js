@@ -31,7 +31,7 @@ const ali = o => B.txn(Object.assign({ kind: '', cp: '某虚构科技有限公�
   const bad = ['内置：滴滴 → 交通出行', '内置（平台「美团」，卖什么的都有）→ 餐饮美食', '支付宝分类：餐饮美食', '「品：果切」几笔的商品说明各指向不同分类，不推荐', '内置（「品：果切」其他几笔的商品说明）→ 餐饮美食'].map(pr);
   ok(bad.every(x => !/内置|落到你的|品：|（.*（/.test(x)), '1 理由里没有内部词、不嵌套括号：' + bad.join(' | '));
 
-  UI()._goStep('refund');
+  UI()._goStep('overview');      // 导入简化 2a：零碎扣款收进总览的「提醒」
   const pl = t.d.querySelector('.imp-petty-rows');
   ok(pl && /看这 10 笔/.test(pl.textContent), '2 零碎扣款能点开「看这 10 笔」');
   pl.click();

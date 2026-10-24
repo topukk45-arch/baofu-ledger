@@ -817,7 +817,7 @@ async function run(cfg, port, browser) {
       ['退款金额', 'refundMoney', async p => { await p.evaluate(() => window.JiwenDetail.openDetail(window.JiwenStore.getUserData().find(r => r.type === 'expense' && !r.refundOf).id)); await p.waitForTimeout(600); await p.click('#detailRefund'); await p.waitForTimeout(500);   // 1023-D 起退款从单笔详情进
         await p.click('#refundKind .cc[data-v="part"]'); }],
       ['设预算', 'askInput', async p => { await p.evaluate(() => window.customPrompt('给「吃饭」设每月预算（虚构）', '', () => {}, '设预算', null, { inputmode: 'decimal', kpOk: '保存' })); }],
-      ['日子管理条数', 'dmCount', async p => { await tab(p, 'ledger'); await p.evaluate(() => document.getElementById('daysManageBtn').click()); await p.waitForTimeout(500); await click(p, '#daysManage'); await p.waitForTimeout(500); await p.click('#dmCount'); }],
+      // 导入简化 2a：日子管理的条数（dmCount）去掉了
     ];
     for (const [w, h] of SIZES) {
       const size = w + 'x' + h;

@@ -81,7 +81,7 @@ const file = B.bill('alipay', tx, { range: RANGE }).bytes;
   const t2 = await A.boot({ html, www: WWW, seed: A.seedOf([{ id: 1, time: '2026-05-03T09:00', money: 99, type: 'expense', cat: '餐饮', remark: '虚构手记' }], CATS), now: '2026-10-21T10:00:00' });
   await t2.importFiles([['a.csv', file]], () => {}, { noGo: true, stay: true });
   t2.w.JiwenImportUI._goStep('overview');
-  ok(t2.$('impBar').contains(t2.$('impRecon')) && t2.$('impMissed'), '7 有手记：有「只对账」和「漏记了 N 笔」');
+  ok(t2.$('impReconCard') && t2.$('impReconCard').contains(t2.$('impRecon')) && t2.$('impMissed'), '7 有手记：有「只对账」和「漏记了 N 笔」');
   t2.$('impRecon').click();
   const cgs = [...t2.d.querySelectorAll('.imp-cgs[data-list="recon"] .imp-cg')];
   ok(cgs.length >= 2 && !t2.d.querySelector('.imp-recon-row'), '7 只对账超过 20 笔：一类一行、默认收起：' + cgs.map(x => x.textContent).join(' | '));
