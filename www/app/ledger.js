@@ -95,12 +95,19 @@
             let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
             const n=on ? raw.filter(r=>r.rv===1).length : 0;
             let b=$('rvChip');
-            if(!on || !n){ if(b) b.remove(); return; }
+            let o=$('optCatChip');
+            if(!on || !n){ if(b) b.remove(); if(o) o.remove(); return; }
             if(!b){
                 b=document.createElement('button'); b.type='button'; b.id='rvChip'; b.className='rv-chip';
                 const head=$('billHead'); head.parentNode.insertBefore(b, head);
             }
             b.textContent = `待确认分类 ${n} 条 ›`;
+            // 导入简化第 6 版：旁边「一键优化 ›」：按现在的规则把能推准的一次改掉（先列出来确认，能撤销）
+            if(!o){
+                o=document.createElement('button'); o.type='button'; o.id='optCatChip'; o.className='rv-chip opt-chip'; o.textContent='一键优化 ›';
+                o.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.openOptimize()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '一键优化分类')); });
+                b.parentNode.insertBefore(o, b.nextSibling);
+            }
         }
         function renderImpEmptyEntry(n){
             let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}

@@ -7,7 +7,7 @@
         // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devPerfBtn').style.display = $('devMeasureBtn').style.display = $('devSplashBtn').style.display = $('devNudgeBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()){ splashWaitPaint(); nudgePaint(); } }
+        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devOptCatBtn').style.display = $('devPerfBtn').style.display = $('devMeasureBtn').style.display = $('devSplashBtn').style.display = $('devNudgeBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()){ splashWaitPaint(); nudgePaint(); } }
         // 1019-X：开发开关里的「启动画面等首屏」（默认开）：真正的开关存在原生层（SharedPreferences，打开 App 时原生那边一开始就要知道），
         //   这里只是读 / 写它；关掉 = 回到 1019-U 之前「系统画出第一帧就收启动画面」，下次打开 App 生效。不在手机上时记在 localStorage 里只为显示
         function splashPlugin(){ const c=window.Capacitor; return c && c.Plugins && c.Plugins.Launch && typeof c.Plugins.Launch.setWait==='function' ? c.Plugins.Launch : null; }
@@ -215,6 +215,11 @@
         $('devRulesBtn').addEventListener('click', () => {
             if(!devImportOn()) return;
             loadImportUI().then(ui=>ui.openRules()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '管理导入规则'));
+        });
+        // 导入简化第 6 版：「设置 → 一键优化分类」（备用入口；主入口在账单页「待确认分类」胶囊旁）
+        $('devOptCatBtn').addEventListener('click', () => {
+            if(!devImportOn()) return;
+            loadImportUI().then(ui=>ui.openOptimize()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '一键优化分类'));
         });
         // 1016-L：「设置 → 导入记录」最近 10 次，每次右侧「撤销」（导入页那一层里打开，返回键照样一层层关）
         $('devLogsBtn').addEventListener('click', () => {

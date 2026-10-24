@@ -49,7 +49,7 @@ async function check(t, arch, tag, strict, capped) {
   });
   const bs = new Set(logs.map(l => l.b));
   logs.forEach(l => {
-    if (l.kind === 'ai') { if (!capped && !logs.some(x => x.kind !== 'ai' && x.b === l.of)) bad.push('AI 修改指向不在的导入 ' + l.of); if (strict) (l.chg || []).forEach(c => { if (!ids.has(c.id)) bad.push('AI 修改的记录不在'); }); return; }
+    if (l.kind === 'ai') { if (!capped && l.of !== '*' && !logs.some(x => x.kind !== 'ai' && x.b === l.of)) bad.push('AI 修改指向不在的导入 ' + l.of); if (strict) (l.chg || []).forEach(c => { if (!ids.has(c.id)) bad.push('AI 修改的记录不在'); }); return; }
     if (strict) (l.add || []).forEach(id => { if (!ids.has(id)) bad.push('导入记录里新建的记录不在 ' + id); });
     if (strict) (l.chg || []).forEach(c => { if (!ids.has(c.id)) bad.push('导入记录里改过的记录不在 ' + c.id); });
     if (Array.isArray(l.h) && l.h.length !== (l.add || []).length) bad.push('指纹和新建条数对不上');
@@ -118,6 +118,12 @@ async function round(seed, mode) {
       trace.push('AI修改');
       try { await t.st().aiApply({ of: lg.b, changes: [{ id, set }] }, {}); } catch (e) { if (e.code !== 'nothing') throw e; }
     },
+    // 第 6 版：一键优化分类（of '*'）：改一条待确认分类的记录
+    async opt() {
+      const rs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].records.filter(x => x.rv === 1 && !x.refundOf); if (!rs.length) return;
+      const r = pick(rs), to = pick(CATS.filter(c => c !== '未分类' && c !== r.cat)); trace.push('一键优化');
+      try { await t.st().aiApply({ of: '*', by: 'opt', changes: [{ id: r.id, set: { cat: to } }] }, {}); } catch (e) { if (e.code !== 'nothing') throw e; }
+    },
     async undoLast() { const logs = await t.st().importsRead(); if (!logs.length) return; trace.push('撤最后'); const p = await t.st().undoPlan(logs[logs.length - 1].b); if (p.ok) await t.st().undo(p); },
     async undoMid() { const logs = await t.st().importsRead(); if (!logs.length) return; const lg = pick(logs); trace.push('撤某次(连着)'); const p = await t.st().undoPlan(lg.b); if (p.ok) await t.st().undo(p); },
     async restore() {
@@ -154,7 +160,7 @@ async function round(seed, mode) {
     async delCat() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); if (cs.length < 2) return; const c = pick(cs); trace.push('删分类'); manual = true; t.w.JiwenCats.deleteCat(c); if (t.ask()) t.$('askOk').click(); await t.idle(); },
     async rules() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); trace.push('改规则'); manual = true; await t.st().rulesSave({ cat: [{ kw: '某虚构超市', cat: pick(cs) }], type: [] }); },
   };
-  const W = mode === 1 ? { imp: 5, ai: 3, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1 };
+  const W = mode === 1 ? { imp: 5, ai: 3, opt: 1, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, opt: 1, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1 };
   const bag = []; Object.keys(W).forEach(k => { for (let i = 0; i < W[k]; i++) bag.push(k); });
   let good = true;
   for (let s = 0; s < STEPS && good; s++) {

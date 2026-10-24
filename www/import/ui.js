@@ -3079,7 +3079,10 @@
       var ofL = l.kind === 'ai' ? logs.filter(function (x) { return x.b === l.of && x.kind !== 'ai'; })[0] : null;
       var aiWhat = function () { var f = { cat: 0, remark: 0, mode: 0, aiFlag: 0 }; (l.chg || []).forEach(function (c) { var w = c.was || {}; if ('cat' in w) f.cat++; if ('remark' in w) f.remark++; if ('skip' in w || 'flow' in w) f.mode++; if ('aiFlag' in w) f.aiFlag++; });
         return [['cat', '分类'], ['remark', '备注'], ['mode', '统计'], ['aiFlag', '标记']].filter(function (x) { return f[x[0]]; }).map(function (x) { return x[1] + ' ' + f[x[0]] + ' 条'; }).join('、'); };
-      if (l.kind === 'ai' && l.by === 'rec') {
+      if (l.kind === 'ai' && l.by === 'opt') {
+        g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · 一键优化分类'));
+        g.appendChild(el('div', 'imp-soft', '按现在的规则改了 ' + nChg + ' 条待确认分类的记录'));
+      } else if (l.kind === 'ai' && l.by === 'rec') {
         g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · 重新分类'));
         g.appendChild(el('div', 'imp-soft', '按新规则重新分类了 ' + nChg + ' 条记录' + (ofL ? ' · 是 ' + String(ofL.at || '').replace('T', ' ').slice(5) + ' 那次导入的' : '')));
       } else if (l.kind === 'ai') {
@@ -3734,7 +3737,86 @@
       return rec.reason ? plainReason(rec) + (w ? '（' + w + '）' : '') : '推不出分类，按导入时的默认放的';
     });
   }
-  var UI = { reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  // ---------- 导入简化第 6 版：一键优化分类（原方案三-1）----------
+  //   带「待确认分类」的记录（不含退款、有退款挂着的、不计的），按现在的规则（你的规则、账本历史、分类对照、内置词表、支付宝分类）再推一遍：
+  //   推得出已有分类、有把握（中 / 高）、和现在不一样的列出来，按改成的分类分组（每组能勾掉、点开看每一笔、勾掉个别的），点「改这 N 条」照 AI 修改那套写
+  //   （of '*'、by 'opt'，自动备份，导入记录里一行「一键优化分类」能撤销，撤销时待确认放回）
+  var OPT = null;
+  function optPlan(rows, info) {
+    var C = window.JiwenImportClassify, cats = info.cats || [];
+    var xs = rows.filter(function (r) { return !r.skip; });
+    if (!xs.length) return [];
+    var recs = C.classify(xs.map(function (r) { return { app: r.app || 'wechat', cp: r.cp, desc: r.remark, kind: r.oc, io: r.type }; }),
+      { cats: cats, rules: info.catRules, maps: info.catMaps, merchants: window.JiwenImportMerchants, isNewUser: false, history: info.cpHist || null }).recs;
+    var out = [];
+    xs.forEach(function (r, i) {
+      var x = recs[i]; if (!x || x.newCat || !x.cat || x.cat === '未分类' || cats.indexOf(x.cat) < 0 || x.cat === r.cat) return;
+      if (x.conf !== 'high' && x.conf !== 'mid') return;
+      out.push({ r: r, to: x.cat, reason: plainReason(x) });
+    });
+    return out;
+  }
+  function openOptimize() {
+    var J = window.JiwenSheet; if (!J) return Promise.resolve();
+    return ensureClassify().then(function (okk) {
+      if (!okk) { alertMsg('分类推荐没载入上，稍后再试一次。', '一键优化分类'); return; }
+      var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e), '一键优化分类'); return; }
+      if (!rows.length) { alertMsg('没有待确认分类的记录。', '一键优化分类'); return; }
+      var ch = optPlan(rows, info);
+      if (!ch.length) { alertMsg('按现在的规则看了一遍 ' + rows.length + ' 条待确认分类的，没有能改得更准的。\n\n可以在账单页「待确认分类」里逐条确认。', '一键优化分类'); return; }
+      OPT = { ch: ch, off: {}, open: null, n: rows.length };
+      paintOptimize();
+    });
+  }
+  function paintOptimize() {
+    var J = window.JiwenSheet, O = OPT; if (!J || !O) return;
+    var by = {}; O.ch.forEach(function (c) { (by[c.to] = by[c.to] || []).push(c); });
+    var groups = Object.keys(by).sort(function (a, b) { return by[b].length - by[a].length; });
+    var picked = O.ch.filter(function (c) { return !O.off[c.r.id]; });
+    J.open({ title: '一键优化分类', tall: true, sub: '待确认的 ' + O.n + ' 条里，有 ' + O.ch.length + ' 条按现在的规则能推得更准',
+      onDismiss: function () { OPT = null; },
+      body: function (box) {
+        groups.forEach(function (to) {
+          var list = by[to], on = list.filter(function (c) { return !O.off[c.r.id]; });
+          var cps = {}; list.forEach(function (c) { var n = cpShow(c.r.cp) || '—'; cps[n] = (cps[n] || 0) + 1; });
+          var top = Object.keys(cps).sort(function (a, b) { return cps[b] - cps[a]; }).slice(0, 3).map(function (n) { return n + ' ' + cps[n]; }).join('、') + (Object.keys(cps).length > 3 ? '…' : '');
+          var g = el('div', 'rvg imp-opt-g'); g.dataset.cat = to;
+          var hd = btn('', 'rvg-head', function () { O.open = O.open === to ? null : to; paintOptimize(); });
+          hd.appendChild(el('span', 'rvg-t', '改成「' + to + '」 · ' + list.length + ' 笔')); hd.appendChild(el('span', 'rvg-s', '（' + top + '）')); hd.appendChild(el('span', 'rvg-go', O.open === to ? '收起 ▴' : '看每一笔 ▸'));
+          g.appendChild(hd);
+          var all = btn(on.length === list.length ? '✓ 这组改' : on.length ? '这组改 ' + on.length + ' / ' + list.length + ' 笔' : '这组不改', 'imp-btn imp-opt-gall' + (on.length ? ' gold' : ''), function () {
+            var allOn = on.length === list.length; list.forEach(function (c) { if (allOn) O.off[c.r.id] = 1; else delete O.off[c.r.id]; }); paintOptimize();
+          });
+          g.appendChild(all);
+          if (O.open === to) {
+            var ul = el('div', 'rvg-list');
+            list.forEach(function (c) {
+              var row = el('label', 'rvg-row'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !O.off[c.r.id];
+              cb.addEventListener('change', function () { if (cb.checked) delete O.off[c.r.id]; else O.off[c.r.id] = 1; paintOptimize(); });
+              row.appendChild(cb);
+              var tx = el('span', 'rvg-r'); tx.appendChild(document.createTextNode(fmtTime(c.r.time) + ' ' + (cpShow(c.r.cp) || c.r.remark || '—') + '：' + c.r.cat + ' → ' + c.to)); tx.appendChild(el('div', 'imp-soft', c.reason));
+              row.appendChild(tx); row.appendChild(el('span', 'rvg-a', yuan(c.r.fen)));
+              ul.appendChild(row);
+            });
+            g.appendChild(ul);
+          }
+          box.appendChild(g);
+        });
+      },
+      foot: function (box, done) {
+        var col = el('div', 'ui-stack');
+        var go = btn(picked.length ? '改这 ' + picked.length + ' 条的分类' : '还没勾', 'ui-btn primary block', function () {
+          if (!picked.length) return;
+          done(); OPT = null;
+          store().aiApply({ of: '*', by: 'opt', changes: picked.map(function (c) { return { id: c.r.id, set: { cat: c.to } }; }) }).then(function (w) {
+            alertMsg('已改了 ' + w.changed + ' 条的分类，这几条不再算待确认。\n\n改之前自动备份了；改错了可以在「导入记录」里「一键优化分类」那一行点「撤销」（你后来又改过的不会动）。', '一键优化分类');
+          }, function (e) { alertMsg('没改成：' + (e && (e.code || e.message) || e) + '。账本没有动。', '一键优化分类'); });
+        }); go.id = 'impOptGo'; go.disabled = !picked.length;
+        var cl = btn('关闭', 'ui-btn block', function () { done(); OPT = null; }); cl.id = 'impOptClose';
+        col.appendChild(go); col.appendChild(cl); box.appendChild(col);
+      } });
+  }
+  var UI = { openOptimize: openOptimize, reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _plainReason: function (r) { return plainReason(r); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

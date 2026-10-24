@@ -1067,7 +1067,7 @@
                 o.rulesAdded=ra;
                 if(x.only===true) o.only=true;      // 1016-Q：只对账（只补了勾选的几笔）
                 // 1017-G：AI 修改（不是导入）：改的是哪一次导入的记录
-                if(x.kind==='ai'){ o.kind='ai'; if(typeof x.of==='string' && IMP_BATCH_RE.test(x.of)) o.of=x.of; if(x.by==='rec') o.by='rec'; }   // 1021-T4：by rec = 按新规则重新分类（照 AI 修改那套记、那套撤）
+                if(x.kind==='ai'){ o.kind='ai'; if(typeof x.of==='string' && IMP_BATCH_RE.test(x.of)) o.of=x.of; if(x.by==='rec') o.by='rec'; if(x.by==='opt' && x.of==='*'){ o.of='*'; o.by='opt'; } }   // 第 6 版：一键优化分类 of '*'   // 1021-T4：by rec = 按新规则重新分类（照 AI 修改那套记、那套撤）
                 // 1017-H：这次导入交给 AI 检查时的导出时间（最近 5 次），AI 回复里的导出时间要是其中之一才认
                 if(Array.isArray(x.aiAt)){ const aa=x.aiAt.filter(v=>typeof v==='string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v)).slice(-5); if(aa.length) o.aiAt=aa; }
                 // 1016-Y：这次改了你已有的哪几条规则（关键词、原来的分类、改成的分类），撤销时改回去
@@ -1772,7 +1772,9 @@
                 const changes=(o && Array.isArray(o.changes) ? o.changes : []).filter(c=>c && typeof c.id==='string' && c.set && typeof c.set==='object');
                 if(!changes.length) throw impErr('nothing');
                 const log0=await impGetJson(t.e, impLogKey(t.e.id, t.aid)), logs=((log0 && log0.list) || []).slice();
-                if(!logs.some(l=>l.kind!=='ai' && l.b===o.of)) throw impErr('nolog');
+                // 导入简化第 6 版：一键优化分类（by 'opt'）不是对着某一次导入做的，of 写 '*'（撤销靠「改过这批碰过的记录」的依赖链）
+                const byOpt=o.by==='opt' && o.of==='*';
+                if(!byOpt && !logs.some(l=>l.kind!=='ai' && l.b===o.of)) throw impErr('nolog');
                 const store=loadStore(t.e.id), a=store.archives[t.name], recs=a.records, at=new Map(recs.map((r, i)=>[r.id, i]));
                 const FIELDS=['cat','remark','skip','flow','aiFlag'];
                 // 1021-T15：AI 选了这一批推荐新建、还没建的分类：先建好（8 个字以内），导入记录记进 catsAdded，撤销这次 AI 修改时没人用的一起删
@@ -1791,7 +1793,7 @@
                     Object.keys(c.set).forEach(k=>{
                         if(!FIELDS.includes(k)) return;
                         let v=c.set[k];
-                        if(k==='cat'){ if(typeof v!=='string' || !a.cats.includes(v)) return; delete n.rv; }   // 1021-T13：改了分类就不用再确认
+                        if(k==='cat'){ if(typeof v!=='string' || !a.cats.includes(v)) return; if(byOpt && old.rv===1){ was.rv=1; now.rv=null; } delete n.rv; }   // 1021-T13：改了分类就不用再确认；第 6 版：一键优化撤销时把待确认放回
                         if(k==='remark'){ if(typeof v!=='string') return; v=v.slice(0, 5000); }
                         if(k==='skip' || k==='flow'){ v=v===true ? true : null; }
                         if(k==='aiFlag' && v!==null){ const f=impCleanAiFlag(v, id=>at.has(id) ? id : null); if(!f) return; v=f; }
@@ -1808,11 +1810,12 @@
                 const b='a'+Date.now().toString(36);
                 const ofLog=logs.filter(l=>l.kind!=='ai' && l.b===o.of)[0];
                 const byRec=o.by==='rec';   // 1021-T4：按新规则重新推荐分类，写法、备份、撤销都和 AI 修改一样，只是说法不同
-                const saved=await impBkSave(t, 'ai', b, { b, what:(byRec ? '按新规则重新分类 ' : '按 AI 的建议改 ') + chg.length + ' 条记录' + (ofLog ? '（' + String(ofLog.at||'').replace('T', ' ') + ' 那次导入的）' : '') });
+                const saved=await impBkSave(t, 'ai', b, { b, what:(byOpt ? '一键优化分类 ' : byRec ? '按新规则重新分类 ' : '按 AI 的建议改 ') + chg.length + ' 条记录' + (ofLog ? '（' + String(ofLog.at||'').replace('T', ' ') + ' 那次导入的）' : '') });
                 const d=new Date(), cl=(a.cps||[]).length, pl=(a.pms||[]).length;
                 logs.push({ kind:'ai', of:o.of, b, at:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`, apps:[], from:'', to:'',
                             add:[], h:[], chg, cpLen:cl, pmLen:pl, cpEnd:cl, pmEnd:pl, catsAdded, rulesAdded:{ cat:[], type:[] } });
                 if(byRec) logs[logs.length-1].by='rec';
+                if(byOpt) logs[logs.length-1].by='opt';
                 const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, cl, pl);
                 try{
                     if(window.__impFailAt==='aiSave') throw impErr('test');
@@ -1825,6 +1828,14 @@
                 }
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return { b, changed:chg.length };
+            },
+            // ---- 导入简化第 6 版：一键优化分类要的（只读）：带「待确认分类」的记录，不含退款、有退款挂着的 ----
+            rvRows(archive){
+                const t=impTarget(archive);
+                const recs=(t.e.archs.get(t.aid)||{ recs:[] }).recs, cps=(ledgerAssembleArchive(t.e, t.aid).cps)||[];
+                const hasRf=new Set(recs.filter(r=>r.refundOf).map(r=>r.refundOf));
+                return recs.filter(r=>r.rv===1 && !r.refundOf && !hasRf.has(r.id))
+                    .map(r=>({ id:r.id, time:r.time, fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', app:(r.src && r.src.app) || '', oc:r.oc||'', remark:(r.remark||'').split('\n')[0].slice(0, 60), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', skip:!!r.skip }));
             },
             // ---- 1016-Z2：「当作退款，挂到某一笔」的候选（只读）：账本里的支出，时间不晚于这笔、180 天以内、还没退完的够挂；新的在前，最多 50 条
             refundTargets(q, archive){
