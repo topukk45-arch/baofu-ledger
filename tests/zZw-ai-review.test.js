@@ -47,6 +47,7 @@ const F = [['微信.csv', B.bill('wechat', TX, { range: RANGE }).bytes]];
   $('impAiPaste').value = REPLY.replace('批次 ' + lg.b, '批次 bzzz');
   $('impAiPasteGo').click(); await t.until(() => $('impAiPasteMsg').textContent);
   ok(/另一次导入的/.test($('impAiPasteMsg').textContent) && q('#uiSheetMask.open'), '1 批次号对不上：写原因、整份不认、面板还开着');
+  ok($('impAiPaste').classList.contains('imp-paste-ta') && /重新复制给 AI/.test($('impAiPasteAct').textContent) && !$('impAiPasteAct').hidden && /^已粘贴 \d+ 行，识别到 \d+ 条建议$/.test($('impAiPasteInfo').textContent), '1 粘贴框共用样式；报错下面「重新复制给 AI ›」；框下面数行数（1024-Y）' + $('impAiPasteInfo').textContent);
   $('impAiPaste').value = '我觉得都挺好。'; $('impAiPasteGo').click(); await t.until(() => /没找到/.test($('impAiPasteMsg').textContent));
   ok(/没找到记问的修改建议，请把 AI 的整段回复复制过来/.test($('impAiPasteMsg').textContent), '1 没有代码块也没有开头那一行：写原因');
   $('impAiPaste').value = REPLY; $('impAiPasteGo').click();

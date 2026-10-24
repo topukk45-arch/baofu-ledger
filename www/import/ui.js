@@ -176,7 +176,7 @@
     '.imp-ai-why{font-size:13px;color:var(--c-text-soft);margin-top:4px;line-height:1.5;}',
     '.imp-ai-tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;margin:4px 6px 0 0;background:var(--c-bg);border:1px solid var(--st-pend);color:var(--st-pend);}',
     '.imp-ai-tag.gone{border-color:var(--st-skip);color:var(--st-skip);}',
-    '#impAiPaste{display:block;box-sizing:border-box;width:100%;min-height:200px;padding:10px;border:1px solid var(--c-border-mid);border-radius:10px;background:var(--c-bg);color:var(--c-text);font-size:14px;line-height:1.5;font-family:inherit;}',
+    // 1024-Y：粘贴框 #impAiPaste 的样式挪到 PASTE_CSS（.imp-paste-ta），和账单页「AI 按组整理」共用
     '.imp-ai-bad{font-size:13px;padding:8px 0;border-bottom:1px dashed var(--c-border);}.imp-ai-bad code{display:block;white-space:pre-wrap;word-break:break-all;color:var(--c-text-soft);}',
     // 1017-E：搜索（确认页标题栏右边的按钮、待处理页顶上、挂退款的候选列表）
     '#impPage .imp-search-btn{flex:0 0 48px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;border:0;background:transparent;color:var(--c-primary-deep);cursor:pointer;padding:0;}',
@@ -3340,27 +3340,67 @@
   // ---------- 1017-J：导回来（粘贴 AI 的回复 → 修改建议页）----------
   var AI_FIELD_NAME = { cat: '分类', remark: '备注', mode: '统计', flag: '标记' };
   var AI_FLAG_NAME = { dup: '可能重复', miss: '可能漏配' };
-  var AI_WHY = { noblock: '没找到记问的修改建议，请把 AI 的整段回复复制过来（要带上「记问修改建议 v1 批次 … 导出 …」那一行）。',
-                 nohead: '```记问 那一段的第一行不是「记问修改建议 v1 批次 … 导出 …」。请让 AI 原样抄那一行。',
-                 batch: '这份回复是另一次导入的（批次号对不上），整份不认。',
-                 time: '这份回复的导出时间对不上（可能是更早导出的、或者这一批又导出了好几次），整份不认。请重新复制全文发给 AI。' };
+  // 1024-Y：报错只写一句短话 + 下一步按钮（again：清空再贴一次；recopy：回去重新复制给 AI）；校验逻辑不动
+  var AI_WHY = { noblock: ['没找到记问的修改建议，请把 AI 的整段回复复制过来。', 'again'],
+                 nohead: ['第一行不对：要原样带上「记问修改建议 …」那一行。', 'again'],
+                 batch: ['这份回复是另一次导入的，用不了。', 'recopy'],
+                 time: ['导出时间对不上，这份回复是旧的。', 'recopy'] };
+  // 1024-Y：粘贴 AI 回复的输入框（导入页「AI 检查」、账单页「AI 按组整理」共用）：至少 7 行、随内容长高、最高约屏幕的 36%（面板可用高度的一半），
+  //   再多框里滚；第一行不被裁；框下面「已粘贴 N 行，识别到 M 条建议」（M 按「#号 | …」/「G号 | …」这种行数，只是给人看贴全了没有，不是校验）
+  var PASTE_CSS = '.imp-paste-ta{display:block;box-sizing:border-box;width:100%;min-height:171px;max-height:36vh;padding:12px;border:1px solid var(--c-border-mid);border-radius:10px;background:var(--c-bg);color:var(--c-text);font-size:14px;line-height:1.5;font-family:inherit;resize:none;overflow-y:auto;}'
+    + '.imp-paste-ta.ro{font-size:13px;}'
+    + '.imp-paste-info{margin-top:6px;font-size:13px;color:var(--c-text-soft);font-variant-numeric:tabular-nums;}'
+    + '.imp-paste-msg{margin-top:6px;font-size:14px;line-height:1.5;color:var(--c-neg);font-weight:bold;}.imp-paste-msg:empty{display:none;}'
+    + '.imp-paste-act{margin-top:8px;}.imp-paste-act[hidden]{display:none;}';
+  function pasteCss() { if (document.getElementById('impPasteStyle')) return; var st = el('style'); st.id = 'impPasteStyle'; st.textContent = PASTE_CSS; document.head.appendChild(st); }
+  function pasteFit(ta) {
+    var max = Math.max(171, Math.round((window.innerHeight || 700) * 0.36));
+    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, max) + 'px';
+  }
+  function pasteBox(box, o) {
+    pasteCss();
+    var ta = document.createElement('textarea'); ta.id = o.id; ta.className = 'imp-paste-ta'; ta.placeholder = '把 AI 的回复整段粘贴在这里'; box.appendChild(ta);
+    var info = el('div', 'imp-paste-info', '还没粘贴'); info.id = o.id + 'Info'; box.appendChild(info);
+    var msg = el('div', 'imp-paste-msg'); msg.id = o.msgId; box.appendChild(msg);
+    var act = btn('', 'ui-btn block imp-paste-act'); act.id = o.id + 'Act'; act.hidden = true; box.appendChild(act);
+    var P = {
+      ta: ta, msg: msg,
+      update: function () {
+        pasteFit(ta);
+        var lines = ta.value.replace(/\r/g, '').split('\n').filter(function (x) { return x.trim(); });
+        if (!lines.length) { info.textContent = '还没粘贴'; return; }
+        var m = lines.filter(function (x) { return o.itemRe.test(x); }).length;
+        info.textContent = '已粘贴 ' + lines.length + ' 行，识别到 ' + m + ' 条建议';
+      },
+      clear: function () { msg.textContent = ''; act.hidden = true; },
+      // why：[一句话, 'again' | 'recopy']；recopy 交给调用的地方（回到复制那一页）
+      fail: function (why, recopy) {
+        msg.textContent = why[0]; act.hidden = false; act.onclick = null;
+        if (why[1] === 'recopy') { act.textContent = '重新复制给 AI ›'; act.onclick = recopy; }
+        else { act.textContent = '清空，再贴一次'; act.onclick = function () { ta.value = ''; P.clear(); P.update(); try { ta.focus(); } catch (_) {} }; }
+      }
+    };
+    ta.addEventListener('input', function () { P.clear(); P.update(); });
+    try { if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function (x) { if (x && !ta.value) { ta.value = x; P.update(); ta.scrollTop = 0; } }, function () {}); } catch (_) {}
+    P.update();
+    return P;
+  }
   function aiPaste() {
     if (!window.JiwenSheet) { alertMsg('主程序版本太旧，先更新一下。', '粘贴 AI 的回复'); return; }
-    var a = S.ai;
+    var a = S.ai, P = null;
     window.JiwenSheet.open({ title: '粘贴 AI 的回复',
       body: function (box) {
-        var ta = document.createElement('textarea'); ta.id = 'impAiPaste'; ta.placeholder = '把 AI 的回复整段粘贴在这里'; box.appendChild(ta);
-        var msg = el('div', 'imp-soft imp-bad'); msg.id = 'impAiPasteMsg'; msg.style.marginTop = '8px'; box.appendChild(msg);
-        try { if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function (x) { if (x && !ta.value) ta.value = x; }, function () {}); } catch (_) {}
+        P = pasteBox(box, { id: 'impAiPaste', msgId: 'impAiPasteMsg', itemRe: /^\s*(?:[-*]\s+)?\**\s*[#＃]\s*\d+\s*[|｜]/ });
       },
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
         var go = btn('读这份回复', 'ui-btn primary block', function () {
           var text = document.getElementById('impAiPaste').value, msg = document.getElementById('impAiPasteMsg');
-          if (!text.trim()) { msg.textContent = '还没粘贴。'; return; }
+          P.update();
+          if (!text.trim()) { P.clear(); msg.textContent = '还没粘贴。'; return; }
           store().aiExportRows(a.batch).then(function (d) {
             var r = window.JiwenImportAI.parseReply(text, { batch: a.batch, aiAt: d.aiAt, cats: d.cats, rows: d.rows, newCats: (a.data && a.data.newCats) || [] });
-            if (!r.ok) { msg.textContent = AI_WHY[r.why] || '读不出来。'; return; }
+            if (!r.ok) { P.fail(AI_WHY[r.why] || ['读不出来。', 'again'], function () { done(); }); return; }
             var ver = null; try { ver = store().archiveInfo().ver; } catch (_) {}
             done(); openAiReview(r, d, ver);
           }, function (e) { msg.textContent = '读不出这次导入：' + (e && (e.code || e.message) || e); });
@@ -3922,7 +3962,8 @@
     J.open({ title: 'AI 按组整理', tall: true, sub: gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类', onDismiss: function () { AIG = null; },
       body: function (box) {
         box.appendChild(el('div', 'imp-soft', '把下面这段整个复制给 AI（豆包、Kimi、ChatGPT 都行），让它按组挑分类；再把它的回复整段粘贴回来。对方名、手机号已经打码，只发了每组的对方、商品说明、笔数、金额。'));
-        var ta = document.createElement('textarea'); ta.id = 'impAiGrpText'; ta.readOnly = true; ta.value = text; ta.className = 'imp-ai-text'; box.appendChild(ta);
+        pasteCss();
+        var ta = document.createElement('textarea'); ta.id = 'impAiGrpText'; ta.readOnly = true; ta.value = text; ta.className = 'imp-ai-text imp-paste-ta ro'; box.appendChild(ta);
       },
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
@@ -3932,24 +3973,27 @@
         col.appendChild(cp); col.appendChild(ps); col.appendChild(cl); box.appendChild(col);
       } });
   }
-  var AIG_WHY = { noblock: '没找到记问的分组建议，请把 AI 的整段回复复制过来（要带上「记问分组建议 v1 导出 …」那一行）。',
-                  nohead: '第一行不是「记问分组建议 v1 导出 …」。请让 AI 原样抄那一行。', time: '这份回复的导出时间对不上（可能是更早导出的），整份不认。请重新复制全文发给 AI。' };
+  // 1024-Y：同 AI_WHY，一句短话 + 下一步按钮
+  var AIG_WHY = { noblock: ['没找到记问的分组建议，请把 AI 的整段回复复制过来。', 'again'],
+                  nohead: ['第一行不对：要原样带上「记问分组建议 …」那一行。', 'again'],
+                  time: ['导出时间对不上，这份回复是旧的。', 'recopy'] };
   function aiGroupPaste() {
-    var J = window.JiwenSheet, A = AIG; if (!J || !A) return;
+    var J = window.JiwenSheet, A = AIG, P = null; if (!J || !A) return;
     J.open({ title: '粘贴 AI 的回复', onDismiss: function () { AIG = null; },
       body: function (box) {
-        var ta = document.createElement('textarea'); ta.id = 'impAiGrpReply'; ta.placeholder = '把 AI 的回复整段粘贴在这里'; box.appendChild(ta);
-        var msg = el('div', 'imp-soft imp-bad'); msg.id = 'impAiGrpMsg'; msg.style.marginTop = '8px'; box.appendChild(msg);
-        try { if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function (x) { if (x && !ta.value) ta.value = x; }, function () {}); } catch (_) {}
+        P = pasteBox(box, { id: 'impAiGrpReply', msgId: 'impAiGrpMsg', itemRe: /^\s*(?:[-*]\s+)?\**\s*[GgＧ]\s*\d+\s*[|｜]/ });
       },
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
+        // 重新复制给 AI：回到「AI 按组整理」复制那一页（重新导出一份，导出时间是新的）
+        var recopy = function () { done(); AIG = null; openAiGroups(); };
         var go = btn('读这份回复', 'ui-btn primary block', function () {
           var text = document.getElementById('impAiGrpReply').value, msg = document.getElementById('impAiGrpMsg');
-          if (!text.trim()) { msg.textContent = '还没粘贴。'; return; }
+          P.update();
+          if (!text.trim()) { P.clear(); msg.textContent = '还没粘贴。'; return; }
           var r = window.JiwenImportAI.parseGroupReply(text, { at: A.at, cats: A.cats, n: A.groups.length });
-          if (!r.ok) { msg.textContent = AIG_WHY[r.why] || '读不出来。'; return; }
-          if (!r.items.filter(function (x) { var g = A.groups[x.g - 1]; return g && g.cat !== x.cat; }).length) { msg.textContent = 'AI 没提能用的建议' + (r.bad.length ? '（' + r.bad.length + ' 行没看懂）' : '') + '。'; return; }
+          if (!r.ok) { P.fail(AIG_WHY[r.why] || ['读不出来。', 'again'], recopy); return; }
+          if (!r.items.filter(function (x) { var g = A.groups[x.g - 1]; return g && g.cat !== x.cat; }).length) { P.fail(['AI 没提能用的建议' + (r.bad.length ? '（' + r.bad.length + ' 行没看懂）' : '') + '。', 'recopy'], recopy); return; }
           A.reply = r; done(); paintAiGroups();
         }); go.id = 'impAiGrpRead';
         var no = btn('取消', 'ui-btn block', function () { done(); AIG = null; }); no.id = 'impAiGrpCancel';

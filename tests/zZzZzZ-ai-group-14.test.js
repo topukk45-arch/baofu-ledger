@@ -36,6 +36,7 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   ok($('rvAiBtn') && /交给 AI 按组整理/.test($('rvAiBtn').textContent), '2 待确认分类的结果页：「交给 AI 按组整理 ›」');
   $('rvAiBtn').click(); await t.until(() => sheetOpen(t) && $('impAiGrpText'), 5000);
   const text = $('impAiGrpText').value;
+  ok($('impAiGrpText').classList.contains('imp-paste-ta'), '2 复制框用共用样式（1024-Y：原来没样式，只有两行高）');
   ok($('uiSheetTitle').textContent === 'AI 按组整理' && /3 组 · 6 笔/.test($('uiSheetSub').textContent) && /G1 \| 某虚构甲店 \| — \| 3 笔/.test(text) && /G3 \| 某虚构丙店/.test(text), '2 按对方分了 3 组（多的在前）：' + $('uiSheetSub').textContent);
   $('impAiGrpCopy').click(); await tick();
   ok(t.w.JiwenImportUI._lastCopy === text, '2 「复制全文」');
@@ -43,6 +44,14 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   $('impAiGrpPaste').click(); await tick();
   $('impAiGrpReply').value = '记问分组建议 v1 导出 2020-01-01 00:00:00\nG1 | 吃饭 | x'; $('impAiGrpRead').click(); await tick();
   ok(/导出时间对不上/.test($('impAiGrpMsg').textContent) && sheetOpen(t), '3 导出时间对不上：面板里写原因、不关');
+  // 1024-Y：粘贴框共用样式、框下面数行数；报错一句短话 + 下一步按钮
+  ok($('impAiGrpReply').classList.contains('imp-paste-ta') && t.d.getElementById('impPasteStyle'), '3 粘贴框用共用样式（至少 7 行，账单页进来也有样式）');
+  ok($('impAiGrpMsg').textContent.length <= 20 && !$('impAiGrpReplyAct').hidden && /重新复制给 AI/.test($('impAiGrpReplyAct').textContent), '3 导出时间对不上：一句短话 + 「重新复制给 AI ›」' + $('impAiGrpMsg').textContent);
+  ok($('impAiGrpReplyInfo').textContent === '已粘贴 2 行，识别到 1 条建议', '3 框下面：已粘贴 N 行，识别到 M 条建议 ' + $('impAiGrpReplyInfo').textContent);
+  $('impAiGrpReply').value = 'abc'; $('impAiGrpRead').click(); await tick();
+  ok(/清空，再贴一次/.test($('impAiGrpReplyAct').textContent), '3 没找到分组建议：按钮「清空，再贴一次」');
+  $('impAiGrpReplyAct').click(); await tick();
+  ok($('impAiGrpReply').value === '' && $('impAiGrpMsg').textContent === '' && $('impAiGrpReplyAct').hidden && $('impAiGrpReplyInfo').textContent === '还没粘贴', '3 点了清空：框空了、报错收起');
   $('impAiGrpReply').value = 'AI：好的\n```记问\n记问分组建议 v1 导出 ' + at + '\nG1 | 吃饭 | 甲店是面馆\nG2 | 购物 | 乙店卖日用品\nG3 | 不存在的分类 | x\n```';
   $('impAiGrpRead').click(); await tick();
   const rows = [...t.d.querySelectorAll('.imp-aig-row')];
