@@ -3119,16 +3119,15 @@
         function odRefreshStatusUI(){
             const statusEl = $('odStatus'), connBtn = $('odConnectBtn'), disBtn = $('odDisconnectBtn'), nameEl = $('odArchiveName');
             if(!statusEl) return;
-            // 1016-W：单号表那一行（开发开关开着、在手机 App 里才有）
+            // 1016-W：单号表那一行（在手机 App 里才有）；导入简化第 13 版起不再藏在开发开关后面
             {
-                let dev=false; try{ dev=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
                 const bar=$('odOrdersBar'), st=$('odOrdersStatus');
                 if(bar && st){
-                    const show=dev && !!odPlugin();
+                    const show=!!odPlugin();
                     bar.style.display = show ? 'flex' : 'none'; st.style.display = show ? '' : 'none';
                     if(show){
                         const ol=odGetOrdLink();
-                        $('odOrdersBtn').textContent = ol && ol.uri ? '换一个单号表云端文件' : '单号表也存一份到云盘（开发中）';
+                        $('odOrdersBtn').textContent = ol && ol.uri ? '换一个单号表云端文件' : '单号表也存一份到云盘';
                         st.textContent = !(ol && ol.uri) ? '单号表没上云：换手机后再导同一份账单，要按时间金额认（拿不准的进待处理）'
                             : ol.lastError ? `单号表文件「${ol.name||''}」上次没传上：${ol.lastError}`
                             : ol.lastSyncAt ? `单号表文件「${ol.name||''}」，每次导入后更新（上次 ${new Date(ol.lastSyncAt).toLocaleString()}）`

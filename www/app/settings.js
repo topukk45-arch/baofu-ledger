@@ -32,7 +32,11 @@
                     odSetLink(JiwenBase.currentUser, JiwenBase.currentArchive, { uri: res.uri, name: res.name || suggested,
                         lastSyncAt:null, lastError:null, blocked:false, lastCount:0 });
                     odRefreshStatusUI();
-                    customAlert('已连接，之后每次记账/修改会自动同步到这个文件。现在先手动同步一次试试。', '连接成功');
+                    // 导入简化第 13 版：导入过账单的存档，连好以后顺带问单号表也存一份吗
+                    if(odPlugin() && !(odGetOrdLink() && odGetOrdLink().uri) && await hasImports())
+                        customConfirm('已连接，之后每次记账/修改会自动同步到这个文件。\n\n这个存档导入过微信 / 支付宝账单，单号表也存一份到云盘吗？换手机或恢复备份以后再导同一份账单，靠单号表认出哪些导过了；没有它，认不出来的会堆进待处理。单号表是另一个文件，只在导入、撤销以后更新。',
+                            ()=>ordersConnect(), '连接成功', { okText:'再选一个文件存单号表', cancelText:'先不用' });
+                    else customAlert('已连接，之后每次记账/修改会自动同步到这个文件。现在先手动同步一次试试。', '连接成功');
                     odSyncNow();
                 }catch(err){
                     // 用户取消选择时也会走到这里，静默即可，不用报错打扰
@@ -40,7 +44,27 @@
             });
         }
         // 1016-W：单号表云端文件：另选（新建）一个文件；恢复时从那个文件读（没连过就让你选一个）
-        $('odOrdersBtn').addEventListener('click', async () => {
+        $('odOrdersBtn').addEventListener('click', ()=>ordersConnect());
+        // 导入简化第 13 版：这个存档导入过账单（有导入记录）吗
+        async function hasImports(archive){ try{ const L=await window.JiwenImportStore.importsRead(archive); return (L||[]).some(l=>l.kind!=='ai'); }catch(_){ return false; } }
+        // 导入了一份备份文件以后：那份备份导入过账单，问一句「要从云盘恢复单号表吗」（新存档还没有单号表）
+        async function offerOrdersRestore(archive){
+            const plugin=odPlugin(); if(!plugin || !(await hasImports(archive))) return;
+            customConfirm(`存档「${archive}」导入过微信 / 支付宝账单。云盘上存过它的单号表吗？恢复了，以后再导同一份账单就不会重复。\n\n按记录内容一条条认回来，认不出来的当作没导过。`, async ()=>{
+                let uri=null; try{ const res=await plugin.pickFile({ mode:'open' }); if(!res || !res.uri) return; uri=res.uri; }catch(_){ return; }
+                try{
+                    const r=await plugin.readText({ uri });
+                    const out=await impOrdersRestoreFromCloud(r && r.text, archive);
+                    odSetOrdLink(JiwenBase.currentUser, archive, { uri, name:'', lastSyncAt:null, lastError:null });
+                    odRefreshStatusUI();
+                    customAlert(`恢复好了：认回 ${out.kept} 个单号` + (out.dropped ? `，${out.dropped} 个对应的记录不在了，当作没导过` : '') + '。以后导入也会更新这个文件。', '恢复单号表');
+                }catch(err){
+                    const c=err && (err.code || err.message);
+                    customAlert(c==='notempty' ? '这个存档已经有单号表了，没有覆盖。' : c==='badfile' ? '这个文件不是记问的单号表。' : '没恢复成，什么都没改：' + c, '恢复单号表');
+                }
+            }, '恢复单号表', { okText:'选云盘上的单号表文件', cancelText:'没存过 / 先不用' });
+        }
+        async function ordersConnect(){
             const plugin=odPlugin(); if(!plugin) return;
             try{
                 const suggested=`记问单号表_${JiwenBase.currentArchive}.json`;
@@ -52,7 +76,7 @@
                 const ol=odGetOrdLink();
                 customAlert(ol && ol.lastError ? '已连接，但这次没传上：' + ol.lastError + '\n\n下次导入后会再试。' : '已连接，现在的单号表传上去了。以后每次导入、撤销、处理待处理后更新这个文件，平时记账不碰它。', '单号表上云');
             }catch(_){ /* 取消选择 */ }
-        });
+        }
         $('odOrdersRestoreBtn').addEventListener('click', async () => {
             const plugin=odPlugin(); if(!plugin) return;
             let uri=null, ol=odGetOrdLink();
@@ -115,6 +139,8 @@
                     askImportOtherDays(daysPending, user, (asked)=>{
                         if(asked && user===JiwenBase.currentUser) window.JiwenTabs.refreshAllViews();
                         customAlert(`导入成功！已存为存档「${finalName}」${importFixSuffix(stats)}${importDaysSuffix(daysAdded+asked)}`, '导入成功', 'left');
+                        // 导入简化第 13 版：那份备份导入过账单：这句提示关掉以后问要不要从云盘恢复单号表
+                        if(odPlugin()) hasImports(finalName).then(y=>{ if(!y) return; const iv=setInterval(()=>{ if(document.getElementById('askMask').style.display==='none'){ clearInterval(iv); offerOrdersRestore(finalName); } }, 200); });
                     });
                 }catch(err){
                     const msg = err && err.message;

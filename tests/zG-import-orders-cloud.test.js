@@ -63,7 +63,7 @@ const pickBackup = async (t, text) => {
   await t.until(() => t.ask()); await t.askOk(); await t.idle();
   const MAIN = Object.keys(C.files)[0];
   ok(MAIN && /记问存档_/.test(MAIN), '1 主云备份连上、写了一次');
-  ok($('odOrdersBar').style.display === 'flex' && /单号表也存一份到云盘/.test($('odOrdersBtn').textContent), '1 开发开关开着：有「单号表也存一份到云盘」');
+  ok($('odOrdersBar').style.display === 'flex' && /单号表也存一份到云盘/.test($('odOrdersBtn').textContent), '1 有「单号表也存一份到云盘」');
   $('odOrdersBtn').click();
   await t.until(() => t.ask()); await t.askOk();
   const ORD = Object.keys(C.files).find(k => /记问单号表_/.test(k));
@@ -153,10 +153,10 @@ const pickBackup = async (t, text) => {
     ok(e3 === 'badfile', '7 主云备份不是单号表文件：不认');
     ok(!t6.errs.length, '6 无报错 ' + t6.errs.join('|'));
   }
-  // ===== 8. 开发开关关着：看不到单号表那一行 =====
+  // ===== 8. 开发开关关着：导入简化第 13 版起单号表那一行照样有（原来藏着）=====
   {
     t.w.localStorage.removeItem('app_dev_import'); (t.w.JiwenStore || t.w).odRefreshStatusUI();
-    ok($('odOrdersBar').style.display === 'none' && $('odOrdersStatus').style.display === 'none', '8 开发开关关着：没有单号表那一行');
+    ok($('odOrdersBar').style.display === 'flex' && $('odOrdersStatus').style.display !== 'none' && !/开发中/.test($('odOrdersBtn').textContent), '8 开发开关关着：单号表那一行照样有，不写「开发中」（第 13 版）');
   }
   ok(!t.errs.length && !tOld.errs.length, '无报错 ' + t.errs.concat(tOld.errs).join('|'));
   console.log(`${pass} 通过，${fail} 失败`);
