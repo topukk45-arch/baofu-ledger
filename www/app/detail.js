@@ -383,8 +383,10 @@
                         : `<button type="button" class="dw-bar${d.k===today ? ' today' : ''}" data-day="${d.k}" aria-label="${C.mdText(d.k)} 支出 ${d.exp.toFixed(2)}"><span class="dw-v">${Math.round(d.exp)}</span><i style="height:${Math.max(4, Math.round(d.exp/mx*96))}px"></i></button>`).join('')
                     + `</div><div class="dw-labs">` + days.map(d=>`<span${d.k===today ? ' class="today"' : ''}>${C.wdText(d.k).slice(1)}</span>`).join('') + `</div>`
                     + `<span class="dw-hint">点某一根，换成那一天的明细</span></div>`;
+                const ns=window.JiwenStore.noSpendDays();   // 导入简化第 12 版：标过「没花钱」的写「没花钱」，能取消
                 h+=`<div class="lg-dc dw-days">` + days.filter(d=>!d.future).reverse().map(d=>d.rs.length
                     ? `<button type="button" class="dw-day" data-day="${d.k}"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">${d.rs.length} 笔</span><span class="dw-day-v">${d.exp.toFixed(2)}</span>${CHEV}</button>`
+                    : ns.has(d.k) ? `<div class="dw-day dw-day-none dw-day-ns"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">没花钱</span><button type="button" class="lg-gap-btn" data-unns="${d.k}">取消标记</button></div>`
                     : `<div class="dw-day dw-day-none"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">没记</span><button type="button" class="lg-gap-btn" data-add="${d.k}">补一笔</button></div>`).join('') + `</div>`;
                 bodyBox.innerHTML=h;
             }
@@ -401,6 +403,7 @@
                         if(e.target.closest('#weekPrev')){ go(-1); return; }
                         if(e.target.closest('#weekNext')){ go(1); return; }
                         const add=e.target.closest('[data-add]'); if(add){ done(); openAddModal({ day:add.dataset.add }); return; }
+                        const un=e.target.closest('[data-unns]'); if(un){ window.JiwenStore.noSpendSet([un.dataset.unns], false); render(); window.JiwenTabs.refreshAllViews(); return; }
                         const d=e.target.closest('[data-day]'); if(d){ const m=mon; done(); openDay(d.dataset.day, { onClose:()=>openWeek(m, opt) }); }
                     });
                     // 左右滑：横着挪了 50px 以上、而且比竖着挪得多，就换一周（往右滑看上一周，往左滑看下一周）

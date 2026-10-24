@@ -1,7 +1,7 @@
 (function(){
         const { $, billList, escapeHtml, pad, parseRecTime } = window.JiwenBase;   // 用到前面模块的
         const { getUserData, impGetJson, impLogKey, impTarget, refundedMap, statContrib } = window.JiwenStore;   // 用到前面模块的
-        const { customAlert } = window.JiwenAsk;   // 用到前面模块的
+        const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
         const { openAddModal } = window.JiwenForms;   // 用到前面模块的
         const { CHEV, cal, openDay, openDetail, openWeek, rowHtml, sumFen, sumHtml } = window.JiwenDetail;   // 用到前面模块的
@@ -169,6 +169,16 @@
             if(a===b && a===today) return `<button type="button" class="lg-gap lg-gap-today" data-a="${a}" data-b="${b}" data-add="${a}"><span class="lg-gap-t">今天 · ${C.mdText(a)} ${C.wdText(a)} · 还没记账</span><span class="lg-gap-go">记一笔</span></button>`;
             return `<button type="button" class="lg-gap" data-a="${a}" data-b="${b}"><span class="lg-gap-t">${gapText(a, b)}</span>${CHEV}</button>`;
         }
+        // 第 12 版：标「没花钱」：存进存档设置（noSpend，按日子），这一行不再显示；马上能「撤销」，以后在一周详情里也能取消
+        function markNoSpend(a, b){
+            const C=cal, ds=[]; for(let k=a; k<=b; k=C.addDay(k, 1)) ds.push(k);
+            const was=window.JiwenStore.noSpendSet(ds, true);
+            if(!was) return;
+            renderBill();
+            customConfirm(`已标「没花钱」：${a===b ? C.mdText(a) : C.rangeText(a, b)}。这一行不再显示，在一周详情里能取消。`, null, '没花钱',
+                { okText:'好的', extra:{ text:'撤销', onClick:()=>{ if(window.JiwenStore.noSpendRestore(was)) renderBill(); } } });
+            const c=document.getElementById('askCancel'); if(c) c.style.display='none';
+        }
         // 点了没记账的那一行：小面板「补一笔（记在 X）」（以后加「这几天没花钱」「导入这几天的账单」）
         function openGap(a, b){
             const C=cal;
@@ -177,6 +187,7 @@
                 body(box, done){
                     const mk=(id, t, sub, fn)=>{ const x=document.createElement('button'); x.type='button'; x.id=id; x.className='ui-btn block lg-gap-opt'; x.innerHTML=`<span>${escapeHtml(t)}</span>${sub ? `<em>${escapeHtml(sub)}</em>` : ''}`; x.addEventListener('click', ()=>{ done(); fn(); }); box.appendChild(x); return x; };
                     mk('gapAdd', '补一笔', '记在 '+C.mdText(b)+(a===b ? '' : '（这几天的最后一天，记的时候能改）'), ()=>openAddModal({ day:b }));
+                    mk('gapNoSpend', a===b ? '这天没花钱' : '这几天没花钱', '标上以后这一行不再显示，可以撤销', ()=>markNoSpend(a, b));
                 },
                 foot(box, done){ const c=document.createElement('button'); c.type='button'; c.id='gapClose'; c.className='ui-btn ui-full'; c.textContent='关闭'; c.addEventListener('click', done); box.appendChild(c); } });
         }
@@ -218,6 +229,7 @@
             const put=(h, n)=>parts.push({ h, n:n||0 });
             let wkKey=null, run=null;
             const flush=()=>{ if(run){ put(gapHtml(run.lo, run.hi, today)); run=null; } };
+            const ns=opt.ym ? window.JiwenStore.noSpendDays() : null;   // 第 12 版：标了「没花钱」的日子不再列「没记账」
             days.forEach(k=>{
                 const mon=C.monOf(k), key=mon+'|'+k.slice(0,7);
                 if(key!==wkKey){
@@ -229,6 +241,7 @@
                 }
                 const list=byDay.get(k);
                 if(!list){
+                    if(ns && ns.has(k)){ flush(); return; }
                     if(k===today){ flush(); put(gapHtml(k, k, today)); return; }
                     if(run) run.lo=k; else run={ hi:k, lo:k };
                     return;

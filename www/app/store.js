@@ -1143,8 +1143,32 @@
             return { pairs:out, kept, dropped };
         }
         // 存档里和导入有关的设置（在 meta 里，跟着备份 / 云备份走）。空的不写，没导入过的存档备份内容不变
+        // 导入简化第 12 版：「这几天没花钱」：存档设置里一串日子（YYYY-MM-DD，排好、不重复）。账单页这些日子不再列「没记账」；进备份、云备份
+        const NO_SPEND_MAX=5000;
+        function cleanNoSpend(x){
+            if(!Array.isArray(x)) return [];
+            const out=[...new Set(x.filter(d=>typeof d==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d+'T00:00:00'))))].sort();
+            return out.length>NO_SPEND_MAX ? out.slice(-NO_SPEND_MAX) : out;
+        }
+        function noSpendDays(){ try{ const a=curArchive(loadStore()); return new Set(cleanNoSpend(a && a.noSpend)); }catch(_){ return new Set(); } }
+        // 标上 / 去掉几天；返回原来的那一串（撤销用），没变返回 null
+        function noSpendSet(days, on){
+            const store=loadStore(), a=curArchive(store), was=cleanNoSpend(a.noSpend), set=new Set(was);
+            (days||[]).forEach(d=>{ if(on) set.add(d); else set.delete(d); });
+            const next=cleanNoSpend([...set]);
+            if(next.join()===was.join()) return null;
+            if(next.length) a.noSpend=next; else delete a.noSpend;
+            if(!saveStoreSafe(store)) return null;
+            return was;
+        }
+        function noSpendRestore(was){
+            const store=loadStore(), a=curArchive(store), next=cleanNoSpend(was);
+            if(next.length) a.noSpend=next; else delete a.noSpend;
+            return saveStoreSafe(store);
+        }
         function impArchFields(a){
             const o={};
+            if(Array.isArray(a.noSpend) && a.noSpend.length) o.noSpend=cleanNoSpend(a.noSpend);
             if(Array.isArray(a.cps) && a.cps.length) o.cps=a.cps;
             if(Array.isArray(a.pms) && a.pms.length) o.pms=a.pms;
             if(a.importRules && ((a.importRules.cat||[]).length || (a.importRules.type||[]).length || (a.importRules.map||[]).length || (a.importRules.big||[]).length || (a.importRules.sum||[]).length)) o.importRules=a.importRules;
@@ -3315,6 +3339,7 @@
             if(cps.length) arch.cps=cps;
             if(pms.length) arch.pms=pms;
             if(importRules) arch.importRules=importRules;
+            { const ns=cleanNoSpend(parsed && parsed.noSpend); if(ns.length) arch.noSpend=ns; }   // 导入简化第 12 版
             const impLog=impCleanLog(parsed && parsed.imports, mapId, cats, cps.length, pms.length);
             const impPend=impCleanPending(parsed && parsed.pending, mapId);
             store.archives[finalName]=arch;
@@ -3483,5 +3508,5 @@
             const dt=new Date(y, mo-1, d);
             return dt.getFullYear()===y && dt.getMonth()===mo-1 && dt.getDate()===d;
         }
-        window.JiwenStore = { RECENT_DAYS, recentCats, IMPORT_MAX_BYTES, IMP_APPS, MAX_IMPORT_RECORDS, TPL_MAX, TPL_NAME_MAX, __LEDGER_STRICT, __corruptedStores, __ledger, __ledgerKeys, __ledgerMergeNotes, __ledgerPending, accountById, accountNameError, balContrib, budgetPhrase, budgetSpentIn, catSigned, charLen, charSlice, createAccount, curArchive, daysKey, expSigned, genId, getAccounts, getBudgets, getCats, getUserData, idbBatch, idbKeys, impArchFields, impBkPrefix, impBlkDecode, impCleanAiFlag, impDraftExpire, impExportFields, impGetJson, impLogKey, impMakeBackup, impOrdersRestoreFromCloud, impPendKey, impRecHash, impRulesDropCat, impRulesRenameCat, impTarget, importArchiveFromText, isAccountId, isOpening, isRefund, isReplaced, isValidDay, ledgerAcceptDamage, ledgerDamageNotice, ledgerDropAccount, ledgerEvictExcept, ledgerExists, ledgerGet, ledgerIdle, ledgerLoad, loadDays, loadStore, mergeImportedDays, migrateAccounts, migrateLedgersToBlocks, migrateLedgersToIdb, modeAmtCls, modeTag, nameOf, nameTaken, odBuildPayload, odClearLink, odGetLink, odGetOrdLink, odMoveLink, odOrdersSync, odPlugin, odRefreshStatusUI, odScheduleSync, odSetLink, odSetOrdLink, odSyncNow, recoverAccountsIfBroken, refundedMap, refundedTag, refundedTotal, refundsOf, sanitizeTpls, saveAccounts, saveStore, saveStoreDurable, saveStoreSafe, saveUserData, setAccountHidden, stampAccountName, statContrib, storeKey, syncRefunds, touchAccount, tplName, tplSame, trackBusy };   // store 模块对外只有这一个入口
+        window.JiwenStore = { RECENT_DAYS, recentCats, IMPORT_MAX_BYTES, IMP_APPS, MAX_IMPORT_RECORDS, TPL_MAX, TPL_NAME_MAX, __LEDGER_STRICT, __corruptedStores, __ledger, __ledgerKeys, __ledgerMergeNotes, __ledgerPending, accountById, accountNameError, balContrib, budgetPhrase, budgetSpentIn, catSigned, charLen, charSlice, createAccount, curArchive, daysKey, expSigned, genId, getAccounts, getBudgets, getCats, getUserData, idbBatch, idbKeys, impArchFields, impBkPrefix, impBlkDecode, impCleanAiFlag, impDraftExpire, impExportFields, impGetJson, impLogKey, impMakeBackup, impOrdersRestoreFromCloud, impPendKey, impRecHash, impRulesDropCat, impRulesRenameCat, impTarget, importArchiveFromText, isAccountId, isOpening, isRefund, isReplaced, isValidDay, noSpendDays, noSpendRestore, noSpendSet, ledgerAcceptDamage, ledgerDamageNotice, ledgerDropAccount, ledgerEvictExcept, ledgerExists, ledgerGet, ledgerIdle, ledgerLoad, loadDays, loadStore, mergeImportedDays, migrateAccounts, migrateLedgersToBlocks, migrateLedgersToIdb, modeAmtCls, modeTag, nameOf, nameTaken, odBuildPayload, odClearLink, odGetLink, odGetOrdLink, odMoveLink, odOrdersSync, odPlugin, odRefreshStatusUI, odScheduleSync, odSetLink, odSetOrdLink, odSyncNow, recoverAccountsIfBroken, refundedMap, refundedTag, refundedTotal, refundsOf, sanitizeTpls, saveAccounts, saveStore, saveStoreDurable, saveStoreSafe, saveUserData, setAccountHidden, stampAccountName, statContrib, storeKey, syncRefunds, touchAccount, tplName, tplSame, trackBusy };   // store 模块对外只有这一个入口
 })();

@@ -69,6 +69,7 @@ async function check(t, arch, tag, strict, capped) {
   ((a.importRules || {}).cat || []).forEach(x => { if (!a.cats.includes(x.cat)) bad.push('规则指向不在的分类 ' + x.cat); });
   ((a.importRules || {}).map || []).forEach(x => { if (!a.cats.includes(x.cat)) bad.push('对照指向不在的分类 ' + x.cat); });
   if (new Set(recs.map(r => r.id)).size !== recs.length) bad.push('记录编号重复');
+  if (a.noSpend !== undefined && (!Array.isArray(a.noSpend) || !a.noSpend.length || a.noSpend.some((x, i) => !/^\d{4}-\d{2}-\d{2}$/.test(x) || (i && a.noSpend[i - 1] >= x)))) bad.push('noSpend 不是排好的日子 ' + JSON.stringify(a.noSpend));
   // 7b：已被账单替换的（rp:1）哪里都看不到
   if (arch === t.w.JiwenBase.currentArchive) { const vis = new Set(t.w.JiwenStore.getUserData().map(r => r.id)); recs.forEach(r => { if ((r.rp === 1) === vis.has(r.id)) bad.push('「已被账单替换」和看不看得到对不上 ' + r.id); }); }
   ok(!bad.length, tag + '：对得上 ' + bad.slice(0, 3).join('；'));
@@ -175,9 +176,11 @@ async function round(seed, mode) {
     async forget() { const rs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].records.filter(x => x.src && !x.refundOf); if (!rs.length) return; trace.push('删掉不再导入'); manual = true; await t.st().forgetRecord(pick(rs).id); await t.idle(); },
     async ren() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); if (!cs.length) return; const c = pick(cs); trace.push('改分类名'); manual = true; t.w.JiwenCats.renameCat(c); t.$('askInput').value = c + 'X'; t.$('askOk').click(); await t.idle(); },
     async delCat() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); if (cs.length < 2) return; const c = pick(cs); trace.push('删分类'); manual = true; t.w.JiwenCats.deleteCat(c); if (t.ask()) t.$('askOk').click(); await t.idle(); },
+    // 第 12 版：标 / 取消「没花钱」（存档设置 noSpend）：导入、撤销、恢复都不该把它弄乱（恢复备份照备份里的）
+    async ns() { const k = '2026-10-' + String(1 + Math.floor(R() * 28)).padStart(2, '0'), on = R() < 0.7; trace.push((on ? '标' : '取消') + '没花钱'); manual = true; t.w.JiwenStore.noSpendSet([k], on); await t.idle(); },
     async rules() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); trace.push('改规则'); manual = true; await t.st().rulesSave({ cat: [{ kw: '某虚构超市', cat: pick(cs) }], type: [] }); },
   };
-  const W = mode === 1 ? { imp: 5, ai: 3, opt: 1, dayBill: 1, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, opt: 1, dayBill: 1, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1 };
+  const W = mode === 1 ? { imp: 5, ai: 3, opt: 1, dayBill: 1, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, opt: 1, dayBill: 1, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1, ns: 1 };
   const bag = []; Object.keys(W).forEach(k => { for (let i = 0; i < W[k]; i++) bag.push(k); });
   let good = true;
   for (let s = 0; s < STEPS && good; s++) {
