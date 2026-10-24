@@ -285,7 +285,7 @@
                 foot(box, done){
                     const st=document.createElement('div'); st.className='ui-stack';
                     const cp=document.createElement('button'); cp.type='button'; cp.className='ui-btn primary block'; cp.id='measureCopy'; cp.textContent='复制全部';
-                    cp.addEventListener('click', ()=>{ const ok=()=>{ cp.textContent='已复制'; }; try{ navigator.clipboard.writeText(text).then(ok, ()=>{ window.prompt && window.prompt('复制下面的文字', text); }); }catch(_){ } });
+                    cp.addEventListener('click', ()=>{ window.JiwenPanel.copyText(text).then(y=>{ cp.textContent = y ? '已复制' : '没复制上，长按上面的字选中复制'; }); });   // 1024-T 后修：不再退到系统 prompt
                     const x=document.createElement('button'); x.type='button'; x.className='ui-btn block'; x.id='measureClose'; x.textContent='关闭';
                     x.addEventListener('click', ()=>done());
                     st.appendChild(cp); st.appendChild(x); box.appendChild(st);

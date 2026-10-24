@@ -644,7 +644,7 @@
                     foot(box, done){
                         const st=document.createElement('div'); st.className='ui-stack';
                         const cp=document.createElement('button'); cp.type='button'; cp.className='ui-btn primary block'; cp.id='perfCopy'; cp.textContent='复制全部';
-                        cp.addEventListener('click', ()=>{ const ok=()=>{ cp.textContent='已复制'; }; try{ navigator.clipboard.writeText(text).then(ok, ()=>{ window.prompt && window.prompt('复制下面的文字', text); }); }catch(_){ } });
+                        cp.addEventListener('click', ()=>{ copyText(text).then(y=>{ cp.textContent = y ? '已复制' : '没复制上，长按上面的字选中复制'; }); });
                         const cl=document.createElement('button'); cl.type='button'; cl.className='ui-btn block'; cl.id='perfClear'; cl.textContent='清空';
                         cl.addEventListener('click', ()=>{ P.clear(); done(); openPerfPage(); });
                         const x=document.createElement('button'); x.type='button'; x.className='ui-btn block'; x.id='perfClose'; x.textContent='关闭';
@@ -655,5 +655,21 @@
             window.openPerfPage=openPerfPage;
             const b=$('devPerfBtn'); if(b) b.addEventListener('click', openPerfPage);
         })();
-        window.JiwenPanel = { bindSheetDrag, sheetGhostsFinish };   // sheet 模块对外只有这一个入口
+        // 1024-T 后修：「复制全部」在手机上没复制上（安卓 WebView 的 navigator.clipboard 常被拒，原来退到系统 prompt，弹出的框里看不到字）。
+        //   先在这一下点击里用藏着的文本框 + execCommand('copy') 复制（WebView 里最稳），不行再试 navigator.clipboard；都不行返回 false，页面上写「长按选中复制」
+        function copyText(text){
+            text=String(text==null ? '' : text);
+            let done=false;
+            try{
+                const ta=document.createElement('textarea');
+                ta.value=text; ta.setAttribute('readonly', ''); ta.style.cssText='position:fixed;left:-9999px;top:0;opacity:0;';
+                document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+                done=!!(document.execCommand && document.execCommand('copy'));
+                ta.remove();
+            }catch(_){ done=false; }
+            if(done) return Promise.resolve(true);
+            try{ if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(()=>true, ()=>false); }catch(_){}
+            return Promise.resolve(false);
+        }
+        window.JiwenPanel = { bindSheetDrag, copyText, sheetGhostsFinish };   // sheet 模块对外只有这一个入口
 })();

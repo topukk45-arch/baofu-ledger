@@ -2181,3 +2181,5 @@
         /* 导入简化第 15 版：账单详情里的「账单原文」 */
         .detail-raw { white-space:pre-wrap; font-size:13px; color:var(--c-text-soft); line-height:1.6; margin-top:6px; word-break:break-all; }
         #detailRawBtn { min-height:var(--ui-tap); padding:0; font-size:14px; }
+        /* 1024-T 后修：性能记录、导入量度的文字能长按选中复制（「复制全部」在手机上没复制上时的退路） */
+        pre.perf-list { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }

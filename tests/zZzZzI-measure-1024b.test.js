@@ -103,6 +103,21 @@ const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
   ok(/3 笔，自动定了/.test(txt) && /2 笔，自动定了/.test(txt) && /导入后改了分类 1 笔，改了别的 1 笔/.test(txt) && /分类来自：.*账本历史 1/.test(txt) && /逐项看看/.test(txt), '4 列出最近几次的量度：' + txt);
   ok(!/某面馆|某虚构书店|25\.00|31\.00|42\.00|吃饭/.test(txt), '4 不带对方名、金额、分类名');
   ok(t.d.getElementById('measureCopy') && t.d.getElementById('measureClose'), '4 有「复制全部」「关闭」');
+  // 1024-T 后修（手机上「复制全部」弹出系统框、框里看不到字）：安卓 WebView 拒了剪贴板时不再退到系统 prompt
+  {
+    let prompted = 0, execd = null; const p0 = w.prompt, e0 = t.d.execCommand, c0 = w.navigator.clipboard;
+    w.prompt = () => { prompted++; return null; };
+    Object.defineProperty(w.navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('NotAllowed')) }, configurable: true });
+    t.d.execCommand = () => false;
+    t.d.getElementById('measureCopy').click(); await tick(60);
+    ok(!prompted && /没复制上，长按上面的字选中复制/.test(t.d.getElementById('measureCopy').textContent), '4 剪贴板被拒：不弹系统框，按钮写「没复制上，长按上面的字选中复制」');
+    t.d.execCommand = cmd => { execd = cmd; return true; };
+    t.d.getElementById('measureCopy').click(); await tick(60);
+    ok(execd === 'copy' && t.d.getElementById('measureCopy').textContent === '已复制' && !prompted, '4 先用藏着的文本框复制（WebView 里最稳）：「已复制」');
+    const css = require('fs').readFileSync(require('path').join(WWW, 'app', 'app.css'), 'utf8');
+    ok(/pre\.perf-list \{[^}]*user-select:text/.test(css), '4 量度那几行能长按选中');
+    w.prompt = p0; t.d.execCommand = e0; Object.defineProperty(w.navigator, 'clipboard', { value: c0, configurable: true });
+  }
   t.d.getElementById('measureClose').click(); await tick();
 
   // 5. 撤销跟着导入记录走：撤了第二次，量度那条一起没了
