@@ -1900,6 +1900,26 @@
                 odOrdersSync(t.e.id, t.name).catch(()=>{});
                 return { added:made.length, ids:made.map(r=>r.id) };
             },
+            // ---- 导入简化 4b：删掉一条导入的（或已对账的）记录，以后也不导入：单号表里指着它（和挂在它上面的退款）的条目改成「不要了」（st:1，批次照留，
+            //   撤销那次导入时一起拿掉），记录删掉。单号表只有「单号 → 记录」一个方向，要按月份扫一遍反查。一个事务写
+            async forgetRecord(id, archive){
+                const t=impTarget(archive);
+                const user=t.e.id, store=loadStore(user), a=store.archives[t.name];
+                if(!a.records.some(r=>r.id===id)) throw impErr('gone');
+                const ids=new Set([id]); a.records.forEach(r=>{ if(isRefund(r) && r.refundOf===id) ids.add(r.id); });
+                const blocks=await impReadOrders(t.e, t.aid), pairs=[];
+                let marked=0;
+                blocks.forEach((list, k)=>{
+                    let ch=false;
+                    const nx=list.map(x=>{ if(x.st!==1 && ids.has(x.id)){ ch=true; marked++; return { no:x.no, id:'', batch:x.batch, st:1 }; } return x; });
+                    if(ch) pairs.push([k, JSON.stringify(impBlkEncode(nx))]);
+                });
+                a.records=a.records.filter(r=>!ids.has(r.id));
+                await saveStoreDurable(store, user, ()=>pairs);
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ window.JiwenTabs.refreshAllViews(); }catch(_){} try{ odScheduleSync(); }catch(_){} }
+                odOrdersSync(t.e.id, t.name).catch(()=>{});
+                return { deleted:ids.size, marked };
+            },
             // ---- 第二期：管理导入规则。rules：{ cat:[{kw,cat}], type:[{app,type|status,as}], map:[{from,cat}] }，洗过再存（同导入备份）；
             //   只改存档设置里的 importRules，不动记录、不动导入记录（以后撤销某次导入时，规则被你改过的那条就不删）
             async rulesSave(rules, archive){

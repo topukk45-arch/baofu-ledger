@@ -3,7 +3,7 @@
 // 恢复任意一份备份（含恢复前）、处理待处理（作为新增 / 不要了 / 合并）、拆开合并、去掉 AI 标记；
 // 每一步之后查：账本、单号表、待处理池、导入记录、规则、名单、AI 标记彼此对得上；
 // 一轮做完：导出备份 → 导入成另一个存档 → 那个存档里也对得上、能全部撤完；原存档全部撤完以后和最开始逐字节一样。
-// 第二种（mode 2）再掺进手动操作（记一笔、删一条、改分类名、删分类、改规则），只查对得上、撤销不报错。
+// 第二种（mode 2）再掺进手动操作（记一笔、删一条、删掉以后也不导入（4b）、改分类名、删分类、改规则），只查对得上、撤销不报错。
 // 步数：PROP_STEPS（每轮，默认 22）× PROP_SEEDS（几轮，默认 2）；本地可以调大跑几百步：PROP_STEPS=150 PROP_SEEDS=4。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
@@ -145,12 +145,16 @@ async function round(seed, mode) {
     },
     // ---- 只在 mode 2：手动操作 ----
     async add() { trace.push('记一笔'); manual = true; const s = t.w.JiwenStore.loadStore(A.ID); s.archives[ARCH].records = s.archives[ARCH].records.concat([{ id: 'x' + Math.floor(R() * 1e9), time: '2026-10-1' + Math.floor(R() * 9) + 'T10:00', money: 1 + Math.floor(R() * 90), type: 'expense', cat: pick(t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats), remark: '虚构' }]); t.w.JiwenStore.saveStore(s, A.ID); await t.idle(); },
-    async del() { const rs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].records; if (!rs.length) return; trace.push('删一条'); manual = true; const r = pick(rs); t.w.openEdit(r.id); t.$('deleteInEdit').click(); t.$('askOk').click(); await t.idle(); },
+    async del() { const rs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].records; if (!rs.length) return; trace.push('删一条'); manual = true; const r = pick(rs); t.w.openEdit(r.id); t.$('deleteInEdit').click();
+      const ch = t.$('askChoices'); if (ch && ch.style.display === 'flex') { const c = ch.querySelector('.cc'); if (c) c.click(); }   // 4b：导入的记录先选「只删这条」
+      t.$('askOk').click(); await t.idle(); },
+    // 4b：删掉一条导入的记录、以后也不导入（单号表里改成「不要了」）
+    async forget() { const rs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].records.filter(x => x.src && !x.refundOf); if (!rs.length) return; trace.push('删掉不再导入'); manual = true; await t.st().forgetRecord(pick(rs).id); await t.idle(); },
     async ren() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); if (!cs.length) return; const c = pick(cs); trace.push('改分类名'); manual = true; t.w.JiwenCats.renameCat(c); t.$('askInput').value = c + 'X'; t.$('askOk').click(); await t.idle(); },
     async delCat() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); if (cs.length < 2) return; const c = pick(cs); trace.push('删分类'); manual = true; t.w.JiwenCats.deleteCat(c); if (t.ask()) t.$('askOk').click(); await t.idle(); },
     async rules() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); trace.push('改规则'); manual = true; await t.st().rulesSave({ cat: [{ kw: '某虚构超市', cat: pick(cs) }], type: [] }); },
   };
-  const W = mode === 1 ? { imp: 5, ai: 3, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, ren: 1, delCat: 1, rules: 1, unflag: 1 };
+  const W = mode === 1 ? { imp: 5, ai: 3, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1 };
   const bag = []; Object.keys(W).forEach(k => { for (let i = 0; i < W[k]; i++) bag.push(k); });
   let good = true;
   for (let s = 0; s < STEPS && good; s++) {

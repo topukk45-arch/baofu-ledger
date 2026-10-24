@@ -3,6 +3,7 @@
         const { TPL_MAX, TPL_NAME_MAX, __ledger, recentCats, budgetPhrase, budgetSpentIn, charLen, curArchive, genId, getBudgets, getCats, getUserData, isRefund, loadStore, refundedTotal, refundsOf, saveStoreSafe, saveUserData, storeKey, syncRefunds, tplName, tplSame } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customChoose, customConfirm, customPrompt } = window.JiwenAsk;   // 用到前面模块的
         const { getDtInput, openDtPicker, setDtInput } = window.JiwenDate;   // 用到前面模块的
+        const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
 
         // ===== 1010-K5：点「备注」后，把保存按钮也露出来 =====
         // 键盘弹起时弹窗被压到半屏，WebView 只把备注框本身滚进视野，紧挨着的「添加记录 / 保存」
@@ -746,6 +747,35 @@
             const msg = (me && isRefund(me)) ? `${what}\n\n删除这笔退款以后，原账单的「还能退」金额会恢复。删掉的找不回来（除非用备份恢复）。`
                 : (rs.length ? `${what}\n\n这笔账单有 ${rs.length} 笔退款（共 ${refundedTotal(cur,id).toFixed(2)}），会跟它一起删除。删掉的找不回来（除非用备份恢复）。` : `${what}\n\n删掉的找不回来（除非用备份恢复）。`);
             const okText = (me && isRefund(me)) ? '删除这笔退款' : (rs.length ? `删除这条和 ${rs.length} 笔退款` : '删除这条记录');
+            // 导入简化 4b：导入的（或已和账单对过账的）记录：分「只删这条」「删掉，以后也不导入」，另给「改成不计」「撤销整批导入」（开发开关开着才有）
+            const iapp=me && !isRefund(me) && me.src && EDIT_WARN_APP[me.src.app];
+            let dev=false; try{ dev=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            if(iapp && dev){
+                const opts=[
+                    { value:'one', label:'只删这条', desc:`下次导入这段时间的${iapp}账单，这笔会再导进来` },
+                    { value:'forget', label:'删掉，以后也不导入', desc:`单号表里记成「不要了」，以后再导同一段${iapp}账单也跳过它` },
+                    { value:'skip', label:'改成不计', desc:'记录留着，哪里都不算（信用卡还款、重复记录这类）' },
+                ];
+                if(me.batch) opts.push({ value:'undo', label:'撤销整批导入', desc:'这一次导入的全部撤掉（先确认，能看清会动哪些）' });
+                customChoose(`${what}\n\n${me.src.merged ? `这笔已经和${iapp}账单对过账。` : `这笔是${iapp}账单导入的。`}${rs.length ? `挂着 ${rs.length} 笔退款，删的话一起删。` : ''}`, opts, act=>{
+                    if(act==='one'){
+                        const data=getUserData().filter(r=>r.id!==id && !(isRefund(r) && r.refundOf===id));
+                        if(!saveUserData(data, true)){ customAlert('删除未能保存，这条记录仍然存在，请稍后重试。', '删除失败'); return; }
+                        closeEditModal({ refresh:true });
+                    } else if(act==='forget'){
+                        window.JiwenImportStore.forgetRecord(id).then(()=>closeEditModal({ refresh:true }), e=>customAlert('没删成：' + (e && (e.code || e.message) || e) + '。账本没有动。', '删除失败'));
+                    } else if(act==='skip'){
+                        const data=getUserData(), i=data.findIndex(r=>r.id===id); if(i<0) return;
+                        const n=Object.assign({}, data[i]); setRecMode(n, 'skip'); if(n.ob) delete n.ob; data[i]=n; syncRefunds(data, n);
+                        if(!saveUserData(data)) return;
+                        closeEditModal({ refresh:true });
+                    } else if(act==='undo'){
+                        closeEditModal();
+                        loadImportUI().then(ui=>ui.undoFromLedger(me.batch)).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '撤销导入'));
+                    }
+                }, '删除导入的记录', null, { layout:'list' });
+                return;
+            }
             customConfirm(msg, ()=>{
                 const data=getUserData().filter(r=>r.id!==id && !(isRefund(r) && r.refundOf===id));
                 // 删除写盘失败时记录其实仍在。这里用 silent 保存：抑制通用提示，只弹一条
