@@ -24,7 +24,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = '1021-T24';
+  var VERSION = '1024-W';
   var HIST_MIN = 3, HIST_SHARE = 0.8;   // 1021-T8 从账本历史里学：同一个对方以前至少 3 条、八成以上同一类
   var REMARK_MIN = 2;   // 导入简化第 10 版：从手记备注学：同一句备注至少 2 次
   var NEW_CAT_MIN = 3;          // 新建分类：这次至少要有 3 笔落进去，不到的归「其他」
@@ -92,8 +92,19 @@
     if (c.indexOf('*') >= 0 && c.length <= 8) return true;
     return /^[A-Za-z][A-Za-z.\s'’·-]*$/.test(c) && c.length <= 40 && !SHOP_WORD.test(c);
   }
+  // 1024-W（实测 10-24：新存档一次导全年，推不出的 640 笔里 220 笔是和个人之间的）：和个人之间的钱。
+  //   转账、红包（不管收支）；扫码付款、商品说明是二维码收款 / 收钱码或 payPerson 认得出是个人的（只算支出）；对方带 * 的
+  function personRow(r) {
+    var cp = String(r.cp || ''), k = String(r.kind || ''), ds = String(r.desc || '');
+    if (/转账|红包/.test(k)) return true;
+    if (cp.indexOf('*') >= 0 && cp.length <= 8) return true;
+    if (r.io !== 'expense') return false;
+    if (/二维码|扫码/.test(k) && (/二维码收款|收款码|收钱码|个人收款/.test(ds) ? !SHOP_WORD.test(cp) : payPerson(cp, ds))) return true;
+    return payPerson(cp, ds);
+  }
   var CARRIER_RE = /(联通|移动|电信)(股份有限公司|有限责任公司|有限公司|分公司|公司|集团)?$/;
   var PLATFORMS = ['淘宝', '天猫', '京东', '拼多多', '抖音商城', '唯品会'];
+  var GROUP_PLAT = /淘宝|天猫|京东|拼多多|抖音|唯品会|美团|饿了么|盒马|闪购|交易猫|闲鱼|快手/;   // 和 plan.js 的 GROUP_PLAT_RE 同一条
   function isPlatform(word) { return PLATFORMS.some(function (p) { return String(word).indexOf(p) >= 0; }); }
   // 分分捐这类合并记录的默认分类：存档里有公益类的就用它，没有用「其他」，再没有「未分类」
   function pettyCat(cats) {
@@ -222,7 +233,10 @@
       if (hit && !weakWord(hit[0])) return { want: hit[1], layer: 'builtin', conf: 'mid', reason: '内置：' + hit[0] + ' → ' + hit[1] };
       // 1021-T7：商品说明里的词和支付宝分类说的是同一类 → 两个依据一致，升到「中」
       if (hd && aw && aw === hd[1]) return { want: hd[1], layer: 'builtin', conf: 'mid', reason: '内置（商品说明里的「' + hd[0] + '」）和支付宝分类一致 → ' + hd[1], descOnly: true, cc: cc, agree: true };
-      if (hd) return { want: hd[1], layer: 'builtin', conf: 'low', reason: '内置（商品说明里的「' + hd[0] + '」）→ ' + hd[1], descOnly: true, cc: cc };
+      // 1024-W（实测 10-24：只在商品说明里认出的 407 笔都是把握低）：对方不是平台、不是什么都卖的、不是个人 → 把握中；
+      //   同一个对方几笔的商品说明指向不一样的，下面投票时照旧降成低
+      var plainShop = cc && !weakWord(cc) && SELLS.every(function (w) { return cc.indexOf(w) < 0; }) && !GROUP_PLAT.test(cp) && !personRow(r);
+      if (hd) return { want: hd[1], layer: 'builtin', conf: plainShop ? 'mid' : 'low', reason: '内置（商品说明里的「' + hd[0] + '」）→ ' + hd[1], descOnly: true, cc: cc };
       // 1016-Z4：游戏词（存档里有「游戏」分类才推荐）：首充、月卡、战令、钻石……→ 游戏（把握中）
       var gs = gameHit(G.strong, cc + ' ' + cp + ' ' + (r.desc || ''));
       if (gameOn && gs) return { cat: G.cat, layer: 'builtin', conf: 'mid', reason: '内置：' + gs + ' → ' + G.cat };
@@ -230,7 +244,7 @@
       //   1021-T3：支付宝「收入」里收钱码 / 转账 / 闲鱼这类是别人付给你的钱 → 推「收款」（存档里没有就是新建分类建议，老用户默认不建、落未分类）
       // 1021-T24（实测 10-21，Adeline 那几笔）：付给个人的钱（扫对方收钱码、转账；对方带 *、或是英文名）：支付宝的「交易分类」是收款方登记的类别
       //   （个人收钱码常写「商业服务」），不是你花钱的用途，不照抄；先推「转账红包」（落你的「转账」），把握低、进组让你定
-      if (aw && aw !== '转账红包' && r.io === 'expense' && payPerson(cp, r.desc)) return { want: '转账红包', layer: 'alipay', conf: 'low', reason: '付给个人的（收钱码 / 转账），支付宝写的「' + aw + '」不算数 → 转账红包' };
+      if (aw && aw !== '转账红包' && r.io === 'expense' && payPerson(cp, r.desc)) return { want: '转账红包', layer: 'alipay', conf: 'low', reason: '付给个人的（收钱码 / 转账），支付宝写的「' + aw + '」不算数 → 转账红包', person: true };
       if (aw === '收入' && RECEIPT_RE.test(cp + ' ' + (r.desc || ''))) return { want: '收款', layer: 'alipay', conf: 'mid', reason: '支付宝分类：收入（收钱码 / 转账收款）→ 收款' };
       if (aw) return { want: aw, layer: 'alipay', conf: 'mid', reason: '支付宝分类：' + aw };
       // 平台名：最后才用，把握低
@@ -238,6 +252,10 @@
       // 1016-Z4：「礼包」→ 游戏，把握低、排在最后；说明里有流量、零食这类词时不算（那些词前面已经认过了）
       var gwText = cc + ' ' + cp + ' ' + (r.desc || '');
       if (gameOn && gameHit(G.weak, gwText) && !gameHit(G.notWith, gwText)) return { cat: G.cat, layer: 'builtin', conf: 'low', reason: '内置（「礼包」多半是游戏）→ ' + G.cat };
+      // 1024-W：和个人之间的转账、红包、扫收钱码，前面都没认出来的 → 转账红包（落你的「转账」），把握低；确认页合成一组「和个人之间的」一次定
+      //   存档里没有转账 / 红包这类分类（也没有对照）时不推荐、不建新分类，只标 person（照旧合成一组）
+      if (personRow(r) && !land('转账红包', cats) && !Object.prototype.hasOwnProperty.call(mapOf, '转账红包')) return { cat: '未分类', layer: 'none', conf: null, reason: '和个人之间的转账、红包，存档里没有转账这类分类', person: true };
+      if (personRow(r)) return { want: '转账红包', layer: 'builtin', conf: 'low', reason: r.io === 'expense' ? '付给个人的（转账、红包、扫收钱码）→ 转账红包' : '个人转给你的（转账、红包）→ 转账红包', person: true };
       return { cat: '未分类', layer: 'none', conf: null, reason: '没找到依据' };
     });
 
@@ -293,6 +311,7 @@
       var o = { cat: x.cat, want: x.want || x.cat, layer: x.layer, conf: x.conf, reason: x.reason };
       if (x.kw) o.kw = x.kw;          // 1016-Y：命中的是你的哪条规则（确认页改了分类时问「以后都改吗」）
       if (x.on) o.on = x.on;          // 导入简化第 9 版：认商品说明的规则
+      if (x.person) o.person = true;  // 1024-W：和个人之间的（确认页合成一组）
       if (!x.cat) {
         var p = plan[x.want];
         o.newCat = x.want;

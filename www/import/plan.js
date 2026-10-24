@@ -361,9 +361,11 @@
       return t.length >= 2 ? t.slice(0, 32) : String(k || '').slice(0, 32);
     };
     var cpKwE = edits.cpKw || {};
+    var PERSON_GROUP = '（和个人之间的转账、红包、收钱码）';
     var groupKeyOf = function (d) {
       var cp = String(d.cp || '');
       if (cp.indexOf('*') >= 0 || GROUP_PLAT_RE.test(cp)) { var dk = descKey(d.desc || ''); if (dk.length >= 2) return '品：' + dk; }
+      if (d.rec && d.rec.person) return PERSON_GROUP;     // 1024-W：和个人之间的转账、红包、扫收钱码合成一组，一次定（括号开头的组不存规则）
       return clean(d.cp) || '（没有交易对方）';
     };
     rows.forEach(function (d) {
@@ -788,9 +790,9 @@
       if (d.group === 'add' && d.mode !== 'skip' && (!r || r.layer === 'none' || r.conf === 'low' || r.cat === '未分类')) keysBy.cat.push(d.key);
     });
     ((p && p.sections && p.sections.cpSingles) || []).forEach(function (s) { (s.keys || []).forEach(function (k) { keysBy.cat.push(k); }); });
-    var seen = {}, look = 0;
+    var seen = {}, look = 0, catGot = [];
     M_WHY.forEach(function (w) {
-      keysBy[w].forEach(function (k) { var d = byKey[k]; if (!d || seen[k]) return; seen[k] = 1; why[w] += units(d); look += units(d); });
+      keysBy[w].forEach(function (k) { var d = byKey[k]; if (!d || seen[k]) return; seen[k] = 1; why[w] += units(d); look += units(d); if (w === 'cat') catGot.push(k); });
     });
     rows.forEach(function (d) {
       if (d.src !== 'row' || d.group !== 'add') return;
@@ -801,6 +803,14 @@
     //   none 推不出的：按交易类型归成 商户消费 shop / 扫码付款 qr / 转账 transfer / 红包 redpack / 别的 other，另数对方是个人的 person；
     //   low 推出了但把握低的：只在商品说明里认出 desc / 平台或综合商超 plat / 付给个人 person / 礼包 game / 别的 other
     var none = { shop: 0, qr: 0, transfer: 0, redpack: 0, other: 0, person: 0 }, low = { desc: 0, plat: 0, person: 0, game: 0, other: 0 };
+    // 1024-W：「要你看 · 分类」里不是推不出、也不是把握低的那些：新建分类的 newcat / 不到 3 笔并进「其他」的merged / 别的 other
+    var rest = { newcat: 0, merged: 0, other: 0 };
+    catGot.forEach(function (k) {
+      var d = byKey[k];
+      var r = d.rec || (d.item && d.item.rec);
+      if (d.group === 'add' && d.mode !== 'skip' && (!r || r.layer === 'none' || d.cat === '未分类' || r.conf === 'low')) return;
+      rest[r && r.newCat ? ((d.cat || r.cat) === r.newCat ? 'newcat' : 'merged') : 'other'] += units(d);
+    });
     var kindOf = function (d) {
       var k = String(d.kind || '');
       if (/转账/.test(k)) return 'transfer';
@@ -816,11 +826,11 @@
       if (!r || r.layer === 'none' || d.cat === '未分类') { none[kindOf(d)] += u; if (personal(d)) none.person += u; return; }
       if (r.conf !== 'low') return;
       var rs = String(r.reason || '');
-      low[r.descOnly || /商品说明/.test(rs) ? 'desc' : /平台|综合商超/.test(rs) ? 'plat' : /付给个人/.test(rs) ? 'person' : /礼包/.test(rs) ? 'game' : 'other'] += u;
+      low[r.person || /付给个人|个人转给你/.test(rs) ? 'person' : r.descOnly || /商品说明/.test(rs) ? 'desc' : /平台|综合商超/.test(rs) ? 'plat' : /礼包/.test(rs) ? 'game' : 'other'] += u;
     });
     var n = Number.isInteger(o.total) && o.total >= 0 ? o.total : rows.reduce(function (s0, d) { return s0 + (d.src === 'row' ? units(d) : 0); }, 0);
     var ms = Number(o.ms), min = isFinite(ms) && ms > 0 ? Math.round(ms / 6000) / 10 : 0;
-    return { v: 1, n: n, auto: Math.max(0, n - look), look: look, why: why, chg: chg, layer: layer, min: min, path: o.path === 'quick' ? 'quick' : 'step', none: none, low: low };
+    return { v: 1, n: n, auto: Math.max(0, n - look), look: look, why: why, chg: chg, layer: layer, min: min, path: o.path === 'quick' ? 'quick' : 'step', none: none, low: low, rest: rest };
   }
 
   function devText(p) {

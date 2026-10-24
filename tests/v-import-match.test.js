@@ -168,7 +168,7 @@ const intoUnique = res => { const s = new Set(); return res.items.every(it => it
   const r4 = by[rows[3].no].rec;
   ok(r4.layer === 'rule' && r4.cat === '午饭' && r4.reason.includes('你的规则'), '10 你的规则「张记 → 午饭」压过内置的「麻辣烫 → 餐饮」（层级优先，不比关键词长短）');
   const r5 = by[rows[4].no].rec;
-  ok(r5.layer === 'builtin' && r5.conf === 'low' && r5.cat === '吃饭' && r5.want === '餐饮美食', '10 只在商品说明里找到（奶茶）：把握低；餐饮美食按同义落到存档的「吃饭」');
+  ok(r5.layer === 'builtin' && r5.conf === 'mid' && r5.cat === '吃饭' && r5.want === '餐饮美食', '10 只在商品说明里找到（奶茶）、对方是普通商户：把握中（1024-W，原来低）；餐饮美食按同义落到存档的「吃饭」');
   const r6 = by[rows[5].no].rec;
   ok(r6.layer === 'borrow' && r6.cat === '吃饭', '10 两家互借：支付宝里同一个对方是餐饮美食，微信跟着用');
   ok(by[rows[6].no].rec.layer === 'none' && by[rows[6].no].rec.cat === '未分类', '10 都没有依据：未分类');

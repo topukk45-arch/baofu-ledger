@@ -747,7 +747,7 @@
   //   几笔加起来、待你确认、金额差一点的、单笔候选、行详情里的候选都用这一份
   function dayNum(t) { return Math.round(Date.UTC(+t.slice(0, 4), +t.slice(5, 7) - 1, +t.slice(8, 10)) / 86400000); }
   function mdhm(t) { return (+t.slice(5, 7)) + '月' + (+t.slice(8, 10)) + '日 ' + t.slice(11, 16); }
-  function billRec(d) { var r = d && d.item && d.item.rec; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; }
+  function billRec(d) { var r = d && d.item && d.item.rec; return r && r.layer !== 'none' && !r.person && r.cat && r.cat !== '未分类' ? r.cat : null; }
   function cut(t, n) { t = String(t || ''); return t.length > n ? t.slice(0, n) + '…' : t; }
   function meBlock(m, lab) {
     var x = el('div', 'pc-me'); x.appendChild(el('div', 'pc-lab', lab || '你记的'));

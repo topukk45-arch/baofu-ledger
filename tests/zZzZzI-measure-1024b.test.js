@@ -58,9 +58,18 @@ const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
     const mq = P.measure(q, {}, {});
     ok(JSON.stringify(mq.none) === JSON.stringify({ shop: 1, qr: 1, transfer: 1, redpack: 2, other: 0, person: 4 }), '1 推不出的按交易类型数、对方是个人的另数（不计的、不是新增的不算）：' + JSON.stringify(mq.none));
     ok(JSON.stringify(mq.low) === JSON.stringify({ desc: 1, plat: 1, person: 1, game: 0, other: 0 }), '1 把握低的按原因数：' + JSON.stringify(mq.low));
+    // 1024-W：和个人之间的（rec.person）算 person；「要你看 · 分类」里其余的按新建分类 / 并进其他 / 别的数
+    const q2 = { rows: [
+      row('p1', 'add', { layer: 'builtin', conf: 'low', cat: '转账', person: true, reason: '个人转给你的（转账、红包）→ 转账红包' }),
+      row('c1', 'add', { layer: 'builtin', conf: 'mid', cat: '游戏', newCat: '游戏' }),
+      row('c2', 'add', { layer: 'builtin', conf: 'mid', cat: '游戏', newCat: '游戏' }),
+      row('c3', 'add', { layer: 'builtin', conf: 'mid', cat: '其他', newCat: '会员订阅' })
+    ], sections: {} };
+    const mq2 = P.measure(q2, { cat: [{ id: 'nc:游戏', keys: ['c1', 'c2'] }, { id: 'cp:某虚构', keys: ['c3', 'p1'] }] }, {});
+    ok(mq2.low.person === 1 && mq2.why.cat === 4 && JSON.stringify(mq2.rest) === JSON.stringify({ newcat: 2, merged: 1, other: 0 }), '1 1024-W：rest 数新建分类 2、并进其他 1（推不出 / 把握低的不重复数）：' + JSON.stringify(mq2.rest) + ' ' + JSON.stringify(mq2.low));
   }
   const flat = JSON.stringify(m);
-  ok(!/某|餐饮|水果|[a-i]"/.test(flat.replace(/"(v|n|auto|look|why|chg|layer|min|path|match|refund|amount|type|cat|rule|learned|history|borrow|builtin|alipay|none|step|low|shop|qr|transfer|redpack|other|person|desc|plat|game)"/g, '')), '1 量度里只有数字，没有对方名、分类名、键（1024-V 起多 none / low 两组数）');
+  ok(!/某|餐饮|水果|[a-i]"/.test(flat.replace(/"(v|n|auto|look|why|chg|layer|min|path|match|refund|amount|type|cat|rule|learned|history|borrow|builtin|alipay|none|step|low|shop|qr|transfer|redpack|other|person|desc|plat|game|rest|newcat|merged)"/g, '')), '1 量度里只有数字，没有对方名、分类名、键（1024-V 起多 none / low 两组数，1024-W 起多 rest）');
 
   // 2. 真导：手记合并后带上对方编号，下次同一对方推手记的分类；导入记录里有 m
   const html = fs.readFileSync(htmlFile, 'utf8'), WWW = path.dirname(htmlFile);
@@ -120,7 +129,7 @@ const tick = (ms = 30) => new Promise(r => setTimeout(r, ms));
   const txt = t.d.getElementById('measureList').textContent;
   ok(/3 笔，自动定了/.test(txt) && /2 笔，自动定了/.test(txt) && /导入后改了分类 1 笔，改了别的 1 笔/.test(txt) && /分类来自：.*账本历史 1/.test(txt) && /逐项看看/.test(txt), '4 列出最近几次的量度：' + txt);
   ok(!/某面馆|某虚构书店|25\.00|31\.00|42\.00|吃饭/.test(txt), '4 不带对方名、金额、分类名');
-  ok(/推不出的 \d+：商户消费 \d+、扫码付款 \d+、转账 \d+、红包 \d+、别的 \d+；其中对方是个人 \d+/.test(txt) && /把握低的 \d+：只在商品说明里认出 \d+、平台或综合商超 \d+、付给个人 \d+、礼包 \d+、别的 \d+/.test(txt), '4 1024-V：分类拿不准的拆开写（推不出的按类型、把握低的按原因）');
+  ok(/推不出的 \d+：商户消费 \d+、扫码付款 \d+、转账 \d+、红包 \d+、别的 \d+；其中对方是个人 \d+/.test(txt) && /把握低的 \d+：只在商品说明里认出 \d+、平台或综合商超 \d+、和个人之间的 \d+、礼包 \d+、别的 \d+/.test(txt) && /分类里其余的 \d+：新建分类的 \d+、不到 3 笔并进「其他」的 \d+、别的 \d+/.test(txt), '4 1024-V：分类拿不准的拆开写（推不出的按类型、把握低的按原因；1024-W 其余的按新建分类 / 并进其他）');
   ok(t.d.getElementById('measureCopy') && t.d.getElementById('measureClose'), '4 有「复制全部」「关闭」');
   // 1024-T 后修（手机上「复制全部」弹出系统框、框里看不到字）：安卓 WebView 拒了剪贴板时不再退到系统 prompt
   {

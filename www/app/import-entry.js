@@ -274,7 +274,8 @@
                 // 1024-V：分类拿不准的拆开数（老记录没有就不写）
                 const sum=o=>Object.keys(o).filter(k=>k!=='person').reduce((s, k)=>s+(o[k]||0), 0);
                 if(m.none) L.push('  推不出的 '+sum(m.none)+'：商户消费 '+m.none.shop+'、扫码付款 '+m.none.qr+'、转账 '+m.none.transfer+'、红包 '+m.none.redpack+'、别的 '+m.none.other+'；其中对方是个人 '+m.none.person);
-                if(m.low) L.push('  把握低的 '+sum(m.low)+'：只在商品说明里认出 '+m.low.desc+'、平台或综合商超 '+m.low.plat+'、付给个人 '+m.low.person+'、礼包 '+m.low.game+'、别的 '+m.low.other);
+                if(m.low) L.push('  把握低的 '+sum(m.low)+'：只在商品说明里认出 '+m.low.desc+'、平台或综合商超 '+m.low.plat+'、和个人之间的 '+m.low.person+'、礼包 '+m.low.game+'、别的 '+m.low.other);
+                if(m.rest) L.push('  分类里其余的 '+sum(m.rest)+'：新建分类的 '+m.rest.newcat+'、不到 3 笔并进「其他」的 '+m.rest.merged+'、别的 '+m.rest.other);   // 1024-W
             }
             L.push('  导入后改了分类 '+x.catChg+' 笔，改了别的 '+x.otherChg+' 笔，删了 '+x.gone+' 笔'+(x.days===null ? '' : '（导入 '+x.days+' 天了）'));
             return L.join('\n');

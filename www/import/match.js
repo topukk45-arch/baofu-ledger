@@ -134,7 +134,7 @@
     var free = function (m) { return !mstate.has(m.id); };
     var exactAmts = function (b) { return b.net !== b.fen && b.net > 0 ? [b.fen, b.net] : [b.fen]; };
     // 1017-UI6：账单推得出分类、和手记的不一样 = 分类冲突（推不出、未分类的不算冲突）
-    var billCat = function (b) { var r = b.it.rec || b.preRec; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; };
+    var billCat = function (b) { var r = b.it.rec || b.preRec; return r && r.layer !== 'none' && !r.person && r.cat && r.cat !== '未分类' ? r.cat : null; };
     var catClash = function (b, m) { var c = billCat(b); return !!c && (m.cat || '未分类') !== c; };
     var preClassify = function () {
       var lc = new Map();
@@ -186,7 +186,7 @@
     if (cand0.length >= 2) {
       var recs0 = C.classify(cand0.map(function (b) { return { app: parsed.files[b.it.file].app, cp: b.r.cp, desc: b.r.desc, kind: b.r.kind, io: b.it.io }; }),
         { cats: cats, rules: ctx.rules, learned: new Map(), borrowRows: [], merchants: ctx.merchants, isNewUser: !!ctx.isNewUser, maps: ctx.maps, history: ctx.hist, remarks: ctx.rmk, aliHist: ctx.aliHist }).recs;
-      combos0 = findCombos(cand0, idx, free, function (b) { var r = recs0[cand0.indexOf(b)]; return r && r.layer !== 'none' && r.cat && r.cat !== '未分类' ? r.cat : null; });
+      combos0 = findCombos(cand0, idx, free, function (b) { var r = recs0[cand0.indexOf(b)]; return r && r.layer !== 'none' && !r.person && r.cat && r.cat !== '未分类' ? r.cat : null; });
     }
     var comboList = combos0.combos, comboBill = new Set(), comboM = new Set(), sameDay = [];
     comboList.forEach(function (c) { comboM.add(c.m.id); c.bs.forEach(function (b) { comboBill.add(b); }); });
@@ -315,7 +315,7 @@
     var nearOk = new Map(), nearBy = new Map();
     bills.forEach(function (b) {
       if (b.done || b.neutral || b.personal) return;
-      var rc = b.it.rec && b.it.rec.layer !== 'none' ? b.it.rec.cat : null;
+      var rc = b.it.rec && b.it.rec.layer !== 'none' && !b.it.rec.person ? b.it.rec.cat : null;
       if (!rc || rc === '未分类') return;
       var tol = Math.min(NEAR_FEN, Math.floor(b.fen * NEAR_RATE)), hits = [];
       if (tol <= 0) return;
@@ -352,7 +352,7 @@
         // 金额相近：3 天内，差额不超过 5 元和 20% 中较小的那个，高低都算
         if (tol > 0) scan(b.type, b.day, -EXACT_DAYS, EXACT_DAYS, b.fen - tol, b.fen + tol, function (m) { if (free(m) && m.fen !== b.fen && m.fen !== b.net) push('near', m); });
         // 部分付款：同一天，账单比手记少，推荐的分类和手记一样（推不出分类的不参与）
-        var rc = it.rec && it.rec.layer !== 'none' ? it.rec.cat : null;
+        var rc = it.rec && it.rec.layer !== 'none' && !it.rec.person ? it.rec.cat : null;
         // 1016-G：账单不到手记的三分之一不算（1 元配不上 29 元）
         if (rc && rc !== '未分类') scan(b.type, b.day, 0, 0, b.fen + tol + 1, b.fen * PARTIAL_MAX, function (m) { if (free(m) && m.cat === rc) push('partial', m); });
       }
@@ -497,7 +497,7 @@
       });
       it.trace = broken.concat(got.filter(function (m) { return !broken.some(function (x) { return x.record === m.id; }); }).slice(0, 8 - broken.length).map(function (m) {
         var dd = Math.abs(dayNo(m.time) - b.day), diff = m.fen - b.fen, why;
-        var rc = it.rec && it.rec.layer !== 'none' ? it.rec.cat : null;
+        var rc = it.rec && it.rec.layer !== 'none' && !it.rec.person ? it.rec.cat : null;
         if (m.type !== b.type) why = '收支不一样（账单是' + (b.type === 'income' ? '收入' : '支出') + '，手记是' + (m.type === 'income' ? '收入' : '支出') + '）';
         else if (mstate.get(m.id) === 'used') { var u = usedBy[m.id]; why = '已经和 ' + (u ? md(u.r.time) + ' ' + yuan(u.fen) + ' 元那笔账单' : '别的账单') + '合并了'; }
         else if (mstate.get(m.id) === 'reserved' && (it.cands || []).every(function (c) { return c.record !== m.id; })) why = reservedBy[m.id] === 'multisum' ? '留给了「几笔加起来正好是一条手记」那一组' : '留给了「金额一样、分不清谁是谁」那一组';
@@ -544,7 +544,7 @@
   // 候选排序（1017-UI5）：先看分类对不对得上（账单推荐的分类和手记一样），再看相差几天、金额差多少，最后看相差几分钟；第一条就是「最像」的。
   //   分类对不上、推不出分类的照样列，只是排后面
   function sortCands(b, cands) {
-    var t = minOf(b.r.time), rc = b.it.rec && b.it.rec.layer !== 'none' && b.it.rec.cat && b.it.rec.cat !== '未分类' ? b.it.rec.cat : null;
+    var t = minOf(b.r.time), rc = b.it.rec && b.it.rec.layer !== 'none' && !b.it.rec.person && b.it.rec.cat && b.it.rec.cat !== '未分类' ? b.it.rec.cat : null;
     var catOk = function (m) { return rc && m.cat === rc ? 0 : 1; };
     // 1017-UI6：手记比账单早一天以上的不当「最像」，排在最后
     var early = function (m) { return dayNo(m.time) < b.day ? 1 : 0; };
