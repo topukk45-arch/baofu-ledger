@@ -3139,6 +3139,9 @@
       if (l.kind === 'ai' && l.by === 'opt') {
         g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · 一键优化分类'));
         g.appendChild(el('div', 'imp-soft', '按现在的规则改了 ' + nChg + ' 条待确认分类的记录'));
+      } else if (l.kind === 'ai' && l.by === 'aigroup') {
+        g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · AI 按组整理'));
+        g.appendChild(el('div', 'imp-soft', '按 AI 的建议改了 ' + nChg + ' 条待确认分类的记录'));
       } else if (l.kind === 'ai' && l.by === 'rec') {
         g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · 重新分类'));
         g.appendChild(el('div', 'imp-soft', '按新规则重新分类了 ' + nChg + ' 条记录' + (ofL ? ' · 是 ' + String(ofL.at || '').replace('T', ' ').slice(5) + ' 那次导入的' : '')));
@@ -3885,7 +3888,99 @@
         col.appendChild(go); col.appendChild(cl); box.appendChild(col);
       } });
   }
-  var UI = { openOptimize: openOptimize, reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  // ---------- 导入简化第 14 版：AI 按组整理（原方案三-4）----------
+  //   待确认分类的记录（rvRows，不计的不算）按对方归组（个人带 *、平台、没有对方的按商品说明归），拼成一段交给 AI（ai.js 的 groupText，默认打码）；
+  //   AI 回「G号 | 分类 | 理由」（parseGroupReply），每组一张勾选卡（默认勾），「改这 N 条」照 AI 修改那套写（of '*'、by 'aigroup'，自动备份，能撤销，撤销时待确认放回）
+  var AIG = null, AIG_PLAT = /淘宝|天猫|京东|拼多多|抖音|唯品会|美团|饿了么|盒马|闪购|交易猫|闲鱼|快手/;
+  function aiGroupsOf(rows) {
+    var by = {}, order = [];
+    rows.filter(function (r) { return !r.skip; }).forEach(function (r) {
+      var cp = cpShow(r.cp || ''), desc = String(r.remark || '').trim().slice(0, 24);
+      var k = (!cp || cp.indexOf('*') >= 0 || AIG_PLAT.test(cp)) && desc ? '品：' + desc : (cp ? '方：' + cp : '品：' + (desc || '—'));
+      var g = by[k]; if (!g) { g = by[k] = { cp: k.indexOf('方：') === 0 ? cp : (cp.indexOf('*') >= 0 || AIG_PLAT.test(cp) ? cp : ''), desc: desc, oc: r.oc || '', n: 0, fen: 0, cats: {}, ids: [] }; order.push(k); }
+      g.n++; g.fen += r.fen; g.ids.push(r.id); g.cats[r.cat] = (g.cats[r.cat] || 0) + 1;
+    });
+    return order.map(function (k) { return by[k]; }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; })
+      .map(function (g, i) { g.g = i + 1; g.cat = Object.keys(g.cats).sort(function (a, b) { return g.cats[b] - g.cats[a]; })[0]; return g; });
+  }
+  function aiStamp() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
+  function openAiGroups() {
+    var J = window.JiwenSheet, AI = window.JiwenImportAI; if (!J || !AI) return;
+    var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e), 'AI 按组整理'); return; }
+    var gs = aiGroupsOf(rows);
+    if (!gs.length) { alertMsg('没有待确认分类的记录。', 'AI 按组整理'); return; }
+    AIG = { at: aiStamp(), groups: gs, cats: info.cats, off: {} };
+    var text = AI.groupText({ at: AIG.at, cats: info.cats, groups: gs }, { mask: true });
+    AIG.text = text;
+    J.open({ title: 'AI 按组整理', tall: true, sub: gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类', onDismiss: function () { AIG = null; },
+      body: function (box) {
+        box.appendChild(el('div', 'imp-soft', '把下面这段整个复制给 AI（豆包、Kimi、ChatGPT 都行），让它按组挑分类；再把它的回复整段粘贴回来。对方名、手机号已经打码，只发了每组的对方、商品说明、笔数、金额。'));
+        var ta = document.createElement('textarea'); ta.id = 'impAiGrpText'; ta.readOnly = true; ta.value = text; ta.className = 'imp-ai-text'; box.appendChild(ta);
+      },
+      foot: function (box, done) {
+        var col = el('div', 'ui-stack');
+        var cp = btn('复制全文', 'ui-btn primary block', function () { UI._lastCopy = text; copyText(text).then(function () { cp.textContent = '✓ 已复制'; }); }); cp.id = 'impAiGrpCopy';
+        var ps = btn('粘贴 AI 的回复', 'ui-btn block', function () { done(); aiGroupPaste(); }); ps.id = 'impAiGrpPaste';
+        var cl = btn('关闭', 'ui-btn block', function () { done(); AIG = null; }); cl.id = 'impAiGrpClose';
+        col.appendChild(cp); col.appendChild(ps); col.appendChild(cl); box.appendChild(col);
+      } });
+  }
+  var AIG_WHY = { noblock: '没找到记问的分组建议，请把 AI 的整段回复复制过来（要带上「记问分组建议 v1 导出 …」那一行）。',
+                  nohead: '第一行不是「记问分组建议 v1 导出 …」。请让 AI 原样抄那一行。', time: '这份回复的导出时间对不上（可能是更早导出的），整份不认。请重新复制全文发给 AI。' };
+  function aiGroupPaste() {
+    var J = window.JiwenSheet, A = AIG; if (!J || !A) return;
+    J.open({ title: '粘贴 AI 的回复', onDismiss: function () { AIG = null; },
+      body: function (box) {
+        var ta = document.createElement('textarea'); ta.id = 'impAiGrpReply'; ta.placeholder = '把 AI 的回复整段粘贴在这里'; box.appendChild(ta);
+        var msg = el('div', 'imp-soft imp-bad'); msg.id = 'impAiGrpMsg'; msg.style.marginTop = '8px'; box.appendChild(msg);
+        try { if (navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(function (x) { if (x && !ta.value) ta.value = x; }, function () {}); } catch (_) {}
+      },
+      foot: function (box, done) {
+        var col = el('div', 'ui-stack');
+        var go = btn('读这份回复', 'ui-btn primary block', function () {
+          var text = document.getElementById('impAiGrpReply').value, msg = document.getElementById('impAiGrpMsg');
+          if (!text.trim()) { msg.textContent = '还没粘贴。'; return; }
+          var r = window.JiwenImportAI.parseGroupReply(text, { at: A.at, cats: A.cats, n: A.groups.length });
+          if (!r.ok) { msg.textContent = AIG_WHY[r.why] || '读不出来。'; return; }
+          if (!r.items.filter(function (x) { var g = A.groups[x.g - 1]; return g && g.cat !== x.cat; }).length) { msg.textContent = 'AI 没提能用的建议' + (r.bad.length ? '（' + r.bad.length + ' 行没看懂）' : '') + '。'; return; }
+          A.reply = r; done(); paintAiGroups();
+        }); go.id = 'impAiGrpRead';
+        var no = btn('取消', 'ui-btn block', function () { done(); AIG = null; }); no.id = 'impAiGrpCancel';
+        col.appendChild(go); col.appendChild(no); box.appendChild(col);
+      } });
+  }
+  function paintAiGroups() {
+    var J = window.JiwenSheet, A = AIG; if (!J || !A || !A.reply) return;
+    var its = A.reply.items.filter(function (x) { var g = A.groups[x.g - 1]; return g && g.cat !== x.cat; });
+    var on = its.filter(function (x) { return !A.off[x.g]; }), n = on.reduce(function (s, x) { return s + A.groups[x.g - 1].n; }, 0);
+    J.open({ title: 'AI 的分组建议', tall: true, sub: 'AI 提了 ' + A.reply.items.length + ' 组，能用的 ' + its.length + ' 组' + (A.reply.bad.length ? '，没看懂 ' + A.reply.bad.length + ' 行' : ''), onDismiss: function () { AIG = null; },
+      body: function (box) {
+        its.forEach(function (x) {
+          var g = A.groups[x.g - 1], row = el('label', 'rvg-row imp-aig-row'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !A.off[x.g]; row.dataset.g = x.g;
+          cb.addEventListener('change', function () { if (cb.checked) delete A.off[x.g]; else A.off[x.g] = 1; paintAiGroups(); });
+          row.appendChild(cb);
+          var tx = el('span', 'rvg-r'); tx.appendChild(document.createTextNode('G' + g.g + ' ' + (cpShow(g.cp) || g.desc || '—') + (g.cp && g.desc ? '（' + cut(g.desc, 12) + '）' : '') + ' · ' + g.n + ' 笔：' + g.cat + ' → ' + x.cat));
+          if (x.why) tx.appendChild(el('div', 'imp-soft', 'AI 的理由：' + x.why));
+          row.appendChild(tx); row.appendChild(el('span', 'rvg-a', yuan(g.fen)));
+          box.appendChild(row);
+        });
+        if (A.reply.bad.length) { var bd = el('div', 'imp-soft imp-aig-bad', '没看懂的几行：' + A.reply.bad.map(function (b) { return '「' + cut(b.line, 20) + '」' + b.why; }).join('；')); box.appendChild(bd); }
+      },
+      foot: function (box, done) {
+        var col = el('div', 'ui-stack');
+        var go = btn(n ? '改这 ' + n + ' 条的分类' : '还没勾', 'ui-btn primary block', function () {
+          if (!n) return;
+          var changes = []; on.forEach(function (x) { A.groups[x.g - 1].ids.forEach(function (id) { changes.push({ id: id, set: { cat: x.cat } }); }); });
+          done(); AIG = null;
+          store().aiApply({ of: '*', by: 'aigroup', changes: changes }).then(function (w) {
+            alertMsg('已按 AI 的建议改了 ' + w.changed + ' 条的分类，这几条不再算待确认。\n\n改之前自动备份了；改错了可以在「导入记录」里「AI 按组整理」那一行点「撤销」（你后来又改过的不会动）。', 'AI 按组整理');
+          }, function (e) { alertMsg('没改成：' + (e && (e.code || e.message) || e) + '。账本没有动。', 'AI 按组整理'); });
+        }); go.id = 'impAiGrpGo'; go.disabled = !n;
+        var cl = btn('关闭', 'ui-btn block', function () { done(); AIG = null; }); cl.id = 'impAiGrpDone';
+        col.appendChild(go); col.appendChild(cl); box.appendChild(col);
+      } });
+  }
+  var UI = { openAiGroups: openAiGroups, openOptimize: openOptimize, reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _plainReason: function (r) { return plainReason(r); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

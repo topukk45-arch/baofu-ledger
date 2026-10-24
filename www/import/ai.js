@@ -269,6 +269,62 @@
     return order.map(function (id) { return by[id]; });
   }
 
+  // ---------- 导入简化第 14 版：AI 按组整理（原方案三-4）----------
+  //   待确认分类的记录按对方（个人 / 平台按商品说明）分成组，一组一行交给 AI：「G号 | 对方 | 商品说明 | N 笔 | 共 x 元 | 现在的分类」；
+  //   AI 回一行一组「G号 | 改成的分类 | 理由」，放在 ```记问 代码块里、第一行原样抄 groupHead(导出时间)。只能改分类，分类要在名单里。
+  //   d = { at, cats, groups:[{ g, cp, desc, n, fen, cat, oc }] }，opts = { mask }（打码：手机号、长数字、个人对方写「个人」）
+  var GROUP_HEAD = '记问分组建议 v1';
+  function groupHead(at) { return GROUP_HEAD + ' 导出 ' + at; }
+  function groupText(d, opts) {
+    opts = opts || {}; var mk = opts.mask !== false;
+    var L = [];
+    L.push('记问 · 待确认分类按组整理（导出 ' + d.at + '）');
+    L.push('');
+    L.push('下面是我账本里分类还没确认的记录，按交易对方（个人、平台按商品说明）分成了 ' + d.groups.length + ' 组。请按组帮我挑一个分类，只能从「可选的分类」里选；拿不准的组不用写。');
+    L.push('回复放在 ```记问 代码块里，第一行原样抄：' + groupHead(d.at));
+    L.push('然后一行一组：G号 | 改成的分类 | 理由（一句话）');
+    L.push('');
+    L.push('可选的分类：' + (d.cats || []).filter(function (c) { return c !== '未分类'; }).join('、'));
+    L.push('');
+    L.push('分组（G号 | 对方 | 商品说明 | 笔数 | 金额 | 现在的分类）：');
+    d.groups.forEach(function (g) {
+      var cp = mk && personal(g.cp, g.oc, g.desc) ? '个人' : (mk ? mask(g.cp || '') : (g.cp || ''));
+      var ds = mk ? mask(g.desc || '') : (g.desc || '');
+      L.push('G' + g.g + ' | ' + (cp || '—') + ' | ' + (ds || '—') + ' | ' + g.n + ' 笔 | 共 ' + (g.fen / 100).toFixed(2) + ' 元 | ' + (g.cat || '未分类'));
+    });
+    return L.join('\n');
+  }
+  // ctx = { at, cats, n（几组）}：→ { ok, why, items:[{ g, cat, why }], bad:[{ line, why }] }
+  var GROUP_HEAD_RE = /^记问分组建议\s*v1\s*导出\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*$/;
+  function parseGroupReply(text, ctx) {
+    text = String(text == null ? '' : text).replace(/\r\n?/g, '\n'); ctx = ctx || {};
+    var bs = blocks(text), lines = [];
+    if (bs.length) bs.forEach(function (b) { b.split('\n').forEach(function (l) { l = normLine(l); if (l) lines.push(l); }); });
+    else {   // 没有围栏：从开头那一行往下读「G号 | …」
+      var reading = false;
+      text.split('\n').forEach(function (raw) { var l = normLine(raw).replace(/^[`*]+|[`*]+$/g, '').trim();
+        if (GROUP_HEAD_RE.test(l)) { lines.push(l); reading = true; return; }
+        if (reading && l && /^G\s*\d+\s*\|/i.test(l)) lines.push(l); else if (reading && l) reading = false; });
+    }
+    if (!lines.length) return { ok: false, why: 'noblock' };
+    var hm = GROUP_HEAD_RE.exec((lines[0] || '').replace(/^[`*]+|[`*]+$/g, '').trim());
+    if (!hm) return { ok: false, why: 'nohead', line: lines[0] || '' };
+    if (hm[1] !== ctx.at) return { ok: false, why: 'time', got: hm[1], want: ctx.at };
+    var items = [], bad = [], seen = {}, cats = (ctx.cats || []).filter(function (c) { return c !== '未分类'; });
+    lines.slice(1).forEach(function (l) {
+      var c = cellsOf(l), m = /^G\s*(\d+)$/i.exec(c[0] || '');
+      if (!m || c.length < 2) { bad.push({ line: l, why: '格式不对（要「G号 | 分类 | 理由」）' }); return; }
+      var g = +m[1], cat = String(c[1] || '').replace(/^改成[「“"]?|[」”"]$/g, '').replace(/^[「“"]|[」”"]$/g, '').trim();
+      if (!(g >= 1 && g <= (ctx.n || 0))) { bad.push({ line: l, why: '没有 G' + g + ' 这一组' }); return; }
+      if (cats.indexOf(cat) < 0) { bad.push({ line: l, why: '「' + cat + '」不在可选的分类里' }); return; }
+      if (seen[g]) { bad.push({ line: l, why: 'G' + g + ' 第二次出现，只认第一次' }); return; }
+      seen[g] = 1;
+      items.push({ g: g, cat: cat, why: [c[2], c[3]].filter(Boolean).join(' | ').slice(0, REMARK_MAX) });
+    });
+    return { ok: true, items: items, bad: bad };
+  }
+
   return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, changesOf: changesOf, HEAD: HEAD, MODE_NAME: MODE_NAME, MODE_OF: MODE_OF, FLAG_OF: FLAG_OF, REMARK_MAX: REMARK_MAX,
-           mask: mask, personal: personal, exportText: exportText, replyHead: replyHead, parseReply: parseReply };
+           mask: mask, personal: personal, exportText: exportText, replyHead: replyHead, parseReply: parseReply,
+           GROUP_HEAD: GROUP_HEAD, groupHead: groupHead, groupText: groupText, parseGroupReply: parseGroupReply };
 });

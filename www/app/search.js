@@ -221,7 +221,7 @@
                     // 批量：有条件、搜到了才有（没条件就等于全部记录，一不小心就改了整本账）；范围 = 这里列出来的全部
                     + (any ? `<button type="button" class="sp-batch" id="batchBar" data-act="batch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>批量改</button>` : '')
                     // 导入简化第 5 版：看的是待确认分类：「逐条确认 ›」「成组确认 ›」
-                    + (searchState.rv && asc.some(r=>r.rv===1) ? `<span class="sp-rv-acts"><button type="button" class="sp-rv-b" id="rvOneBtn" data-act="rvone">逐条确认 ›</button><button type="button" class="sp-rv-b" id="rvGroupBtn" data-act="rvgroup">成组确认 ›</button></span>` : '')
+                    + (searchState.rv && asc.some(r=>r.rv===1) ? `<span class="sp-rv-acts"><button type="button" class="sp-rv-b" id="rvOneBtn" data-act="rvone">逐条确认 ›</button><button type="button" class="sp-rv-b" id="rvGroupBtn" data-act="rvgroup">成组确认 ›</button><button type="button" class="sp-rv-b" id="rvAiBtn" data-act="rvai">交给 AI 按组整理 ›</button></span>` : '')
                 : '';
             sum.hidden=!asc.length;
             // 底部按钮：有条件「清空条件 | 改条件」，没条件只有一个「设条件」
@@ -255,6 +255,7 @@
             if(e.target.closest('[data-act="batch"]')) openBatchMenu();
             else if(e.target.closest('[data-act="rvone"]')) openRvOne(0);
             else if(e.target.closest('[data-act="rvgroup"]')) openRvGroups();
+            else if(e.target.closest('[data-act="rvai"]')) loadImportUI().then(ui=>ui.openAiGroups()).catch(err=>customAlert('导入模块没加载上：' + (err && err.message || err), 'AI 按组整理'));   // 导入简化第 14 版
         });
         list.addEventListener('click', e=>{
             const row=e.target.closest('.bl-row[data-id]'); if(row){ openDetail(row.dataset.id); return; }

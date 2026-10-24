@@ -122,6 +122,12 @@ async function round(seed, mode) {
       trace.push('AI修改');
       try { await t.st().aiApply({ of: lg.b, changes: [{ id, set }] }, {}); } catch (e) { if (e.code !== 'nothing') throw e; }
     },
+    // 第 14 版：AI 按组整理（of '*'、by 'aigroup'）：改一条待确认分类的记录
+    async aig() {
+      const rs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].records.filter(x => x.rv === 1 && !x.refundOf); if (!rs.length) return;
+      const r = pick(rs), to = pick(CATS.filter(c => c !== '未分类' && c !== r.cat)); trace.push('AI按组整理');
+      try { await t.st().aiApply({ of: '*', by: 'aigroup', changes: [{ id: r.id, set: { cat: to } }] }, {}); } catch (e) { if (e.code !== 'nothing') throw e; }
+    },
     // 7b：按天对账，对不上的天都选「以账单为准」（手记标 rp:1）
     async dayBill() {
       await t.importFiles(pick(FILES), null, { noGo: true, stay: true });
@@ -180,7 +186,7 @@ async function round(seed, mode) {
     async ns() { const k = '2026-10-' + String(1 + Math.floor(R() * 28)).padStart(2, '0'), on = R() < 0.7; trace.push((on ? '标' : '取消') + '没花钱'); manual = true; t.w.JiwenStore.noSpendSet([k], on); await t.idle(); },
     async rules() { const cs = t.w.JiwenStore.loadStore(A.ID).archives[ARCH].cats.filter(c => c !== '未分类'); trace.push('改规则'); manual = true; await t.st().rulesSave({ cat: [{ kw: '某虚构超市', cat: pick(cs) }], type: [] }); },
   };
-  const W = mode === 1 ? { imp: 5, ai: 3, opt: 1, dayBill: 1, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, opt: 1, dayBill: 1, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1, ns: 1 };
+  const W = mode === 1 ? { imp: 5, ai: 3, opt: 1, aig: 1, dayBill: 1, undoLast: 3, undoMid: 2, restore: 3, pend: 2, split: 2, only: 1 } : { imp: 4, ai: 2, opt: 1, aig: 1, dayBill: 1, undoLast: 2, undoMid: 1, restore: 2, pend: 2, split: 1, add: 2, del: 2, forget: 1, ren: 1, delCat: 1, rules: 1, unflag: 1, ns: 1 };
   const bag = []; Object.keys(W).forEach(k => { for (let i = 0; i < W[k]; i++) bag.push(k); });
   let good = true;
   for (let s = 0; s < STEPS && good; s++) {
