@@ -974,7 +974,8 @@
                 if(!x || typeof x!=='object') return null;
                 const kw=typeof x.kw==='string' ? x.kw.trim().slice(0, 32) : '';
                 const c=typeof x.cat==='string' ? x.cat : '';
-                return (kw && cats.includes(c)) ? { kw, cat:c } : null;
+                // 导入简化第 9 版：on:'desc' 认商品说明（没有 = 认交易对方，和原来一样）
+                return (kw && cats.includes(c)) ? (x.on==='desc' ? { kw, cat:c, on:'desc' } : { kw, cat:c }) : null;
             }).filter(Boolean);
             const type=(Array.isArray(r.type) ? r.type : []).slice(0, 500).map(x=>{
                 if(!x || typeof x!=='object' || !IMP_APPS.includes(x.app)) return null;
@@ -1099,7 +1100,7 @@
                 if(Array.isArray(x.aiAt)){ const aa=x.aiAt.filter(v=>typeof v==='string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v)).slice(-5); if(aa.length) o.aiAt=aa; }
                 // 1016-Y：这次改了你已有的哪几条规则（关键词、原来的分类、改成的分类），撤销时改回去
                 if(Array.isArray(x.rulesChanged)){
-                    const rc=x.rulesChanged.filter(r=>r && typeof r.kw==='string' && r.kw && typeof r.from==='string' && typeof r.to==='string').map(r=>({ kw:r.kw.slice(0, 32), from:r.from, to:r.to }));
+                    const rc=x.rulesChanged.filter(r=>r && typeof r.kw==='string' && r.kw && typeof r.from==='string' && typeof r.to==='string').map(r=>Object.assign({ kw:r.kw.slice(0, 32), from:r.from, to:r.to }, r.on==='desc' ? { on:'desc' } : {}));
                     if(rc.length) o.rulesChanged=rc;
                 }
                 // 1016-U：每个来源各自的账单起止 { 来源: [起, 止] }（记住上次导到哪天）
@@ -1385,11 +1386,12 @@
             const rulesChanged=[];
             (Array.isArray(ws.rulesChange) ? ws.rulesChange : []).forEach(x=>{
                 if(!x || typeof x.kw!=='string' || !a.cats.includes(x.to)) return;
-                const r0=a.importRules||{}, list=(r0.cat||[]).slice(), i=list.findIndex(r=>r.kw===x.kw && r.cat===x.from);
+                const on=x.on==='desc' ? { on:'desc' } : {};
+                const r0=a.importRules||{}, list=(r0.cat||[]).slice(), i=list.findIndex(r=>r.kw===x.kw && r.cat===x.from && (r.on||'')===(x.on==='desc' ? 'desc' : ''));
                 if(i<0) return;
-                list[i]={ kw:x.kw, cat:x.to };
+                list[i]=Object.assign({ kw:x.kw, cat:x.to }, on);
                 a.importRules=Object.assign({}, r0, { cat:list, type:(r0.type||[]) });
-                rulesChanged.push({ kw:x.kw, from:x.from, to:x.to });
+                rulesChanged.push(Object.assign({ kw:x.kw, from:x.from, to:x.to }, on));
             });
             // 1016-M：类型规则（没见过的交易类型 / 状态选了怎么处理）：同一来源、同一类型（状态）已有规则的不重复存
             const typesAdd0=(Array.isArray(ws.typesAdd) ? ws.typesAdd : []).filter(x=>x && IMP_APPS.includes(x.app) && (

@@ -1,6 +1,6 @@
 // 1021-T14（实测 10-20 第 3 轮）第 4 步「分类」只列组：未分类和推荐把握低的都进组；按清洗后的对方归，平台 / 个人按清洗后的商品说明归
 // （「品：…」，去数字、单号、括号）；只有 2 笔以上的列出来，其余算进 cpRest（照推荐入账、标待确认分类）；组上写商品说明、推荐、疑点；
-// 按商品说明归的组选了分类不存规则；没选的写进账本带 rv。jsdom 那段：展开看逐笔、先显示 20 组。node zZzZt-step4-groups.test.js [index.html]。账单虚构。
+// 按商品说明归的组选了分类存成认商品说明的规则（导入简化第 9 版起，原来不存）；没选的写进账本带 rv。jsdom 那段：展开看逐笔、先显示 20 组。node zZzZt-step4-groups.test.js [index.html]。账单虚构。
 const fs = require('fs'), path = require('path');
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
 const IMP = path.join(path.dirname(htmlFile), 'import');
@@ -32,8 +32,9 @@ ok(g1.doubts.length === 0 || g1.doubts.every(x => typeof x === 'string'), '1 疑
 // 选了分类：对方组存规则，商品说明组不存
 const p2 = PL.plan(input, { cpCats: { '某虚构科技有限公司': '游戏', '品：果切': '餐饮' } });
 const ws = WR.build(input, p2, { batch: 'b1', at: '2026-10-20T10:00', cpCats: { '某虚构科技有限公司': '游戏', '品：果切': '餐饮' } });
-const kws = (ws.rules || ws.rulesAdd || (ws.log && ws.log.rulesAdded && ws.log.rulesAdded.cat) || []).map(r => r.kw);
-ok(kws.includes('某虚构科技有限公司') && !kws.some(k => /^品：/.test(k)), '2 对方组存规则、按商品说明归的组不存：' + kws.join('、'));
+const rs = (ws.rules || ws.rulesAdd || (ws.log && ws.log.rulesAdded && ws.log.rulesAdded.cat) || []), kws = rs.map(r => r.kw);
+// 导入简化第 9 版：对方组的关键词收短（去掉「有限公司」）；按商品说明归的组存成认商品说明的规则（on:'desc'）
+ok(rs.some(r => r.kw === '某虚构科技' && r.cat === '游戏' && !r.on) && rs.some(r => r.kw === '果切' && r.cat === '餐饮' && r.on === 'desc') && !kws.some(k => /^品：/.test(k)), '2 对方组存规则（关键词收短）、按商品说明归的组存成认商品说明的规则：' + JSON.stringify(rs));
 ok(ws.records.filter(r => r.cat === '游戏').length === 3 && ws.records.filter(r => r.cat === '餐饮').length === 2 && ws.records.filter(r => r.rv).length === 1, '2 选了的不带 rv，没进组的那 1 笔带 rv');
 const ws0 = WR.build(input, p, { batch: 'b1', at: '2026-10-20T10:00' });
 ok(ws0.records.filter(r => r.rv).length === 6, '2 什么都不选：6 笔都照推荐入账、带 rv');

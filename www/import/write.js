@@ -230,22 +230,28 @@
     // ---- 分类、规则 ----
     var catsAdded = [];
     recs.forEach(function (r) { if (r.cat && cats.indexOf(r.cat) < 0 && catsAdded.indexOf(r.cat) < 0) catsAdded.push(r.cat); });
-    var have = {}; (info.catRules || []).forEach(function (r) { if (r && r.kw) have[r.kw] = r.cat; });
+    // 导入简化第 9 版：规则分认对方的和认商品说明的（on:'desc'），have 的键：认对方的就是关键词，认商品说明的前面加「d:」
+    var have = {}; (info.catRules || []).forEach(function (r) { if (r && r.kw) have[(r.on === 'desc' ? 'd:' : '') + r.kw] = r.cat; });
     var rulesAdd = [], rulesChange = [], learnedN = 0;
     var okCat = function (c) { return c && c !== '未分类' && (cats.indexOf(c) >= 0 || catsAdded.indexOf(c) >= 0); };
     // 确认页「按对方选分类」选了的：记成你的规则（1016-Y：这个关键词已经有规则、分类不一样的，改那条规则，不再加一条一样的关键词）
-    Object.keys(ctx.cpCats || {}).forEach(function (kw) {
-      var cat = ctx.cpCats[kw];
-      if (!kw || !cat || cat === '未分类' || have[kw] === cat || kw.indexOf('（') === 0 || kw.indexOf('品：') === 0) return;   // 1021-T14：按商品说明归的组不存规则（规则只认对方）
-      if (have[kw] !== undefined) rulesChange.push({ kw: kw, from: have[kw], to: cat });
-      else { rulesAdd.push({ kw: kw, cat: cat }); have[kw] = cat; }
+    //   导入简化第 9 版：关键词用组上收短过的（确认页能改，plan.js 的 cpGroups[].kw）；按商品说明归的组（「品：」）存成认商品说明的规则
+    var cpgOf = {}; ((p.sections && p.sections.cpGroups) || []).forEach(function (g) { cpgOf[g.cp] = g; });
+    Object.keys(ctx.cpCats || {}).forEach(function (gk) {
+      var cat = ctx.cpCats[gk], g = cpgOf[gk];
+      if (!gk || !cat || cat === '未分类' || gk.indexOf('（') === 0) return;
+      var desc = gk.indexOf('品：') === 0, kw = g && g.kw ? g.kw : (desc ? gk.slice(2) : gk), hk = (desc ? 'd:' : '') + kw;
+      if (!kw || have[hk] === cat) return;
+      if (have[hk] !== undefined) rulesChange.push(desc ? { kw: kw, from: have[hk], to: cat, on: 'desc' } : { kw: kw, from: have[hk], to: cat });
+      else { rulesAdd.push(desc ? { kw: kw, cat: cat, on: 'desc' } : { kw: kw, cat: cat }); have[hk] = cat; }
     });
     // 1016-Y：你的规则归的分类被你在确认页改掉、选了「以后都改」：改那条规则
     Object.keys(ctx.ruleFix || {}).forEach(function (kw) {
       var cat = ctx.ruleFix[kw];
-      if (!kw || !okCat(cat) || have[kw] === undefined || have[kw] === cat) return;
+      var dk = have[kw] === undefined && have['d:' + kw] !== undefined, hk = (dk ? 'd:' : '') + kw;     // 第 9 版：认商品说明的规则也能「以后都改」
+      if (!kw || !okCat(cat) || have[hk] === undefined || have[hk] === cat) return;
       if (rulesChange.some(function (x) { return x.kw === kw; })) return;
-      rulesChange.push({ kw: kw, from: have[kw], to: cat });
+      rulesChange.push(dk ? { kw: kw, from: have[hk], to: cat, on: 'desc' } : { kw: kw, from: have[hk], to: cat });
     });
     // 1016-Y：从合并里学到的（同一对方至少合并上 2 次、分类一致、没矛盾）：存成你的规则；已经有这个关键词的规则就不存
     ((input.matched && input.matched.learned) || []).forEach(function (x) {

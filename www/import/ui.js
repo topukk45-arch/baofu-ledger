@@ -330,7 +330,7 @@
   // ---------- 打开 / 关掉 ----------
   function open() {
     build(); setTokens(); stashResult(null);   // 1021-T23：开始新的一次导入，「回到导入结果」就不要了
-    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {} }, types: {}, statuses: {},
+    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {}, cpKw: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {}, seen: {}, more: {}, step: null } };
     try { dom.archive.textContent = '导入到存档「' + store().archiveInfo().name + '」'; } catch (_) { dom.archive.textContent = ''; }
     dom.page.style.display = 'block'; barSet([]);
@@ -392,7 +392,7 @@
   function resume(d) {
     if (!S || S.phase !== 'pick') return;
     var e = d.edits || {};
-    S.edits = Object.assign({ rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {} }, e);
+    S.edits = Object.assign({ rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {}, cpKw: {} }, e);
     S.types = d.types || {}; S.statuses = d.statuses || {};
     var v = d.view || {};
     S.view.step = v.step || null; S.view.seen = v.seen || {}; if (v.reconPick) S.view.reconPick = v.reconPick;
@@ -437,7 +437,7 @@
     runId++;
     if (J()) try { J().cancel(); } catch (_) {}
     dom.prog.style.display = 'none'; closeSheet(); closePicker();
-    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {} }, types: {}, statuses: {},
+    S = { phase: 'pick', edits: { rows: {}, cpCats: {}, newCats: {}, petty: {}, sums: {}, ruleFix: {}, days: {}, cpKw: {} }, types: {}, statuses: {},
           view: { details: false, open: {}, shown: {}, tag: null, sumOpen: {}, moreCands: {}, seen: {}, more: {}, step: null } };
     hideSteps();
     renderPick();
@@ -463,7 +463,7 @@
     if (!S || !S.edits) return 0;
     var e = S.edits, n = 0;
     Object.keys(e.rows || {}).forEach(function (k) { n += Object.keys(e.rows[k]).length; });
-    ['cpCats', 'newCats', 'petty', 'sums', 'ruleFix', 'days'].forEach(function (k) { n += Object.keys(e[k] || {}).length; });
+    ['cpCats', 'newCats', 'petty', 'sums', 'ruleFix', 'days', 'cpKw'].forEach(function (k) { n += Object.keys(e[k] || {}).length; });
     n += Object.keys(S.types || {}).length + Object.keys(S.statuses || {}).length;
     if (e.nearPay) n++;
     if (e.receipt !== undefined) n++;
@@ -1923,12 +1923,25 @@
         });
         tg.dataset.of = 'cp:' + g.cp;
         gc.appendChild(tg);
+        // 导入简化第 9 版：选了分类的组：存成规则时用的关键词（自动收短过），能改
+        if (g.kw && (g.cp in S.edits.cpCats)) {
+          var kl = el('div', 'imp-soft imp-cp-kw'); kl.dataset.of = 'cp:' + g.cp;
+          kl.appendChild(document.createTextNode('以后' + (g.by === 'desc' ? '商品说明' : '对方') + '里有「' + g.kw + '」的都记成「' + g.cat + '」 '));
+          kl.appendChild(btn('改关键词', 'imp-link imp-cp-kwedit', function (ev) {
+            ev.stopPropagation();
+            window.customPrompt('存成规则时用的关键词：' + (g.by === 'desc' ? '商品说明' : '交易对方') + '里有这几个字的，以后都记成「' + g.cat + '」。\n\n写短一点能认出同一家的别的分店，太短会认错。', g.kw, function (v) {
+              v = String(v || '').trim().slice(0, 32); if (!v) return;
+              S.edits.cpKw = S.edits.cpKw || {}; S.edits.cpKw[g.cp] = v; replan();
+            }, '改关键词');
+          }));
+          gc.appendChild(kl);
+        }
       });
       if (s.cpGroups.length > showN) {
         var mb = btn('再显示 ' + Math.min(CP_SHOW_N, s.cpGroups.length - showN) + ' 组（还有 ' + (s.cpGroups.length - showN) + ' 组）', 'ui-btn block imp-cp-more', function () { S.view.cpShowN = showN + CP_SHOW_N; render(); });
         gc.appendChild(mb);
       }
-      gc.appendChild(el('div', 'imp-soft', '不选的照推荐入账、标「待确认分类」。选了的导入时记成你的规则（按商品说明归的组不存规则），以后同一个对方直接归过去（规则只管以后的导入，不改已经入账的）。'));
+      gc.appendChild(el('div', 'imp-soft', '不选的照推荐入账、标「待确认分类」。选了的导入时记成你的规则（按商品说明归的组记成认商品说明的规则），以后同一个对方（同样的商品说明）直接归过去（规则只管以后的导入，不改已经入账的）。'));
       out.cpGroups = gc;
     }
     // 多笔合一（1017-UI8：配对卡）。组里各种选法的手记一样时，「你记的」只在组顶上写一次；几笔加起来的、一笔账单的分开叫
@@ -3519,12 +3532,13 @@
     // 分类规则
     var c1 = el('div', 'imp-card'); c1.id = 'impRulesCat';
     c1.appendChild(el('h4', null, '分类规则（' + rules.cat.length + '）'));
-    c1.appendChild(el('div', 'imp-soft', '交易对方里有这个词，就归到这个分类。导入时你选过的、从合并里学到的都在这里；只管以后的导入。'));
+    c1.appendChild(el('div', 'imp-soft', '交易对方里有这个词，就归到这个分类（写着「商品说明」的认商品说明）。导入时你选过的、从合并里学到的都在这里；只管以后的导入。'));
     if (!rules.cat.length) c1.appendChild(el('div', 'imp-soft', '还没有。可以在最下面加一条，或者导入时在「按对方选分类」里选过就会记在这里。'));
     rules.cat.forEach(function (r, i) {
-      var row = el('div', 'imp-row-opt imp-rule-row'); row.dataset.kw = r.kw;
-      row.appendChild(el('span', 'grow', '「' + r.kw + '」→'));
-      row.appendChild(wrapSel(catSel(r.cat, function (v) { var n = rules.cat.slice(); n[i] = { kw: r.kw, cat: v }; save(Object.assign({}, rules, { cat: n }), '已改：「' + r.kw + '」→ ' + v); }, 'imp-rule-cat'), '交易对方里有「' + r.kw + '」的'));
+      var row = el('div', 'imp-row-opt imp-rule-row'); row.dataset.kw = r.kw; if (r.on === 'desc') row.dataset.on = 'desc';
+      var wh = r.on === 'desc' ? '商品说明' : '交易对方';     // 导入简化第 9 版：认商品说明的规则
+      row.appendChild(el('span', 'grow', (r.on === 'desc' ? '商品说明「' : '「') + r.kw + '」→'));
+      row.appendChild(wrapSel(catSel(r.cat, function (v) { var n = rules.cat.slice(); n[i] = r.on === 'desc' ? { kw: r.kw, cat: v, on: 'desc' } : { kw: r.kw, cat: v }; save(Object.assign({}, rules, { cat: n }), '已改：「' + r.kw + '」→ ' + v); }, 'imp-rule-cat'), wh + '里有「' + r.kw + '」的'));
       row.appendChild(btn('删除', 'imp-btn imp-rule-del', function () { save(Object.assign({}, rules, { cat: rules.cat.filter(function (_, k) { return k !== i; }) }), '已删：「' + r.kw + '」'); }));
       c1.appendChild(row);
     });
@@ -3535,7 +3549,7 @@
     var ab = btn('添加', 'imp-btn gold', function () {
       var k = kw.value.trim();
       if (!k) { alertMsg('先写一个词。', '管理导入规则'); return; }
-      if (rules.cat.some(function (r) { return r.kw === k; })) { alertMsg('「' + k + '」已经有规则了，在上面改它的分类就行。', '管理导入规则'); return; }
+      if (rules.cat.some(function (r) { return r.kw === k && r.on !== 'desc'; })) { alertMsg('「' + k + '」已经有规则了，在上面改它的分类就行。', '管理导入规则'); return; }
       save(Object.assign({}, rules, { cat: rules.cat.concat([{ kw: k, cat: ac.value }]) }), '已加：「' + k + '」→ ' + ac.value);
     }); ab.id = 'impRuleAddBtn';
     add.appendChild(ab);

@@ -153,15 +153,15 @@
     if (ir) {
       var o = Object.assign({}, ir), cat = (o.cat || []).slice(), type = (o.type || []).slice(), map = (o.map || []).slice(), big = (o.big || []).slice(), hab = (o.sum || []).slice();
       var dropLast = function (arr, eq) { for (var x = arr.length - 1; x >= 0; x--) if (eq(arr[x])) { arr.splice(x, 1); return true; } return false; };
-      (ra.cat || []).forEach(function (q) { if (dropLast(cat, function (r) { return r.kw === q.kw && r.cat === q.cat; })) sum.rulesRemoved++; });
+      (ra.cat || []).forEach(function (q) { if (dropLast(cat, function (r) { return r.kw === q.kw && r.cat === q.cat && (r.on || '') === (q.on || ''); })) sum.rulesRemoved++; });
       (ra.type || []).forEach(function (q) { if (dropLast(type, function (r) { return r.app === q.app && r.type === q.type && r.status === q.status && r.as === q.as; })) sum.typesRemoved++; });
       (ra.map || []).forEach(function (q) { if (dropLast(map, function (m) { return m.from === q.from && m.cat === q.cat; })) sum.mapsRemoved++; });
       (ra.big || []).forEach(function (q) { if (dropLast(big, function (b) { return b.cp === q.cp && b.fen === q.fen && b.mode === q.mode; })) sum.bigRemoved = (sum.bigRemoved || 0) + 1; });   // 导入简化第 3 版：大额的选法
       (ra.sum || []).forEach(function (q) { if (dropLast(hab, function (b) { return b.cp === q.cp; })) sum.habitRemoved = (sum.habitRemoved || 0) + 1; });   // 7c：对账习惯
       // 1016-Y：这批改过的你的规则：现在还是改成的那个分类，就改回原来的（原来的分类已经没了就不动）
       (log.rulesChanged || []).slice().reverse().forEach(function (q) {
-        for (var x = cat.length - 1; x >= 0; x--) if (cat[x].kw === q.kw && cat[x].cat === q.to) {
-          if (S.cats.indexOf(q.from) >= 0) { cat[x] = { kw: q.kw, cat: q.from }; sum.rulesRestored++; }
+        for (var x = cat.length - 1; x >= 0; x--) if (cat[x].kw === q.kw && cat[x].cat === q.to && (cat[x].on || '') === (q.on || '')) {
+          if (S.cats.indexOf(q.from) >= 0) { cat[x] = q.on === 'desc' ? { kw: q.kw, cat: q.from, on: 'desc' } : { kw: q.kw, cat: q.from }; sum.rulesRestored++; }
           return;
         }
       });

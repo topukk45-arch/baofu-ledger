@@ -169,10 +169,16 @@
 
     var raw = rows.map(function (r) {
       var cp = r.cp || '', cc = cleanCp(cp);
-      // 1. 你的规则
+      // 1. 你的规则：先认交易对方的，再认商品说明的（导入简化第 9 版：on:'desc'）
       for (var i = 0; i < rules.length; i++) {
         var kw = rules[i].kw;
+        if (rules[i].on === 'desc') continue;
         if (cp.indexOf(kw) >= 0 || cc.indexOf(kw) >= 0) return { cat: rules[i].cat, layer: 'rule', conf: 'high', reason: '你的规则：' + kw + ' → ' + rules[i].cat, kw: kw };
+      }
+      var ds0 = String(r.desc || '');
+      if (ds0) for (var j = 0; j < rules.length; j++) {
+        if (rules[j].on !== 'desc') continue;
+        if (ds0.indexOf(rules[j].kw) >= 0) return { cat: rules[j].cat, layer: 'rule', conf: 'high', reason: '你的规则：商品说明里有「' + rules[j].kw + '」→ ' + rules[j].cat, kw: rules[j].kw, on: 'desc' };
       }
       // 2. 从本批合并里学
       if (cc && learned.has(cc)) { var lc = learned.get(cc); return { cat: lc, layer: 'learned', conf: 'high', reason: '从合并里学：「' + cc + '」你记成' + lc }; }
@@ -263,6 +269,7 @@
     var recs = raw.map(function (x) {
       var o = { cat: x.cat, want: x.want || x.cat, layer: x.layer, conf: x.conf, reason: x.reason };
       if (x.kw) o.kw = x.kw;          // 1016-Y：命中的是你的哪条规则（确认页改了分类时问「以后都改吗」）
+      if (x.on) o.on = x.on;          // 导入简化第 9 版：认商品说明的规则
       if (!x.cat) {
         var p = plan[x.want];
         o.newCat = x.want;

@@ -349,6 +349,18 @@
       do { prev = t; t = t.replace(/[（(【\[][^（()）【】\[\]]*[)）】\]]/g, ''); } while (t !== prev);
       return t.replace(/[0-9０-９]+/g, '').replace(/[\s\-_·:：#*.,，、\/|]+/g, ' ').trim();
     };
+    // 导入简化第 9 版：从对方存规则时关键词收短：去掉括号里的、公司后缀（有限公司、集团……）、末尾的分店名（「某某面馆朝阳店」→「某某面馆」），
+    //   「便利店」「书店」这种店名本身就是店的不收；收完不到 2 个字就用原来的。确认页能改（edits.cpKw）
+    var SHOP_TAIL = /(便利店|专卖店|旗舰店|书店|花店|饭店|酒店|商店|药店|面包店|水果店|蛋糕店|五金店|小吃店|快餐店|服装店|鞋店|眼镜店|门店|分店|总店)$/;
+    var shrinkKw = function (k) {
+      var t = String(k || ''), prev;
+      do { prev = t; t = t.replace(/[（(【\[][^（()）【】\[\]]*[)）】\]]/g, '').trim(); } while (t !== prev);
+      do { prev = t; t = t.replace(/(股份)?有限(责任)?公司$|分公司$|集团$|股份$/, '').trim(); } while (t !== prev);
+      var m = /^(.{4,})([\u4e00-\u9fa5]{2,4}店)$/.exec(t);
+      if (m && !SHOP_TAIL.test(m[2]) && !SHOP_TAIL.test(m[1])) t = m[1];
+      return t.length >= 2 ? t.slice(0, 32) : String(k || '').slice(0, 32);
+    };
+    var cpKwE = edits.cpKw || {};
     var groupKeyOf = function (d) {
       var cp = String(d.cp || '');
       if (cp.indexOf('*') >= 0 || GROUP_PLAT_RE.test(cp)) { var dk = descKey(d.desc || ''); if (dk.length >= 2) return '品：' + dk; }
@@ -504,7 +516,8 @@
       if (descs.length > 1) doubts.push('商品说明不止一种');
       return { cp: g.cp, n: g.n, fen: g.fen, min: g.min, max: g.max, hour: hour, cat: cpCats[k] || null, keys: g.keys,
                hint: patternHint(g.keys.length, g.wd, g.we, g.hours), others: g.others || null, refundN: g.refundN || 0, refundFen: g.refundFen || 0,
-               by: g.cp.indexOf('品：') === 0 ? 'desc' : 'cp', descs: descs.slice(0, 2), rec: recCat && recCat !== '未分类' ? { cat: recCat, reason: g.recs[recCat].reason, conf: g.recs[recCat].conf || null } : null, doubts: doubts };
+               by: g.cp.indexOf('品：') === 0 ? 'desc' : 'cp', descs: descs.slice(0, 2),
+               kw: g.cp.indexOf('品：') === 0 ? (cpKwE[k] || g.cp.slice(2)).slice(0, 32) : g.cp.indexOf('（') === 0 ? null : (cpKwE[k] || shrinkKw(g.cp)), kwAuto: !cpKwE[k], rec: recCat && recCat !== '未分类' ? { cat: recCat, reason: g.recs[recCat].reason, conf: g.recs[recCat].conf || null } : null, doubts: doubts };
     }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; });
     var notes = { neutralVsNormal: [], joined: [], noNote: [], overlap: [] };
     rows.forEach(function (d) { d.tags.forEach(function (t) { if (notes[t] && d.key) notes[t].push(d.key); }); });
