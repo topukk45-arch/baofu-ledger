@@ -36,14 +36,15 @@ const TX = () => [
 ];
 
 (async () => {
-  for (const theme of [null, '#3f6f6b']) {
+  // 1025-UX：默认主题从金色改成雾松青，金色这一档改成显式选上金色来测（金色离琥珀太近、往橙红挪）
+  for (const theme of ['#d4af37', null]) {
     const seed = A.seedOf(MANUAL); if (theme) seed.app_appearance = JSON.stringify({ primary: theme });
     const t = await A.boot({ html, www: WWW, seed });
     const q = s => t.d.querySelector(s), raw = id => t.d.getElementById(id), S = () => t.S();
     await pick(t, bill(TX())); const UI = t.w.JiwenImportUI;
     const pend = t.d.documentElement.style.getPropertyValue('--st-pend');
-    ok(theme ? pend === '#b4660e' : pend === '#b9520a', '0 琥珀按主色算：' + (theme ? '雾松青用 #b4660e' : '金色离琥珀太近，挪到 #b9520a') + '：' + pend);
-    if (theme) { ok(!t.errs.length, '0 雾松青主题无报错 ' + t.errs.join('|')); continue; }
+    ok(!theme ? pend === '#b4660e' : pend === '#b9520a', '0 琥珀按主色算：' + (!theme ? '默认雾松青用 #b4660e' : '金色离琥珀太近，挪到 #b9520a') + '：' + pend);
+    if (!theme) { ok(!t.errs.length, '0 默认雾松青主题无报错 ' + t.errs.join('|')); continue; }
     // ===== 1. 多笔合一：已选收成一行「✓ 已选：…… · 改」，点「改」变回待选 =====
     UI._goStep('match');
     const box = () => q('#impSums [data-sum]');

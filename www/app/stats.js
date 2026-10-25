@@ -427,7 +427,7 @@
 
         // —— 统计页自带的颜色工具（独立于外观系统的私有函数，避免作用域报错） ——
         function statHexToRgb(h){ h=(h||'').replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join('');
-            if(h.length<6) h='d4af37';
+            if(h.length<6) h='3f6f6b';
             return { r:parseInt(h.slice(0,2),16), g:parseInt(h.slice(2,4),16), b:parseInt(h.slice(4,6),16) }; }
         function statRgbToHsl(r,g,b){ r/=255;g/=255;b/=255; const mx=Math.max(r,g,b),mn=Math.min(r,g,b); let h,s,l=(mx+mn)/2;
             if(mx===mn){h=s=0;}else{const d=mx-mn; s=l>0.5?d/(2-mx-mn):d/(mx+mn);
@@ -442,7 +442,7 @@
 
         // 为当月每个分类分配稳定颜色：基于主题色在色相环上均匀散开，保证跟随主题
         function catColor(idx, total){
-            const base=cssVar('--c-primary')||'#d4af37';
+            const base=cssVar('--c-primary')||'#3f6f6b';
             const {r,g,b}=statHexToRgb(base);
             const {h,s}=statRgbToHsl(r,g,b);
             const hue=(h + idx*(360/Math.max(total,1))) % 360;

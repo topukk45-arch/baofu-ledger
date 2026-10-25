@@ -11,11 +11,11 @@
     <meta name="theme-color" content="#f1f9f8">
     <meta name="color-scheme" content="light">
     <title>记问</title>
-    <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成米黄，从源头消除白闪。
+    <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成默认主题的底色（1025-UX 起是雾松青的 #f1f9f8，原来是米黄），从源头消除白闪。
          不依赖 CSS 变量，避免极早期合成时变量尚未解析。 -->
     <style>
-        html { background-color:#fdf8e8 !important; color-scheme:light; }
-        html, body { background-color:#fdf8e8; }
+        html { background-color:#f1f9f8 !important; color-scheme:light; }
+        html, body { background-color:#f1f9f8; }
     </style>
 
     <link rel="stylesheet" href="app/app.css?v=1024-Y">
