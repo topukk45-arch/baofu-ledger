@@ -32,6 +32,9 @@
                 <button class="login-import-btn" id="loginImportBtn">从文件导入存档</button>
                 <input type="file" id="loginImportFile" accept=".json" style="display:none">
             </div>
+            <!-- 1025-UX：登录页也能换主题色（打开和设置里同一个外观弹窗），下面一句写进去以后在哪改 -->
+            <button type="button" class="login-theme-btn" id="loginThemeBtn"><span class="login-theme-dot" id="loginThemeDot" aria-hidden="true"></span><span class="login-theme-k">主题色</span><span class="login-theme-v" id="loginThemeCur">雾松青</span><span class="login-theme-go">换一个 ›</span></button>
+            <div class="login-theme-hint">进去以后在「设置 → 外观」也能改</div>
         </div>
 
         <div class="main-box" id="mainBox">
@@ -599,6 +602,7 @@
             <div class="field">
                 <label class="field-label">预设主题</label>
                 <div class="theme-presets" id="themePresets"></div>
+                <p class="theme-tip theme-where" id="themeWhere" hidden>点一下就换，整个 App 跟着变。进去以后在「设置 → 外观」也能改。</p>
             </div>
 
             <div class="field" style="margin-top:14px;">

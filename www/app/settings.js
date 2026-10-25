@@ -275,22 +275,40 @@
 
             // —— 弹窗交互 ——
             const themeMask=$('themeMask');
+            // 1025-UX：每个预设一格：色块 + 下面写名字（原来只有 42px 的圆、没名字，点击区不到 48），一行 4 格
             function renderPresets(activeColor){
                 const box=$('themePresets'); box.innerHTML='';
                 PRESETS.forEach(p=>{
-                    const sw=document.createElement('div');
+                    const sw=document.createElement('button'); sw.type='button';
                     sw.className='theme-swatch';
-                    sw.style.background=`linear-gradient(135deg, ${p.color}, ${hslToHex(rgbToHsl(hexToRgb(p.color)).h, rgbToHsl(hexToRgb(p.color)).s, Math.max(rgbToHsl(hexToRgb(p.color)).l-16,22))})`;
+                    const dot=document.createElement('span'); dot.className='theme-swatch-dot';
+                    dot.style.background=`linear-gradient(135deg, ${p.color}, ${hslToHex(rgbToHsl(hexToRgb(p.color)).h, rgbToHsl(hexToRgb(p.color)).s, Math.max(rgbToHsl(hexToRgb(p.color)).l-16,22))})`;
+                    const nm=document.createElement('span'); nm.className='theme-swatch-name'; nm.textContent=p.name;
+                    sw.appendChild(dot); sw.appendChild(nm);
                     sw.title=p.name;
-                    if(activeColor && p.color.toLowerCase()===activeColor.toLowerCase()) sw.classList.add('active');
+                    const on=!!(activeColor && p.color.toLowerCase()===activeColor.toLowerCase());
+                    if(on) sw.classList.add('active');
+                    sw.setAttribute('aria-pressed', on ? 'true' : 'false');
                     sw.onclick=()=>{
                         applyPrimary(p.color);
                         const pf=loadPrefs(); pf.primary=p.color; pf.hue=Math.round(rgbToHsl(hexToRgb(p.color)).h*10)/10; pf.hueOf=p.color; savePrefs(pf);
                         renderPresets(p.color);
                         $('customColor').value=p.color; paintCustomRow();
+                        paintLoginTheme();
                     };
                     box.appendChild(sw);
                 });
+            }
+            // 1025-UX：登录页「换个主题色」那一行：写现在用的是哪个（预设的名字，自己调的写「自己调的」）
+            function themeName(){
+                const c=(loadPrefs().primary||DEFAULT_PRIMARY).toLowerCase();
+                const p=PRESETS.find(x=>x.color.toLowerCase()===c);
+                return p ? p.name : '自己调的';
+            }
+            function paintLoginTheme(){
+                const v=$('loginThemeCur'), dot=$('loginThemeDot');
+                if(v) v.textContent=themeName();
+                if(dot) dot.style.background=getComputedStyle(document.documentElement).getPropertyValue('--c-primary').trim() || DEFAULT_PRIMARY;
             }
             function openTheme(){
                 const pf=loadPrefs();
@@ -298,6 +316,8 @@
                 $('customColor').value = /^#[0-9a-fA-F]{6}$/.test(cur)?cur:DEFAULT_PRIMARY;
                 paintCustomRow();
                 renderPresets(cur);
+                // 1025-UX：从登录页打开时多一句「以后在哪改」（设置里打开的就不写了）
+                const wh=$('themeWhere'); if(wh) wh.hidden=!document.body.classList.contains('login-mode');
                 themeMask.style.display='flex';
             }
             // 1020-E：「自定义主色」那一行：色块 + 色值
@@ -306,7 +326,9 @@
                 $('customColorDot').style.background=c; $('customColorVal').textContent=c;
             }
             $('themeBtn').addEventListener('click', openTheme);
-            $('closeTheme').addEventListener('click', ()=>{ themeMask.style.display='none'; });
+            // 1025-UX：登录页也能换主题色（新用户不用先进去再找设置）；外观弹窗关了把登录页那一行的名字跟上
+            if($('loginThemeBtn')) $('loginThemeBtn').addEventListener('click', openTheme);
+            $('closeTheme').addEventListener('click', ()=>{ themeMask.style.display='none'; paintLoginTheme(); });
 
             // ===== 1020-E：App 自己的选色面板（不用系统的选色框：安卓上是白底的，和 App 不搭）=====
             //   共用底部面板 JiwenSheet：一排常用色块 + 色相条 + 深浅条 + 鲜艳条，下面写现在选的色值、能直接输入色值；
@@ -399,7 +421,7 @@
                         const st=document.createElement('div'); st.className='ui-pair';
                         const ok=document.createElement('button'); ok.type='button'; ok.className='ui-btn primary'; ok.id='cpApply'; ok.textContent='应用';
                         ok.addEventListener('click', ()=>{ done(); if(raf){ cancelAnimationFrame(raf); raf=0; } applyPrimary(cur, hsl.h); const p=loadPrefs(); p.primary=cur; p.hue=Math.round(hsl.h*10)/10; p.hueOf=cur; savePrefs(p);
-                            $('customColor').value=cur; paintCustomRow(); renderPresets(cur); });
+                            $('customColor').value=cur; paintCustomRow(); renderPresets(cur); paintLoginTheme(); });
                         const no=document.createElement('button'); no.type='button'; no.className='ui-btn'; no.id='cpCancel'; no.textContent='取消';
                         no.addEventListener('click', ()=>{ done(); restore(); });
                         st.appendChild(no); st.appendChild(ok); box.appendChild(st);
@@ -411,11 +433,13 @@
                 const pf=loadPrefs(); pf.primary=DEFAULT_PRIMARY; pf.hue=DEFAULT_HUE; pf.hueOf=DEFAULT_PRIMARY; savePrefs(pf);
                 $('customColor').value=DEFAULT_PRIMARY; paintCustomRow();
                 renderPresets(DEFAULT_PRIMARY);
+                paintLoginTheme();
             });
 
             // —— 启动时应用已保存的外观 ——
             const pf=loadPrefs();
             if(pf.primary) applyPrimary(pf.primary, pf.hueOf===pf.primary ? savedHue() : null);
+            paintLoginTheme();
         })();
 
         // 1016-V：设置里「存储已用 x%」，超过 70% 提醒。按浏览器给这个 App 的配额算（navigator.storage.estimate，账本在 IndexedDB 里）。
