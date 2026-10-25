@@ -1,13 +1,14 @@
 (function(){
         const { fabHold, fabWake } = window.JiwenBase;   // 用到前面模块的
-        // ===== 1023-C：月份浮条（账单页、统计页共用）；1023-J 改：靠右、点一下切月份、右端带回顶箭头；1025-UX 改：拨动松手切月份 =====
+        // ===== 1023-C：月份浮条（账单页、统计页共用）；1023-J 改：靠右、点一下切月份、右端带回顶箭头；1025-UX 改：拨动松手切月份、回顶箭头挪到浮条上方 =====
         //   1025-UX：中间一个深色选中框（.ms-sel，不动），月份在它下面左右拨；松手、停下来（MS_SETTLE 毫秒没再滚、手指离开）就切到框里那个月。
         //   两头各垫半条宽的空白（.ms-pad），最早的月份和这个月都能拨到中间；这个月右边是空的，一看就知道没有更晚的了。点某个月也行（滚到中间并切过去）。
         //   1023-J 那次「打开 App 显示成最早的月份」：页面没露出来时浮条宽度是 0，露出来浏览器补发一次滚动，被当成拨到了最左边。
         //   现在只认手指真拨过的（touchstart 之后这一次手势里滚过、松手停下了；鼠标滚轮也算），代码自己滚的（放回选中的那格）、
         //   浏览器补发的滚动、宽度是 0 时的滚动一概不算，所以不会再自己跳月份。
         //   超了预算的月份，月份字下面一个带白圈的小红点（和预算卡「超支」同一个红），选中框里也看得见。
-        //   右端可以带一个回顶箭头（setTop(true) 才露出来）。
+        //   回顶箭头（setTop(true) 才露出来）：1025-UX 起是浮条右上方单独一个圆钮（.ms-totop，和浮条同一套底色、边框、阴影），
+        //   跟着浮条一起出来、一起收起；不占浮条的地方，左右拨不受影响。
         //   出现 / 收起走共用的 fabWake / fabHold：叫 wake() 就出来，停 1.5 秒淡出；手指碰着它不收；pin(true) 时一直显示（列表不满一屏）。
         //   用法：const s=JiwenMonthStrip.create({ id, onPick(ym), onTop() })；s.set([{ ym:'2026-10', over:超预算 }], 选中的 ym)；s.wake()
         const MS_SETTLE=160;    // 松手以后停多久没再滚，算拨好了
@@ -15,7 +16,7 @@
         function create(o){
             const el=document.createElement('div'); el.className='mstrip'; el.id=o.id;
             el.innerHTML='<div class="ms-sel" aria-hidden="true"></div><span class="ms-year"></span><div class="ms-track" role="listbox" aria-label="选择月份，左右拨"></div>'
-                + '<button type="button" class="ms-top" aria-label="回到顶部" tabindex="-1">'+UP_SVG+'</button>';
+                + '<button type="button" class="ms-totop ms-top" aria-label="回到顶部" tabindex="-1">'+UP_SVG+'</button>';
             document.body.appendChild(el);
             const track=el.querySelector('.ms-track'), yearEl=el.querySelector('.ms-year'), topBtn=el.querySelector('.ms-top');
             let months=[], sel=-1, pre=-1, sig='', pinned=false;

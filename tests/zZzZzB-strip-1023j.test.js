@@ -2,7 +2,7 @@
 // 1023-J 月份浮条和按下反馈（jsdom 跑整个 App；真等计时器）。node zZzZzB-strip-1023j.test.js [index.html]
 // 1. 1025-UX：中间选中框，左右拨、松手停好了切到框里那个月；只认手指真拨过的（原来「打开 App 显示成最早的月份」是浏览器补发的滚动被当成切换）；点一下也切
 // 2. 不画小柱子；统计页超了月预算的月份，字下面一个小红点
-// 3. 回顶箭头在浮条右端：滑过一屏才露出来、回到上面就藏；整页不满一屏时浮条一直显示（不收起）
+// 3. 回顶圆钮在浮条右上方（1025-UX）：滑过一屏才露出来、回到上面就藏；整页不满一屏时浮条一直显示（不收起）
 // 4. 按下反馈：手指按住不动约 0.1 秒才变色；手指一挪、页面一滚就作废（滑动时碰到日卡片不闪）
 // 记录全是虚构的。今天是 2026-10-23。
 const fs = require('fs'), path = require('path');
@@ -104,7 +104,8 @@ const R = (id, time, money, cat, remark) => ({ id, time, money, type: 'expense',
   scroll(100);
   ok(on('lgStrip') && !strip.classList.contains('has-top'), '3 没滑过一屏：没有回顶箭头');
   scroll(w.innerHeight + 50);
-  ok(strip.classList.contains('has-top'), '3 滑过一屏：浮条右端露出回顶箭头');
+  ok(strip.classList.contains('has-top'), '3 滑过一屏：浮条右上方露出回顶圆钮');
+  ok(strip.querySelector('.ms-totop') && !strip.querySelector('.ms-track .ms-top'), '3 回顶圆钮不在月份那一条里（1025-UX 挪出来，不占拨月份的地方）');
   strip.querySelector('.ms-top').click();
   ok(w.__y === 0, '3 点回顶箭头：回到顶上');
   scroll(0);

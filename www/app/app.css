@@ -1842,7 +1842,7 @@
         .mstrip.show { opacity:1; transform:none; pointer-events:auto; }
         @media (min-width:761px){ .mstrip { left:50%; right:auto; width:480px; margin-left:-240px; } }
         body:not(.tab-ledger) #lgStrip, body.kb-open .mstrip, body.login-mode .mstrip { display:none !important; }
-        /* 1025-UX：中间一个深色选中框不动，月份在它下面左右拨，松手停好了切到框里那个月；年份浮在左上角 */
+        /* 1025-UX：中间一个深色选中框不动，月份在它下面左右拨，松手停好了切到框里那个月；年份浮在左上角；回顶箭头是浮条右上方单独一个圆钮 */
         .ms-sel { position:absolute; left:50%; top:8px; bottom:8px; width:56px; margin-left:-28px; border-radius:12px; background:var(--c-primary-dark); pointer-events:none; }
         .ms-year { position:absolute; left:12px; top:5px; z-index:1; font-size:11px; font-weight:bold; color:var(--c-primary-dark); pointer-events:none; white-space:nowrap; }
         .ms-track { position:relative; flex:1 1 auto; min-width:0; height:100%; display:flex; align-items:center; gap:2px; overflow-x:auto; overflow-y:hidden;
@@ -1857,10 +1857,11 @@
         .ms-item.on .ms-lab { font-weight:bold; }
         .ms-dot { position:absolute; left:50%; bottom:3px; width:6px; height:6px; margin-left:-5px; border-radius:50%; background:var(--c-neg);
             border:2px solid #fff; box-sizing:content-box; }
-        button.ms-top { position:absolute; right:6px; top:8px; bottom:8px; z-index:2; display:none; width:48px; border:none; border-left:1px solid var(--c-border); border-radius:0 12px 12px 0;
-            background:var(--c-surface); padding:0; cursor:pointer; align-items:center; justify-content:center; }
-        .mstrip.has-top button.ms-top { display:flex; }
-        button.ms-top svg { width:22px; height:22px; fill:none; stroke:var(--c-primary-dark); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        button.ms-totop { position:absolute; right:0; bottom:calc(100% + 10px); display:none; width:48px; height:48px; border-radius:50%;
+            border:1px solid var(--c-border-mid); background:var(--c-surface); box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.28);
+            padding:0; cursor:pointer; align-items:center; justify-content:center; }
+        .mstrip.has-top button.ms-totop { display:flex; }
+        button.ms-totop svg { width:22px; height:22px; fill:none; stroke:var(--c-primary-dark); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
         @media (prefers-reduced-motion: reduce){ button.ms-item { transition:none; } }
         /* 统计页的总结余（1023-C 从账单页总览搬来；1023-H 再改样子） */
         button.st-bal { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); text-align:left; font-family:inherit; cursor:pointer; color:var(--c-text); }
