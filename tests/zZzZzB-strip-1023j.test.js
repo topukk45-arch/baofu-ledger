@@ -1,6 +1,6 @@
 // @serial
 // 1023-J 月份浮条和按下反馈（jsdom 跑整个 App；真等计时器）。node zZzZzB-strip-1023j.test.js [index.html]
-// 1. 浮条靠右排：最右一格是这个月；点一下才切月份；拨动（滚动）不会切月份（原来「打开 App 显示成最早的月份」就是滚动被当成切换）
+// 1. 1025-UX：中间选中框，左右拨、松手停好了切到框里那个月；只认手指真拨过的（原来「打开 App 显示成最早的月份」是浏览器补发的滚动被当成切换）；点一下也切
 // 2. 不画小柱子；统计页超了月预算的月份，字下面一个小红点
 // 3. 回顶箭头在浮条右端：滑过一屏才露出来、回到上面就藏；整页不满一屏时浮条一直显示（不收起）
 // 4. 按下反馈：手指按住不动约 0.1 秒才变色；手指一挪、页面一滚就作废（滑动时碰到日卡片不闪）
@@ -34,19 +34,63 @@ const R = (id, time, money, cat, remark) => ({ id, time, money, type: 'expense',
   const scroll = y => { w.__y = y; w.dispatchEvent(new w.Event('scroll')); };
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await sleep(50);
 
-  // 1. 靠右、点一下切、拨动不切
+  // 1. 1025-UX：中间选中框、左右拨松手切（只认手指真拨过的）、点一下也切
   const strip = $('lgStrip'), items = () => [...strip.querySelectorAll('.ms-item')];
-  ok(strip.querySelector('.ms-track').firstElementChild.classList.contains('ms-pad'), '1 月份前面一块空白把月份推到右边');
-  ok(items().map(b => b.dataset.ym).join() === '2026-08,2026-09,2026-10' && items()[2].classList.contains('on'), '1 最右一格是这个月、选中');
-  ok(!strip.querySelector('.ms-sel') && !strip.querySelector('.ms-bar'), '1 没有中间的选中框、没有小柱子');
   const track = strip.querySelector('.ms-track');
+  ok(track.firstElementChild.classList.contains('ms-pad') && track.lastElementChild.classList.contains('ms-pad'), '1 两头各垫一块空白（最早的月份和这个月都能拨到中间）');
+  ok(items().map(b => b.dataset.ym).join() === '2026-08,2026-09,2026-10' && items()[2].classList.contains('on'), '1 最后一格是这个月、在选中框里');
+  ok(strip.querySelector('.ms-sel') && !strip.querySelector('.ms-bar'), '1 中间一个选中框、没有小柱子');
+  // jsdom 没有排版：给浮条一个宽度、每格一个位置（宽 300：空白 120、每格 56 + 间隔 2）
+  const W = 300, PAD = 120;
+  const lay = w0 => {
+    Object.defineProperty(track, 'clientWidth', { get: () => w0, configurable: true });
+    items().forEach((b, i) => { Object.defineProperty(b, 'offsetLeft', { get: () => PAD + 2 + i * 58, configurable: true }); Object.defineProperty(b, 'offsetWidth', { get: () => 56, configurable: true }); });
+  };
+  const at = i => PAD + 2 + i * 58 + 28 - W / 2;   // 第 i 格在正中时的 scrollLeft
+  const touch = type => track.dispatchEvent(new w.Event(type, { bubbles: true }));
+  const swipeTo = async (x, opt) => {
+    lay(W); touch('touchstart'); track.scrollLeft = x; track.dispatchEvent(new w.Event('scroll'));
+    if (opt && opt.hold) await sleep(opt.hold);
+    touch('touchend'); await sleep(400); lay(W);
+  };
+  lay(W); w.JiwenLedger.stripWake();
+  ok(Math.abs(track.scrollLeft - at(2)) < 1, '1 出来时把选中的这个月放到正中');
   track.scrollLeft = 0; track.dispatchEvent(new w.Event('scroll'));
   await sleep(400);
-  ok(w.JiwenLedger.curYM() === '2026-10', '1 浮条被滚到最左边（打开 App 时会这样）：月份不变，还是 10 月');
+  ok(w.JiwenLedger.curYM() === '2026-10', '1 没碰它、浮条被滚到最左边（打开 App 时浏览器补发的滚动）：月份不变');
+  await swipeTo(at(1));
+  ok(w.JiwenLedger.curYM() === '2026-09' && $('lgMonth').textContent === '9月', '1 手指往右拨一格、松手：切到 9 月');
+  ok(items()[1].classList.contains('on'), '1 9 月在选中框里');
+  w.JiwenLedger.stripWake();
+  await swipeTo(at(0) + 10, { hold: 300 });
+  ok(w.JiwenLedger.curYM() === '2026-08', '1 拨到 8 月附近、按住停一下再松手：切到 8 月（停在两格中间的按最近的那格）');
+  lay(W); touch('touchstart'); await sleep(50); touch('touchend'); await sleep(400);
+  ok(w.JiwenLedger.curYM() === '2026-08', '1 只碰一下没拨：月份不变');
+  lay(W); w.JiwenLedger.stripWake();
+  touch('touchstart'); track.scrollLeft = at(2); track.dispatchEvent(new w.Event('scroll'));
+  await sleep(400);
+  ok(w.JiwenLedger.curYM() === '2026-08', '1 手指还按着：先不切');
+  touch('touchend'); await sleep(400);
+  ok(w.JiwenLedger.curYM() === '2026-10', '1 松手停好了：才切到 10 月');
+  lay(0); w.JiwenLedger.stripWake();
+  touch('touchstart'); track.scrollLeft = 0; track.dispatchEvent(new w.Event('scroll')); touch('touchend'); await sleep(400);
+  ok(w.JiwenLedger.curYM() === '2026-10', '1 浮条宽度是 0（还没露出来）时的滚动：不切');
+  lay(W); w.JiwenLedger.stripWake();
   items()[1].click();
   ok(w.JiwenLedger.curYM() === '2026-09' && items()[1].classList.contains('on') && $('lgMonth').textContent === '9月', '1 点 9 月：切过去');
   items()[2].click();
-  ok(w.JiwenLedger.curYM() === '2026-10', '1 点最右一格：回到这个月');
+  ok(w.JiwenLedger.curYM() === '2026-10', '1 点最后一格：回到这个月');
+  // 统计页同一个组件
+  d.querySelector('.tab-btn[data-tab="stats"]').click(); await sleep(50);
+  { const sTr = $('stStrip').querySelector('.ms-track'), sIt = [...$('stStrip').querySelectorAll('.ms-item')];
+    Object.defineProperty(sTr, 'clientWidth', { get: () => W, configurable: true });
+    sIt.forEach((b, i) => { Object.defineProperty(b, 'offsetLeft', { get: () => PAD + 2 + i * 58, configurable: true }); Object.defineProperty(b, 'offsetWidth', { get: () => 56, configurable: true }); });
+    w.dispatchEvent(new w.Event('scroll'));
+    sTr.dispatchEvent(new w.Event('touchstart')); sTr.scrollLeft = at(1); sTr.dispatchEvent(new w.Event('scroll')); sTr.dispatchEvent(new w.Event('touchend'));
+    await sleep(400);
+    ok($('statMonthLabel').textContent.includes('9月'), '1 统计页：左右拨松手也切月份');
+    w.JiwenStats.stepMonth(1); }
+  d.querySelector('.tab-btn[data-tab="ledger"]').click(); await sleep(50);
 
   // 2. 统计页：超预算的月份一个小红点（9 月吃饭 100 > 50）
   d.querySelector('.tab-btn[data-tab="stats"]').click(); await sleep(50);

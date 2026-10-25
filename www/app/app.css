@@ -1842,22 +1842,26 @@
         .mstrip.show { opacity:1; transform:none; pointer-events:auto; }
         @media (min-width:761px){ .mstrip { left:50%; right:auto; width:480px; margin-left:-240px; } }
         body:not(.tab-ledger) #lgStrip, body.kb-open .mstrip, body.login-mode .mstrip { display:none !important; }
-        .ms-year { flex:none; align-self:flex-start; margin:6px 0 0 12px; font-size:11px; font-weight:bold; color:var(--c-primary-dark); pointer-events:none; white-space:nowrap; }
-        .ms-track { flex:1 1 auto; min-width:0; height:100%; display:flex; align-items:center; gap:2px; overflow-x:auto; overflow-y:hidden;
-            padding:0 6px; box-sizing:border-box; scrollbar-width:none; touch-action:pan-x; overscroll-behavior:contain; }
+        /* 1025-UX：中间一个深色选中框不动，月份在它下面左右拨，松手停好了切到框里那个月；年份浮在左上角 */
+        .ms-sel { position:absolute; left:50%; top:8px; bottom:8px; width:56px; margin-left:-28px; border-radius:12px; background:var(--c-primary-dark); pointer-events:none; }
+        .ms-year { position:absolute; left:12px; top:5px; z-index:1; font-size:11px; font-weight:bold; color:var(--c-primary-dark); pointer-events:none; white-space:nowrap; }
+        .ms-track { position:relative; flex:1 1 auto; min-width:0; height:100%; display:flex; align-items:center; gap:2px; overflow-x:auto; overflow-y:hidden;
+            padding:0; box-sizing:border-box; scrollbar-width:none; touch-action:pan-x; overscroll-behavior:contain; scroll-snap-type:x mandatory; border-radius:18px; }
         .ms-track::-webkit-scrollbar { display:none; }
-        .ms-pad { flex:1 0 0; }   /* 月份少时把它们推到右边 */
+        .ms-pad { flex:0 0 calc(50% - 30px); height:1px; }   /* 两头各垫半条：最早的月份和这个月都能拨到正中 */
         button.ms-item { position:relative; flex:none; width:56px; height:44px; border:none; border-radius:12px; background:transparent; padding:0; margin:0;
-            display:flex; align-items:center; justify-content:center; color:var(--c-text-soft); font-family:inherit; cursor:pointer; }
+            scroll-snap-align:center; display:flex; align-items:center; justify-content:center; color:var(--c-text-soft); font-family:inherit; cursor:pointer;
+            transition:color .12s; }
         .ms-lab { font-size:14px; line-height:16px; }
-        button.ms-item.on { background:var(--c-primary-dark); color:var(--c-on-primary); }
+        button.ms-item.on { color:var(--c-on-primary); }
         .ms-item.on .ms-lab { font-weight:bold; }
         .ms-dot { position:absolute; left:50%; bottom:3px; width:6px; height:6px; margin-left:-5px; border-radius:50%; background:var(--c-neg);
             border:2px solid #fff; box-sizing:content-box; }
-        button.ms-top { display:none; flex:none; width:48px; height:44px; margin-right:6px; border:none; border-left:1px solid var(--c-border); border-radius:0 12px 12px 0;
-            background:transparent; padding:0; cursor:pointer; align-items:center; justify-content:center; }
+        button.ms-top { position:absolute; right:6px; top:8px; bottom:8px; z-index:2; display:none; width:48px; border:none; border-left:1px solid var(--c-border); border-radius:0 12px 12px 0;
+            background:var(--c-surface); padding:0; cursor:pointer; align-items:center; justify-content:center; }
         .mstrip.has-top button.ms-top { display:flex; }
         button.ms-top svg { width:22px; height:22px; fill:none; stroke:var(--c-primary-dark); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        @media (prefers-reduced-motion: reduce){ button.ms-item { transition:none; } }
         /* 统计页的总结余（1023-C 从账单页总览搬来；1023-H 再改样子） */
         button.st-bal { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); text-align:left; font-family:inherit; cursor:pointer; color:var(--c-text); }
         .st-bal-k { flex:1 1 auto; min-width:0; font-size:14px; font-weight:bold; }
