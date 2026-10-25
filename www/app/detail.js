@@ -323,67 +323,56 @@
         function btn(id, text, cls){ const b=document.createElement('button'); b.type='button'; b.className='ui-btn'+(cls ? ' '+cls : ''); b.id=id; b.textContent=text; return b; }
         function pairFoot(box, a, b){ const p=document.createElement('div'); p.className='ui-pair'; p.appendChild(a); if(b) p.appendChild(b); box.appendChild(p); }
 
-        // ===== 1023-D：当日详情（账单页点日期抬头、单笔详情里「这一天」、一周详情里点某一天；统计页 1023-H 也用它）=====
-        //   支出（比本月日均多 / 少）、收入（当天净剩）、当天支出按分类的小横条、当天每一笔（点了进单笔详情，关了回到这里）；底部「关闭 | 给这天补一笔」
-        //   本月日均 = 这个月的支出 ÷ 过去了的天数（这个月按到今天算，过去的月按整月）。opt.onClose：关掉以后回到哪（一周详情点进来的回一周）
+        // ===== 1023-D：当日详情、一周详情；1025-UX 合成一个面板（以这段为准）=====
+        //   原来一周详情里点某一天，要关掉一周、再弹一个当日详情，叠两层；现在一周和一天是同一个面板，在里面切：
+        //   顶上一行「整周 一 二 三 四 五 六 日」（`.wd-tabs`，还没到的日子点不了），点「整周」看这一周，点某一天看那一天；
+        //   一周里点柱子、点某一天那一行，也是就地换成那一天。下面一行 ‹ ›（`#weekPrev` / `#weekNext`）：看整周时换上一周 / 下一周（最晚到本周），
+        //   看某一天时换前一天 / 后一天（最晚到今天，跨周时上面那行跟着换周）；在面板上横着滑也一样。
+        //   看整周：支出（比上一周多 / 少）、记了几笔（日均按过去了的天数算）、周一到周日 7 根大柱子（每根上面写取整的金额，今天深色，没到的日子一个点）、
+        //   每天一行（没记的写「没记 · 补一笔」，标过没花钱的写「没花钱 · 取消标记」）；底部「关闭」（`#weekClose`）。
+        //   看一天：支出（比本月日均多 / 少）、收入（当天净剩）、当天支出按分类的小横条、当天每一笔（点了进单笔详情，关了回到这个面板的这一天）；
+        //   底部「关闭 | 给这天补一笔」（`#dayClose` / `#dayAdd`）。本月日均 = 这个月的支出 ÷ 过去了的天数（这个月按到今天算，过去的月按整月）。
+        //   openWeek(周一) 打开时看整周，openDay(日子) 打开时看那一天（账单页点日期抬头、单笔详情里「这一天」、统计页日历）。opt.onClose：关掉以后回到哪
         function openDay(k, opt){
-            if(!window.JiwenSheet || !/^\d{4}-\d{2}-\d{2}$/.test(k||'')) return;
-            const C=cal, list=byTimeDesc(recsOfDays(k, k)), s=sumFen(list), rMap=refundedMap(getUserData());
-            const ym=k.slice(0,7), today=C.todayKey();
-            const dim=+C.monthEnd(ym).slice(8,10), passed = today.slice(0,7)===ym ? +today.slice(8,10) : (today<ym ? 0 : dim);
-            const ms=sumFen(recsOfDays(ym+'-01', C.monthEnd(ym))), avg = passed>0 ? ms.exp/passed : 0;
-            const back=opt && opt.onClose;
-            const reopen=()=>openDay(k, opt);
-            window.JiwenSheet.open({ title:C.dayTitle(k), sub:`${list.length} 笔`, tall:true, onDismiss:back,
-                body(box, done){
-                    box.classList.add('dd-body');
-                    const net=round2(s.inc-s.exp);
-                    let h=`<div class="dd-cells">`
-                        + cellHtml('支出', s.exp.toFixed(2), passed>0 ? moreLess(round2(s.exp-avg), '本月日均') : '')
-                        + cellHtml('收入', s.inc.toFixed(2), `当天净剩 ${net<0 ? '−' : '+'}${Math.abs(net).toFixed(2)}`, 'pos')
-                        + `</div>`;
-                    // 当天支出按分类（退完了的不列）
-                    const byCat=new Map();
-                    list.forEach(r=>{ const e=statContrib(r).exp; if(e) byCat.set(r.cat||'未分类', (byCat.get(r.cat||'未分类')||0)+e); });
-                    const cats=[...byCat].map(([c, v])=>[c, round2(v)]).filter(x=>x[1]>0).sort((a, b)=>b[1]-a[1]);
-                    if(cats.length){
-                        const mx=cats[0][1];
-                        h+=`<div class="dd-cats">` + cats.map(([c, v])=>`<div class="dd-cat"><span class="dd-cat-n">${escapeHtml(c)}</span><span class="dd-cat-b"><i style="width:${(v/mx*100).toFixed(0)}%"></i></span><span class="dd-cat-v">${v.toFixed(2)}</span></div>`).join('') + `</div>`;
-                    }
-                    h+= list.length ? `<div class="lg-dc dd-rows">` + list.map(r=>rowHtml(r, rMap)).join('') + `</div>` : `<div class="dd-empty">这天没记账</div>`;
-                    box.innerHTML=h;
-                    box.addEventListener('click', e=>{ const row=e.target.closest('.bl-row[data-id]'); if(!row) return; done(); openDetail(row.dataset.id, { onClose:reopen }); });
-                },
-                foot(box, done){
-                    const c=btn('dayClose', '关闭'), a=btn('dayAdd', '给这天补一笔', 'primary');
-                    c.addEventListener('click', ()=>{ done(); if(back) back(); });
-                    a.addEventListener('click', ()=>{ done(); openAddModal({ day:k }); });
-                    pairFoot(box, c, a);
-                } });
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(k||'')) return;
+            openWD(cal.monOf(k), k, opt);
         }
-
-        // ===== 1023-D：一周详情（账单页点周小计；统计页 1023-H 也用它）=====
-        //   支出（比上一周多 / 少）、记了几笔（日均按过去了的天数算）、周一到周日 7 根柱子（今天深色、没到的日子虚线框）、
-        //   每天一行（点了进当日详情，关了回到这里；没记的写「没记 · 补一笔」）；底部「关闭」
-        // 1023-L：一周详情顶上 7 根大柱子带每天的金额，点一根换成那一天的当日详情（关了回到这一周）；
-        //   左右滑（或点顶上的 ‹ ›）看上一周 / 下一周，就在这个面板里换，不关不开；最晚到本周
         function openWeek(mon, opt){
-            if(!window.JiwenSheet || !/^\d{4}-\d{2}-\d{2}$/.test(mon||'')) return;
-            const C=cal; mon=C.monOf(mon);
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(mon||'')) return;
+            openWD(cal.monOf(mon), null, opt);
+        }
+        function openWD(mon, day, opt){
+            if(!window.JiwenSheet) return;
+            const C=cal;
             const back=opt && opt.onClose;
             const today=C.todayKey(), thisMon=C.monOf(today);
-            let bodyBox=null;
-            function render(){
+            let bodyBox=null, footBox=null, doneFn=null;
+            const reopen=()=>openWD(mon, day, opt);
+            function setHead(t, sub){
+                const te=document.getElementById('uiSheetTitle'); if(te) te.textContent=t;
+                const se=document.getElementById('uiSheetSub'); if(se){ se.textContent=sub||''; se.style.display=sub ? '' : 'none'; }
+            }
+            function tabsHtml(){
+                let h=`<div class="wd-tabs" role="tablist"><button type="button" class="wd-tab wd-tab-wk${day ? '' : ' on'}" role="tab" aria-selected="${day ? 'false' : 'true'}" data-v="week">整周</button>`;
+                for(let i=0;i<7;i++){
+                    const k=C.addDay(mon, i), fut=k>today, on=k===day;
+                    h+=`<button type="button" class="wd-tab${on ? ' on' : ''}${k===today ? ' today' : ''}" role="tab" aria-selected="${on ? 'true' : 'false'}" data-v="${k}"${fut ? ' disabled' : ''} aria-label="${C.mdText(k)} ${C.wdText(k)}">${C.wdText(k).slice(1)}<small>${+k.slice(8,10)}</small></button>`;
+                }
+                return h+`</div>`;
+            }
+            function navHtml(){
+                const canNext = day ? day<today : mon<thisMon;
+                return `<div class="dw-nav"><button type="button" class="dw-prev" id="weekPrev" aria-label="${day ? '前一天' : '上一周'}">‹</button>`
+                    + `<span class="dw-nav-t">${day ? '左右滑动看前一天、后一天' : '左右滑动看上一周、下一周'}</span>`
+                    + `<button type="button" class="dw-next" id="weekNext" aria-label="${day ? '后一天' : '下一周'}"${canNext ? '' : ' disabled'}>›</button></div>`;
+            }
+            function weekHtml(){
                 const sun=C.addDay(mon, 6);
                 const list=recsOfDays(mon, sun), s=sumFen(list), prev=recsOfDays(C.addDay(mon, -7), C.addDay(mon, -1)), ps=sumFen(prev);
                 const days=[]; for(let i=0;i<7;i++){ const k=C.addDay(mon, i), rs=list.filter(r=>(r.time||'').slice(0,10)===k); days.push({ k, rs, exp:sumFen(rs).exp, future:k>today }); }
                 const passed=days.filter(d=>!d.future).length;
-                const t=document.getElementById('uiSheetTitle'); if(t) t.textContent=`${C.weekLabel(mon)} · ${C.rangeText(mon, sun)}`;
-                const canNext = mon<thisMon;
-                let h=`<div class="dw-nav"><button type="button" class="dw-prev" id="weekPrev" aria-label="上一周">‹</button>`
-                    + `<span class="dw-nav-t">左右滑动看上一周、下一周</span>`
-                    + `<button type="button" class="dw-next" id="weekNext" aria-label="下一周"${canNext ? '' : ' disabled'}>›</button></div>`;
-                h+=`<div class="dd-cells">`
+                setHead(`${C.weekLabel(mon)} · ${C.rangeText(mon, sun)}`, '');
+                let h=`<div class="dd-cells">`
                     + cellHtml('支出', s.exp.toFixed(2), prev.length ? moreLess(round2(s.exp-ps.exp), '上一周') : '上一周没有记录可比')
                     + cellHtml('记了', `${list.length} <small>笔</small>`, passed ? `日均 ${(s.exp/passed).toFixed(2)}（${passed} 天）` : '')
                     + `</div>`;
@@ -392,31 +381,77 @@
                         ? `<div class="dw-bar future"><span class="dw-v"></span><i class="dw-fdot"></i></div>`
                         : `<button type="button" class="dw-bar${d.k===today ? ' today' : ''}" data-day="${d.k}" aria-label="${C.mdText(d.k)} 支出 ${d.exp.toFixed(2)}"><span class="dw-v">${Math.round(d.exp)}</span><i style="height:${Math.max(4, Math.round(d.exp/mx*96))}px"></i></button>`).join('')
                     + `</div><div class="dw-labs">` + days.map(d=>`<span${d.k===today ? ' class="today"' : ''}>${C.wdText(d.k).slice(1)}</span>`).join('') + `</div>`
-                    + `<span class="dw-hint">点某一根，换成那一天的明细</span></div>`;
+                    + `<span class="dw-hint">点某一根，看那一天的明细</span></div>`;
                 const ns=window.JiwenStore.noSpendDays();   // 导入简化第 12 版：标过「没花钱」的写「没花钱」，能取消
                 h+=`<div class="lg-dc dw-days">` + days.filter(d=>!d.future).reverse().map(d=>d.rs.length
                     ? `<button type="button" class="dw-day" data-day="${d.k}"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">${d.rs.length} 笔</span><span class="dw-day-v">${d.exp.toFixed(2)}</span>${CHEV}</button>`
                     : ns.has(d.k) ? `<div class="dw-day dw-day-none dw-day-ns"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">没花钱</span><button type="button" class="lg-gap-btn" data-unns="${d.k}">取消标记</button></div>`
                     : `<div class="dw-day dw-day-none"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">没记</span><button type="button" class="lg-gap-btn" data-add="${d.k}">补一笔</button></div>`).join('') + `</div>`;
-                bodyBox.innerHTML=h;
+                return h;
             }
+            function dayHtml(k){
+                const list=byTimeDesc(recsOfDays(k, k)), s=sumFen(list), rMap=refundedMap(getUserData());
+                const ym=k.slice(0,7);
+                const dim=+C.monthEnd(ym).slice(8,10), passed = today.slice(0,7)===ym ? +today.slice(8,10) : (today<ym ? 0 : dim);
+                const ms=sumFen(recsOfDays(ym+'-01', C.monthEnd(ym))), avg = passed>0 ? ms.exp/passed : 0;
+                setHead(C.dayTitle(k), `${list.length} 笔`);
+                const net=round2(s.inc-s.exp);
+                let h=`<div class="dd-cells">`
+                    + cellHtml('支出', s.exp.toFixed(2), passed>0 ? moreLess(round2(s.exp-avg), '本月日均') : '')
+                    + cellHtml('收入', s.inc.toFixed(2), `当天净剩 ${net<0 ? '−' : '+'}${Math.abs(net).toFixed(2)}`, 'pos')
+                    + `</div>`;
+                // 当天支出按分类（退完了的不列）
+                const byCat=new Map();
+                list.forEach(r=>{ const e=statContrib(r).exp; if(e) byCat.set(r.cat||'未分类', (byCat.get(r.cat||'未分类')||0)+e); });
+                const cats=[...byCat].map(([c, v])=>[c, round2(v)]).filter(x=>x[1]>0).sort((a, b)=>b[1]-a[1]);
+                if(cats.length){
+                    const mx=cats[0][1];
+                    h+=`<div class="dd-cats">` + cats.map(([c, v])=>`<div class="dd-cat"><span class="dd-cat-n">${escapeHtml(c)}</span><span class="dd-cat-b"><i style="width:${(v/mx*100).toFixed(0)}%"></i></span><span class="dd-cat-v">${v.toFixed(2)}</span></div>`).join('') + `</div>`;
+                }
+                h+= list.length ? `<div class="lg-dc dd-rows">` + list.map(r=>rowHtml(r, rMap)).join('') + `</div>` : `<div class="dd-empty">这天没记账</div>`;
+                return h;
+            }
+            function paintFoot(){
+                if(!footBox) return;
+                footBox.textContent='';
+                if(day){
+                    const c=btn('dayClose', '关闭'), a=btn('dayAdd', '给这天补一笔', 'primary'), k=day;
+                    c.addEventListener('click', ()=>{ doneFn(); if(back) back(); });
+                    a.addEventListener('click', ()=>{ doneFn(); openAddModal({ day:k }); });
+                    pairFoot(footBox, c, a);
+                } else {
+                    const c=btn('weekClose', '关闭', 'block'); c.addEventListener('click', ()=>{ doneFn(); if(back) back(); }); footBox.appendChild(c);
+                }
+            }
+            function render(){
+                if(!bodyBox) return;
+                bodyBox.classList.toggle('wd-isday', !!day);
+                bodyBox.innerHTML = tabsHtml() + navHtml() + `<div class="wd-pane">` + (day ? dayHtml(day) : weekHtml()) + `</div>`;
+                paintFoot();
+            }
+            // 换一周 / 换一天（d：-1 往前、1 往后）；到头了返回 false
+            function can(d){ return d<0 || (day ? day<today : mon<thisMon); }
             function go(d){
-                const m=C.addDay(mon, 7*d);
-                if(m>thisMon) return;
-                mon=m; render();
+                if(!can(d)) return false;
+                if(day){ day=C.addDay(day, d); mon=C.monOf(day); }
+                else mon=C.addDay(mon, 7*d);
+                render(); return true;
             }
-            window.JiwenSheet.open({ title:`${C.weekLabel(mon)} · ${C.rangeText(mon, C.addDay(mon, 6))}`, tall:true, onDismiss:back,
+            function show(v){ day = v==='week' ? null : v; render(); }
+            window.JiwenSheet.open({ title:day ? C.dayTitle(day) : `${C.weekLabel(mon)} · ${C.rangeText(mon, C.addDay(mon, 6))}`, tall:true, onDismiss:back,
                 body(box, done){
-                    box.classList.add('dd-body');
-                    bodyBox=box; render();
+                    box.classList.add('dd-body', 'wd-body');
+                    bodyBox=box; doneFn=done;
                     box.addEventListener('click', e=>{
                         if(e.target.closest('#weekPrev')){ go(-1); return; }
                         if(e.target.closest('#weekNext')){ go(1); return; }
+                        const tb=e.target.closest('.wd-tab'); if(tb){ if(!tb.disabled) show(tb.dataset.v); return; }
                         const add=e.target.closest('[data-add]'); if(add){ done(); openAddModal({ day:add.dataset.add }); return; }
                         const un=e.target.closest('[data-unns]'); if(un){ window.JiwenStore.noSpendSet([un.dataset.unns], false); render(); window.JiwenTabs.refreshAllViews(); return; }
-                        const d=e.target.closest('[data-day]'); if(d){ const m=mon; done(); openDay(d.dataset.day, { onClose:()=>openWeek(m, opt) }); }
+                        const row=e.target.closest('.bl-row[data-id]'); if(row){ done(); openDetail(row.dataset.id, { onClose:reopen }); return; }
+                        const d=e.target.closest('[data-day]'); if(d) show(d.dataset.day);
                     });
-                    // 左右滑：横着挪了 50px 以上、而且比竖着挪得多，就换一周（往右滑看上一周，往左滑看下一周）
+                    // 左右滑：横着挪了 50px 以上、而且比竖着挪得多，就换（往右滑看前面的，往左滑看后面的）
                     let sx=null, sy=0;
                     box.addEventListener('pointerdown', e=>{ sx=e.clientX; sy=e.clientY; }, { passive:true });
                     box.addEventListener('pointerup', e=>{
@@ -426,7 +461,7 @@
                     });
                     box.addEventListener('click', e=>{ if(box.__swiped && Date.now()-box.__swiped<400){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // 滑完那一下不算点
                 },
-                foot(box, done){ const c=btn('weekClose', '关闭', 'block'); c.addEventListener('click', ()=>{ done(); if(back) back(); }); box.appendChild(c); } });
+                foot(box, done){ footBox=box; doneFn=done; render(); } });
         }
         window.JiwenDetail = { CHEV, aiFlagText, balanceAfter, cal, closeDetail, openDay, openDetail, openWeek, rowHtml, sumFen, sumHtml };   // detail 模块对外只有这一个入口
 })();

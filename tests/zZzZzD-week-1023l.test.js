@@ -31,8 +31,8 @@ const R = (id, time, money, remark) => ({ id, time, money, type: 'expense', cat:
   ok(bars[3].querySelector('i').style.height === '96px' && bars[0].querySelector('i').style.height === '21px', '1 高度按这一周最多的那天算');
   bars[3].click(); await tick();
   ok(title() === '昨天 · 10月22日 周四', '1 点周四那根：换成那一天的当日详情');
-  $('dayClose').click(); await tick();
-  ok(title() === '本周 · 10月19日–25日', '1 当日关了回到这一周');
+  body().querySelector('.wd-tab-wk').click(); await tick();
+  ok(title() === '本周 · 10月19日–25日', '1 点顶上「整周」回到这一周');
 
   // 2. ‹ › 换周
   ok($('weekNext').disabled && !$('weekPrev').disabled, '2 本周：下一周点不了（最晚到本周）');
@@ -59,9 +59,33 @@ const R = (id, time, money, remark) => ({ id, time, money, type: 'expense', cat:
   ok(title() === '第 42 周 · 10月12日–18日', '3 竖着挪得多（在滚）：不换');
   // 点一根，关了回到的是现在看的那一周
   body().querySelector('button.dw-bar[data-day="2026-10-13"]').click(); await tick();
+  body().querySelector('.wd-tab-wk').click(); await tick();
+  ok(title() === '第 42 周 · 10月12日–18日', '3 换过周以后点一天，再点「整周」回到换过的那一周');
+  // 4. 1025-UX：一周和一天是同一个面板，在里面切
+  let opens = 0; const o0 = w.JiwenSheet.open; w.JiwenSheet.open = function () { opens++; return o0.apply(this, arguments); };
+  body().querySelector('.dw-day[data-day="2026-10-13"]').click(); await tick();
+  ok(title() === '10月13日 周二' && opens === 0 && $('uiSheetMask').style.display === 'flex', '4 点某一天那一行：就地换成那一天，面板没有关了再开');
+  const tabs = () => [...body().querySelectorAll('.wd-tab')];
+  ok(tabs().map(txt).join(',') === '整周,一12,二13,三14,四15,五16,六17,日18' && tabs()[2].classList.contains('on'), '4 顶上一行「整周 一 … 日」，选中的是周二：' + tabs().map(txt).join(','));
+  ok(txt($('uiSheetSub')) === '1 笔' && $('dayAdd') && $('dayClose') && !$('weekClose'), '4 看一天：副标题写几笔，底部「关闭 | 给这天补一笔」');
+  tabs()[7].click(); await tick();
+  ok(title() === '10月18日 周日', '4 点「日」：换成周日');
+  $('weekNext').click(); await tick();
+  ok(title() === '10月19日 周一' && body().querySelector('.wd-tab.on').dataset.v === '2026-10-19' && tabs()[1].dataset.v === '2026-10-19', '4 看一天时 › 是后一天，跨到下一周时顶上那行跟着换周');
+  swipe(100, 220, 300, 310); await tick();
+  ok(title() === '10月18日 周日', '4 看一天时往右滑：前一天');
+  swipe(250, 100, 300, 300); await tick(); swipe(250, 100, 300, 300); await tick(); swipe(250, 100, 300, 300); await tick(); swipe(250, 100, 300, 300); await tick(); swipe(250, 100, 300, 300); await tick();
+  ok(title() === '今天 · 10月23日 周五' && $('weekNext').disabled, '4 往后最多到今天');
+  ok(tabs()[6].disabled && tabs()[7].disabled, '4 还没到的日子点不了');
+  w.JiwenDetail.openDay('2026-10-22'); await tick();
+  body().querySelector('.wd-tab-wk').click(); await tick();
+  ok(title() === '本周 · 10月19日–25日' && $('weekClose') && !txt($('uiSheetSub')), '4 从当日打开（账单页点日期抬头）也能点「整周」看那一周');
+  body().querySelector('.wd-tab[data-v="2026-10-22"]').click(); await tick();
+  body().querySelector('.bl-row[data-id="b"]').click(); await tick();
+  w.JiwenDetail.closeDetail(); await tick();
+  ok(title() === '昨天 · 10月22日 周四', '4 点一笔进单笔详情，关了回到这个面板的那一天');
+  w.JiwenSheet.open = o0;
   $('dayClose').click(); await tick();
-  ok(title() === '第 42 周 · 10月12日–18日', '3 换过周以后点一天，关了回到换过的那一周');
-  $('weekClose').click(); await tick();
 
   ok(!t.errs.length, '没有报错 ' + t.errs.join('|'));
   console.log(`1023-L 一周详情：${pass} 通过，${fail} 失败`);

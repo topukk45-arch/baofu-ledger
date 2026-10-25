@@ -1911,6 +1911,17 @@
         .dd-empty { padding:24px 0; text-align:center; color:var(--c-text-soft); font-size:14px; }
         .dw-chart { display:flex; flex-direction:column; gap:6px; padding:12px 14px 10px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
         /* 1023-L：大柱子（能点，点了换成那一天），每根上面写那天的金额；顶上一行 ‹ 左右滑动看上一周、下一周 › */
+        /* 1025-UX：一周 / 一天同一个面板：顶上「整周 一 … 日」一行切换（选中的深色底，今天的日子数字主色），下面的内容 .wd-pane */
+        .wd-pane { display:flex; flex-direction:column; gap:12px; }
+        .wd-tabs { display:flex; gap:2px; padding:3px; border-radius:14px; background:color-mix(in srgb, var(--c-primary) 10%, var(--c-surface)); }
+        button.wd-tab { flex:1 1 0; min-width:0; height:48px; border:none; border-radius:11px; background:transparent; padding:0; font-family:inherit; font-size:13px;
+            color:var(--c-text); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.15; }
+        button.wd-tab small { font-size:11px; color:var(--c-text-soft); }
+        button.wd-tab.today small { color:var(--c-primary-dark); font-weight:bold; }
+        button.wd-tab-wk { flex:1.5 1 0; font-weight:bold; }
+        button.wd-tab.on { background:var(--c-primary-dark); color:var(--c-on-primary); font-weight:bold; }
+        button.wd-tab.on small { color:var(--c-on-primary); }
+        button.wd-tab[disabled] { opacity:.35; cursor:default; }
         .dw-nav { display:flex; align-items:center; gap:4px; margin:-4px 0 2px; }
         .dw-nav button { flex:none; width:48px; height:44px; border:none; border-radius:12px; background:transparent; font-size:24px; line-height:1; color:var(--c-text-soft); font-family:inherit; cursor:pointer; }
         .dw-nav button[disabled] { opacity:.3; cursor:default; }

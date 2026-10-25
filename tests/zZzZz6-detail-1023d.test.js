@@ -92,9 +92,9 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');   // 一块�
   s.body.querySelector('.dw-day[data-day="2026-10-22"]').click(); await tick();
   s = sheet();
   ok(s && s.title === '昨天 · 10月22日 周四', '3 点一天进当日详情');
-  $('dayClose').click(); await tick();
+  s.body.querySelector('.wd-tab-wk').click(); await tick();
   s = sheet();
-  ok(s && s.title === '本周 · 10月19日–25日', '3 当日关了回到一周');
+  ok(s && s.title === '本周 · 10月19日–25日', '3 点顶上「整周」回到一周（1025-UX：同一个面板里切，不再关了一层回一层）');
   s.body.querySelector('.dw-day [data-add="2026-10-23"]').click(); await tick();
   ok(!sheet() && shown('addMask') && ($('billTime').dataset.value || '').startsWith('2026-10-23T'), '3 没记的那天「补一笔」');
   $('closeAdd').click(); await tick();
