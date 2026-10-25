@@ -78,6 +78,12 @@
         }
         try{ if(window.ResizeObserver){ const ro=new ResizeObserver(()=>{ if(pageOpen) fitCard(); }); ro.observe($('searchCard')); ro.observe(page.querySelector('.sp-bar')); } }catch(_){}
         function spNoMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){ return false; } }
+        // 1025-UX：列表往下滑过 24px 收起最近搜过，回到 4px 以内展开（中间留一段，不会来回闪）
+        function setFold(on){ page.classList.toggle('sp-folded', !!on); }
+        $('searchBody').addEventListener('scroll', ()=>{
+            const y=$('searchBody').scrollTop;
+            if(y>24) setFold(true); else if(y<=4) setFold(false);
+        }, { passive:true });
         function isOpen(){ return pageOpen; }
         function openSearch(o){
             o=o||{};
@@ -88,6 +94,7 @@
             page.classList.remove('sp-out'); page.classList.remove('sp-in');
             if(!spNoMotion()){ void page.offsetWidth; page.classList.add('sp-in'); }
             document.body.classList.add('search-open');
+            setFold(false);
             $('searchBody').scrollTop=0;
             render();
             if(!o.noSheet) openSheet();
@@ -174,10 +181,14 @@
         function histDrop(i){ const a=histLoad(); a.splice(i, 1); histSave(a); }
         const CLOCK='<svg class="sp-hist-ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
         // 结果页没条件时，条件卡里列最近 3 条
+        //   1025-UX：列表往下滑（看全部账单）时这 3 条收成一行「还没设条件 · 最近搜过 3 条 ›」，不再一直盖着列表；回到列表顶上自己展开，
+        //   点那一行也回到顶上、展开（`.sp-hist-fold`，`search-page.sp-folded`）。不照月份浮条那样停 1.5 秒自己收：它是要读、要点的内容，
+        //   人没动它就消失会来不及点；只在人明确往下看列表时让开
         function histCardHtml(){
             const a=histLoad().slice(0, 3);
             if(!a.length) return `<span class="sp-nocond">还没设条件，下面是全部账单</span>`;
-            return `<div class="sp-hist"><div class="sp-hist-head"><span>最近搜过</span><button type="button" class="sp-hist-clear" data-act="hclear">清空</button></div>`
+            return `<button type="button" class="sp-hist-fold" data-act="hunfold">还没设条件 · 最近搜过 ${a.length} 条<span class="sp-hist-fold-go" aria-hidden="true">›</span></button>`
+                + `<div class="sp-hist"><div class="sp-hist-head"><span>最近搜过</span><button type="button" class="sp-hist-clear" data-act="hclear">清空</button></div>`
                 + a.map((h, i)=>`<div class="sp-hist-row"><button type="button" class="sp-hist-go" data-act="happly" data-i="${i}">${CLOCK}<span class="sp-hist-t">${escapeHtml(histLabel(h))}</span></button>`
                     + `<button type="button" class="sp-hist-x" data-act="hdrop" data-i="${i}" aria-label="删掉这条：${escapeHtml(histLabel(h))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`).join('')
                 + `</div>`;
@@ -251,7 +262,8 @@
             const ha=e.target.closest('[data-act^="h"]');
             if(ha){
                 const act=ha.dataset.act, i=+ha.dataset.i;
-                if(act==='happly'){ const h=histLoad()[i]; if(h) histApply(h); }
+                if(act==='hunfold'){ const sb=$('searchBody'); try{ sb.scrollTo({ top:0, behavior:spNoMotion() ? 'instant' : 'smooth' }); }catch(_){ sb.scrollTop=0; } setFold(false); }
+                else if(act==='happly'){ const h=histLoad()[i]; if(h) histApply(h); }
                 else if(act==='hdrop'){ histDrop(i); render(); }
                 else if(act==='hclear'){ customConfirm('清空最近搜过的条件？只删这台手机上记下的搜索条件，账本不动。', ()=>{ histSave([]); render(); }, '清空最近搜过', { okText:'清空', danger:true }); }
                 return;

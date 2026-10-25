@@ -75,6 +75,20 @@ const R = (id, time, money, type, cat, remark) => ({ id, time, money, type, cat,
   t2.w.JiwenSearch.resetSearch(); t2.$('filterFab').click(); await tick(); t2.w.closeFilterSheet(); await tick();
   const rows2 = () => [...t2.$('searchTags').querySelectorAll('.sp-hist-row')];
   ok(rows2().length === 3, '4 卡片里最多 3 条');
+  // 1025-UX：列表往下滑收成一行，回到顶上展开；点那一行回到顶上
+  const pg = t2.$('pageSearch'), sb = t2.$('searchBody'), fold = () => t2.$('searchTags').querySelector('.sp-hist-fold');
+  const scr = y => { sb.scrollTop = y; sb.dispatchEvent(new t2.w.Event('scroll')); };
+  ok(fold() && /最近搜过 3 条/.test(txt(fold())) && !pg.classList.contains('sp-folded'), '4 刚打开：3 条都列着（收起的那一行藏着）');
+  scr(120);
+  ok(pg.classList.contains('sp-folded'), '4 列表往下滑：最近搜过收成一行，不再盖着列表');
+  scr(12);
+  ok(pg.classList.contains('sp-folded'), '4 滑回来一点（还没到顶）：先不展开（不来回闪）');
+  scr(0);
+  ok(!pg.classList.contains('sp-folded'), '4 回到顶上：展开');
+  scr(200); fold().click(); await tick();
+  ok(!pg.classList.contains('sp-folded') && sb.scrollTop === 0, '4 点收起的那一行：回到顶上、展开');
+  const css2 = [...t2.d.querySelectorAll('style')].map(x => x.textContent).join('\n');
+  ok(/\.search-page\.sp-folded \.sp-hist \{ display:none; \}/.test(css2), '4 收起时 3 条那块不显示');
   rows2()[1].querySelector('.sp-hist-x').click(); await tick();
   ok(JSON.parse(t2.w.localStorage.getItem(`app_search_hist_${A.ID}__默认存档`)).length === 2 && rows2().length === 2, '4 × 删一条');
   t2.$('searchTags').querySelector('.sp-hist-clear').click(); await tick();

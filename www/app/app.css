@@ -2053,6 +2053,12 @@
         button.sp-hist-x { flex:none; width:var(--ui-tap); height:var(--ui-tap); border:none; background:transparent; cursor:pointer; display:flex; align-items:center; justify-content:center; }
         button.sp-hist-x svg { width:12px; height:12px; fill:none; stroke:var(--c-text-soft); stroke-width:2.6; stroke-linecap:round; }
         .sp-tags:has(.sp-hist) { overflow:visible; flex-wrap:wrap; }
+        /* 1025-UX：列表往下滑时最近搜过收成一行，回到顶上展开 */
+        button.sp-hist-fold { display:none; width:100%; min-height:var(--ui-tap); align-items:center; gap:6px; padding:0 4px; border:none; background:transparent;
+            font:inherit; font-size:14px; color:var(--c-text-soft); text-align:left; cursor:pointer; }
+        .sp-hist-fold-go { margin-left:auto; font-size:18px; color:var(--c-text-soft); transform:rotate(-90deg); }
+        .search-page.sp-folded button.sp-hist-fold { display:flex; }
+        .search-page.sp-folded .sp-hist { display:none; }
         .sf-hist { display:flex; flex-direction:column; gap:6px; }
         .sf-hist[hidden] { display:none; }
         .sf-hist-k { font-size:13px; color:var(--c-text-soft); }
