@@ -175,7 +175,10 @@
                 sheet.classList.toggle('ui-sheet-tall', !!cur.tall);   // 1020-J：内容多的（选色面板）能到 88% 屏幕高，和记一笔这类表单一样
                 titleEl.textContent=cur.title||'';
                 subEl.textContent=cur.sub||''; subEl.style.display=cur.sub?'':'none';
-                bodyEl.textContent=''; footEl.textContent='';
+                // 1025-UX：每次打开换一个新的内容区 / 按钮区：原来一直用同一个元素，上一个面板挂在上面的监听（点、滑）和加的类（dd-body）留着，
+                //   下一个面板里照样会响——一周详情打开两次后左右滑，旧的那份也跟着换周，把内容盖成别的
+                const nb=document.createElement('div'); nb.className='sheet-body ui-sheet-body'; nb.id='uiSheetBody'; bodyEl.replaceWith(nb); bodyEl=nb;
+                const nf=document.createElement('div'); nf.className='ui-sheet-foot'; nf.id='uiSheetFoot'; footEl.replaceWith(nf); footEl=nf;
                 if(cur.body) cur.body(bodyEl, close);
                 if(cur.foot) cur.foot(footEl, close);
                 mask.style.zIndex=String(zAbove());
