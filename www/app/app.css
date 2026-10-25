@@ -1877,6 +1877,24 @@
         .mstrip.has-top button.ms-totop { display:flex; }
         button.ms-totop svg { width:22px; height:22px; fill:none; stroke:var(--c-primary-dark); stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
         @media (prefers-reduced-motion: reduce){ button.ms-item { transition:none; } }
+        /* 1025-UX：底部不挡路的小条（sheet.js 的 snack）：和月份浮条同一个位置、同一套底色 / 边框 / 阴影，盖在它上面；4 秒淡出 */
+        .snack { position:fixed; left:16px; right:16px; bottom:calc(128px + env(safe-area-inset-bottom)); z-index:985; display:flex; align-items:center; gap:8px;
+            min-height:60px; padding:6px 6px 6px 16px; box-sizing:border-box; border:1px solid var(--c-border-mid); border-radius:18px; background:var(--c-surface);
+            box-shadow:0 6px 18px rgba(var(--c-shadow-rgb),0.28); opacity:0; transform:translateY(8px); pointer-events:none; transition:transform .18s ease-out, opacity .18s ease-out; }
+        .snack.show { opacity:1; transform:none; pointer-events:auto; }
+        @media (min-width:761px){ .snack { left:50%; right:auto; width:480px; margin-left:-240px; } }
+        body.kb-open .snack { display:none; }
+        .snack-tx { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; line-height:20px; }
+        .snack-t { font-size:15px; font-weight:bold; color:var(--c-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .snack-s { font-size:12px; line-height:16px; color:var(--c-text-soft); }
+        button.snack-b { flex:none; min-height:var(--ui-tap); padding:0 12px; border:none; border-radius:12px; background:transparent; font-family:inherit; font-size:14px; font-weight:bold;
+            color:var(--c-primary-dark); cursor:pointer; white-space:nowrap; }
+        button.snack-b.primary { background:var(--c-primary-dark); color:var(--c-on-primary); }
+        @media (prefers-reduced-motion: reduce){ .snack { transition:opacity .18s; transform:none; } }
+        /* 1025-UX：记完一笔，账单页里那一行闪一下 */
+        .bl-row.row-flash { animation:rowFlash 1.2s ease-out; }
+        @keyframes rowFlash { 0%, 30% { background:color-mix(in srgb, var(--c-primary) 22%, transparent); } 100% { background:transparent; } }
+        @media (prefers-reduced-motion: reduce){ .bl-row.row-flash { animation:none; } }
         /* 统计页的总结余（1023-C 从账单页总览搬来；1023-H 再改样子） */
         button.st-bal { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); text-align:left; font-family:inherit; cursor:pointer; color:var(--c-text); }
         .st-bal-k { flex:1 1 auto; min-width:0; font-size:14px; font-weight:bold; }

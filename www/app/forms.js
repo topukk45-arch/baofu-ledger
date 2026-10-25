@@ -590,25 +590,32 @@
             if(!saveUserData(data)) return;
             JiwenBase.curPage = 1;            // 新记录在最前，回到第 1 页才看得到
             window.JiwenTabs.refreshAllViews();
-            // 关闭记账弹窗，弹出「再记一笔 / 关闭」二选一
+            // 1025-UX：关掉记账弹窗，底部浮一条小条「已记下 吃饭 12.00」+「再记一笔」（没写备注再加「补备注」），4 秒自己收；
+            //   原来弹「记账成功，要再记一笔吗？」，每记一笔都要多点一下才回得到账本
             addMask.style.display='none';
-            // 这一笔没填备注 → 成功弹窗额外给个「添加备注」按钮，方便当场补；填了则不显示。
-            const confirmOpts={ okText:'再记一笔', cancelText:'关闭' };
-            if(!remark){
-                confirmOpts.extra={ text:'添加备注', onClick:()=>addRemarkToRecord(newId) };
-            }
-            // 这笔落在有预算的分类上（且是计入的支出）：成功提示里带一句当月预算情况
+            // 这笔落在有预算的分类上（且是计入的支出）：小条第二行带一句当月预算情况
             let bHint='';
             const bLimit=getBudgets()[cat];
             if(bLimit>0 && newRec.type==='expense' && recMode(newRec)==='normal'){
                 const tt=parseRecTime(time);
                 const spentNow=budgetSpentIn(data, cat, tt.getFullYear(), tt.getMonth());
-                bHint=`${tt.getMonth()+1}月「${cat}」预算：${budgetPhrase(spentNow, bLimit)}\n\n`;
+                bHint=`${tt.getMonth()+1}月「${cat}」预算：${budgetPhrase(spentNow, bLimit)}`;
             }
-            customConfirm(bHint+'已记下这一笔，要再记一笔吗？', ()=>{
-                openAddModal();     // 重新打开，且为全新空白表单（不带上次数据）
-            }, '记账成功', confirmOpts);
+            const acts=[];
+            if(!remark) acts.push({ id:'snackRemark', text:'补备注', onClick:()=>addRemarkToRecord(newId) });
+            acts.push({ id:'snackAgain', text:'再记一笔', primary:true, onClick:()=>openAddModal() });   // 重新打开，且为全新空白表单（不带上次数据）
+            window.JiwenPanel.snack({ text:`已记下 ${cat} ${type==='income' ? '+' : ''}${m.val.toFixed(2)}`, sub:bHint, actions:acts });
+            flashRow(newId);
         });
+        // 1025-UX：记完一笔，账单页里新记的那一行闪一下（看得出记到哪了）；不在屏幕上就不滚，免得打断
+        function flashRow(id){
+            requestAnimationFrame(()=>{
+                const row=[...document.querySelectorAll('#billList .bl-row[data-id]')].find(r=>r.dataset.id===id);
+                if(!row) return;
+                row.classList.remove('row-flash'); void row.offsetWidth; row.classList.add('row-flash');
+                setTimeout(()=>row.classList.remove('row-flash'), 1300);
+            });
+        }
 
         // 给某条记录补备注（用于「记账成功」弹窗的「添加备注」按钮）。
         // 弹输入框拿到内容后按 id 找回那条记录写回、保存、刷新。

@@ -77,7 +77,7 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
   ok(t.$('bgGroups').querySelector('.bg-num').textContent==='300.00 / 200.00', '9 月按 9 月的记录算');
 }
 
-// ===== 3. 记账成功提示 =====
+// ===== 3. 记账成功提示（1025-UX 起是底部小条，这里把小条第二行的预算情况拼成原来的样子来比）=====
 {
   const t=await boot(null,{'游戏':200});
   const add=(money,cat,type,mode)=>{
@@ -85,7 +85,9 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
     t.chip('billCatChips',cat).click(); t.chip('billTypeChips',type).click();
     if(mode) RC.pickMode(t.d, 'billMode', mode);
     t.$('addBill').click();
-    const msg=t.$('askMsg').textContent; t.$('askCancel').click(); return msg;
+    // 1025-UX：记完不再弹「记账成功」，底部小条：第一行「已记下 分类 金额」，预算情况在第二行
+    const sn=t.d.getElementById('uiSnack'), s2=sn && sn.querySelector('.snack-s');
+    return (s2 ? s2.textContent+'\n\n' : '')+'已记下这一笔，要再记一笔吗？';
   };
   const m1=add(30,'游戏','支出');
   ok(m1.startsWith('10月「游戏」预算：已花 188.87 / 200.00，还剩 11.13'), '记游戏支出后提示预算：'+m1.split('\n')[0]);

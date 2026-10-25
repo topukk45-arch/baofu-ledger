@@ -87,8 +87,7 @@ const recs = [{ id: 'r1', time: '2026-12-01T12:00', money: 18, type: 'expense', 
   ok($('addSheet').querySelector('.sheet-head h3').textContent === '记一笔', '5 记一笔标题照旧');
   $('billMoney').value = '3'; chip('billCatChips', '吃饭').click(); chip('billTypeChips', '支出').click();
   $('addBill').click(); await t.idle();
-  ok(t.ask() && $('askOk').textContent === '再记一笔' && arc().records.length === 2 && (arc().tpls || []).length === 0, '5 记完照旧问「再记一笔」，不存模板');
-  await t.askCancel();
+  ok(!t.ask() && $('snackAgain') && $('snackAgain').textContent === '再记一笔' && arc().records.length === 2 && (arc().tpls || []).length === 0, '5 记完底部小条有「再记一笔」（1025-UX 起不弹框），不存模板');
 
   // 6. 模板的名字跟着备份走；旧备份没名字照旧
   const st = w.JiwenStore.loadStore(A.ID); st.archives['默认存档'].tpls = [{ id: 'x', type: 'expense', cat: '吃饭', remark: '早饭', money: null, mode: 'normal', name: '虚构早点' }]; w.JiwenStore.saveStore(st, A.ID); await t.idle();

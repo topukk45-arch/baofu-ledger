@@ -674,5 +674,34 @@
             try{ if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text).then(()=>true, ()=>false); }catch(_){}
             return Promise.resolve(false);
         }
-        window.JiwenPanel = { bindSheetDrag, copyText, sheetGhostsFinish };   // sheet 模块对外只有这一个入口
+        // ===== 1025-UX：底部不挡路的小条（snack）=====
+        //   做完一件事告诉一声，不用点「知道了」：浮在底栏上方（和月份浮条同一个位置、同一套底色 / 边框 / 阴影），SNACK_MS 毫秒后自己淡出；
+        //   手指按着它不收、松手重新计时；点了里面的按钮就收起。一次只有一条，新的顶掉旧的。系统「减少动画」时不上移、只淡入淡出。
+        //   snack({ text, sub, actions:[{ id, text, primary, onClick }] })
+        const SNACK_MS=4000;
+        let snackEl=null, snackT=null;
+        function snackHide(){ clearTimeout(snackT); if(snackEl) snackEl.classList.remove('show'); }
+        function snack(o){
+            o=o||{};
+            if(!snackEl){
+                snackEl=document.createElement('div'); snackEl.className='snack'; snackEl.id='uiSnack'; snackEl.setAttribute('role', 'status'); snackEl.setAttribute('aria-live', 'polite');
+                document.body.appendChild(snackEl);
+                snackEl.addEventListener('pointerdown', ()=>clearTimeout(snackT));
+                ['pointerup', 'pointercancel'].forEach(ev=>snackEl.addEventListener(ev, ()=>{ if(snackEl.classList.contains('show')){ clearTimeout(snackT); snackT=setTimeout(snackHide, SNACK_MS); } }));
+            }
+            snackEl.textContent='';
+            const tx=document.createElement('div'); tx.className='snack-tx';
+            const t1=document.createElement('span'); t1.className='snack-t'; t1.textContent=o.text||''; tx.appendChild(t1);
+            if(o.sub){ const t2=document.createElement('span'); t2.className='snack-s'; t2.textContent=o.sub; tx.appendChild(t2); }
+            snackEl.appendChild(tx);
+            (o.actions||[]).forEach(a=>{
+                const b=document.createElement('button'); b.type='button'; b.className='snack-b'+(a.primary ? ' primary' : ''); if(a.id) b.id=a.id; b.textContent=a.text;
+                b.addEventListener('click', ()=>{ snackHide(); if(a.onClick) a.onClick(); });
+                snackEl.appendChild(b);
+            });
+            void snackEl.offsetWidth;
+            snackEl.classList.add('show');
+            clearTimeout(snackT); snackT=setTimeout(snackHide, o.ms || SNACK_MS);
+        }
+        window.JiwenPanel = { bindSheetDrag, copyText, sheetGhostsFinish, snack, snackHide };   // sheet 模块对外只有这一个入口
 })();
