@@ -632,6 +632,11 @@
             window.JiwenPanel.snack({ text:`已记下 ${cat} ${type==='income' ? '+' : ''}${m.val.toFixed(2)}`, sub:bHint, actions:acts });
             flashRow(newId);
         });
+        // 1025-UX：改好一笔也告诉一声：底部小条「已改好 吃饭 12.00」（没有按钮），那一行闪一下
+        function savedSnack(what, r, id){
+            window.JiwenPanel.snack({ text:`${what} ${isRefund(r) ? '退款' : (r.cat||'未分类')} ${r.type==='income' && !isRefund(r) ? '+' : ''}${safeNum(r.money).toFixed(2)}` });
+            flashRow(id);
+        }
         // 1025-UX：记完一笔，账单页里新记的那一行闪一下（看得出记到哪了）；不在屏幕上就不滚，免得打断
         function flashRow(id){
             requestAnimationFrame(()=>{
@@ -882,7 +887,9 @@
                     next=Object.assign({}, old, { time, money:m.val, remark });
                     data[idx]=next;
                     if(!saveUserData(data)) return;
+                    const rid=editId;
                     closeEditModal({ refresh:true });
+                    savedSnack('已改好', next, rid);
                     return;
                 }
                 const done=refundedTotal(data, editId);
@@ -903,6 +910,7 @@
                 // 避免「提示失败但弹窗已关、看似已保存」的不一致。
                 if(!saveUserData(data)) return;
                 closeEditModal({ refresh:true });
+                savedSnack('已改好', next, next.id);
                 if(cat!==(old.cat||'未分类')) askCatRule(next, cat);   // 第 5 版：改了导入的记录的分类，问以后要不要也这么记
             } else {
                 // 找不到原记录（例如保存前存档被切换/记录已被删）：先复位关闭，再明确提示。

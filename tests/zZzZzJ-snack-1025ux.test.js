@@ -57,6 +57,13 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
   await sleep(4300);
   ok(!sn.classList.contains('show'), '3 松手：重新计时，4 秒后收');
 
+  // 4. 改好一笔：也浮一条「已改好 …」，那一行闪一下
+  w.openEdit('o1'); await sleep(20);
+  $('editMoney').value = '22'; $('saveEdit').click(); await sleep(40);
+  ok(!shown('editMask') && sn.classList.contains('show') && txt(sn.querySelector('.snack-t')) === '已改好 吃饭 22.00' && !sn.querySelector('button'), '4 改好一笔：小条「已改好 吃饭 22.00」，没有按钮');
+  const row2 = [...$('billList').querySelectorAll('.bl-row')].find(r => r.dataset.id === 'o1');
+  ok(row2 && row2.classList.contains('row-flash'), '4 改的那一行闪一下');
+
   ok(!t.errs.length, '没有报错 ' + t.errs.join('|'));
   console.log(`1025-UX 记完的小条：${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
