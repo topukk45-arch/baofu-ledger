@@ -967,6 +967,71 @@ async function run(cfg, port, browser) {
         if (!short) bad.push('样例 5 月不是不满一屏（' + de.scrollHeight + ' > ' + innerHeight + '），这条没测到');
         return { bad, ok: !bad.length };
       })));
+      // 1025-UX：月份浮条真手指左右拨能切月份（松手停好了切）；回顶圆钮在浮条右上方、不压浮条、不出屏幕、点得到
+      await page.evaluate(() => { window.JiwenLedger.setYM('2026-10'); window.scrollTo(0, 0); window.JiwenLedger.stripWake(); }); await page.waitForTimeout(450);
+      {
+        const cdp = await page.context().newCDPSession(page);
+        const tb = await page.evaluate(() => { const r = document.querySelector('#lgStrip .ms-track').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+        const tp = x => [{ x, y: tb.y, id: 1 }];
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: tp(tb.x) });
+        for (let i = 1; i <= 10; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: tp(tb.x + 12 * i) }); await page.waitForTimeout(16); }
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await page.waitForTimeout(900);
+        results.push(Object.assign({ name: 'strip-swipe-1025ux', cfg: size, clip: true }, await page.evaluate(() => {
+          const ym = window.JiwenLedger.curYM(), on = document.querySelector('#lgStrip .ms-item.on'), sel = document.querySelector('#lgStrip .ms-sel').getBoundingClientRect(), r = on && on.getBoundingClientRect();
+          const bad = [];
+          if (ym === '2026-10') bad.push('往右拨两格松手，月份没变（还是 10 月）');
+          if (!on || on.dataset.ym !== ym) bad.push('选中框里的月份和列表的月份对不上');
+          else if (Math.abs((r.left + r.width / 2) - (sel.left + sel.width / 2)) > 3) bad.push('拨完那格没停在选中框正中');
+          return { bad, ok: !bad.length, ym };
+        })));
+        await cdp.detach();
+      }
+      await page.evaluate(() => { window.JiwenLedger.setYM('2026-10'); window.scrollTo(0, innerHeight * 2); window.JiwenLedger.stripWake(); }); await page.waitForTimeout(450);
+      await shot(page, size, '账单页', '回顶圆钮（滑过一屏）');
+      results.push(Object.assign({ name: 'totop-1025ux', cfg: size, clip: true }, await page.evaluate(() => {
+        const st = document.getElementById('lgStrip'), b = st.querySelector('.ms-totop'), r = b.getBoundingClientRect(), s = st.getBoundingClientRect();
+        const bad = [];
+        if (!st.classList.contains('has-top') || getComputedStyle(b).display === 'none') bad.push('滑过一屏了，回顶圆钮没出来（样例数据不够长时这条测不到）');
+        else {
+          if (r.width < 48 || r.height < 48) bad.push('回顶圆钮小于 48');
+          if (r.bottom > s.top - 8) bad.push('回顶圆钮下沿离浮条不到 8px');
+          if (r.left < 0 || r.right > innerWidth || r.top < 0) bad.push('回顶圆钮出了屏幕');
+          const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+          if (!hit || !hit.closest('.ms-totop')) bad.push('回顶圆钮中间被别的东西盖住');
+        }
+        return { bad, ok: !bad.length };
+      })));
+      // 1025-UX：记完一笔的小条：不出屏幕、不压操作栏、按钮 48 高、第一行字不被切
+      await page.evaluate(() => { window.scrollTo(0, 0); window.JiwenForms.openAddModal(); }); await page.waitForTimeout(700);
+      await page.evaluate(() => { window.kpClose && window.kpClose(); document.getElementById('billMoney').value = '12.5'; window.JiwenForms.pickBillCat('吃饭'); const io = [...document.querySelectorAll('#billTypeChips .cc')].find(e => e.textContent === '支出'); if (!window.JiwenForms.billTypeSel) io.click(); document.getElementById('addBill').click(); });
+      await page.waitForTimeout(400);
+      await shot(page, size, '记一笔', '存好以后的小条');
+      results.push(Object.assign({ name: 'snack-1025ux', cfg: size, clip: true }, await page.evaluate(() => {
+        const sn = document.getElementById('uiSnack'), bad = [];
+        if (!sn || !sn.classList.contains('show')) return { bad: ['存好以后没有小条'], ok: false };
+        const r = sn.getBoundingClientRect(), a = document.getElementById('actionBar'), ar = a && a.offsetParent ? a.getBoundingClientRect() : null;
+        if (r.left < 0 || r.right > innerWidth) bad.push('小条出了屏幕');
+        if (ar && r.bottom > ar.top - 8) bad.push('小条压到操作栏');
+        sn.querySelectorAll('button').forEach(b => { if (b.getBoundingClientRect().height < 48) bad.push('「' + b.textContent + '」不到 48 高'); });
+        const t = sn.querySelector('.snack-t'); if (t.scrollWidth > t.clientWidth + 1) bad.push('第一行字被切：' + t.textContent);
+        return { bad, ok: !bad.length };
+      })));
+      await page.evaluate(() => window.JiwenPanel.snackHide());
+      // 1025-UX：一周 / 一天同一个面板：顶上一行「整周 一 … 日」放得下、每格 48 高
+      await page.evaluate(() => window.JiwenDetail.openWeek('2026-10-12')); await page.waitForTimeout(600);
+      await shot(page, size, '一周详情', '整周');
+      await page.evaluate(() => document.querySelector('#uiSheetBody .wd-tab[data-v="2026-10-14"]').click()); await page.waitForTimeout(500);
+      await shot(page, size, '一周详情', '点进某一天');
+      results.push(Object.assign({ name: 'week-day-1025ux', cfg: size, clip: true }, await page.evaluate(() => {
+        const row = document.querySelector('#uiSheetBody .wd-tabs'), bad = [];
+        if (!row) return { bad: ['没有「整周 一 … 日」那一行'], ok: false };
+        const rr = row.getBoundingClientRect();
+        row.querySelectorAll('.wd-tab').forEach(b => { const q = b.getBoundingClientRect(); if (q.height < 48) bad.push(b.textContent + ' 不到 48 高'); if (q.right > rr.right + 0.5 || q.left < rr.left - 0.5) bad.push(b.textContent + ' 出了那一行'); if (b.scrollWidth > b.clientWidth + 1) bad.push(b.textContent + ' 字放不下'); });
+        if (document.getElementById('uiSheetTitle').textContent.indexOf('10月14日') < 0) bad.push('点了周三没换成那一天');
+        return { bad: bad.slice(0, 6), ok: !bad.length };
+      })));
+      await closeAll(page);
       await page.evaluate(() => { window.JiwenLedger.setYM('2026-10'); window.scrollTo(0, 0); }); await page.waitForTimeout(300);
       await page.evaluate(() => document.querySelector('#billList .bl-row').click()); await page.waitForTimeout(700);
       await shot(page, size, '账单详情', '平时'); if (meas) await CLIP(page, '账单详情', '#detailMask');
