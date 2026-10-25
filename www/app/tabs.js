@@ -190,6 +190,7 @@
                 mb.querySelectorAll('.tab-page').forEach(pg=>{ if(pg.id!==pageId) pg.remove(); else pg.style.display='block'; });
                 const pd=mb.querySelector('#pageDays'); if(pd) pd.remove();
                 mb.querySelectorAll('input, textarea').forEach(x=>{ if(x.type!=='checkbox' && x.type!=='radio') x.setAttribute('value', x.value||''); });
+                mb.querySelectorAll('.row-flash').forEach(x=>x.classList.remove('row-flash'));   // 1025-UX：记完一笔那一行正在闪，快照里不要（打开 App 时别再闪一次）
                 c.appendChild(mb);
                 const tb=$('tabBar').cloneNode(true); tb.style.display='flex';
                 tb.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
