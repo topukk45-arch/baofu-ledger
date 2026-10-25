@@ -308,6 +308,7 @@
             function paintLoginTheme(){
                 const v=$('loginThemeCur'), dot=$('loginThemeDot');
                 if(v) v.textContent=themeName();
+                if($('themeCur')) $('themeCur').textContent=themeName();   // 设置页「外观主题」那一行也写现在用的颜色
                 if(dot) dot.style.background=getComputedStyle(document.documentElement).getPropertyValue('--c-primary').trim() || DEFAULT_PRIMARY;
             }
             function openTheme(){

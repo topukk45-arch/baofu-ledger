@@ -124,6 +124,56 @@
                 <div class="set-account" id="nowUser">当前用户：</div>
 
                 <div class="set-group">
+                    <!-- 1025-UX：「管理账单分类」「管理常用模板」从存档管理最后面挪到最上面一组（比导出、导入常用） -->
+                    <div class="set-group-title">记账</div>
+                    <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
+                    <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
+                </div>
+                <div class="set-group">
+                    <div class="set-group-title">外观和偏好</div>
+                    <!-- 1025-UX：「外观主题」从「账户」那组最底下挪到这里第一行，右边写现在用的颜色 -->
+                    <button class="set-item" id="themeBtn"><span>外观主题</span><span class="set-arrow set-theme-cur"><i class="set-theme-dot" id="themeCurDot" aria-hidden="true"></i><span id="themeCur">雾松青</span> ›</span></button>
+                    <div class="set-item set-static">
+                        <span>默认进入页面</span>
+                        <div class="seg" id="defaultTabSeg">
+                            <button data-v="stats">统计</button>
+                            <button data-v="ledger">记账</button>
+                            <button data-v="settings">设置</button>
+                            <button data-v="last">上次停留</button>
+                        </div>
+                    </div>
+                    <div class="set-item set-static">
+                        <span>记一笔按钮位置</span>
+                        <div class="seg" id="addSideSeg">
+                            <button data-v="left">左</button>
+                            <button data-v="right">右</button>
+                        </div>
+                    </div>
+                    <div class="set-item set-static">
+                        <span>用系统键盘输入金额</span>
+                        <div class="seg" id="sysMoneyKbSeg">
+                            <button data-v="on">开</button>
+                            <button data-v="off">关</button>
+                        </div>
+                    </div>
+                    <!-- 1025-UX：「滑动提示」现在没有用到它的地方（1023-O 起），开关了看不出变化，先藏起来（设置值照留） -->
+                    <div class="set-item set-static" id="scrollHintRow" hidden>
+                        <span>滑动提示</span>
+                        <div class="seg" id="scrollHintSeg">
+                            <button data-v="on">开</button>
+                            <button data-v="off">关</button>
+                        </div>
+                    </div>
+                    <div class="set-item set-static">
+                        <span>收支按钮顺序</span>
+                        <div class="seg" id="ioSideSeg">
+                            <button data-v="out">支出在左</button>
+                            <button data-v="in">收入在左</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="set-group">
                     <div class="set-group-title">存档管理</div>
                     <div class="set-item set-static" style="flex-direction:column; align-items:stretch; gap:10px;">
                         <span>当前存档</span>
@@ -148,8 +198,6 @@
                     <button class="set-item" id="devMeasureBtn" style="display:none"><span>导入量度（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devNudgeBtn" style="display:none"><span>字往下挪几像素（开发中）</span><span class="set-arrow" id="devNudgeVal">自动</span></button>
                     <button class="set-item" id="devSplashBtn" style="display:none"><span>启动画面等首屏（开发中）</span><span class="set-arrow" id="devSplashVal">开</span></button>
-                    <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
-                    <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
                 </div>
 
                 <!-- 云备份：不走任何官方登录，借助手机上已装好的网盘 App（Google Drive/OneDrive 等，
@@ -179,49 +227,7 @@
                 </div>
 
                 <div class="set-group">
-                    <div class="set-group-title">偏好</div>
-                    <div class="set-item set-static">
-                        <span>默认进入页面</span>
-                        <div class="seg" id="defaultTabSeg">
-                            <button data-v="stats">统计</button>
-                            <button data-v="ledger">记账</button>
-                            <button data-v="settings">设置</button>
-                            <button data-v="last">上次停留</button>
-                        </div>
-                    </div>
-                    <div class="set-item set-static">
-                        <span>记一笔按钮位置</span>
-                        <div class="seg" id="addSideSeg">
-                            <button data-v="left">左</button>
-                            <button data-v="right">右</button>
-                        </div>
-                    </div>
-                    <div class="set-item set-static">
-                        <span>用系统键盘输入金额</span>
-                        <div class="seg" id="sysMoneyKbSeg">
-                            <button data-v="on">开</button>
-                            <button data-v="off">关</button>
-                        </div>
-                    </div>
-                    <div class="set-item set-static">
-                        <span>滑动提示</span>
-                        <div class="seg" id="scrollHintSeg">
-                            <button data-v="on">开</button>
-                            <button data-v="off">关</button>
-                        </div>
-                    </div>
-                    <div class="set-item set-static">
-                        <span>收支按钮顺序</span>
-                        <div class="seg" id="ioSideSeg">
-                            <button data-v="out">支出在左</button>
-                            <button data-v="in">收入在左</button>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="set-group">
                     <div class="set-group-title">账户</div>
-                    <button class="set-item" id="themeBtn"><span>外观主题</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="editNameBtn"><span>修改用户名</span><span class="set-arrow">›</span></button>
                     <button class="set-item set-danger" id="logoutBtn"><span>退出登录</span><span class="set-arrow">›</span></button>
                 </div>
