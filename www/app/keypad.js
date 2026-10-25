@@ -180,8 +180,13 @@
             if(!kpCaretRaf) kpCaretLoop(); else kpCaretPlace();
         }
         function kpCaretOff(){ if(kpCaretRaf){ cancelAnimationFrame(kpCaretRaf); kpCaretRaf=0; } if(kpCaretEl) kpCaretEl.style.display='none'; }
+        // 1025-UX：大按钮能看情况换成别的事（上层登记进来）：kpOkWhen(id, ()=>({ ok:'保存', onOk })|null)，打开键盘那一刻问一次，
+        //   给了就用它的字、点了先收键盘再做它的事；没给（null）照旧「确定」= 收起键盘。记一笔 / 修改账单用它：分类、收支都选好了，大按钮写「保存」，点了直接存
+        const KP_OK_WHEN={};
+        function kpOkWhen(id, fn){ KP_OK_WHEN[id]=fn; }
         function kpOpen(el, opts){
             opts=opts||{};
+            if(!opts.ok && !opts.onOk && KP_OK_WHEN[el.id]){ let x=null; try{ x=KP_OK_WHEN[el.id](); }catch(_){} if(x) opts=Object.assign({}, opts, x); }
             if(kpTarget && kpTarget!==el) kpTarget.classList.remove('kp-on');
             kpTarget=el; kpOnOk=opts.onOk||null;
             el.classList.add('kp-on');
@@ -289,5 +294,5 @@
             }));
             paint();
         })();
-        window.JiwenKeypad = { kpClose, kpOn, kpOpen, kpFit, kpRegister, get kpTarget(){ return kpTarget; }, get kpFitInfo(){ return kpFitInfo; } };   // keypad 模块对外只有这一个入口（get 的是会变的，读的时候才取）
+        window.JiwenKeypad = { kpClose, kpOn, kpOpen, kpFit, kpOkWhen, kpRegister, get kpTarget(){ return kpTarget; }, get kpFitInfo(){ return kpFitInfo; } };   // keypad 模块对外只有这一个入口（get 的是会变的，读的时候才取）
 })();

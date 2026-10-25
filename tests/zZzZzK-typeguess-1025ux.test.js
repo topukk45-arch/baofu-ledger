@@ -50,6 +50,23 @@ const R = (id, d, money, type, cat, extra) => Object.assign({ id, time: `2026-10
   const last = w.JiwenStore.getUserData().find(r => r.money === 7);
   ok(last && last.type === 'expense' && last.cat === '吃饭', '3 只填金额、点分类就能存（存成支出）');
 
+  // 4. 数字键盘的大按钮：分类、收支都选好了写「保存」，点了直接存；没选好照旧「确定」
+  $('fabAdd').click(); await tick(); w.kpClose();
+  $('billMoney').click(); await tick();
+  ok($('kpMask').style.display === 'flex' && txt($('kpOk')) === '确定', '4 还没选分类：大按钮「确定」');
+  w.kpClose();
+  F.pickBillCat('吃饭');
+  $('billMoney').click(); await tick();
+  ok(txt($('kpOk')) === '保存', '4 选好吃饭（自动带上支出）再点金额：大按钮写「保存」');
+  ['1', '8'].forEach(k => d.querySelector(`#kpGrid .kp-key[data-k="${k}"]`).click());
+  const n0 = w.JiwenStore.getUserData().length;
+  $('kpOk').click(); await tick();
+  ok(w.JiwenStore.getUserData().length === n0 + 1 && w.JiwenStore.getUserData().some(r => r.money === 18 && r.cat === '吃饭' && r.type === 'expense') && $('addMask').style.display !== 'flex' && $('kpMask').style.display !== 'flex', '4 点「保存」：键盘收起、直接存好、记一笔关掉');
+  w.openEdit('a'); await tick();
+  $('editMoney').click(); await tick();
+  ok(txt($('kpOk')) === '保存', '4 修改账单点金额：大按钮写「保存」');
+  w.kpClose(); $('cancelEdit').click(); await tick();
+
   ok(!t.errs.length, '没有报错 ' + t.errs.join('|'));
   console.log(`1025-UX 收支跟着分类：${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

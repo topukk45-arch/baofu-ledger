@@ -552,6 +552,9 @@
             }
         }
         $('fabAdd').addEventListener('click', ()=>openAddModal());
+        // 1025-UX：金额的数字键盘：分类、收支都选好了，大按钮写「保存」，点了直接存（不用先收键盘再点保存）；没选好照旧「确定」= 收起键盘
+        window.JiwenKeypad.kpOkWhen('billMoney', ()=>(billCatSel && billTypeSel) ? { ok:'保存', onOk:()=>addBill.click() } : null);
+        window.JiwenKeypad.kpOkWhen('editMoney', ()=>(editId!=null && editCatSel && editTypeSel) ? { ok:'保存', onOk:()=>saveEdit.click() } : null);
         $('closeAdd').addEventListener('click', ()=>{ addMask.style.display='none'; });
 
         addBill.addEventListener('click', () => {
