@@ -63,6 +63,30 @@
             billCatSel=c; billCat.value=c;
             paintCatRow('bill', c);
             autoModeOnCat($('billMode'), prevCat, c);
+            autoTypeOnCat(c);
+        }
+        // 1025-UX：选了分类、还没亲手选收支时，按这个分类以前记的收支自动选上（以前八成以上是支出就选支出；退款不算；没记过的照旧不选，保存时再问）。
+        //   自动选的（billTypeAuto）再换分类时跟着重新看；亲手点过收支就不再动。最近常用那 4 个不重排（刚点的那格不会在手指下面挪走）
+        const TYPE_GUESS_SHARE=0.8;
+        let billTypeAuto=false;
+        function guessTypeOfCat(c){
+            let e=0, i=0;
+            getUserData().forEach(r=>{ if(r.cat!==c || isRefund(r)) return; if(r.type==='expense') e++; else if(r.type==='income') i++; });
+            const n=e+i; if(!n) return '';
+            return e/n>=TYPE_GUESS_SHARE ? 'expense' : (i/n>=TYPE_GUESS_SHARE ? 'income' : '');
+        }
+        function autoTypeOnCat(c){
+            if(billTypeSel && !billTypeAuto) return;
+            const t=c ? guessTypeOfCat(c) : '';
+            if(!t){ if(billTypeAuto) setBillTypeQuiet(''); return; }
+            setBillTypeQuiet(t); billTypeAuto=true;
+        }
+        function setBillTypeQuiet(v){
+            billTypeSel=v; billType.value=v; billTypeAuto=false;
+            $('billTypeChips').querySelectorAll('.cc').forEach(el=>{
+                el.classList.remove('sel-out','sel-in');
+                if(v && el.dataset.v===v) el.classList.add(v==='expense' ? 'sel-out' : 'sel-in');
+            });
         }
         function renderBillCatChips(keep){
             const cats=getCats();
@@ -120,18 +144,19 @@
         function renderBillTypeChips(){
             billTypeSel='';
             billType.value='';
+            billTypeAuto=false;
             const box=$('billTypeChips');
             box.innerHTML='';
             const opts=[ {v:'expense', t:'支出', cls:'sel-out'},
                          {v:'income',  t:'收入', cls:'sel-in'} ];
             opts.forEach(o=>{
                 const b=document.createElement('div');
-                b.className='cc';
+                b.className='cc'; b.dataset.v=o.v;
                 { const sp=document.createElement('span'); sp.className='cc-t'; sp.textContent=o.t; b.appendChild(sp); }   // 1020-H：字包一层，好按字形裁掉上下留白居中
                 b.setAttribute('role','radio');
                 b.onclick=()=>{
-                    const changed=billTypeSel!==o.v;
-                    billTypeSel=o.v; billType.value=o.v;
+                    const changed=billTypeSel!==o.v || billTypeAuto;   // 1025-UX：自动选上的那个再亲手点一下也算选了，最近常用按它重算
+                    billTypeSel=o.v; billType.value=o.v; billTypeAuto=false;
                     box.querySelectorAll('.cc').forEach(el=>{
                         el.classList.remove('sel-out','sel-in');
                     });

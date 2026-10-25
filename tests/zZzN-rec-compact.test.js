@@ -73,10 +73,10 @@ const recs = [
   $('addBill').click(); await t.idle();
   const saved = w.JiwenStore.loadStore(A.ID).archives['默认存档'].records.find(r => r.money === 26.5);
   ok(saved && saved.type === 'expense' && saved.cat === '吃饭' && !shown('addMask'), '4 照旧记进账本、记一笔关掉');
-  // 收支没选：照旧拦住
+  // 收支没选：照旧拦住（1025-UX 起选了以前记过的分类会自动带上收支，这里用没记过的「购物」）
   $('fabAdd').click(); await wait(420); w.kpClose();
   $('billMoney').value = '3';
-  RC.chip(d, 'billCatChips', '吃饭').click();
+  RC.chip(d, 'billCatChips', '购物').click();
   $('addBill').click(); await t.idle();
   ok(shown('addMask') && w.JiwenStore.loadStore(A.ID).archives['默认存档'].records.length === 3, '4 收支没选：照旧不让存');
   $('closeAdd').click(); await wait(400);
