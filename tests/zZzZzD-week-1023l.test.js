@@ -85,7 +85,24 @@ const R = (id, time, money, remark) => ({ id, time, money, type: 'expense', cat:
   w.JiwenDetail.closeDetail(); await tick();
   ok(title() === '昨天 · 10月22日 周四', '4 点一笔进单笔详情，关了回到这个面板的那一天');
   w.JiwenSheet.open = o0;
-  $('dayClose').click(); await tick();
+  // 5. 1025-UX：横着滑时内容跟着手指走；到头了只挪三成；松手不够弹回
+  w.JiwenDetail.openWeek('2026-10-19'); await tick();
+  const pane = () => body().querySelector('.wd-pane');
+  const pe = (type, x, y) => body().dispatchEvent(new w.PointerEvent(type, { bubbles: true, clientX: x, clientY: y }));
+  pe('pointerdown', 100, 300); pe('pointermove', 140, 302); pe('pointermove', 180, 304);
+  ok(pane().style.transform === 'translateX(80px)', '5 往右拖 80px：内容跟着挪 80px（' + pane().style.transform + '）');
+  pe('pointerup', 130, 304); await tick();
+  ok(title() === '本周 · 10月19日–25日' && pane().style.transform === 'translateX(0)', '5 松手时只挪了 30px：不换，弹回原处');
+  pe('pointerdown', 200, 300); pe('pointermove', 150, 300); pe('pointermove', 100, 300);
+  ok(pane().style.transform === 'translateX(-30px)', '5 本周往左拖（没有下一周）：只挪三成，拉不动的感觉（' + pane().style.transform + '）');
+  pe('pointerup', 100, 300); await tick();
+  ok(title() === '本周 · 10月19日–25日', '5 到头了松手：不换 ' + title());
+  pe('pointerdown', 100, 300); pe('pointermove', 100, 340); pe('pointermove', 105, 400);
+  ok(!pane().style.transform || pane().style.transform === 'translateX(0)', '5 竖着拖（在滚列表）：内容不横着动');
+  pe('pointerup', 105, 400); await tick();
+  const css3 = [...d.querySelectorAll('style')].map(x => x.textContent).join('\n');
+  ok(/\.wd-pane \{[^}]*touch-action:pan-y/.test(css3), '5 内容区只把竖着的滑动交给浏览器（横着的归自己，手指一直跟得上）');
+  $('weekClose').click(); await tick();
 
   ok(!t.errs.length, '没有报错 ' + t.errs.join('|'));
   console.log(`1023-L 一周详情：${pass} 通过，${fail} 失败`);

@@ -341,6 +341,7 @@
             if(!/^\d{4}-\d{2}-\d{2}$/.test(mon||'')) return;
             openWD(cal.monOf(mon), null, opt);
         }
+        const WD_MS=260;   // 1025-UX：一周 / 一天切换的滑动时长（比面板收起的 300 毫秒略短，切得利落）
         function openWD(mon, day, opt){
             if(!window.JiwenSheet) return;
             const C=cal;
@@ -429,15 +430,45 @@
                 bodyBox.innerHTML = tabsHtml() + navHtml() + `<div class="wd-pane">` + (day ? dayHtml(day) : weekHtml()) + `</div>`;
                 paintFoot();
             }
-            // 换一周 / 换一天（d：-1 往前、1 往后）；到头了返回 false
+            // 换一周 / 换一天（d：-1 往前、1 往后）；到头了返回 false。from：手指松开时内容已经跟着挪到了哪（像素），从那里接着滑
             function can(d){ return d<0 || (day ? day<today : mon<thisMon); }
-            function go(d){
+            function go(d, from){
                 if(!can(d)) return false;
                 if(day){ day=C.addDay(day, d); mon=C.monOf(day); }
                 else mon=C.addDay(mon, 7*d);
-                render(); return true;
+                slide(d, from||0); return true;
             }
-            function show(v){ day = v==='week' ? null : v; render(); }
+            function show(v){
+                const nd = v==='week' ? null : v;
+                if(nd===day) return;
+                // 方向：整周算在最左边，日子按先后
+                const pos=x=>x ? 1+Math.round((C.kd(x)-C.kd(mon))/86400000) : 0;
+                const d = pos(nd)>=pos(day) ? 1 : -1;
+                day=nd; slide(d, 0);
+            }
+            // 1025-UX：切换时的动效：旧的内容往一边滑走，新的从另一边滑进来（WD_MS 毫秒，和面板同一条先快后慢的曲线）；
+            //   跟着手指挪的那一段在下面 pointermove 里。系统「减少动画」时直接换。新内容当场就画好（标题、按钮马上是新的），只是位置在滑
+            function slide(d, from){
+                const oldPane=bodyBox && bodyBox.querySelector('.wd-pane');
+                const ghost = (oldPane && !noMotion() && bodyBox.clientWidth) ? oldPane.cloneNode(true) : null;
+                const top = oldPane ? oldPane.offsetTop : 0, left = oldPane ? oldPane.offsetLeft : 0, wid = oldPane ? oldPane.offsetWidth : 0;
+                render();
+                const pane=bodyBox.querySelector('.wd-pane');
+                if(!ghost || !pane) return;
+                const W=bodyBox.clientWidth;
+                ghost.classList.add('wd-ghost'); ghost.removeAttribute('id');
+                ghost.querySelectorAll('[id]').forEach(x=>x.removeAttribute('id'));
+                ghost.style.top=top+'px'; ghost.style.left=left+'px'; ghost.style.width=wid+'px'; ghost.style.transform=`translateX(${from}px)`;
+                bodyBox.appendChild(ghost);
+                pane.style.transition='none'; pane.style.transform=`translateX(${from + d*W}px)`;
+                void pane.offsetWidth;
+                const tr=`transform ${WD_MS}ms var(--sheet-ease), opacity ${WD_MS}ms ease-out`;
+                ghost.style.transition=tr; pane.style.transition=tr;
+                ghost.style.transform=`translateX(${-d*W}px)`; ghost.style.opacity='0.2';
+                pane.style.transform='translateX(0)';
+                setTimeout(()=>{ ghost.remove(); pane.style.transition=''; pane.style.transform=''; }, WD_MS+40);
+            }
+            function noMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){ return false; } }
             window.JiwenSheet.open({ title:day ? C.dayTitle(day) : `${C.weekLabel(mon)} · ${C.rangeText(mon, C.addDay(mon, 6))}`, tall:true, onDismiss:back,
                 body(box, done){
                     box.classList.add('dd-body', 'wd-body');
@@ -451,13 +482,34 @@
                         const row=e.target.closest('.bl-row[data-id]'); if(row){ done(); openDetail(row.dataset.id, { onClose:reopen }); return; }
                         const d=e.target.closest('[data-day]'); if(d) show(d.dataset.day);
                     });
-                    // 左右滑：横着挪了 50px 以上、而且比竖着挪得多，就换（往右滑看前面的，往左滑看后面的）
-                    let sx=null, sy=0;
-                    box.addEventListener('pointerdown', e=>{ sx=e.clientX; sy=e.clientY; }, { passive:true });
+                    // 左右滑：横着挪了 50px 以上、而且比竖着挪得多，就换（往右滑看前面的，往左滑看后面的）。
+                    //   1025-UX：手指横着挪的时候内容跟着手指走（到头了只挪三成，拉不动的感觉），松手够了就接着滑过去，不够就弹回原处
+                    let sx=null, sy=0, lock=null, pdx=0;
+                    const paneEl=()=>box.querySelector('.wd-pane');
+                    function snapBack(){
+                        const pn=paneEl(); if(!pn) return;
+                        pn.style.transition=`transform ${WD_MS}ms var(--sheet-ease)`; pn.style.transform='translateX(0)';
+                        setTimeout(()=>{ pn.style.transition=''; pn.style.transform=''; }, WD_MS+40);
+                    }
+                    box.addEventListener('pointerdown', e=>{ sx=e.clientX; sy=e.clientY; lock=null; pdx=0; }, { passive:true });
+                    box.addEventListener('pointermove', e=>{
+                        if(sx==null) return;
+                        const dx=e.clientX-sx, dy=e.clientY-sy;
+                        if(!lock && (Math.abs(dx)>8 || Math.abs(dy)>8)) lock = Math.abs(dx)>Math.abs(dy)*1.2 ? 'x' : 'y';
+                        if(lock!=='x' || noMotion()) return;
+                        const pn=paneEl(); if(!pn) return;
+                        pdx = can(dx>0 ? -1 : 1) ? dx : dx*0.3;
+                        pn.style.transition='none'; pn.style.transform=`translateX(${pdx}px)`;
+                    }, { passive:true });
+                    box.addEventListener('pointercancel', ()=>{ if(lock==='x') snapBack(); sx=null; lock=null; });
                     box.addEventListener('pointerup', e=>{
                         if(sx==null) return;
-                        const dx=e.clientX-sx, dy=e.clientY-sy; sx=null;
-                        if(Math.abs(dx)>=50 && Math.abs(dx)>Math.abs(dy)*1.5){ e.preventDefault(); go(dx>0 ? -1 : 1); box.__swiped=Date.now(); }
+                        const dx=e.clientX-sx, dy=e.clientY-sy, wasX=lock==='x'; sx=null; lock=null;
+                        if(Math.abs(dx)>=50 && Math.abs(dx)>Math.abs(dy)*1.5){
+                            e.preventDefault(); box.__swiped=Date.now();
+                            if(go(dx>0 ? -1 : 1, wasX ? pdx : 0)) return;
+                        }
+                        if(wasX) snapBack();
                     });
                     box.addEventListener('click', e=>{ if(box.__swiped && Date.now()-box.__swiped<400){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // 滑完那一下不算点
                 },
