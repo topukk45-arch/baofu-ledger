@@ -134,6 +134,7 @@
         //   和「筛选」浮层同一套样式和代码：.mask.sheet-mask > .sheet（顶上 .sheet-grip 拖动条 + 标题），往下拉关闭用 bindSheetDrag。
         //   JiwenSheet.open({ title, sub, body(容器, 关面板), foot(容器, 关面板), onDismiss, busy })：
         //     onDismiss：下拉 / 返回键 / 取消时调（等于「取消 / 再看看 / 继续导入」）；busy()：为真时（正在写入）下拉、返回键都不关
+        //     onBack（1025-UX）：下拉 / 返回键时先问它，返回 true 就是面板里自己退了一层，不关面板
         //   JiwenSheet.pick({ title, sub, options:[{ value, label }], value, chips, onPick })：单选，点一下就选中并关掉；底部只有「取消」
         //     chips 为真时用筛选里分类那种圆角块（一行几个、自动换行），否则一行一个
         window.JiwenSheet=(function(){
@@ -166,6 +167,7 @@
             }
             function dismiss(){
                 if(!cur || (cur.busy && cur.busy())) return;
+                if(cur.onBack && cur.onBack()){ drag.reset(); return; }   // 1025-UX：面板里自己能退一层的（一周 / 一天面板从某一天回整周），这一下先退一层、不关
                 const fn=cur.onDismiss; close(); if(fn) fn();
             }
             function open(o){

@@ -100,6 +100,17 @@ const R = (id, time, money, remark) => ({ id, time, money, type: 'expense', cat:
   pe('pointerdown', 100, 300); pe('pointermove', 100, 340); pe('pointermove', 105, 400);
   ok(!pane().style.transform || pane().style.transform === 'translateX(0)', '5 竖着拖（在滚列表）：内容不横着动');
   pe('pointerup', 105, 400); await tick();
+  // 6. 1025-UX：从整周点进某一天，返回键先回整周、再按才关；一打开就是某一天的，返回键直接关
+  body().querySelector('.dw-day[data-day="2026-10-22"]').click(); await tick();
+  ok(title() === '昨天 · 10月22日 周四', '6 从整周点进周四');
+  await t.back();
+  ok(title() === '本周 · 10月19日–25日' && $('uiSheetMask').style.display === 'flex', '6 按返回键：回到整周，面板没关');
+  await t.back();
+  ok($('uiSheetMask').style.display !== 'flex', '6 再按：关掉');
+  w.JiwenDetail.openDay('2026-10-22'); await tick();
+  await t.back();
+  ok($('uiSheetMask').style.display !== 'flex', '6 一打开就是某一天的（账单页点日期抬头）：返回键直接关');
+  w.JiwenDetail.openWeek('2026-10-19'); await tick();
   const css3 = [...d.querySelectorAll('style')].map(x => x.textContent).join('\n');
   ok(/\.wd-pane \{[^}]*touch-action:pan-y/.test(css3), '5 内容区只把竖着的滑动交给浏览器（横着的归自己，手指一直跟得上）');
   $('weekClose').click(); await tick();

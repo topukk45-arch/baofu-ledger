@@ -347,8 +347,8 @@
             const C=cal;
             const back=opt && opt.onClose;
             const today=C.todayKey(), thisMon=C.monOf(today);
-            let bodyBox=null, footBox=null, doneFn=null;
-            const reopen=()=>openWD(mon, day, opt);
+            let bodyBox=null, footBox=null, doneFn=null, fromWeek=!!(opt && opt.fromWeek);
+            const reopen=()=>openWD(mon, day, Object.assign({}, opt, { fromWeek }));
             function setHead(t, sub){
                 const te=document.getElementById('uiSheetTitle'); if(te) te.textContent=t;
                 const se=document.getElementById('uiSheetSub'); if(se){ se.textContent=sub||''; se.style.display=sub ? '' : 'none'; }
@@ -438,9 +438,12 @@
                 else mon=C.addDay(mon, 7*d);
                 slide(d, from||0); return true;
             }
+            // fromWeek：这一天是从整周点进来的（返回键 / 往下拉先回整周）；一打开就是某一天的（账单页点日期抬头）没有这一层
             function show(v){
                 const nd = v==='week' ? null : v;
                 if(nd===day) return;
+                if(nd && !day) fromWeek=true;
+                if(!nd) fromWeek=false;
                 // 方向：整周算在最左边，日子按先后
                 const pos=x=>x ? 1+Math.round((C.kd(x)-C.kd(mon))/86400000) : 0;
                 const d = pos(nd)>=pos(day) ? 1 : -1;
@@ -470,6 +473,7 @@
             }
             function noMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){ return false; } }
             window.JiwenSheet.open({ title:day ? C.dayTitle(day) : `${C.weekLabel(mon)} · ${C.rangeText(mon, C.addDay(mon, 6))}`, tall:true, onDismiss:back,
+                onBack:()=>{ if(day && fromWeek){ show('week'); return true; } return false; },
                 body(box, done){
                     box.classList.add('dd-body', 'wd-body');
                     bodyBox=box; doneFn=done;
