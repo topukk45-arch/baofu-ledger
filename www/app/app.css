@@ -294,7 +294,7 @@
         /* 收支标签与正负金额颜色 */
         .io-tag { display:inline-block; border-radius:10px; padding:2px 9px; font-size:13px; }
         .io-in  { background:#e3f3e0; border:1px solid #b9e0b0; color:#3a7a2e; }
-        .io-out { background:#fbe6e0; border:1px solid #f0c2b4; color:#b5482e; }
+        .io-out { background:#fdf0ec; border:1px solid #f0c2b4; color:#b5482e; }   /* 1027-UI：底色原来 #fbe6e0，字只有 4.45:1，底色调浅一点到 4.8:1 */
         .pos { color:#3a7a2e; }
         .neg { color:#b5482e; }
 
@@ -437,7 +437,7 @@
             stroke-linecap:round; stroke-linejoin:round; }
         .tab-btn .tab-txt { font-size:13px; font-family:'JiwenTab', serif; letter-spacing:1px; }
         .tab-btn.active { color:var(--c-primary-dark); }
-        .tab-btn:not(.active) .tab-ico, .tab-btn:not(.active) .tab-txt { opacity:.62; }   /* 未选中再淡一档，选中项更跳 */
+        .tab-btn:not(.active) .tab-ico { opacity:.62; }   /* 未选中再淡一档，选中项更跳；1027-UI：字不再淡（原来叠 .62 透明以后只有 2.6～3.1:1，看不清），选中的靠加粗和主题深色区分 */
         .tab-btn.active .tab-ico { stroke-width:2; }
         .tab-btn.active .tab-ico .acc { stroke:var(--c-tab-accent); }
         .tab-btn.active .tab-txt { font-weight:bold; }
@@ -1540,7 +1540,7 @@
         .bgo-pct.warn { color:#b07a1c; }
         .bgo-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
         .bgc { font-size:12px; padding:3px 9px; border-radius:10px; border:1px solid var(--c-border); color:var(--c-text-soft); background:var(--c-surface); }
-        .bgc.over { color:var(--c-neg); border-color:#f0c2b4; background:#fbe6e0; }
+        .bgc.over { color:var(--c-neg); border-color:#f0c2b4; background:#fdf0ec; }
         .bgc.warn { color:#9a6a12; border-color:#ecd5a6; background:#fbf1dc; }
         .bgc.ok { color:var(--c-pos); border-color:#b9e0b0; background:#e3f3e0; }
         .bgo-legend { margin-top:8px; font-size:11.5px; color:var(--c-text-soft); }
