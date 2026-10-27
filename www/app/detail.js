@@ -342,6 +342,9 @@
             openWD(cal.monOf(mon), null, opt);
         }
         const WD_MS=260;   // 1025-UX：一周 / 一天切换的滑动时长（比面板收起的 300 毫秒略短，切得利落）
+        // 1027-UI：面板高度：打开时按这一周里内容最多的那一天和整周取最高（不超过屏幕 WD_MAX_H），之后切天、切整周、左右滑、换周都不变，顶边不动；
+        //   换到的那一周要更高时才长高（0.2 秒过渡，见 .ui-sheet.wd-fixed），矮了不缩。内容少的（这天没记账）在中间，多的在面板里滚
+        const WD_MAX_H=0.85;
         function openWD(mon, day, opt){
             if(!window.JiwenSheet) return;
             const C=cal;
@@ -397,8 +400,9 @@
                 const ms=sumFen(recsOfDays(ym+'-01', C.monthEnd(ym))), avg = passed>0 ? ms.exp/passed : 0;
                 setHead(C.dayTitle(k), `${list.length} 笔`);
                 const net=round2(s.inc-s.exp);
+                const cmp = passed>0 ? moreLess(round2(s.exp-avg), '本月日均') : '';
                 let h=`<div class="dd-cells">`
-                    + cellHtml('支出', s.exp.toFixed(2), passed>0 ? moreLess(round2(s.exp-avg), '本月日均') : '')
+                    + cellHtml('支出', s.exp.toFixed(2), cmp)
                     + cellHtml('收入', s.inc.toFixed(2), `当天净剩 ${net<0 ? '−' : '+'}${Math.abs(net).toFixed(2)}`, 'pos')
                     + `</div>`;
                 // 当天支出按分类（退完了的不列）
@@ -434,9 +438,30 @@
             function can(d){ return d<0 || (day ? day<today : mon<thisMon); }
             function go(d, from){
                 if(!can(d)) return false;
+                const m0=mon;
                 if(day){ day=C.addDay(day, d); mon=C.monOf(day); }
                 else mon=C.addDay(mon, 7*d);
+                if(mon!==m0) fitHeight(true);   // 换了一周：这一周要更高才长高
                 slide(d, from||0); return true;
+            }
+            // 1027-UI：面板定高（见 WD_MAX_H）：把这一周的整周和每一天（到今天为止）挨个画一遍量高度，取最高的；grow：只许长高（换周时）
+            let fixedH=0;
+            function fitHeight(grow){
+                const sh=document.getElementById('uiSheet'), mk=document.getElementById('uiSheetMask');
+                if(!sh || !mk || !bodyBox || !mk.clientHeight) return;
+                const keep=day, cap=Math.floor(mk.clientHeight*WD_MAX_H);
+                const views=[null]; for(let i=0;i<7;i++){ const k=C.addDay(mon, i); if(k<=today) views.push(k); }
+                const oldH=sh.style.height; sh.classList.remove('wd-fixed'); sh.style.height='';
+                let mx=0;
+                views.forEach(v=>{ day=v; render(); mx=Math.max(mx, sh.scrollHeight); });
+                day=keep; render();
+                const h=Math.min(cap, Math.ceil(mx));
+                const nh = grow ? Math.max(h, fixedH) : h;
+                if(grow && fixedH){ sh.style.height=fixedH+'px'; void sh.offsetHeight; }   // 从原来的高度接着过渡
+                else if(oldH) sh.style.height=oldH;
+                sh.classList.add('wd-fixed');
+                fixedH=nh; sh.style.height=nh+'px';
+                sh.dataset.wdH=String(nh);
             }
             // fromWeek：这一天是从整周点进来的（返回键 / 往下拉先回整周）；一打开就是某一天的（账单页点日期抬头）没有这一层
             function show(v){
@@ -518,6 +543,7 @@
                     box.addEventListener('click', e=>{ if(box.__swiped && Date.now()-box.__swiped<400){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // 滑完那一下不算点
                 },
                 foot(box, done){ footBox=box; doneFn=done; render(); } });
+            fitHeight(false);
         }
         window.JiwenDetail = { CHEV, aiFlagText, balanceAfter, cal, closeDetail, openDay, openDetail, openWeek, rowHtml, sumFen, sumHtml };   // detail 模块对外只有这一个入口
 })();

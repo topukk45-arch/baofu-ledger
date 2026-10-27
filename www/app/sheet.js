@@ -174,7 +174,8 @@
                 build();
                 if(cur) close();
                 cur=o||{};
-                sheet.classList.toggle('ui-sheet-tall', !!cur.tall);   // 1020-J：内容多的（选色面板）能到 88% 屏幕高，和记一笔这类表单一样
+                sheet.classList.toggle('ui-sheet-tall', !!cur.tall);
+                sheet.classList.remove('wd-fixed'); sheet.style.height=''; delete sheet.dataset.wdH;   // 1027-UI：上一个一周 / 一天面板定的高不带过来   // 1020-J：内容多的（选色面板）能到 88% 屏幕高，和记一笔这类表单一样
                 titleEl.textContent=cur.title||'';
                 subEl.textContent=cur.sub||''; subEl.style.display=cur.sub?'':'none';
                 // 1025-UX：每次打开换一个新的内容区 / 按钮区：原来一直用同一个元素，上一个面板挂在上面的监听（点、滑）和加的类（dd-body）留着，
