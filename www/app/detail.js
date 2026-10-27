@@ -408,7 +408,8 @@
                 const ms=sumFen(recsOfDays(ym+'-01', C.monthEnd(ym))), avg = passed>0 ? ms.exp/passed : 0;
                 setHead(C.dayTitle(k), `${list.length} 笔`);
                 const net=round2(s.inc-s.exp);
-                const cmp = passed>0 ? moreLess(round2(s.exp-avg), '本月日均') : '';
+                // 1027-UI：0 笔的那一天不比；今天还没过完，「比本月日均少」不写（还会再花），多了照写
+                const dAvg=round2(s.exp-avg), cmp = (passed>0 && list.length && !(k===today && dAvg<0)) ? moreLess(dAvg, '本月日均') : '';
                 let h=`<div class="dd-cells">`
                     + cellHtml('支出', s.exp.toFixed(2), cmp)
                     + cellHtml('收入', s.inc.toFixed(2), `当天净剩 ${net<0 ? '−' : '+'}${Math.abs(net).toFixed(2)}`, 'pos')
