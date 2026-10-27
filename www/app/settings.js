@@ -193,6 +193,9 @@
             // 黑 / 白 / 灰没有色相（rgbToHsl 给 0 = 红，原来再被「饱和度至少 12」提上去，配出来的浅底是粉色）；太黑太白时取整也把色相弄乱了
             function noHue(hsl){ return hsl.s<1 || hsl.l<2 || hsl.l>98; }
             const DEFAULT_HUE=175;   // 默认主色 #3f6f6b 的色相：没色相、又没记过上一次的色相时用它
+            // 1027-UI4：两档浅色字之间提亮多少（OKLCH 亮度）、汇总块和页面底至少要多少对比（真机看了不清楚再提到 1.05 左右，仍然靠推底色）
+            const T2_STEP=0.07, SUM_MIN=1.035;
+            function mixHex(a, b, p){ const A=hexToRgb(a), B=hexToRgb(b); return rgbToHex(A.r*p+B.r*(1-p), A.g*p+B.g*(1-p), A.b*p+B.b*(1-p)); }   // a 占 p
             // 从一个主色推导整套主题变量（保证浅底深字、对比足够）
             //   hue：选色面板记着的色相（拖条时用它，不从色值反推）；不给时从色值反推，色值没有色相的用 hueFallback（上一次的色相）
             function buildPalette(primaryHex, hue, hueFallback){
@@ -250,6 +253,31 @@
                 const ink=deepen(T.ink, lights);
                 ['--c-primary-dark','--c-primary-deep','--c-text','--c-text-soft'].forEach(k=>{ pal[k]=deepen(pal[k], lights); });
                 pal['--c-sel-text']=deepen(pal['--c-sel-text'], [pal['--c-sel-bg']]);
+                // 1027-UI4：浅色字两档（界面收敛第一轮）。小字还会落在日卡抬头（主色 8% 混卡片）、「整周 一…日」的槽（主色 10%）上，这两种也算进去：
+                //   --c-t1 说明文字 = 原来的次文字（--c-text-soft 留作它的别名），在这几种底上都推到 ≥ 4.5；
+                //   --c-t2 时间、序号、百分比：从 t1 在 OKLCH 里提亮 T2_STEP、彩度 ×0.8，再往深推到同样 ≥ 4.5；推完比 t1 还深就等于 t1（松花这类两档一样，靠字号分）
+                const line=_contrast(T.fill, T.bg) >= 3 ? T.fill : ink;   // 和下面 --c-primary 同一个
+                const smalls=lights.concat([mixHex(line, pal['--c-surface'], 0.08), mixHex(line, pal['--c-surface'], 0.10)]);
+                const t1=deepen(pal['--c-text-soft'], smalls);
+                const o1=JiwenTheme.oklch(t1);
+                const deepenFine=(c, bgs)=>{ const o=JiwenTheme.oklch(c); let L=o.L, x=c, g2=0;
+                    while(bgs.some(b=>_contrast(x,b)<4.5) && L>0.05 && g2++<160){ L-=0.005; x=JiwenTheme.ok2hex(L, o.C, o.H); }
+                    return x; };
+                //   t2 只放在小字会落的那 7 种底上（页面底、白、卡片、面板底、chip、日卡抬头、「整周」槽），不算卡片渐变深端（上面不放小字）
+                const smalls2=['#ffffff', T.bg, pal['--c-surface'], pal['--c-sheet'], pal['--c-chip'], smalls[smalls.length-2], smalls[smalls.length-1]];
+                let t2=deepenFine(JiwenTheme.ok2hex(Math.min(o1.L+T2_STEP, 0.95), o1.C*0.8, o1.H), smalls2);
+                if(JiwenTheme.oklch(t2).L < o1.L) t2=t1;
+                pal['--c-text-soft']=t1;
+                // 1027-UI4：汇总块的底：从页面底往白里推，推到和页面底对比 ≥ SUM_MIN 为止（不靠边框分开）；推到白还不够才加一道细边
+                let sum=T.bg, sp=0;
+                while(_contrast(sum, T.bg) < SUM_MIN && sp < 1){ sp=Math.min(1, sp+0.05); sum=mixHex('#ffffff', T.bg, sp); }
+                Object.assign(pal, {
+                    '--c-t1':            t1,
+                    '--c-t2':            t2,
+                    '--c-sum':           sum,
+                    '--c-sum-edge':      _contrast(sum, T.bg) < SUM_MIN ? pal['--c-border'] : 'transparent',
+                    '--c-track':         pal['--c-accent-soft']   // 滑块槽（选中的滑块用卡片底 --c-surface，字用 --c-ink）
+                });
                 Object.assign(pal, {
                     '--c-fill':          T.fill,
                     '--c-on-fill':       T.on,
