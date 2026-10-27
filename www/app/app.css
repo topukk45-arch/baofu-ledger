@@ -2042,7 +2042,7 @@
         .dc-rows { display:flex; flex-direction:column; gap:2px; }
         button.dc-item { display:flex; align-items:center; gap:10px; width:100%; min-height:52px; padding:0 10px; border:none; border-radius:12px;
             background:transparent; font-family:inherit; text-align:left; cursor:pointer; color:var(--c-text); }
-        button.dc-item.pin { background:color-mix(in srgb, var(--c-primary) 12%, var(--c-surface)); }
+        button.dc-item.pin { background:color-mix(in srgb, var(--c-primary) 8%, var(--c-surface)); }   /* 1027-UI4：12% → 8%（和日卡抬头同一种底），上面的日期小字（t2）才够 4.5 */
         .dc-dot { flex:none; width:6px; height:6px; border-radius:3px; background:var(--c-border-mid); }
         .dc-item.pin .dc-dot { background:var(--c-primary-dark); }
         .dc-l { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
@@ -2370,7 +2370,7 @@
         .dw-day { min-height:var(--row-1); }
         button.lg-dh, .lg-dc-noday .lg-dh { min-height:var(--row-1); }
         .cs-row { min-height:var(--row-1); padding-top:0; padding-bottom:0; }
-        .stat-cat-list .sc-item { min-height:var(--row-1); justify-content:center; }
+        .stat-cat-list .sc-item { min-height:var(--row-2); justify-content:center; }   /* 两行：名字 + 百分比、金额 */
         button.dc-item { min-height:var(--row-2); }
         .bgo-row { min-height:var(--row-2); align-content:center; padding:6px 0; }
         /* 圆角只留三档：9 小胶囊、标签；12 按钮、选项、提示条；16 卡片、汇总块、列表（全圆胶囊按高度一半、圆点 50%、≤ 8px 的小条、图表柱子、底部面板顶角 18 不算） */
