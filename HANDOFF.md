@@ -48,7 +48,7 @@
 
 ## 发版
 - 「1027-UI5 体验版」https://github.com/topukk45-arch/baofu-ledger/releases/tag/1027-UI5 ：打包 #316 成功（推送 `6cc3b1e`），安装包 `jiwen-1027-UI5.apk`（4631633 字节，sha256 `3187d92fd10273093077cadbf8b4d1b457c324e23becf882d476f31c15f7bfac`）。
-- 「1027-UI6 体验版」https://github.com/topukk45-arch/baofu-ledger/releases/tag/1027-UI6 ：由这次带截图总表的提交打包（版本提交 `2f20b63` 后面跟的是 `[skip ci]` 的交接提交，那次推送 GitHub 整个跳过了打包，所以这个提交不带 `[skip ci]`）。
+- 「1027-UI6 体验版」https://github.com/topukk45-arch/baofu-ledger/releases/tag/1027-UI6 ：由这次带截图总表的提交打包（版本提交 `2f20b63` 后面跟的是 `[skip ci]` 的交接提交，那次推送 GitHub 整个跳过了打包，所以下一个提交不带它；可那个提交的说明正文里写了「不带 [skip ci]」这几个字，GitHub 只要说明里出现这串字就跳过，又白推了一次，最后由 `交接文档补一句出包经过` 那个提交出包）。以后提交说明里提到它要换个说法，比如「跳过打包的标记」。
 
 # 1027-UI5 界面收敛第二轮（在 1027-UI4 `b83939e` 上接着做）
 
