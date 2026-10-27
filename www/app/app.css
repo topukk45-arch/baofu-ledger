@@ -777,6 +777,11 @@
         #uiSheetMask { z-index:1000; }
         .ui-sheet { max-height:72vh; max-height:72dvh; padding-bottom:0; }
         .ui-sheet.ui-sheet-tall { max-height:88vh; max-height:88dvh; }
+        /* 1027-UI：叠在别的面板上、被拉高和下面那层顶边对齐（sheet.js 的 stackAlign，data-stack-align）时，内容比面板矮，
+           贴底的按钮排原来停在内容后面、下面露出一截（选色面板叠在外观弹窗上露 11px）；这时面板竖排、内容撑满，按钮排落到底 */
+        .ui-sheet[data-stack-align] { display:flex; flex-direction:column; }
+        .ui-sheet[data-stack-align] > * { flex:none; }
+        .ui-sheet[data-stack-align] > .ui-sheet-body { flex:1 0 auto; }
         .ui-sheet .sheet-head { margin-bottom:6px; }
         .ui-sheet-sub { font-size:13px; color:var(--c-text-soft); margin:-2px 0 10px; overflow-wrap:anywhere; }
         .ui-sheet-body { padding:2px 0 6px; }
