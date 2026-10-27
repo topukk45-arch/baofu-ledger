@@ -1462,7 +1462,7 @@ async function run(cfg, port, browser) {
       //   d 24 个预设：日历四档相邻两档（和第 1 档和卡片底）对比 ≥ 1.12、画出来的格子上的字和格子底 ≥ 4.5；斜纹和条的底色、和实际的条（主题色 / 接近上限 / 超支）≥ 1.3；
       //     超预算提示条的字和它的底 ≥ 4.5
       //   e 截图：日历（雾松青、黄栌）、预算页（花得快的、花得慢的、超了的都有）、账单页的超预算提示
-      const ls13 = seedOf({ dev: true, recs: oldRecords(60).concat(EXTRA11), cats: BASE_CATS.slice(0, 16), tpls: TPLS, budgets: { '吃饭': 60, '购物': 5000, '出行': 120, '日用': 9000 }, extra: id => ({ ['days_' + id]: JSON.stringify(DAYS) }) });
+      const ls13 = seedOf({ dev: true, recs: oldRecords(60).concat(EXTRA11, [{ id: 'x-ob13', time: '2026-10-08T12:10', money: 236, type: 'expense', cat: '吃饭', remark: '虚构的聚餐' }]), cats: BASE_CATS.slice(0, 16), tpls: TPLS, budgets: { '吃饭': 60, '购物': 5000, '出行': 120, '日用': 9000 }, extra: id => ({ ['days_' + id]: JSON.stringify(DAYS) }) });
       const heatBad = [], paceBad = [], obBad = [];
       for (const p of presets) {
         const pg = await page11(412, 915, Object.assign({}, ls13, { app_appearance: JSON.stringify({ primary: p.color }) }));
