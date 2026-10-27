@@ -77,6 +77,7 @@ const CALLBACKS = {
   'forms → tabs': ['refreshAllViews'],
   'forms → cats': ['openCatManager'],   // 1020-G：分类抽屉底部「管理分类」打开分类管理（分类管理排在记一笔后面：它要调记一笔那边的刷新），关了回到抽屉
   'detail → tabs': ['refreshAllViews'],   // 1023-B：详情里去掉 AI 标记 / 待确认以后刷新页面（原来是 stats → tabs，跟着详情搬过来）
+  'detail → search': ['openSearch'],   // 1027-UI5：一天面板的分类胶囊点了去搜一笔（详情排在搜一笔前面：搜一笔的结果列表要用详情的 rowHtml / openDetail）
 };
 
 function plan(www) {

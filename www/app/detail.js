@@ -330,7 +330,7 @@
         function catsHtml(cats){
             const shade=i=>`color-mix(in srgb, var(--c-primary) ${CAT_SHADES[i % CAT_SHADES.length]}%, var(--c-surface))`;
             return `<div class="dd-stack" aria-hidden="true">` + cats.map(([c, v], i)=>`<i style="flex:${v};background:${shade(i)}"></i>`).join('') + `</div>`
-                + `<div class="dd-cats">` + cats.map(([c, v], i)=>`<span class="dd-cat" data-cat="${escapeHtml(c)}"><i class="dd-cat-dot" style="background:${shade(i)}"></i><span class="dd-cat-n">${escapeHtml(c)}</span><em class="dd-cat-v">${v.toFixed(2)}</em></span>`).join('') + `</div>`;
+                + `<div class="dd-cats">` + cats.map(([c, v], i)=>`<button type="button" class="dd-cat" data-cat="${escapeHtml(c)}" aria-label="看这一天的「${escapeHtml(c)}」"><i class="dd-cat-dot" style="background:${shade(i)}"></i><span class="dd-cat-n">${escapeHtml(c)}</span><em class="dd-cat-v">${v.toFixed(2)}</em><span class="dd-cat-go" aria-hidden="true">›</span></button>`).join('') + `</div>`;
         }
         function moreLess(d, what){ return d>=0 ? `比${what}多 ${d.toFixed(2)}` : `比${what}少 ${(-d).toFixed(2)}`; }
         function btn(id, text, cls){ const b=document.createElement('button'); b.type='button'; b.className='ui-btn'+(cls ? ' '+cls : ''); b.id=id; b.textContent=text; return b; }
@@ -428,7 +428,7 @@
                 const netHtml=`<span class="dd-net">净剩 <b class="dd-net-v${net<0 ? ' neg' : net>0 ? ' pos' : ''}">${net<0 ? '−' : net>0 ? '+' : ''}${Math.abs(net).toFixed(2)}</b></span>`;
                 let h=sumBlockHtml({ k:`支出 · ${list.length} 笔`, v:s.exp.toFixed(2), sk:'收入', sv:s.inc.toFixed(2), sc:'pos',
                     line: netHtml + (cmp ? `<span class="dd-cmp"> · ${cmp}</span>` : ''), extra: cats.length ? catsHtml(cats) : '' });
-                h+= list.length ? `<div class="lg-dc dd-rows">` + list.map(r=>rowHtml(r, rMap)).join('') + `</div>` : `<div class="dd-empty">${emptyHtml('calendar', '这天没记账', { text:'给这天补一笔', attrs:`data-add="${k}"` })}</div>`;   // 1027-UI4：空状态统一写法
+                h+= list.length ? `<div class="lg-dc dd-rows">` + list.map(r=>rowHtml(r, rMap)).join('') + `</div>` : `<div class="dd-empty">${emptyHtml('calendar', '这天没记账')}</div>`;   // 1027-UI4：空状态统一写法；面板底部已有「给这天补一笔」，空状态只放图标和一句话
                 return h;
             }
             function paintFoot(){
@@ -521,6 +521,8 @@
                         if(e.target.closest('#weekNext')){ go(1); return; }
                         const tb=e.target.closest('.wd-tab'); if(tb){ if(!tb.disabled) show(tb.dataset.v); return; }
                         const add=e.target.closest('[data-add]'); if(add){ done(); openAddModal({ day:add.dataset.add }); return; }
+                        // 1027-UI5：分类胶囊 → 搜一笔（这一天 + 这个分类），返回键 / ‹ 回到这个面板的这一天（回调口 detail → search，用的时候才去拿）
+                        const dc=e.target.closest('.dd-cat[data-cat]'); if(dc && day){ const k=day; done(); window.JiwenSearch.openSearch({ preset:{ from:k, to:k, cats:[dc.dataset.cat] }, from:{ back:reopen } }); return; }
                         const un=e.target.closest('[data-unns]'); if(un){ window.JiwenStore.noSpendSet([un.dataset.unns], false); render(); window.JiwenTabs.refreshAllViews(); return; }
                         const row=e.target.closest('.bl-row[data-id]'); if(row){ done(); openDetail(row.dataset.id, { onClose:reopen }); return; }
                         const d=e.target.closest('[data-day]'); if(d) show(d.dataset.day);

@@ -85,8 +85,16 @@
             if(y>24) setFold(true); else if(y<=4) setFold(false);
         }, { passive:true });
         function isOpen(){ return pageOpen; }
+        // 1027-UI5：从别的页面点分类进来：preset 是带进来的条件（from / to 日子、ios、cats），会替换现在的条件；
+        //   带进来的那几个条件在底部条件卡里用浅底（--c-track）标出来（presetSig 记着它们的样子，改了就不再算带进来的），点 ✕ 照样能去掉；
+        //   from { back } 是来源页：收起结果页（‹、返回键）以后调 back 回去（统计页 / 预算页本来就在下面，一天面板要重新打开）
+        let presetSig=new Set(), fromBack=null;
+        function tagSig(t){ return t.sec+'|'+t.t; }
         function openSearch(o){
             o=o||{};
+            if(o.preset){ clearState(); Object.assign(searchState, JSON.parse(JSON.stringify(o.preset))); }
+            presetSig = o.preset ? new Set(condTags().map(tagSig)) : new Set();
+            fromBack = (o.from && typeof o.from.back==='function') ? o.from.back : null;
             if(o.rv){ clearState(); searchState.rv=true; }   // 账单页「待确认分类 N 条 ›」：只看待确认分类
             if(o.batch){ clearState(); searchState.batch=o.batch; }   // 4a：导入横幅 / 导入记录的「查看」：只看那一次导入的
             clearTimeout(closeT);
@@ -97,13 +105,15 @@
             setFold(false);
             $('searchBody').scrollTop=0;
             render();
-            if(!o.noSheet) openSheet();
+            if(!o.noSheet && !o.preset) openSheet();   // 带着条件进来的直接看结果，不拉抽屉
         }
-        function closeSearch(){
+        function closeSearch(opt){
             closeSheet({ noHist:true });   // 直接回账单：不算确认条件
             if(!pageOpen) return;
             pageOpen=false;
             document.body.classList.remove('search-open');
+            if(opt && opt.noBack){ fromBack=null; presetSig=new Set(); }   // 换页签、换账号、去记一笔：不回来源页
+            if(fromBack){ const f=fromBack; fromBack=null; presetSig=new Set(); try{ f(); }catch(_){} }   // 1027-UI5：回到来源页
             if(spNoMotion()){ page.hidden=true; return; }
             page.classList.remove('sp-in'); page.classList.add('sp-out');
             clearTimeout(closeT); closeT=setTimeout(()=>{ if(!pageOpen){ page.hidden=true; page.classList.remove('sp-out'); } }, 240);
@@ -222,7 +232,7 @@
             tagList=condTags();
             // 1023-M：条件一个一个排成一行（多了横着滑、不换行）；点条件本身是改这个条件（打开抽屉翻到那一项），点 × 是去掉
             $('searchTags').innerHTML = tagList.length
-                ? tagList.map((x, i)=>`<span class="sp-tag" data-i="${i}"><button type="button" class="sp-tag-t" data-act="edit" aria-label="改条件：${escapeHtml(x.t)}">${escapeHtml(x.t)}</button>`
+                ? tagList.map((x, i)=>`<span class="sp-tag${presetSig.has(tagSig(x)) ? ' from' : ''}" data-i="${i}"><button type="button" class="sp-tag-t" data-act="edit" aria-label="改条件：${escapeHtml(x.t)}">${escapeHtml(x.t)}</button>`
                     + `<button type="button" class="sp-tag-x" data-act="drop" aria-label="去掉条件：${escapeHtml(x.t)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></span>`).join('')
                 : histCardHtml();   // 1023-N：没条件时列最近搜过的 3 条
             $('searchCount').textContent=`${asc.length} 笔`;
@@ -262,7 +272,7 @@
         $('searchEmpty').addEventListener('click', e=>{
             const b=e.target.closest('[data-empty]'); if(!b) return;
             if(b.dataset.empty==='sheet') openSheet();
-            else { closeSearch(); openAddModal(); }
+            else { closeSearch({ noBack:true }); openAddModal(); }
         });
         $('searchTags').addEventListener('click', e=>{
             const ha=e.target.closest('[data-act^="h"]');
@@ -430,7 +440,8 @@
         function resetSearch(){
             clearState();
             kw.value=''; min.value=''; max.value='';
-            if(pageOpen) closeSearch(); else closeSheet();
+            if(pageOpen) closeSearch({ noBack:true }); else closeSheet();
+            fromBack=null; presetSig=new Set();
         }
         window.__filterActive = ()=>pageOpen;   // 1019-U：首屏快照看要不要存（搜一笔开着时不存）
 
