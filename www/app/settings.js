@@ -324,7 +324,8 @@
             }
             // 1025-UX：登录页「换个主题色」那一行写现在用的是哪个；1027-UI：预设写预设名，自己调的按方案页四步起名（JiwenTheme.nameOf），
             //   名字下一行短评（冷暖 · 浓淡 · 深浅 · 按钮配什么字），不再写「自己调的」。
-            //   三处：设置「外观主题」、外观弹窗「自己调一个颜色」、登录页「主题色」；选色面板里拖动时按正在看的颜色实时改（paintThemeNames(色值)）
+            //   名字三处：设置「外观主题」、外观弹窗「自己调一个颜色」、登录页「主题色」；短评只在外观弹窗、选色面板里写（10-27 用户说外面那两处不要）；
+            //   选色面板里拖动时按正在看的颜色实时改（paintThemeNames(色值)）
             function curColor(){ const c=loadPrefs().primary; return (HEX_RE.test(c||'') ? c : DEFAULT_PRIMARY).toLowerCase(); }
             function themeName(){ return JiwenTheme.colorName(curColor()).name; }
             function paintThemeNames(hex){

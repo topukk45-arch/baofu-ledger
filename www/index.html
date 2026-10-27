@@ -18,13 +18,13 @@
         html, body { background-color:#eafbf9; }
     </style>
 
-    <link rel="stylesheet" href="app/app.css?v=1027-UI">
+    <link rel="stylesheet" href="app/app.css?v=1027-UI2">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1027-UI</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1027-UI2</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -33,8 +33,8 @@
                 <input type="file" id="loginImportFile" accept=".json" style="display:none">
             </div>
             <!-- 1025-UX：登录页也能换主题色（打开和设置里同一个外观弹窗），下面一句写进去以后在哪改 -->
-            <!-- 1027-UI：名字下一行短评（自己调的颜色按方案页四步起名） -->
-            <button type="button" class="login-theme-btn" id="loginThemeBtn"><span class="login-theme-dot" id="loginThemeDot" aria-hidden="true"></span><span class="theme-name-col"><span class="login-theme-l1"><span class="login-theme-k">主题色</span><span class="login-theme-v" id="loginThemeCur">雾松青</span></span><span class="theme-verdict" id="loginThemeVerdict"></span></span><span class="login-theme-go">换一个 ›</span></button>
+            <!-- 1027-UI：写颜色名（自己调的颜色按方案页四步起名），短评只在外观弹窗里写 -->
+            <button type="button" class="login-theme-btn" id="loginThemeBtn"><span class="login-theme-dot" id="loginThemeDot" aria-hidden="true"></span><span class="login-theme-k">主题色</span><span class="login-theme-v" id="loginThemeCur">雾松青</span><span class="login-theme-go">换一个 ›</span></button>
             <div class="login-theme-hint">进去以后在「设置 → 外观」也能改</div>
         </div>
 
@@ -133,8 +133,8 @@
                 <div class="set-group">
                     <div class="set-group-title">外观和偏好</div>
                     <!-- 1025-UX：「外观主题」从「账户」那组最底下挪到这里第一行，右边写现在用的颜色 -->
-                    <!-- 1027-UI：右边写现在的颜色名，下一行短评 -->
-                    <button class="set-item set-theme-item" id="themeBtn"><span class="theme-name-col"><span class="set-theme-l1"><span>外观主题</span><span class="set-theme-cur"><i class="set-theme-dot" id="themeCurDot" aria-hidden="true"></i><span id="themeCur">雾松青</span></span></span><span class="theme-verdict" id="themeCurVerdict"></span></span><span class="set-arrow">›</span></button>
+                    <!-- 1027-UI：右边色点 + 颜色名 + › 排一行（短评只在外观弹窗里写） -->
+                    <button class="set-item" id="themeBtn"><span>外观主题</span><span class="set-arrow set-theme-cur"><i class="set-theme-dot" id="themeCurDot" aria-hidden="true"></i><span id="themeCur">雾松青</span><span class="set-theme-go" aria-hidden="true">›</span></span></button>
                     <div class="set-item set-static">
                         <span>默认进入页面</span>
                         <div class="seg" id="defaultTabSeg">
@@ -831,31 +831,31 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1027-UI"></script>
-    <script src="app/theme-data.js?v=1027-UI"></script>
-    <script src="app/theme.js?v=1027-UI"></script>
-    <script src="app/store.js?v=1027-UI"></script>
-    <script src="app/select.js?v=1027-UI"></script>
-    <script src="app/keypad.js?v=1027-UI"></script>
-    <script src="app/text.js?v=1027-UI"></script>
-    <script src="app/sheet.js?v=1027-UI"></script>
-    <script src="app/ask.js?v=1027-UI"></script>
-    <script src="app/date.js?v=1027-UI"></script>
-    <script src="app/monthstrip.js?v=1027-UI"></script>
-    <script src="app/ai-export.js?v=1027-UI"></script>
-    <script src="app/import-entry.js?v=1027-UI"></script>
-    <script src="app/forms.js?v=1027-UI"></script>
-    <script src="app/detail.js?v=1027-UI"></script>
-    <script src="app/ledger.js?v=1027-UI"></script>
-    <script src="app/search.js?v=1027-UI"></script>
-    <script src="app/cats.js?v=1027-UI"></script>
-    <script src="app/stats.js?v=1027-UI"></script>
-    <script src="app/days.js?v=1027-UI"></script>
-    <script src="app/settings.js?v=1027-UI"></script>
-    <script src="app/tabs.js?v=1027-UI"></script>
-    <script src="app/login.js?v=1027-UI"></script>
-    <script src="app/back.js?v=1027-UI"></script>
-    <script src="app/boot.js?v=1027-UI"></script>
+    <script src="app/base.js?v=1027-UI2"></script>
+    <script src="app/theme-data.js?v=1027-UI2"></script>
+    <script src="app/theme.js?v=1027-UI2"></script>
+    <script src="app/store.js?v=1027-UI2"></script>
+    <script src="app/select.js?v=1027-UI2"></script>
+    <script src="app/keypad.js?v=1027-UI2"></script>
+    <script src="app/text.js?v=1027-UI2"></script>
+    <script src="app/sheet.js?v=1027-UI2"></script>
+    <script src="app/ask.js?v=1027-UI2"></script>
+    <script src="app/date.js?v=1027-UI2"></script>
+    <script src="app/monthstrip.js?v=1027-UI2"></script>
+    <script src="app/ai-export.js?v=1027-UI2"></script>
+    <script src="app/import-entry.js?v=1027-UI2"></script>
+    <script src="app/forms.js?v=1027-UI2"></script>
+    <script src="app/detail.js?v=1027-UI2"></script>
+    <script src="app/ledger.js?v=1027-UI2"></script>
+    <script src="app/search.js?v=1027-UI2"></script>
+    <script src="app/cats.js?v=1027-UI2"></script>
+    <script src="app/stats.js?v=1027-UI2"></script>
+    <script src="app/days.js?v=1027-UI2"></script>
+    <script src="app/settings.js?v=1027-UI2"></script>
+    <script src="app/tabs.js?v=1027-UI2"></script>
+    <script src="app/login.js?v=1027-UI2"></script>
+    <script src="app/back.js?v=1027-UI2"></script>
+    <script src="app/boot.js?v=1027-UI2"></script>
 
 </body>
 </html>

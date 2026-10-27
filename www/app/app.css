@@ -1138,11 +1138,12 @@
         .theme-where { margin-top:8px; }
         .theme-where[hidden] { display:none; }
         /* 1025-UX：设置页「外观主题」那一行右边：小色块 + 现在用的颜色名 */
-        .set-item .set-theme-cur { display:flex; align-items:center; gap:6px; font-size:14px; }
+        .set-item .set-theme-cur { display:flex; align-items:center; gap:6px; font-size:14px; line-height:1; }
+        .set-theme-cur .set-theme-go { margin-left:4px; font-size:18px; }   /* 1027-UI：色点、名字、› 在同一条线上 */
         .set-theme-dot { display:inline-block; width:14px; height:14px; border-radius:50%; background:var(--c-fill); box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); }
         #scrollHintRow[hidden] { display:none; }
         /* 1025-UX：登录页「主题色 雾松青 换一个 ›」一行 + 下面一句以后在哪改 */
-        button.login-theme-btn { display:flex; align-items:center; gap:10px; width:min(100%, 320px); min-height:var(--ui-tap); margin:28px auto 0; padding:8px 14px;
+        button.login-theme-btn { display:flex; align-items:center; gap:10px; width:min(100%, 320px); min-height:var(--ui-tap); margin:28px auto 0; padding:0 14px;
             border:1px solid var(--c-border-mid); border-radius:12px; background:var(--c-surface); font-family:inherit; font-size:15px; color:var(--c-text); cursor:pointer; text-align:left; }
         .login-theme-dot { flex:none; width:20px; height:20px; border-radius:50%; background:var(--c-fill); box-shadow:inset 0 0 0 1px rgba(0,0,0,.12); }
         .login-theme-k { flex:none; }
@@ -1158,11 +1159,8 @@
         .theme-verdict { display:block; font-size:12px; line-height:16px; font-weight:normal; color:var(--c-text-soft); white-space:normal; overflow-wrap:anywhere; }
         .theme-verdict:empty { display:none; }
         /* 窄的两处（登录页、「自己调一个颜色」）一行放不下：固定留两行高，拖选色条时名字、短评变来变去，这一行不跳 */
-        .login-theme-btn .theme-verdict, .theme-pick-row .theme-verdict, .cp-verdict { min-height:32px; }
-        .set-item.set-theme-item { gap:10px; text-align:left; font-family:inherit; }
-        .set-theme-l1 { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-        .set-theme-l1 .set-theme-cur { color:var(--c-text-soft); }
-        .login-theme-l1 { display:flex; align-items:center; gap:10px; min-width:0; }
+        .theme-pick-row .theme-verdict, .cp-verdict { min-height:32px; }
+
         /* 1020-E：自定义主色一行（点开 App 自己的选色面板）+ 选色面板 */
         .theme-pick-row { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); padding:8px 12px;
             background:var(--c-surface); border:1px solid var(--c-border-mid); border-radius:12px; color:var(--c-text);
