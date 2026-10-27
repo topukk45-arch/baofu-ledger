@@ -70,7 +70,6 @@
                 } });
         }
         $('daysAdd').addEventListener('click', ()=>openDayDialog(null));
-        $('daysEmpty').addEventListener('click', e=>{ if(e.target.closest('[data-empty="add"]')) openDayDialog(null); });
 
         // ===== 日子管理弹窗 =====
         // 导入简化 2a：「入口卡显示几条」去掉了（日子卡 1023-E 起固定最多 3 条，这一项早就不起作用），管理里只剩「批量删除日子」
@@ -159,7 +158,7 @@
             const list=sortedDays(loadDays());
             if(!list.length){
                 box.innerHTML='';
-                empty.innerHTML=emptyHtml('star', '还没有记录任何日子', { text:'添加日子', attrs:'data-empty="add"' });
+                empty.innerHTML=emptyHtml('star', '还没有记录任何日子');   // 底部操作栏已有「添加日子」，空状态只放图标和一句话
                 empty.style.display='block';
                 const ln=$('daysLines'); if(ln) ln.innerHTML='';
                 if(daysSelecting) exitSelectMode();   // 全删光了就自动退出选择模式
