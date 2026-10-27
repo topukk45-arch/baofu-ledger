@@ -383,7 +383,7 @@
                 const list=recsOfDays(mon, sun), s=sumFen(list), prev=recsOfDays(C.addDay(mon, -7), C.addDay(mon, -1)), ps=sumFen(prev);
                 const days=[]; for(let i=0;i<7;i++){ const k=C.addDay(mon, i), rs=list.filter(r=>(r.time||'').slice(0,10)===k); days.push({ k, rs, exp:sumFen(rs).exp, future:k>today }); }
                 const passed=days.filter(d=>!d.future).length;
-                setHead(`${C.weekLabel(mon)} · ${C.rangeText(mon, sun)}`, '');
+                setHead(`${C.weekLabel(mon)} · ${C.rangeText(mon, sun)}`, `${list.length} 笔`);   // 1027-UI：整周也写「N 笔」，和一天一样有这一行，切换时下面的内容不上下跳
                 let h=`<div class="dd-cells">`
                     + cellHtml('支出', s.exp.toFixed(2), prev.length ? moreLess(round2(s.exp-ps.exp), '上一周') : '上一周没有记录可比')
                     + cellHtml('记了', `${list.length} <small>笔</small>`, passed ? `日均 ${(s.exp/passed).toFixed(2)}（${passed} 天）` : '')

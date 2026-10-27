@@ -1958,11 +1958,11 @@
         .dd-body { display:flex; flex-direction:column; gap:12px; }
         .dd-cells { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
         .dd-cell { display:flex; flex-direction:column; gap:2px; min-width:0; padding:12px 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
-        .dd-k { font-size:12px; color:var(--c-text-soft); }
+        .dd-k { font-size:12px; line-height:16px; color:var(--c-text-soft); }
         .dd-v { font-size:24px; line-height:30px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .dd-v.pos { color:var(--c-pos); }
-        .dd-v small { font-size:14px; font-weight:normal; }
-        .dd-s { font-size:12px; color:var(--c-text-soft); }
+        .dd-v small { font-size:14px; font-weight:normal; line-height:1; }
+        .dd-s { font-size:12px; line-height:18px; min-height:18px; color:var(--c-text-soft); }   /* 1027-UI：这一行空着时也留高，一周 / 一天切换时两格一样高（原来 97 / 94 / 77 来回变） */
         .dd-cats { display:flex; flex-direction:column; gap:8px; padding:12px 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
         .dd-cat { display:grid; grid-template-columns:minmax(3em, max-content) minmax(0,1fr) auto; align-items:center; gap:8px; font-size:13px; color:var(--c-text); }
         .dd-cat-n { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:7em; }

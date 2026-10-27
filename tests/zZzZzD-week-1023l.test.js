@@ -79,7 +79,7 @@ const R = (id, time, money, remark) => ({ id, time, money, type: 'expense', cat:
   ok(tabs()[6].disabled && tabs()[7].disabled, '4 还没到的日子点不了');
   w.JiwenDetail.openDay('2026-10-22'); await tick();
   body().querySelector('.wd-tab-wk').click(); await tick();
-  ok(title() === '本周 · 10月19日–25日' && $('weekClose') && !txt($('uiSheetSub')), '4 从当日打开（账单页点日期抬头）也能点「整周」看那一周');
+  ok(title() === '本周 · 10月19日–25日' && $('weekClose') && /^\d+ 笔$/.test(txt($('uiSheetSub'))), '4 从当日打开（账单页点日期抬头）也能点「整周」看那一周（1027-UI 起整周也写「N 笔」）');
   body().querySelector('.wd-tab[data-v="2026-10-22"]').click(); await tick();
   body().querySelector('.bl-row[data-id="b"]').click(); await tick();
   w.JiwenDetail.closeDetail(); await tick();
