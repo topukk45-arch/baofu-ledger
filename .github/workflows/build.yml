@@ -4,8 +4,8 @@ on:
   # 1021-T1 的体验版分支 10-21 已快进合进 main，那一段「发布到体验版」删掉了
   # 1021-T26 的启动画面体验版分支 10-23 已快进合进 main，那一段「发布到体验版」删掉了
   push:
-    # 1024-Y 临时（1025-UX 接着用，换成这一轮的分支）：分支推上去也打包（发到单独的预发布版，见最后两段）。合回 main 之前必须删掉这条分支名
-    branches: [main, claude/magical-ride-noyguy]
+    # 1024-Y 临时（1025-UX 接着用，换成这一轮的分支；1027-UI4 界面收敛换成 claude/gallant-wright-usdjkx）：分支推上去也打包（发到单独的预发布版，见最后两段）。合回 main 之前必须删掉这条分支名
+    branches: [main, claude/gallant-wright-usdjkx]
   workflow_dispatch:
 jobs:
   build:
@@ -131,7 +131,7 @@ jobs:
       #   docs/release/branch-publish 第一行写标签（比如 1024-Y），标题读 <标签>.title、说明读 <标签>.md；
       #   没有这个文件就不发。只发到这个单独的标签，绝不碰「最新测试版」latest-build 和正式版
       - name: 发布界面修补版（1024-Y 临时，1025-UX 接着用，只在这一轮的分支上）
-        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/magical-ride-noyguy'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/gallant-wright-usdjkx'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -157,7 +157,7 @@ jobs:
   #   发成单独的预发布版 1025-UX-start（标签打在 1024-Y 的提交 38d0971）。不重新打包、不碰 latest-build 和 1024-Y；已经发过就跳过
   #   （1024-Y 那次的「1024-X 稳妥版」1024-X-safe 已经发过，这一段原来复制它，现在换成复制 1024-Y）
   start-copy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/claude/magical-ride-noyguy'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/claude/gallant-wright-usdjkx'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
