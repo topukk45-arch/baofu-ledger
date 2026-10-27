@@ -1848,7 +1848,8 @@
         .lg-sum-e { color:var(--c-text-soft); }
         .lg-chev { flex:none; width:14px; height:14px; fill:none; stroke:var(--c-text-soft); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
         /* 每天一张卡片：抬头是日期 + 当天支出 / 收入（点了看这一天，1023-D），下面每笔两行 */
-        .lg-dc { margin-top:12px; border:1px solid var(--c-border); border-radius:16px; background:var(--c-surface); overflow:hidden;
+        .lg-dc { margin-top:12px; border:1px solid var(--c-border); border-radius:14px;   /* 1027-UI：卡片圆角统一 14（原来 16，一天详情里和上面两格的 14 挨着，看得出不一样） */
+            background:var(--c-surface); overflow:hidden;
             content-visibility:auto; contain-intrinsic-size:auto 200px; }
         button.lg-dh { display:flex; align-items:center; gap:8px; width:100%; min-height:50px; padding:0 10px 0 14px; margin:0;
             border:none; border-bottom:1px solid var(--c-border); border-radius:0; background:var(--c-chip); background:color-mix(in srgb, var(--c-primary) 8%, var(--c-surface));
@@ -2016,7 +2017,8 @@
         .dw-labs { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; text-align:center; font-size:12px; color:var(--c-text-soft); }
         .dw-labs .today { color:var(--c-text); font-weight:bold; }
         .dw-days.lg-dc { margin-top:0; content-visibility:visible; }
-        .dw-day { display:flex; align-items:center; gap:10px; width:100%; min-height:50px; padding:0 14px; margin:0; border:none; border-top:1px solid var(--c-border);
+        .dw-day { display:flex; align-items:center; gap:10px; width:100%; min-height:54px;   /* 1027-UI：和一天里每一笔那一行（.bl-row）一样 54 高，原来 50 */
+            padding:0 14px; margin:0; border:none; border-top:1px solid var(--c-border);
             background:transparent; color:var(--c-text); font-size:14px; font-family:inherit; text-align:left; }
         .dw-days .dw-day:first-child { border-top:none; }
         button.dw-day { cursor:pointer; }
@@ -2027,7 +2029,7 @@
         .dw-day-none button.lg-gap-btn { margin-left:auto; }
 
         /* ===== 1023-E：日子竖排卡片（账单页）、全部日子页的置顶大卡片、单条日子的详情 ===== */
-        .days-card { position:relative; margin:0 0 4px; padding:4px 30px 8px 6px; border:1px solid var(--c-border); border-radius:16px; background:var(--c-surface); cursor:pointer; }
+        .days-card { position:relative; margin:0 0 4px; padding:4px 30px 8px 6px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); cursor:pointer; }
         .days-card.pressed { background:var(--c-chip); }
         /* 1023-K：整张卡片点了进全部日子，右边一个 › */
         .dc-go { position:absolute; right:10px; top:50%; width:16px; height:16px; margin-top:-8px; fill:none; stroke:var(--c-text-soft); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
