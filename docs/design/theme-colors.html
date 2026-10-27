@@ -1,0 +1,229 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>记问 主题色起名</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style>
+/* 布局：单栏手机宽度优先。先选颜色（预设或自己调），下面两台「手机」对比现在和拆色以后；再是规则、起名 */
+:root{
+  --bg:#f1f9f8; --card:#ffffff; --fg:#20393a; --muted:#5d7472; --line:#d5e5e3; --accent:#3f6f6b; --chip:#e3f0ee;
+  --serif:"Noto Serif SC","Songti SC",serif; --sans:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#121b1b;--card:#1a2626;--fg:#dcebe9;--muted:#93aaa7;--line:#2b3b3a;--accent:#86b8b2;--chip:#223231;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121b1b;--card:#1a2626;--fg:#dcebe9;--muted:#93aaa7;--line:#2b3b3a;--accent:#86b8b2;--chip:#223231;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.6}
+.wrap{max-width:620px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:20px}
+h1{font-family:var(--serif);font-size:24px;margin:0;text-wrap:balance}
+h2{font-family:var(--serif);font-size:18px;margin:0}
+.sub{color:var(--muted);margin:2px 0 0;font-size:14px}
+section{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;display:grid;gap:12px;min-width:0}
+.grp{display:grid;gap:6px}
+.lbl{font-size:12px;color:var(--muted);letter-spacing:.06em}
+.swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.sw{display:grid;justify-items:center;gap:4px;background:none;border:none;padding:4px 0;cursor:pointer;color:var(--fg);font-family:var(--sans);font-size:12px;border-radius:10px;min-height:60px}
+.sw i{width:36px;height:36px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.sw.on{background:var(--chip)}
+.sw.on i{box-shadow:0 0 0 2px var(--card),0 0 0 4px var(--fg)}
+.pick{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+input[type=color]{width:48px;height:48px;border:none;padding:0;background:none;border-radius:12px;cursor:pointer}
+#hex{font-family:ui-monospace,Menlo,monospace;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);width:120px}
+input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.namebox{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center}
+.big{width:60px;height:60px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
+.name{font-family:var(--serif);font-size:30px;font-weight:700;letter-spacing:.08em;line-height:1.15}
+.verdict{color:var(--muted);font-size:14px;margin-top:2px}
+.why{font-size:14px;background:var(--chip);border-radius:10px;padding:10px 12px}
+.phones{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:440px){.phones{gap:8px}}
+.phone{display:grid;gap:6px;min-width:0}
+.phone .cap{font-size:12px;color:var(--muted);text-align:center}
+.scr{border-radius:18px;overflow:hidden;border:1px solid var(--line);font-family:var(--sans)}
+.scr .top{padding:12px 12px 8px;display:grid;gap:2px}
+.scr .mon{font-family:var(--serif);font-size:22px;font-weight:700;line-height:1.1}
+.scr .sm{font-size:11px;opacity:.75}
+.scr .amt{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.scr .list{background:#fff;margin:0 10px;border-radius:10px;font-size:12px;color:#22302f}
+.scr .li{display:flex;justify-content:space-between;padding:7px 10px;border-top:1px solid #eef1f0}
+.scr .li:first-child{border-top:none}
+.scr .btns{display:grid;grid-template-columns:1fr 1.4fr;gap:6px;padding:10px}
+.scr .b{border-radius:10px;padding:9px 4px;font-size:12px;font-weight:700;text-align:center;white-space:nowrap}
+.scr .tabs{display:flex;justify-content:space-around;padding:8px 4px 10px;font-size:11px;background:#fff;border-top:1px solid #e6ebea;color:#7b8988}
+.scr .tabs b{font-weight:700}
+ol{margin:0;padding-left:1.3em;display:grid;gap:6px}
+li{font-size:14px}
+.note{font-size:13px;color:var(--muted);margin:0}
+details summary{cursor:pointer;color:var(--accent);font-size:14px}
+.dict{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}
+.dict button{display:flex;align-items:center;gap:6px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;color:var(--fg);cursor:pointer;font-family:var(--sans)}
+.dot{width:14px;height:14px;border-radius:50%;display:inline-block;flex:none}
+table{border-collapse:collapse;font-size:13px;width:100%}
+td,th{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:500;white-space:nowrap}
+td:first-child{white-space:nowrap}
+.tw{overflow-x:auto}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>主题色起名</h1>
+    <p class="sub">主色拆成按钮底色、按钮上的字、强调字几个颜色以后，浅色也能当主题。天青就是真的淡天青，按钮上配同色的深字，不再一律压深、配黑白。</p>
+  </header>
+
+  <section aria-labelledby="t1">
+    <h2 id="t1">24 个预设</h2>
+    <p class="sub">一组一行 6 个，深浅交错。点一个，下面两台手机对比现在的做法和拆色以后。</p>
+    <div id="presetGroups" class="grp" style="gap:12px"></div>
+    <div class="lbl">或者自己调一个</div>
+    <div class="pick">
+      <input type="color" id="pick" value="#95b6ce" aria-label="选颜色">
+      <input id="hex" value="#95b6ce" aria-label="色值" spellcheck="false">
+    </div>
+  </section>
+
+  <section aria-label="效果">
+    <div class="namebox">
+      <span class="big" id="big"></span>
+      <div><div class="name" id="name"></div><div class="verdict" id="verdict"></div></div>
+    </div>
+    <div class="why" id="why"></div>
+    <div class="phones">
+      <div class="phone"><div class="scr" id="scrOld"></div><div class="cap">现在：压深，配黑或白字</div></div>
+      <div class="phone"><div class="scr" id="scrNew"></div><div class="cap">拆色以后</div></div>
+    </div>
+    <p class="note" id="notes"></p>
+  </section>
+
+  <section aria-labelledby="t3">
+    <h2 id="t3">几个颜色怎么定</h2>
+    <div class="tw"><table>
+      <tr><th>用在哪</th><th>怎么算</th></tr>
+      <tr><td>按钮底色</td><td>就是选的颜色，不再压深。</td></tr>
+      <tr><td>按钮上的字</td><td>同色相的「浅字」（带一点颜色的白）和「深字」（同色相、压得很深）里挑对比高的；不到 4.5:1 就把字往更浅或更深推；推到头还不够，把底色往反方向挪一点点。24 个预设都不用挪。</td></tr>
+      <tr><td>强调字</td><td>选中的页签、金额、外框按钮这些放在浅底上的字：同色相，深到在页面底色和白卡上都 ≥ 4.5:1。</td></tr>
+      <tr><td>页面底色</td><td>同色相、很浅很淡，和现在一样。</td></tr>
+      <tr><td>描边</td><td>按钮底色和页面底色太接近时（比如松花），按钮加一道强调字颜色的细边。</td></tr>
+    </table></div>
+  </section>
+
+  <section aria-labelledby="t4">
+    <h2 id="t4">起名顺序（自己调的颜色）</h2>
+    <ol>
+      <li>和某个预设同色：用预设名。</li>
+      <li>和词典里某个颜色几乎一样：用那个名字。</li>
+      <li>挨着某个预设但不是它：叫「近」+ 预设名，比如「近天青」。</li>
+      <li>都不像：深浅浓淡取一个字，加色相名，比如「雾竹青」「明朱砂」。</li>
+    </ol>
+    <p class="note">同一个色值永远同一个名字，不存、不调 AI；拖选色条时名字实时变。豆沙粉、橄榄绿、素墨米在词典里，以前选过的人名字照旧。</p>
+    <details>
+      <summary>词典（预设之外的色名，点一个试）</summary>
+      <div class="dict" id="dict" style="margin-top:10px"></div>
+    </details>
+  </section>
+</div>
+
+<script>
+const PRESETS=[
+ ['红赭','苏芳','#7d2a4d'],['红赭','退红','#dcb1b3'],['红赭','朱砂','#b2392b'],['红赭','赭石红','#a8553f'],['红赭','沉香','#623e29'],['红赭','黄栌','#e7b643'],
+ ['青绿','松花','#c4d580'],['青绿','苍葭','#45532e'],['青绿','竹青','#88aa80'],['青绿','石绿','#1f744f'],['青绿','雾松青','#3f6f6b'],['青绿','天水碧','#98c8ca'],
+ ['蓝紫','天青','#95b6ce'],['蓝紫','黛蓝','#3a5a7a'],['蓝紫','群青','#374f9d'],['蓝紫','丁香','#ada4cd'],['蓝紫','黛紫烟','#6b5a82'],['蓝紫','暮山紫','#683964'],
+ ['墨灰','松烟墨','#292e34'],['墨灰','蟹壳青','#94a9ae'],['墨灰','秘色','#a4b099'],['墨灰','宣纸灰','#5f5b54'],['墨灰','茶褐','#775e44'],['墨灰','灰梅','#aa909b']];
+const DICT=[["铜绿","#3f7f71"],["葱倩","#547e4b"],["黛绿","#244534"],["黛青","#294751"],["靛青","#234566"],["玄青","#243251"],["霁蓝","#2e5ba6"],["回青","#2770ad"],["烟岚","#5f788a"],["月白","#d4e1ea"],["绀紫","#594a82"],["紫棠","#4d3054"],["藕荷","#c9a9bc"],["绛色","#742d31"],["殷红","#602331"],["檀色","#974a32"],["银朱","#b65c4e"],["茜色","#9d486c"],["紫檀","#68432f"],["栗壳","#5b3427"],["藤黄","#927226"],["缃色","#e6d39a"],["鸦青","#313c47"],["苍烟","#5a5e62"],["淡墨","#73787c"],["米汤娇","#d8d0c0"],["苍苔","#405340"],["缥碧","#558675"],["孔雀绿","#32766e"],["鱼肚白","#ece6df"],["豆沙粉","#9c5b63"],["橄榄绿","#6b7245"],["素墨米","#8a7f66"]];
+const HUES=['退红','朱砂','赭石','檀色','沉香','黄栌','藤黄','苔痕','苍葭','竹青','葱倩','石绿','松青','天水碧','缥碧','天青','霁蓝','群青','绀青','螺黛','黛紫','暮山紫','紫棠','苏芳'];
+const MOD=[[['墨','苍'],['沉','深'],['浓','重']],[['烟','尘'],['素','清'],['明','艳']],[['雾','霜'],['浅','淡'],['晴','鲜']]];
+const LROW=['偏深','适中','偏浅'], CCOL=['灰而柔','不浓不淡','浓郁'];
+const NEAR_DICT=.035, NEAR_PRESET=.045;
+
+/* —— 颜色工具 —— */
+const hexToRgb=h=>{h=h.replace('#','');if(h.length===3)h=[...h].map(c=>c+c).join('');const n=parseInt(h,16);return{r:n>>16&255,g:n>>8&255,b:n&255}};
+const rgbToHex=(r,g,b)=>'#'+[r,g,b].map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0')).join('');
+function rgbToHsl({r,g,b}){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h,s,l=(mx+mn)/2;
+  if(mx===mn){h=s=0}else{const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);h=mx===r?(g-b)/d+(g<b?6:0):mx===g?(b-r)/d+2:(r-g)/d+4;h/=6}
+  return{h:h*360,s:s*100,l:l*100}}
+function hslToHex(h,s,l){h=(h%360+360)%360;s=Math.max(0,Math.min(100,s))/100;l=Math.max(0,Math.min(100,l))/100;
+  const c=(1-Math.abs(2*l-1))*s,x=c*(1-Math.abs((h/60)%2-1)),m=l-c/2;let r,g,b;
+  if(h<60)[r,g,b]=[c,x,0];else if(h<120)[r,g,b]=[x,c,0];else if(h<180)[r,g,b]=[0,c,x];else if(h<240)[r,g,b]=[0,x,c];else if(h<300)[r,g,b]=[x,0,c];else[r,g,b]=[c,0,x];
+  return rgbToHex((r+m)*255,(g+m)*255,(b+m)*255)}
+const lum=hex=>{const{r,g,b}=hexToRgb(hex);const a=[r,g,b].map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)});return .2126*a[0]+.7152*a[1]+.0722*a[2]};
+const con=(a,b)=>{const x=lum(a),y=lum(b);return(Math.max(x,y)+.05)/(Math.min(x,y)+.05)};
+function oklab(hex){const{r,g,b}=hexToRgb(hex);const f=v=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)};const R=f(r),G=f(g),B=f(b);
+  const l=Math.cbrt(.4122214708*R+.5363325363*G+.0514459929*B),m=Math.cbrt(.2119034982*R+.6806995451*G+.1073969566*B),s=Math.cbrt(.0883024619*R+.2817188376*G+.6299787005*B);
+  return[.2104542553*l+.793617785*m-.0040720468*s,1.9779984951*l-2.428592205*m+.4505937099*s,.0259040371*l+.7827717662*m-.808675766*s]}
+function oklch(hex){const[L,A,B]=oklab(hex);let H=Math.atan2(B,A)*180/Math.PI;if(H<0)H+=360;return{L,C:Math.hypot(A,B),H}}
+function ok2hex(L,C,H){const a=C*Math.cos(H*Math.PI/180),b=C*Math.sin(H*Math.PI/180);
+  const l=(L+.3963377774*a+.2158037573*b)**3,m=(L-.1055613458*a-.0638541728*b)**3,s=(L-.0894841775*a-1.291485548*b)**3;
+  const R=4.0767416621*l-3.3077115913*m+.2309699292*s,G=-1.2684380046*l+2.6097574011*m-.3413193965*s,B=-.0041960863*l-.7034186147*m+1.707614701*s;
+  const g=v=>255*(v<=.0031308?12.92*v:1.055*Math.pow(Math.max(v,0),1/2.4)-.055);return rgbToHex(g(R),g(G),g(B))}
+const dE=(a,b)=>{const x=oklab(a),y=oklab(b);return Math.hypot(x[0]-y[0],x[1]-y[1],x[2]-y[2])};
+
+/* 拆色以后：一个颜色 → 底色、按钮字、页面底、强调字 */
+function themeNew(fill){
+  let{L,C,H}=oklch(fill);
+  const bg=ok2hex(.975,Math.min(C,.018),H);
+  const paleF=l=>ok2hex(l,Math.min(C,.02)*(1-(l-.97)/.03*.5),H), deepF=l=>ok2hex(l,Math.min(C,.05),H);
+  let pl=.97,dl=.28;const pale=paleF(pl),deep=deepF(dl);
+  const usePale=con(fill,pale)>=con(fill,deep);let on=usePale?pale:deep,g=0;
+  while(con(fill,on)<4.5&&g++<20){if(usePale){pl=Math.min(1,pl+.005);on=paleF(pl)}else{dl-=.01;on=deepF(dl)}}
+  let f=fill,nudged=false;g=0;
+  while(con(f,on)<4.5&&g++<40){L+=usePale?-.01:.01;f=ok2hex(L,C,H);nudged=true}
+  let il=Math.min(.48,L),ink=ok2hex(il,Math.min(C,.09),H);g=0;
+  while((con(ink,bg)<4.5||con(ink,'#ffffff')<4.5)&&g++<40){il-=.01;ink=ok2hex(il,Math.min(C,.09),H)}
+  return{fill:f,on,bg,ink,onC:con(f,on),nudged,edge:con(f,bg)<1.6,mode:usePale?'浅字':'深字'};
+}
+/* 现在：照 settings.js 的 buildPalette，亮度 20–56、饱和度至少 12，再压到白字 ≥2.4，字黑白二选一 */
+function themeOld(hex){let{h,s,l}=rgbToHsl(hexToRgb(hex));if(s<1)h=175;if(s<12)s=12;let pL=Math.max(20,Math.min(l,56));
+  let p=hslToHex(h,s,pL),g=0;while(con(p,'#ffffff')<2.4&&pL>20&&g++<40){pL-=2;p=hslToHex(h,s,pL)}
+  const on=con(p,'#ffffff')>=con(p,'#2a2200')?'#ffffff':'#2a2200';
+  return{fill:p,on,bg:hslToHex(h,Math.min(s+8,80),95),ink:p,onC:con(p,on)}}
+
+const PLIST=PRESETS.map(x=>({name:x[1],hex:x[2]})), DLIST=DICT.map(x=>({name:x[0],hex:x[1]}));
+function nearest(list,p){let best=null,d=9;for(const x of list){const e=dE(p,x.hex);if(e<d){d=e;best=x}}return{best,d}}
+function nameOf(hex){
+  const t=themeNew(hex),p=t.fill,{L,C,H}=oklch(p);
+  const li=L<.45?0:L<.65?1:2,ci=C<.045?0:C<.10?1:2,neutral=C<.025,warm=(H>=40&&H<120);
+  const temp=neutral?'中性':(H<100||H>=330)?'暖调':(H<160)?'不冷不暖':'冷调';
+  const verdict=`${temp} · ${CCOL[ci]} · ${LROW[li]} · 按钮配${t.mode} ${t.onC.toFixed(1)}:1`;
+  const ex=PLIST.find(x=>x.hex.toLowerCase()===hex.toLowerCase());
+  if(ex)return{t,verdict,name:ex.name,why:`预设「${ex.name}」。`};
+  const nd=nearest(DLIST,p),np=nearest(PLIST,p);
+  if(nd.d<NEAR_DICT&&nd.d<=np.d)return{t,verdict,name:nd.best.name,why:`最像词典里的「${nd.best.name}」（${nd.best.hex}）。`};
+  if(np.d<NEAR_PRESET)return{t,verdict,name:'近'+np.best.name,why:`挨着预设「${np.best.name}」（${np.best.hex}），所以叫「近${np.best.name}」。`};
+  const base=neutral?(warm?'沙灰':'岩灰'):HUES[Math.floor(H/15)%24];
+  let[m,alt]=MOD[li][ci],name=m+base;if(PLIST.some(x=>x.name===name)||DLIST.some(x=>x.name===name))name=alt+base;
+  return{t,verdict,name,why:`按规则拼：「${name[0]}」是${LROW[li]}、${CCOL[ci]}；「${base}」来自${neutral?(warm?'偏暖的灰':'偏冷的灰'):'色相 '+Math.round(H)+'°'}。`};
+}
+
+/* —— 画两台手机 —— */
+function screen(t){
+  const edge=t.edge?`box-shadow:inset 0 0 0 1px ${t.ink}`:'';
+  return `<div style="background:${t.bg}">
+    <div class="top" style="color:${t.ink}"><span class="mon">10月</span><span class="sm">支出</span><span class="amt">4615.34</span></div>
+    <div class="list"><div class="li"><span>话费</span><span>−50.00</span></div><div class="li"><span>打车</span><span>−11.00</span></div></div>
+    <div class="btns"><div class="b" style="background:#fff;color:${t.ink};box-shadow:inset 0 0 0 1px ${t.ink}55">关闭</div><div class="b" style="background:${t.fill};color:${t.on};${edge}">给这天补一笔</div></div>
+  </div><div class="tabs"><b style="color:${t.ink}">账单</b><span>统计</span><span>日子</span><span>设置</span></div>`;
+}
+const $=id=>document.getElementById(id);
+function render(hex){
+  const n=nameOf(hex),o=themeOld(hex);
+  $('big').style.background=n.t.fill;$('name').textContent=n.name;$('verdict').textContent=n.verdict;$('why').textContent=n.why;
+  $('scrOld').innerHTML=screen(o);$('scrNew').innerHTML=screen(n.t);
+  const notes=[];
+  if(o.fill.toLowerCase()!==hex.toLowerCase())notes.push(`现在的做法会把它压成 ${o.fill}，和选的颜色不是一回事。`);
+  if(o.onC<4.5)notes.push(`现在的按钮字对比只有 ${o.onC.toFixed(1)}:1，看着发糊。`);
+  if(n.t.nudged)notes.push(`这个颜色卡在不深不浅的中间，字怎么配都不够清楚，底色自动挪到了 ${n.t.fill}。`);
+  if(n.t.edge)notes.push('按钮和页面底色太接近，加了一道细边。');
+  $('notes').textContent=notes.join(' ');
+  document.querySelectorAll('.sw').forEach(s=>s.classList.toggle('on',s.dataset.hex.toLowerCase()===hex.toLowerCase()));
+}
+function set(hex){if(!/^#?[0-9a-f]{6}$/i.test(hex))return;if(hex[0]!=='#')hex='#'+hex;hex=hex.toLowerCase();$('pick').value=hex;$('hex').value=hex;render(hex)}
+$('pick').addEventListener('input',e=>set(e.target.value));
+$('hex').addEventListener('input',e=>set(e.target.value.trim()));
+
+const groups={};PRESETS.forEach(x=>(groups[x[0]]=groups[x[0]]||[]).push(x));
+$('presetGroups').innerHTML=Object.entries(groups).map(([g,list])=>`<div class="grp"><span class="lbl">${g}</span><div class="swatches">`+
+  list.map(([,nm,c])=>`<button class="sw" type="button" data-hex="${c}" aria-label="${nm}"><i style="background:${c}"></i><span>${nm}</span></button>`).join('')+`</div></div>`).join('');
+document.querySelectorAll('.sw').forEach(b=>b.onclick=()=>set(b.dataset.hex));
+$('dict').innerHTML=DICT.map(([n,c])=>`<button type="button" data-hex="${c}"><i class="dot" style="background:${c}"></i>${n}</button>`).join('');
+document.querySelectorAll('#dict button').forEach(b=>b.onclick=()=>set(b.dataset.hex));
+set('#95b6ce');
+</script>
+
+</body></html>
