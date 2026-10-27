@@ -2339,3 +2339,28 @@
         .sp-head { border-bottom:none; }
         .sp-title { font-size:20px; line-height:28px; font-weight:700; color:var(--c-text); }
         .ui-sheet.wd-fixed #uiSheetTitle { font-size:20px; line-height:28px; font-weight:700; color:var(--c-text); }
+
+        /* ③ 两到四个选项的切换一律是浅底滑块：槽高 40、圆角 12（--c-track 底），滑块高 34、圆角 9（卡片底、强调字、一点阴影）。
+           统计页「收支 | 预算」、饼图「支出 | 收入」、设置里的开关都是它（.seg，id、data-v 不变）；按钮的点击区照旧用 ::after 撑到 48 */
+        .seg { display:inline-flex; align-items:center; height:40px; padding:3px; gap:0; border:none; border-radius:var(--r-m); background:var(--c-track); overflow:visible; flex:none; }
+        .seg button, .seg button:first-child, .seg button:last-child { height:34px; min-width:var(--ui-tap); padding:0 14px; border:none; border-radius:var(--r-s);
+            background:transparent; color:var(--c-ink); font-size:14px; font-weight:400; line-height:34px; transition:background .12s, box-shadow .12s; }
+        .seg button.on { background:var(--c-surface); color:var(--c-ink); font-weight:500; box-shadow:0 1px 2px rgba(var(--c-shadow-rgb),.18); }
+        .stat-tabs button, #statMonthCatSeg button { flex:none; padding:0 14px; font-size:14px; }
+        /* 「整周 一 … 日」是导航（每格对应一页内容、跟着左右滑），不是选项切换：照旧实心选中块（--c-fill / --c-on-fill），高 40、圆角 12，和滑块槽对齐；
+           外面那道槽去掉；每格的点击区上下各撑 4px 到 48 */
+        .wd-tabs { gap:4px; padding:0; border-radius:0; background:transparent; }
+        button.wd-tab { position:relative; height:40px; border-radius:var(--r-m); }
+        button.wd-tab::after { content:''; position:absolute; left:0; right:0; top:-4px; bottom:-4px; }
+
+        /* 设置页（1027-UI4，照草图）：每组一张列表卡 .set-list（细边、圆角 16），组里每行一行 48 高、中间一道细线；带滑块的行按内容撑高（滑块 40 + 上下各 8）；
+           「默认进入页面」四个选项一行放不下，滑块放到名字下面占满一行 */
+        .set-list { border:1px solid var(--c-border); border-radius:var(--r-l); background:var(--c-surface); overflow:hidden; }
+        .set-list > .set-item { min-height:var(--row-1); margin:0; padding:0 16px; border:none; border-radius:0; background:transparent; box-shadow:none; }
+        .set-list > * + .set-item { border-top:1px solid var(--c-border); }
+        .set-list > .set-item:hover { border-color:var(--c-border); box-shadow:none; }
+        .set-list > * + .set-item:hover { border-top-color:var(--c-border); }
+        .set-list > .set-item.set-static { padding-top:8px; padding-bottom:8px; }
+        .set-list > .set-item.set-col { flex-direction:column; align-items:stretch; gap:8px; }
+        .set-list > .set-item.set-col > .seg { display:flex; width:100%; }
+        .set-list > .set-item.set-col > .seg button { flex:1 1 0; padding:0 6px; }

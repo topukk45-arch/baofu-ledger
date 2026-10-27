@@ -9,6 +9,8 @@
 //    预算总览是 .ui-sum、预算外 / 年度预算在下面一张列表卡；日子页置顶那个是浅底（.ui-sum 同一种底），不是主题色实心
 // 4. 页头：统计、设置是 32px 一级页头（.pg-h1），统计页写「10月」大字 + 小字年份、完整年月在 aria-label，没有「统计」两个字，「收支 | 预算」在页头里；
 //    日子、搜一笔 20px 不画线；一天 / 一周面板标题 20px；账单页「10月」字重 700
+// 5. 切换控件：.seg 是浅底滑块（槽 40 / 12、滑块 34 / 9）；「整周 一…日」40 高、圆角 12、实心选中块；设置页每组一张列表卡 .set-list，
+//    7 个滑块都在（id 不变），「默认进入页面」那一行滑块在名字下面
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
 const APP = path.join(path.dirname(htmlFile), 'app');
@@ -109,12 +111,23 @@ function palette() {
     ok($('statMonthLabel').closest('.pg-h1') && $('statMonthLabel').closest('.pg-h1').contains($('statTabSeg')), '4 「收支 | 预算」在页头里');
     ok(!/统计/.test(txt(d.querySelector('#pageStats .pg-h1'))), '4 统计页头不写「统计」');
     ok(d.querySelector('#pageSettings .pg-h1 .pg-h1-t') && txt(d.querySelector('#pageSettings .pg-h1')) === '设置', '4 设置页头');
-    const rule = sel => { const i = css.lastIndexOf(sel + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
+    const rule = sel => { const i = css.lastIndexOf('\n        ' + sel + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
     ok(/font-size:32px/.test(rule('h3.pg-h1-t, .pg-h1-t')) && /font-weight:700/.test(rule('h3.pg-h1-t, .pg-h1-t')), '4 一级页头 32px / 700');
     ok(/font-size:20px/.test(rule('.days-title')) && /border-bottom:none/.test(rule('.days-head')), '4 日子页头 20px、不画线');
     ok(/font-size:20px/.test(rule('.sp-title')) && /border-bottom:none/.test(rule('.sp-head')), '4 搜一笔页头 20px、不画线');
     ok(/font-size:20px/.test(rule('.ui-sheet.wd-fixed #uiSheetTitle')), '4 一天 / 一周标题 20px');
     ok(/font-weight:700/.test(rule('.lg-bar-m')), '4 账单页「10月」700');
+    // ===== 5. 切换控件、设置页 =====
+    const segR = rule('.seg'), segB = rule('.seg button, .seg button:first-child, .seg button:last-child');
+    ok(/height:40px/.test(segR) && /border-radius:var\(--r-m\)/.test(segR) && /background:var\(--c-track\)/.test(segR) && /border:none/.test(segR), '5 滑块槽 40 高、圆角 12、浅底、不画边');
+    ok(/height:34px/.test(segB) && /border-radius:var\(--r-s\)/.test(segB), '5 滑块 34 高、圆角 9');
+    ok(/background:var\(--c-surface\)/.test(rule('.seg button.on')), '5 选中的滑块是卡片底');
+    ok(/height:40px/.test(rule('button.wd-tab')) && /border-radius:var\(--r-m\)/.test(rule('button.wd-tab')) && /background:var\(--c-fill\)/.test(rule('button.wd-tab.on')), '5 「整周 一…日」40 高、圆角 12、实心选中');
+    for (const id of ['statTabSeg', 'statMonthCatSeg', 'defaultTabSeg', 'addSideSeg', 'sysMoneyKbSeg', 'scrollHintSeg', 'ioSideSeg']) ok($(id) && $(id).classList.contains('seg'), '5 滑块 ' + id + ' 还在');
+    const groups = [...d.querySelectorAll('#pageSettings .set-group')];
+    ok(groups.length === 5 && groups.every(g => g.querySelector(':scope > .set-group-title + .set-list') && !g.querySelector(':scope > .set-item')), '5 设置页每组：组名 + 一张列表卡，行都在卡里');
+    ok($('defaultTabSeg').parentElement.classList.contains('set-col'), '5 「默认进入页面」滑块放在名字下面');
+    ok(/border-radius:var\(--r-l\)/.test(rule('.set-list')) && /min-height:var\(--row-1\)/.test(rule('.set-list > .set-item')), '5 列表卡圆角 16、每行 48');
     ok(!t.errs.length, '3 没有报错 ' + t.errs.join('|'));
   }
 

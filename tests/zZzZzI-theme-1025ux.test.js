@@ -38,8 +38,8 @@ const tick = () => new Promise(r => setTimeout(r, 0));
   t2.d.querySelector('.tab-btn[data-tab="settings"]').click(); await tick();
   const groups = [...t2.d.querySelectorAll('#pageSettings .set-group-title')].map(txt);
   ok(groups.join() === '记账,外观和偏好,存档管理,云备份,账户', '2 设置页分组：记账 → 外观和偏好 → 存档管理 → 云备份 → 账户：' + groups.join());
-  const g1 = t2.$('manageCatSetting').parentElement, g2 = t2.$('themeBtn').parentElement;
-  ok(txt(g1.querySelector('.set-group-title')) === '记账' && t2.$('manageTplSetting').parentElement === g1, '2 管理分类、管理常用模板在最上面「记账」组');
+  const g1 = t2.$('manageCatSetting').closest('.set-group'), g2 = t2.$('themeBtn').closest('.set-group');   // 1027-UI4：组里多了一层列表卡 .set-list
+  ok(txt(g1.querySelector('.set-group-title')) === '记账' && t2.$('manageTplSetting').closest('.set-group') === g1, '2 管理分类、管理常用模板在最上面「记账」组');
   ok(txt(g2.querySelector('.set-group-title')) === '外观和偏好' && g2.querySelector('.set-item') === t2.$('themeBtn') && txt(t2.$('themeCur')) === '雾松青', '2 外观主题在「外观和偏好」第一行，右边写现在用的颜色');
   ok(t2.$('scrollHintRow').hidden && t2.$('scrollHintSeg'), '2 不起作用的「滑动提示」那一行藏起来（开关还在）');
   t2.$('themeBtn').click(); await tick();

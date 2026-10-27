@@ -131,15 +131,18 @@
                 <div class="set-group">
                     <!-- 1025-UX：「管理账单分类」「管理常用模板」从存档管理最后面挪到最上面一组（比导出、导入常用） -->
                     <div class="set-group-title">记账</div>
+                    <div class="set-list">   <!-- 1027-UI4：每组一张列表卡（细边、圆角 16），组里每行 48 高、中间细线隔开 -->
                     <button class="set-item" id="manageCatSetting"><span>管理账单分类</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="manageTplSetting"><span>管理常用模板</span><span class="set-arrow">›</span></button>
+                    </div>
                 </div>
                 <div class="set-group">
                     <div class="set-group-title">外观和偏好</div>
+                    <div class="set-list">   <!-- 1027-UI4：每组一张列表卡（细边、圆角 16），组里每行 48 高、中间细线隔开 -->
                     <!-- 1025-UX：「外观主题」从「账户」那组最底下挪到这里第一行，右边写现在用的颜色 -->
                     <!-- 1027-UI：右边色点 + 颜色名 + › 排一行（短评只在外观弹窗里写） -->
                     <button class="set-item" id="themeBtn"><span>外观主题</span><span class="set-arrow set-theme-cur"><i class="set-theme-dot" id="themeCurDot" aria-hidden="true"></i><span id="themeCur">雾松青</span><span class="set-theme-go" aria-hidden="true">›</span></span></button>
-                    <div class="set-item set-static">
+                    <div class="set-item set-static set-col">
                         <span>默认进入页面</span>
                         <div class="seg" id="defaultTabSeg">
                             <button data-v="stats">统计</button>
@@ -177,10 +180,12 @@
                             <button data-v="in">收入在左</button>
                         </div>
                     </div>
+                    </div>
                 </div>
 
                 <div class="set-group">
                     <div class="set-group-title">存档管理</div>
+                    <div class="set-list">   <!-- 1027-UI4：每组一张列表卡（细边、圆角 16），组里每行 48 高、中间细线隔开 -->
                     <div class="set-item set-static" style="flex-direction:column; align-items:stretch; gap:10px;">
                         <span>当前存档</span>
                         <div class="archive-bar arc-bar" style="margin-bottom:0;">
@@ -204,6 +209,7 @@
                     <button class="set-item" id="devMeasureBtn" style="display:none"><span>导入量度（开发中）</span><span class="set-arrow">›</span></button>
                     <button class="set-item" id="devNudgeBtn" style="display:none"><span>字往下挪几像素（开发中）</span><span class="set-arrow" id="devNudgeVal">自动</span></button>
                     <button class="set-item" id="devSplashBtn" style="display:none"><span>启动画面等首屏（开发中）</span><span class="set-arrow" id="devSplashVal">开</span></button>
+                    </div>
                 </div>
 
                 <!-- 云备份：不走任何官方登录，借助手机上已装好的网盘 App（Google Drive/OneDrive 等，
@@ -212,6 +218,7 @@
                      以后每次记账/修改当前存档会自动写进去。仅安卓原生 App 内可用。 -->
                 <div class="set-group">
                     <div class="set-group-title">云备份</div>
+                    <div class="set-list">   <!-- 1027-UI4：每组一张列表卡（细边、圆角 16），组里每行 48 高、中间细线隔开 -->
                     <div class="set-item set-static" style="flex-direction:column; align-items:stretch; gap:10px;">
                         <span id="odStatus">加载中…</span>
                         <div class="archive-bar" style="margin-bottom:0;">
@@ -230,12 +237,15 @@
                             切换存档要分别连接。手机需联网才能同步，断网时会静默失败、下次记账自动重试。
                         </span>
                     </div>
+                    </div>
                 </div>
 
                 <div class="set-group">
                     <div class="set-group-title">账户</div>
+                    <div class="set-list">   <!-- 1027-UI4：每组一张列表卡（细边、圆角 16），组里每行 48 高、中间细线隔开 -->
                     <button class="set-item" id="editNameBtn"><span>修改用户名</span><span class="set-arrow">›</span></button>
                     <button class="set-item set-danger" id="logoutBtn"><span>退出登录</span><span class="set-arrow">›</span></button>
+                    </div>
                 </div>
                 <div class="set-build" id="setBuild"></div>
             </div>
