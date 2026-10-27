@@ -1031,7 +1031,8 @@ async function run(cfg, port, browser) {
         const row = document.querySelector('#uiSheetBody .wd-tabs'), bad = [];
         if (!row) return { bad: ['没有「整周 一 … 日」那一行'], ok: false };
         const rr = row.getBoundingClientRect();
-        row.querySelectorAll('.wd-tab').forEach(b => { const q = b.getBoundingClientRect(); if (q.height < 48) bad.push(b.textContent + ' 不到 48 高'); if (q.right > rr.right + 0.5 || q.left < rr.left - 0.5) bad.push(b.textContent + ' 出了那一行'); if (b.scrollWidth > b.clientWidth + 1) bad.push(b.textContent + ' 字放不下'); });
+        row.querySelectorAll('.wd-tab').forEach(b => { const q = b.getBoundingClientRect(), af = getComputedStyle(b, '::after'), hitH = q.height - (parseFloat(af.top) || 0) - (parseFloat(af.bottom) || 0);   // 1027-UI4：看得见的 40 高（和滑块槽对齐），点击区靠 ::after 上下各撑 4px 到 48
+          if (Math.round(q.height) !== 40) bad.push(b.textContent + ' 不是 40 高'); if (hitH < 48 - 0.5) bad.push(b.textContent + ' 点击区不到 48 高'); if (q.right > rr.right + 0.5 || q.left < rr.left - 0.5) bad.push(b.textContent + ' 出了那一行'); if (b.scrollWidth > b.clientWidth + 1) bad.push(b.textContent + ' 字放不下'); });
         if (document.getElementById('uiSheetTitle').textContent.indexOf('10月14日') < 0) bad.push('点了周三没换成那一天');
         return { bad: bad.slice(0, 6), ok: !bad.length };
       })));
