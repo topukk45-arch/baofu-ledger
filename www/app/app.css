@@ -27,7 +27,7 @@
             --c-ink:#376763;           /* 1027-UI：强调字（选中的页签、金额、外框按钮……，在各种浅底上 ≥ 4.5:1） */
             --c-fill-edge:transparent;  /* 1027-UI：按钮底色和页面底太接近时按钮的细边（强调字颜色），不接近时透明 */
             --c-on-primary:#e7faf8;      /* 1027-UI 起是 --c-on-fill 的别名 */
-            /* 1027-UI4（界面收敛第一轮）：浅色字两档、汇总块底、滑块槽，都由 buildPalette 按主题算（下面是雾松青的值）；
+            /* 1027-UI4（界面收敛第一轮）：浅色字两档（t2 用在：账单行第二行「分类 · 时间」、周分隔线的日期、一周里每天几笔和柱子上的数、「整周」下面的小日期、饼图旁的百分比、日子的日期、版本号）、汇总块底、滑块槽，都由 buildPalette 按主题算（下面是雾松青的值）；
                --c-text-soft 是 --c-t1 的别名。很浅的 --c-border-mid 只给装饰（›）和禁用状态，不放要读的字 */
             --c-t1:#33716b;            /* 说明文字：页面底、白卡、面板底、日卡抬头、「整周」槽上都 ≥ 4.5 */
             --c-t2:#45736e;            /* 时间、序号、百分比、笔数：比 t1 浅一档，同样 ≥ 4.5（推不开时就等于 t1） */
@@ -483,7 +483,7 @@
         .set-item.set-static { cursor:default; }
         .set-item.set-static:hover { border-color:var(--c-border); box-shadow:none; }
         /* 1015-A：设置页最底下的版本号。连点 5 次开关「导入（开发中）」 */
-        .set-build { text-align:center; font-size:11px; color:var(--c-text-soft); padding:6px 0 14px;
+        .set-build { text-align:center; font-size:11px; color:var(--c-t2); padding:6px 0 14px;
             -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
         .dev-imp-out { font-size:13px; line-height:1.7; color:var(--c-text); margin:6px 0 4px; white-space:pre-wrap; word-break:break-all; }
         .seg { display:flex; border:1px solid var(--c-border-mid); border-radius:9px; overflow:hidden; }
@@ -555,7 +555,7 @@
         .sc-name { display:flex; align-items:center; gap:6px; min-width:0; flex:1 1 auto; color:var(--c-text); }
         .sc-dot { width:9px; height:9px; border-radius:2px; flex-shrink:0; }
         .sc-cat-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-        .sc-pct { flex:0 0 auto; text-align:right; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .sc-pct { flex:0 0 auto; text-align:right; color:var(--c-t2); font-variant-numeric:tabular-nums; }
         .sc-amt { align-self:flex-end; font-weight:bold; white-space:nowrap; font-variant-numeric:tabular-nums; }
 
         /* 当日收支明细：一条一「行卡」。上行=时间/类型/分类/备注，金额错位到右下角。整行可点进账单详情 */
@@ -1321,7 +1321,7 @@
         .day-item .di-name { font-size:15px; font-weight:600; color:var(--c-primary-deep);
             margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .day-item .di-name .pin { font-size:11px; color:var(--c-ink); margin-right:4px; }
-        .day-item .di-date { font-size:12px; color:var(--c-text-soft); }
+        .day-item .di-date { font-size:12px; color:var(--c-t2); }
         .day-item .di-r { text-align:right; flex-shrink:0; }
         .day-item .di-word { font-size:12px; color:var(--c-text-soft); }
         .day-item .di-num { font-size:24px; font-weight:bold; color:var(--c-primary-dark);
@@ -1810,7 +1810,7 @@
         .bl-cat { display:flex; align-items:center; gap:2px; min-width:0; font-size:15px; color:var(--c-text); line-height:1.35; }
         .bl-cat-t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600; margin-right:4px; }
         .bl-cat .io-tag, .bl-cat .io-skip, .bl-cat .io-flow, .bl-cat .io-refunded { flex:none; margin-left:0; margin-right:2px; padding:1px 7px; font-size:11.5px; }
-        .bl-sub { display:flex; gap:8px; min-width:0; margin-top:2px; font-size:12.5px; color:var(--c-text-soft); line-height:1.35; }
+        .bl-sub { display:flex; gap:8px; min-width:0; margin-top:2px; font-size:12.5px; color:var(--c-t2); line-height:1.35; }
         .bl-time { flex:none; font-variant-numeric:tabular-nums; }
         .bl-remark { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .bl-amt { flex:none; font-size:16px; font-weight:bold; font-variant-numeric:tabular-nums; white-space:nowrap; }
@@ -1852,7 +1852,7 @@
         .lg-wk-line.lg-wk-lead { flex:0 0 12px; }
         .lg-wk-n { font-weight:bold; color:var(--c-text-soft); }
         .lg-wk.cur .lg-wk-n { color:var(--c-primary-dark); }
-        .lg-wk-r { color:var(--c-text-soft); }
+        .lg-wk-r { color:var(--c-t2); }
         .lg-wk-bars { flex:none; display:flex; align-items:flex-end; gap:3px; height:16px; }
         .lg-wk-bars i { display:block; width:4px; border-radius:2px; background:var(--c-primary); }
         .lg-wk-bars i.lg-wk-dot { width:4px; height:4px; border-radius:50%; background:var(--c-border-mid); }
@@ -1878,7 +1878,7 @@
         .bl-t { display:flex; align-items:center; gap:4px; min-width:0; font-size:15px; line-height:21px; color:var(--c-text); }
         .bl-t-x { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .bl-t .io-tag, .bl-t .io-skip, .bl-t .io-flow, .bl-t .io-refunded { flex:none; margin:0; padding:0 6px; font-size:11px; line-height:17px; }
-        .lg-dc .bl-sub { display:block; margin-top:0; font-size:12px; line-height:17px; color:var(--c-text-soft); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .lg-dc .bl-sub { display:block; margin-top:0; font-size:12px; line-height:17px; color:var(--c-t2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .bl-amt { font-weight:500; }
         .bl-amt.out { color:var(--c-text); }
         /* 没记账的日子（导入简化第 11 版）：一行细字，不装框，整行能点（48 高，按下整行浅底）；今天那条右边「记一笔」 */
@@ -2014,7 +2014,7 @@
         .wd-tabs { display:flex; gap:2px; padding:3px; border-radius:14px; background:color-mix(in srgb, var(--c-primary) 10%, var(--c-surface)); }
         button.wd-tab { flex:1 1 0; min-width:0; height:48px; border:none; border-radius:11px; background:transparent; padding:0; font-family:inherit; font-size:13px;
             color:var(--c-text); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; line-height:1.15; }
-        button.wd-tab small { font-size:11px; color:var(--c-text-soft); }
+        button.wd-tab small { font-size:11px; color:var(--c-t2); }
         button.wd-tab.today small { color:var(--c-primary-dark); font-weight:bold; }
         button.wd-tab-wk { flex:1.5 1 0; font-weight:bold; }
         button.wd-tab.on { background:var(--c-fill); color:var(--c-on-fill); font-weight:bold; box-shadow:inset 0 0 0 1px var(--c-fill-edge); }
@@ -2030,10 +2030,10 @@
         button.dw-bar { border:none; background:transparent; padding:0; margin:0; font-family:inherit; cursor:pointer; border-radius:8px; }
         button.dw-bar.pressed { background:var(--c-chip); }
         .dw-bar .dw-fdot { width:8px; height:8px; border-radius:50%; background:var(--c-border-mid); border:none; }
-        .dw-v { font-size:11px; font-weight:bold; color:var(--c-text); white-space:nowrap; font-variant-numeric:tabular-nums; }
+        .dw-v { font-size:11px; font-weight:bold; color:var(--c-t2); white-space:nowrap; font-variant-numeric:tabular-nums; }
         .dw-bar i { display:block; width:100%; border-radius:4px 4px 0 0; background:color-mix(in srgb, var(--c-primary) 40%, var(--c-surface)); }
         .dw-bar.today i { background:var(--c-primary-dark); }
-        .dw-labs { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; text-align:center; font-size:12px; color:var(--c-text-soft); }
+        .dw-labs { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:8px; text-align:center; font-size:12px; color:var(--c-t2); }
         .dw-labs .today { color:var(--c-text); font-weight:bold; }
         .dw-days.lg-dc { margin-top:0; content-visibility:visible; }
         .dw-day { display:flex; align-items:center; gap:10px; width:100%; min-height:54px;   /* 1027-UI：和一天里每一笔那一行（.bl-row）一样 54 高，原来 50 */
@@ -2042,7 +2042,7 @@
         .dw-days .dw-day:first-child { border-top:none; }
         button.dw-day { cursor:pointer; }
         .dw-day-l { flex:1 1 auto; min-width:0; }
-        .dw-day-n { color:var(--c-text-soft); }
+        .dw-day-n { color:var(--c-t2); }
         .dw-day-v { min-width:64px; text-align:right; font-weight:bold; font-variant-numeric:tabular-nums; }
         .dw-day-none .dw-day-l { color:var(--c-text-soft); }
         .dw-day-none button.lg-gap-btn { margin-left:auto; }
@@ -2065,7 +2065,7 @@
         .dc-l { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
         .dc-name { font-size:15px; line-height:20px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .dc-item.pin .dc-name { font-weight:bold; }
-        .dc-date { font-size:11px; line-height:15px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
+        .dc-date { font-size:11px; line-height:15px; color:var(--c-t2); font-variant-numeric:tabular-nums; }
         .dc-r { flex:none; display:flex; align-items:baseline; gap:3px; white-space:nowrap; }
         .dc-w { font-size:12px; color:var(--c-text-soft); }
         .dc-n { font-size:22px; line-height:26px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; }
