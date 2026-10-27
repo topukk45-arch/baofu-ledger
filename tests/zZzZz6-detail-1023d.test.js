@@ -16,6 +16,7 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
 const R = (id, time, money, type, cat, remark, extra) => Object.assign({ id, time, money, type, cat, remark: remark || '' }, extra || {});
 const txt = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
 const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');   // 一块里的几段，中间加空格
+const sumOf = b => { const u = b.querySelector('.ui-sum'); return u ? { main: sp(u.querySelector('.ui-sum-main')), side: sp(u.querySelector('.ui-sum-side')), line: txt(u.querySelector('.ui-sum-line')) } : {}; };   // 1027-UI4
 
 (async () => {
   const recs = [
@@ -56,12 +57,12 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');   // 一块�
   w.JiwenDetail.openDetail('w3');
   $('detailDayRow').click(); await tick();
   let s = sheet();
-  ok(!shown('detailMask') && s && s.title === '昨天 · 10月22日 周四' && s.sub === '4 笔', '2 这一天 → 当日详情：' + (s && s.title));
-  const cells = [...s.body.querySelectorAll('.dd-cell')].map(sp);
+  ok(!shown('detailMask') && s && s.title === '昨天 · 10月22日 周四' && !s.sub, '2 这一天 → 当日详情：' + (s && s.title));
+  // 1027-UI4：两格和「当天净剩」合成一个汇总块：左边「支出 · N 笔」大字，右边收入，下面一行「净剩 x · 比本月日均多 y」
   const avg = (50 + 30 + 217) / 23;
-  ok(cells[0] === `支出 217.00 比本月日均多 ${(217 - avg).toFixed(2)}`, '2 支出 + 比本月日均多：' + cells[0]);
-  // 1027-UI：「当天净剩」从收入那格挪出来，两格下面单独一行
-  ok(cells[1] === '收入 200.00' && sp(s.body.querySelector('.dd-net')) === '当天净剩 −17.00', '2 收入 + 下面一行当天净剩：' + cells[1] + ' / ' + sp(s.body.querySelector('.dd-net')));
+  let sm = sumOf(s.body);
+  ok(sm.main === '支出 · 4 笔 217.00', '2 支出 · 几笔：' + sm.main);
+  ok(sm.side === '收入 200.00' && sm.line === `净剩 −17.00 · 比本月日均多 ${(217 - avg).toFixed(2)}`, '2 收入在右，下面一行净剩 + 比本月日均多：' + sm.side + ' / ' + sm.line);
   const cats = [...s.body.querySelectorAll('.dd-cat')].map(sp);
   ok(cats.join('|') === '购物 197.00|吃饭 12.00|出行 8.00', '2 当天支出按分类、从大到小：' + cats.join('|'));
   const rows = [...s.body.querySelectorAll('.bl-row')].map(r => r.dataset.id);
@@ -82,9 +83,10 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');   // 一块�
   wk.click(); await tick();
   s = sheet();
   ok(s && s.title === '本周 · 10月19日–25日', '3 点周小计：一周详情 ' + (s && s.title));
-  const wc = [...s.body.querySelectorAll('.dd-cell')].map(sp);
-  ok(wc[0] === '支出 247.00 比上一周多 197.00', '3 支出 + 比上一周：' + wc[0]);
-  ok(wc[1] === `记了 5 笔 日均 ${(247 / 5).toFixed(2)}（5 天）`, '3 记了几笔、日均按过去了的天数：' + wc[1]);
+  sm = sumOf(s.body);
+  ok(sm.main === '支出 · 5 笔 247.00' && sm.line === '比上一周多 197.00', '3 支出 · 几笔 + 比上一周：' + sm.main + ' / ' + sm.line);
+  ok(sm.side === `日均（5 天） ${(247 / 5).toFixed(2)}`, '3 日均按过去了的天数：' + sm.side);
+  ok(s.body.querySelector('.ui-sum .dw-bars'), '3 柱子在汇总块里');
   const bars = [...s.body.querySelectorAll('.dw-bar')];
   ok(bars.length === 7 && bars[4].classList.contains('today') && bars[5].classList.contains('future') && bars[6].classList.contains('future') && txt(bars[3]) === '217' && txt(bars[5]) === '', '3 7 根柱子：今天深色、没到的日子虚线框、数取整');
   ok([...s.body.querySelectorAll('.dw-labs span')].map(txt).join('') === '一二三四五六日', '3 周一到周日');
@@ -103,11 +105,11 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');   // 一块�
   // 4. 账单页点日期抬头：当日详情
   $('billList').querySelector('.lg-dh[data-day="2026-10-19"]').click(); await tick();
   s = sheet();
-  ok(s && s.title === '10月19日 周一' && s.sub === '1 笔', '4 点日期抬头：当日详情 ' + (s && s.title));
+  ok(s && s.title === '10月19日 周一' && sumOf(s.body).main === '支出 · 1 笔 30.00', '4 点日期抬头：当日详情 ' + (s && s.title));
   $('dayClose').click(); await tick();
   ok(!sheet(), '4 关闭');
   w.JiwenDetail.openWeek('2026-10-12'); await tick();
-  ok(sheet().title === '第 42 周 · 10月12日–18日' && sp(sheet().body.querySelector('.dd-cell')) === '支出 50.00 上一周没有记录可比', '4 上一周没有记录：写「没有记录可比」');
+  ok(sheet().title === '第 42 周 · 10月12日–18日' && sumOf(sheet().body).line === '上一周没有记录可比', '4 上一周没有记录：写「没有记录可比」');
   $('weekClose').click(); await tick();
 
   ok(!t.errs.length, '没有报错 ' + t.errs.join('|'));

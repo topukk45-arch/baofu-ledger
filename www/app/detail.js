@@ -318,7 +318,20 @@
         }
         function recsOfDays(a, b){ return getUserData().filter(r=>{ const k=(r.time||'').slice(0,10); return k>=a && k<=b; }); }
         function byTimeDesc(list){ return list.map((r, i)=>({ r, i, ts:parseRecTime(r.time).getTime() })).sort((x, y)=>(y.ts-x.ts) || (y.i-x.i)).map(x=>x.r); }
-        function cellHtml(k, v, sub, cls){ return `<div class="dd-cell"><span class="dd-k">${k}</span><span class="dd-v${cls ? ' '+cls : ''}">${v}</span><span class="dd-s">${sub}</span></div>`; }
+        // 1027-UI4：汇总块（.ui-sum，浅底、不画边框、圆角 16）：左边大字（支出），右边一个中号的数（收入 / 日均），下面一行说明，再往下可以挂别的（柱子、分类条）
+        function sumBlockHtml(o){
+            return `<section class="ui-sum dd-sum"><div class="ui-sum-row">`
+                + `<div class="ui-sum-main"><span class="ui-sum-k dd-k">${o.k}</span><span class="ui-sum-big dd-v">${o.v}</span></div>`
+                + `<div class="ui-sum-side"><span class="ui-sum-k dd-k">${o.sk}</span><span class="ui-sum-mid dd-v${o.sc ? ' '+o.sc : ''}">${o.sv}</span></div>`
+                + `</div><div class="ui-sum-line dd-s">${o.line || ''}</div>${o.extra || ''}</section>`;
+        }
+        // 1027-UI4：当天分类：一根叠起来的条（按金额分段，颜色是主题色的几档深浅）+ 下面每个分类一个小胶囊（第一轮不能点，第二轮点了去搜一笔）
+        const CAT_SHADES=[100, 72, 50, 34, 22];
+        function catsHtml(cats){
+            const shade=i=>`color-mix(in srgb, var(--c-primary) ${CAT_SHADES[i % CAT_SHADES.length]}%, var(--c-surface))`;
+            return `<div class="dd-stack" aria-hidden="true">` + cats.map(([c, v], i)=>`<i style="flex:${v};background:${shade(i)}"></i>`).join('') + `</div>`
+                + `<div class="dd-cats">` + cats.map(([c, v], i)=>`<span class="dd-cat" data-cat="${escapeHtml(c)}"><i class="dd-cat-dot" style="background:${shade(i)}"></i><span class="dd-cat-n">${escapeHtml(c)}</span><em class="dd-cat-v">${v.toFixed(2)}</em></span>`).join('') + `</div>`;
+        }
         function moreLess(d, what){ return d>=0 ? `比${what}多 ${d.toFixed(2)}` : `比${what}少 ${(-d).toFixed(2)}`; }
         function btn(id, text, cls){ const b=document.createElement('button'); b.type='button'; b.className='ui-btn'+(cls ? ' '+cls : ''); b.id=id; b.textContent=text; return b; }
         function pairFoot(box, a, b){ const p=document.createElement('div'); p.className='ui-pair'; p.appendChild(a); if(b) p.appendChild(b); box.appendChild(p); }
@@ -383,17 +396,14 @@
                 const list=recsOfDays(mon, sun), s=sumFen(list), prev=recsOfDays(C.addDay(mon, -7), C.addDay(mon, -1)), ps=sumFen(prev);
                 const days=[]; for(let i=0;i<7;i++){ const k=C.addDay(mon, i), rs=list.filter(r=>(r.time||'').slice(0,10)===k); days.push({ k, rs, exp:sumFen(rs).exp, future:k>today }); }
                 const passed=days.filter(d=>!d.future).length;
-                setHead(`${C.weekLabel(mon)} · ${C.rangeText(mon, sun)}`, `${list.length} 笔`);   // 1027-UI：整周也写「N 笔」，和一天一样有这一行，切换时下面的内容不上下跳
-                let h=`<div class="dd-cells">`
-                    + cellHtml('支出', s.exp.toFixed(2), prev.length ? moreLess(round2(s.exp-ps.exp), '上一周') : '上一周没有记录可比')
-                    + cellHtml('记了', `${list.length} <small>笔</small>`, passed ? `日均 ${(s.exp/passed).toFixed(2)}（${passed} 天）` : '')
-                    + `</div>`;
+                setHead(`${C.weekLabel(mon)} · ${C.rangeText(mon, sun)}`, '');   // 1027-UI4：「N 笔」挪进汇总块（「支出 · N 笔」），标题下面不再单独一行（一周、一天一样，切换时不跳）
                 const mx=Math.max(1, ...days.map(d=>d.exp));
-                h+=`<div class="dw-chart"><div class="dw-bars">` + days.map(d=>d.future
+                let h=sumBlockHtml({ k:`支出 · ${list.length} 笔`, v:s.exp.toFixed(2), sk: passed ? `日均（${passed} 天）` : '日均', sv: passed ? (s.exp/passed).toFixed(2) : '—',
+                    line: prev.length ? moreLess(round2(s.exp-ps.exp), '上一周') : '上一周没有记录可比', extra:`<div class="dw-chart"><div class="dw-bars">` + days.map(d=>d.future
                         ? `<div class="dw-bar future"><span class="dw-v"></span><i class="dw-fdot"></i></div>`
                         : `<button type="button" class="dw-bar${d.k===today ? ' today' : ''}" data-day="${d.k}" aria-label="${C.mdText(d.k)} 支出 ${d.exp.toFixed(2)}"><span class="dw-v">${Math.round(d.exp)}</span><i style="height:${Math.max(4, Math.round(d.exp/mx*96))}px"></i></button>`).join('')
                     + `</div><div class="dw-labs">` + days.map(d=>`<span${d.k===today ? ' class="today"' : ''}>${C.wdText(d.k).slice(1)}</span>`).join('') + `</div>`
-                    + `<span class="dw-hint">点某一根，看那一天的明细</span></div>`;
+                    + `<span class="dw-hint">点某一根，看那一天的明细</span></div>` });
                 const ns=window.JiwenStore.noSpendDays();   // 导入简化第 12 版：标过「没花钱」的写「没花钱」，能取消
                 h+=`<div class="lg-dc dw-days">` + days.filter(d=>!d.future).reverse().map(d=>d.rs.length
                     ? `<button type="button" class="dw-day" data-day="${d.k}"><span class="dw-day-l">${C.mdText(d.k)} ${C.wdText(d.k)}</span><span class="dw-day-n">${d.rs.length} 笔</span><span class="dw-day-v">${d.exp.toFixed(2)}</span>${CHEV}</button>`
@@ -406,24 +416,18 @@
                 const ym=k.slice(0,7);
                 const dim=+C.monthEnd(ym).slice(8,10), passed = today.slice(0,7)===ym ? +today.slice(8,10) : (today<ym ? 0 : dim);
                 const ms=sumFen(recsOfDays(ym+'-01', C.monthEnd(ym))), avg = passed>0 ? ms.exp/passed : 0;
-                setHead(C.dayTitle(k), `${list.length} 笔`);
+                setHead(C.dayTitle(k), '');
                 const net=round2(s.inc-s.exp);
                 // 1027-UI：0 笔的那一天不比；今天还没过完，「比本月日均少」不写（还会再花），多了照写
                 const dAvg=round2(s.exp-avg), cmp = (passed>0 && list.length && !(k===today && dAvg<0)) ? moreLess(dAvg, '本月日均') : '';
-                let h=`<div class="dd-cells">`
-                    + cellHtml('支出', s.exp.toFixed(2), cmp)
-                    + cellHtml('收入', s.inc.toFixed(2), '', 'pos')
-                    + `</div>`
-                    // 1027-UI：「当天净剩」从收入那格挪出来，两格下面单独一行
-                    + `<div class="dd-net"><span class="dd-net-k">当天净剩</span><span class="dd-net-v${net<0 ? ' neg' : net>0 ? ' pos' : ''}">${net<0 ? '−' : net>0 ? '+' : ''}${Math.abs(net).toFixed(2)}</span></div>`;
                 // 当天支出按分类（退完了的不列）
                 const byCat=new Map();
                 list.forEach(r=>{ const e=statContrib(r).exp; if(e) byCat.set(r.cat||'未分类', (byCat.get(r.cat||'未分类')||0)+e); });
                 const cats=[...byCat].map(([c, v])=>[c, round2(v)]).filter(x=>x[1]>0).sort((a, b)=>b[1]-a[1]);
-                if(cats.length){
-                    const mx=cats[0][1];
-                    h+=`<div class="dd-cats">` + cats.map(([c, v])=>`<div class="dd-cat"><span class="dd-cat-n">${escapeHtml(c)}</span><span class="dd-cat-b"><i style="width:${(v/mx*100).toFixed(0)}%"></i></span><span class="dd-cat-v">${v.toFixed(2)}</span></div>`).join('') + `</div>`;
-                }
+                // 1027-UI4：两格和「当天净剩」那一行合成一个汇总块：支出大字、收入在右，下面一行「净剩 x · 比本月日均多 y」，分类条挂在最下面
+                const netHtml=`<span class="dd-net">净剩 <b class="dd-net-v${net<0 ? ' neg' : net>0 ? ' pos' : ''}">${net<0 ? '−' : net>0 ? '+' : ''}${Math.abs(net).toFixed(2)}</b></span>`;
+                let h=sumBlockHtml({ k:`支出 · ${list.length} 笔`, v:s.exp.toFixed(2), sk:'收入', sv:s.inc.toFixed(2), sc:'pos',
+                    line: netHtml + (cmp ? `<span class="dd-cmp"> · ${cmp}</span>` : ''), extra: cats.length ? catsHtml(cats) : '' });
                 h+= list.length ? `<div class="lg-dc dd-rows">` + list.map(r=>rowHtml(r, rMap)).join('') + `</div>` : `<div class="dd-empty">这天没记账</div>`;
                 return h;
             }

@@ -37,7 +37,7 @@ const R = (id, time, money, remark) => ({ id, time, money, type: 'expense', cat:
   // 2. ‹ › 换周
   ok($('weekNext').disabled && !$('weekPrev').disabled, '2 本周：下一周点不了（最晚到本周）');
   $('weekPrev').click(); await tick();
-  ok(title() === '第 42 周 · 10月12日–18日' && /50\.00/.test(txt(body().querySelector('.dd-cell'))) && !$('weekNext').disabled, '2 ‹：换成上一周（第 42 周），就在这个面板里换');
+  ok(title() === '第 42 周 · 10月12日–18日' && /50\.00/.test(txt(body().querySelector('.ui-sum-big'))) && !$('weekNext').disabled, '2 ‹：换成上一周（第 42 周），就在这个面板里换');
   ok($('uiSheetMask').style.display === 'flex', '2 面板没关');
   $('weekNext').click(); await tick();
   ok(title() === '本周 · 10月19日–25日', '2 ›：回到本周');
@@ -67,7 +67,7 @@ const R = (id, time, money, remark) => ({ id, time, money, type: 'expense', cat:
   ok(title() === '10月13日 周二' && opens === 0 && $('uiSheetMask').style.display === 'flex', '4 点某一天那一行：就地换成那一天，面板没有关了再开');
   const tabs = () => [...body().querySelectorAll('.wd-tab')];
   ok(tabs().map(txt).join(',') === '整周,一12,二13,三14,四15,五16,六17,日18' && tabs()[2].classList.contains('on'), '4 顶上一行「整周 一 … 日」，选中的是周二：' + tabs().map(txt).join(','));
-  ok(txt($('uiSheetSub')) === '1 笔' && $('dayAdd') && $('dayClose') && !$('weekClose'), '4 看一天：副标题写几笔，底部「关闭 | 给这天补一笔」');
+  ok(/^支出 · 1 笔/.test(txt(body().querySelector('.ui-sum-k'))) && $('dayAdd') && $('dayClose') && !$('weekClose'), '4 看一天：汇总块写几笔（1027-UI4 从副标题挪进来），底部「关闭 | 给这天补一笔」');
   tabs()[7].click(); await tick();
   ok(title() === '10月18日 周日', '4 点「日」：换成周日');
   $('weekNext').click(); await tick();
@@ -79,7 +79,7 @@ const R = (id, time, money, remark) => ({ id, time, money, type: 'expense', cat:
   ok(tabs()[6].disabled && tabs()[7].disabled, '4 还没到的日子点不了');
   w.JiwenDetail.openDay('2026-10-22'); await tick();
   body().querySelector('.wd-tab-wk').click(); await tick();
-  ok(title() === '本周 · 10月19日–25日' && $('weekClose') && /^\d+ 笔$/.test(txt($('uiSheetSub'))), '4 从当日打开（账单页点日期抬头）也能点「整周」看那一周（1027-UI 起整周也写「N 笔」）');
+  ok(title() === '本周 · 10月19日–25日' && $('weekClose') && /^支出 · \d+ 笔$/.test(txt(body().querySelector('.ui-sum-k'))), '4 从当日打开（账单页点日期抬头）也能点「整周」看那一周（整周也写「N 笔」，1027-UI4 起在汇总块里）');
   body().querySelector('.wd-tab[data-v="2026-10-22"]').click(); await tick();
   body().querySelector('.bl-row[data-id="b"]').click(); await tick();
   w.JiwenDetail.closeDetail(); await tick();

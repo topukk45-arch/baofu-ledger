@@ -66,10 +66,14 @@
                 <div id="statPaneFlow">
 
                 <!-- 1023-H：两格：当月支出（几笔、比上月多 / 少；1023-O 起这个月没过完时比上月同期）| 当月收入（本月净剩）；总结余 1023-O 挪到页面底部 -->
-                <div class="st-cells">
-                    <div class="st-cell"><span class="st-cell-k" id="statOutK">当月支出</span><span class="st-cell-v" id="statMonthOut" data-fit>0.00</span><span class="st-cell-s" id="statOutCmp"></span></div>
-                    <div class="st-cell"><span class="st-cell-k">当月收入</span><span class="st-cell-v pos" id="statMonthIn" data-fit>+0.00</span><span class="st-cell-s" id="statNet"></span></div>
-                </div>
+                <!-- 1027-UI4：两格合成一个汇总块（.ui-sum）：左边当月支出大字、右边当月收入，下面一行「比 9月同期多花 x · 本月净剩 +y」 -->
+                <section class="ui-sum st-sum" aria-label="当月汇总">
+                    <div class="ui-sum-row">
+                        <div class="ui-sum-main"><span class="ui-sum-k" id="statOutK">当月支出</span><span class="ui-sum-big" id="statMonthOut" data-fit>0.00</span></div>
+                        <div class="ui-sum-side"><span class="ui-sum-k">当月收入</span><span class="ui-sum-mid pos" id="statMonthIn" data-fit>+0.00</span></div>
+                    </div>
+                    <div class="ui-sum-line"><span id="statOutCmp"></span><span id="statNet"></span></div>
+                </section>
 
                 <!-- 日历：右边一列「周合计」（和格子一样按当天净额算，跨月的周只算本月几天；本周那格深一点；点了打开一周详情）；点某一天打开当日详情 -->
                 <div class="stat-card">
@@ -110,9 +114,8 @@
 
                 <!-- ===== 预算页签 ===== -->
                 <div id="statPaneBudget" style="display:none">
-                    <div class="stat-card">
-                        <div id="bgOverview"></div>
-                    </div>
+                    <!-- 1027-UI4：预算总览 = 汇总块（合计已用大字 + 百分比，下面条、几个数）+ 下面一张列表卡（预算外、年度预算），都画在 bgOverview 里 -->
+                    <div id="bgOverview"></div>
                     <div id="bgGroups"></div>
                     <div class="stat-card" id="bgUnsetCard" style="display:none"></div>
                 </div>

@@ -205,7 +205,7 @@
                 B.rows.forEach(r=>n[r.state]++);
                 $('bgOverview').innerHTML=
                     // 1023-O：顶上一行「合计 已用 x / y」（设了预算的分类加起来）
-                    `<div class="bgo-main"><div class="bgo-total"><span class="bgo-k">合计 已用</span> `
+                    `<section class="ui-sum bg-sum" aria-label="预算汇总"><div class="bgo-main"><div class="bgo-total"><span class="bgo-k">合计 已用</span> `
                     + `<span class="bgo-num"><b>${used.toFixed(2)}</b> / ${lim.toFixed(2)}</span></div>`
                     + `<div class="bgo-pct ${st}">${pct.toFixed(0)}%</div></div>`
                     + `<div class="bg-bar"><div class="bg-fill ${st}" style="width:${Math.max(0,Math.min(100,pct)).toFixed(1)}%"></div>`
@@ -215,7 +215,8 @@
                     + `<span class="bgc over">超支 ${n.over}</span><span class="bgc warn">接近上限 ${n.warn}</span><span class="bgc ok">正常 ${n.ok}</span>`
                     + `</div>`
                     + (B.timePct!=null ? `<div class="bgo-legend">竖线是今天（${B.day}/${B.dim}），条越过竖线就是花得偏快。</div>` : '')
-                    + budgetExtraRowsHtml(dec, B);
+                    + `</section>`
+                    + (()=>{ const x=budgetExtraRowsHtml(dec, B); return x ? `<div class="stat-card bg-extra">${x}</div>` : ''; })();
 
                 // —— 分组：超支 → 接近 → 正常，组内按已用比例从高到低 ——
                 const GROUPS=[ ['over','已超支'], ['warn','接近上限（80% 以上）'], ['ok','正常'] ];
@@ -644,7 +645,7 @@
             $('statMonthIn').textContent='+'+mIn.toFixed(2);
             const net=round2(mIn-mOut);
             $('statNet').innerHTML=`本月净剩 <b class="${net>=0 ? 'pos' : 'out'}">${net>=0 ? '+' : '−'}${Math.abs(net).toFixed(2)}</b>`;
-            fitNums($('statMonthOut').parentElement.parentElement);   // 金额太长（上千万）就把字缩小，不切掉
+            fitNums($('statMonthOut').closest('.ui-sum'));   // 金额太长（上千万）就把字缩小，不切掉
 
             renderStatBal(dec);
             // 本月预算（共用同一份预解析结果）

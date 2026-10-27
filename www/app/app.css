@@ -1978,27 +1978,9 @@
             color:var(--c-primary-dark); font-size:14px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
         /* 当日 / 一周：上面两格、分类小横条、7 根柱子、每笔 / 每天一行 */
         .dd-body { display:flex; flex-direction:column; gap:12px; }
-        .dd-cells { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; }
-        .dd-cell { display:flex; flex-direction:column; gap:2px; min-width:0; padding:12px 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
-        .dd-k { font-size:12px; line-height:16px; color:var(--c-text-soft); }
-        .dd-v { font-size:24px; line-height:30px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .dd-v.pos { color:var(--c-pos); }
-        .dd-v small { font-size:14px; font-weight:normal; line-height:1; }
-        .dd-s { font-size:12px; line-height:18px; min-height:18px; color:var(--c-text-soft); }   /* 1027-UI：这一行空着时也留高，一周 / 一天切换时两格一样高（原来 97 / 94 / 77 来回变） */
-        .dd-cats { display:flex; flex-direction:column; gap:8px; padding:12px 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
-        .dd-cat { display:grid; grid-template-columns:minmax(3em, max-content) minmax(0,1fr) auto; align-items:center; gap:8px; font-size:13px; color:var(--c-text); }
-        .dd-cat-n { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:7em; }
-        .dd-cat-b { height:6px; border-radius:3px; background:var(--c-border); overflow:hidden; }
-        .dd-cat-b i { display:block; height:100%; border-radius:3px; background:var(--c-primary-dark); }
-        .dd-cat-v { text-align:right; font-weight:500; font-variant-numeric:tabular-nums; }
         .dd-rows.lg-dc { margin-top:0; content-visibility:visible; }
         .dd-rows .bl-row:first-child { border-top:none; }
         .dd-empty { padding:24px 0; text-align:center; color:var(--c-text-soft); font-size:14px; }
-        /* 1027-UI：一天详情两格下面单独一行「当天净剩」 */
-        .dd-net { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:var(--ui-tap); padding:0 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
-        .dd-net-k { font-size:14px; color:var(--c-text-soft); }
-        .dd-net-v { font-size:17px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; }
-        .dd-net-v.pos { color:var(--c-pos); }
         /* 1027-UI：一周 / 一天面板定高（detail.js 的 fitHeight，打开时定好、之后不变）：面板竖排，按钮排在最底下；
            1027-UI3：上面的标题、「整周 一 … 日」、两格、柱子固定不动，只有下面的账单（一天）/ 每天那几行（一周）在自己的框里滚
            （原来是整个面板一起滚，标题和日期那行滚出去了）；面板最高到屏幕只留顶上一小条（WD_TOP_GAP），不再卡在 88% */
@@ -2247,14 +2229,6 @@
         .st-title h3 { margin:0; }
         button.st-ym { min-height:var(--ui-tap); padding:0 4px 0 12px; border:none; background:transparent; font-family:inherit; font-size:15px; font-weight:bold;
             color:var(--c-primary-dark); cursor:pointer; font-variant-numeric:tabular-nums; }
-        .st-cells { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:10px; margin-bottom:12px; }
-        .st-cell { display:flex; flex-direction:column; gap:2px; min-width:0; padding:12px 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
-        .st-cell-k { font-size:12px; color:var(--c-text-soft); }
-        .st-cell-v { font-size:24px; line-height:30px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .st-cell-v.pos { color:var(--c-pos); }
-        .st-cell-s { font-size:12px; color:var(--c-text-soft); }
-        .st-cell-s b.pos { color:var(--c-pos); }
-        .st-cell-s b.out { color:var(--c-text); }
         .stat-card.st-bal { display:block; padding:4px 14px 6px; }
         button.st-bal-head { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); padding:6px 0; border:none; background:transparent;
             font-family:inherit; text-align:left; cursor:pointer; color:var(--c-text); }
@@ -2314,3 +2288,45 @@
         #detailRawBtn { min-height:var(--ui-tap); padding:0; font-size:14px; }
         /* 1024-T 后修：性能记录、导入量度的文字能长按选中复制（「复制全部」在手机上没复制上时的退路） */
         pre.perf-list { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+
+        /* ===== 1027-UI4：界面收敛第一轮（统一规范，照草图「记问 界面收敛 · 第二版」的对照表）=====
+           ① 汇总块 .ui-sum：浅底（--c-sum）、不画边框、圆角 16；凡是「大字金额 + 一行说明」都用它。列表卡（.ui-list / .lg-dc / .stat-card……）才有细边，两者靠有没有边框区分 */
+        .ui-sum { display:flex; flex-direction:column; gap:10px; padding:14px 16px; margin-bottom:12px; border-radius:var(--r-l);
+            background:var(--c-sum); box-shadow:inset 0 0 0 1px var(--c-sum-edge); border:none; }
+        .ui-sum-row { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; min-width:0; }
+        .ui-sum-main, .ui-sum-side { display:flex; flex-direction:column; gap:2px; min-width:0; }
+        .ui-sum-main { flex:1 1 auto; }
+        .ui-sum-side { flex:0 1 auto; text-align:right; align-items:flex-end; }
+        .ui-sum-k { display:block; font-size:13px; line-height:18px; color:var(--c-t1); }
+        .ui-sum-big { font-size:30px; line-height:36px; font-weight:700; color:var(--c-text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+        .ui-sum-mid { font-size:18px; line-height:24px; font-weight:700; color:var(--c-text); font-variant-numeric:tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+        .ui-sum-mid.pos { color:var(--c-pos); }
+        .ui-sum-line { font-size:13px; line-height:18px; color:var(--c-t1); min-height:18px; }
+        .ui-sum-line b { font-weight:500; color:var(--c-text); }
+        .ui-sum-line b.pos { color:var(--c-pos); }
+        .ui-sum-line b.out, .ui-sum-line b.neg { color:var(--c-text); }
+        .dd-net-v.pos { color:var(--c-pos); }
+        /* 统计页：两段说明之间加「 · 」 */
+        .st-sum .ui-sum-line span:empty { display:none; }
+        .st-sum .ui-sum-line span + span:not(:empty)::before { content:' · '; }
+        /* 一天 / 一周面板里：块放在面板底上，块底比面板底浅；汇总块下面不再留外边距（面板里用 gap 排） */
+        .dd-sum { margin-bottom:0; }
+        .dd-sum .dw-chart { padding:0; border:none; border-radius:0; background:transparent; }
+        .dd-net { white-space:nowrap; }
+        .dd-net-v.neg { color:var(--c-text); }
+        .dd-stack { display:flex; gap:2px; height:8px; border-radius:4px; overflow:hidden; }
+        .dd-stack i { display:block; min-width:2px; }
+        .dd-cats { display:flex; flex-wrap:wrap; gap:6px; padding:0; border:none; border-radius:0; background:transparent; }
+        .dd-cat { display:inline-flex; align-items:center; gap:6px; height:32px; padding:0 10px 0 8px; border-radius:var(--r-s); background:var(--c-track);
+            font-size:13px; color:var(--c-text); max-width:100%; }
+        .dd-cat-dot { width:8px; height:8px; border-radius:50%; flex:none; }
+        .dd-cat-n { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:7em; }
+        .dd-cat-v { font-style:normal; color:var(--c-t2); font-variant-numeric:tabular-nums; }
+        /* 预算总览 */
+        .bg-sum { padding-top:12px; }
+        .bg-sum .bgo-main { margin-top:0; }
+        /* 日子页置顶的那个：原来是主题色实心大卡片，改成汇总块的浅底，字用强调字颜色 */
+        #pageDays .day-item.day-hero { border-radius:var(--r-l); background:var(--c-sum); color:var(--c-text); box-shadow:inset 0 0 0 1px var(--c-sum-edge); }
+        #pageDays .day-item.day-hero .dh-top, #pageDays .day-item.day-hero .dh-date, #pageDays .day-item.day-hero .dhn-w { color:var(--c-t1); opacity:1; }
+        #pageDays .day-item.day-hero .di-star { color:var(--c-ink); }
+        .bg-extra .bgo-rows { margin-top:0; border-top:none; }

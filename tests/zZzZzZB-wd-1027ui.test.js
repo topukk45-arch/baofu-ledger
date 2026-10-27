@@ -74,7 +74,8 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');
   ok(w.localStorage.getItem('app_wd_hint_n') === '4', '2 次数记在这台手机上：' + w.localStorage.getItem('app_wd_hint_n'));
 
   // 3. 比本月日均
-  const cell0 = () => sp($('uiSheetBody').querySelector('.dd-cell'));
+  // 1027-UI4：两格合成了汇总块：「支出」大字 +（有的话）「比本月日均多 / 少」，比较在说明那一行（.dd-cmp）
+  const cell0 = (b) => { const u = (b || $('uiSheetBody')).querySelector('.ui-sum'); const c = txt(u.querySelector('.dd-cmp')).replace(/^·\s*/, ''); return '支出 ' + txt(u.querySelector('.ui-sum-big')) + (c ? ' ' + c : ''); };
   await tabTo('2026-10-21');
   ok(cell0() === '支出 0.00', '3 0 笔的那天：不比日均：' + cell0());
   await tabTo('2026-10-23');
@@ -82,13 +83,13 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');
   await tabTo('2026-10-22');
   ok(/^支出 209\.00 比本月日均多 /.test(cell0()), '3 过完的日子照写：' + cell0());
   // 4. 当天净剩
-  const cells = [...$('uiSheetBody').querySelectorAll('.dd-cell')].map(sp);
-  ok(cells[1] === '收入 200.00' && sp($('uiSheetBody').querySelector('.dd-net')) === '当天净剩 −9.00', '4 收入那格只写收入，下面一行当天净剩：' + cells[1] + ' / ' + sp($('uiSheetBody').querySelector('.dd-net')));
+  const side = sp($('uiSheetBody').querySelector('.ui-sum-side')), netT = txt($('uiSheetBody').querySelector('.dd-net'));
+  ok(side === '收入 200.00' && netT === '净剩 −9.00', '4 收入在右只写收入，净剩在下面那一行（1027-UI4 合成汇总块）：' + side + ' / ' + netT);
   w.JiwenSheet.close();
   // 今天比日均多照写
   const t2 = await A.boot({ html, www: WWW, now: '2026-10-23T10:00:00', seed: A.seedOf(recs.concat([R('t2', '2026-10-23T09:00', 500, 'expense', '购物', '虚构的大件')])) });
   t2.w.JiwenDetail.openDay('2026-10-23'); await tick();
-  ok(/^支出 503\.00 比本月日均多 /.test(sp(t2.$('uiSheetBody').querySelector('.dd-cell'))), '3 今天已经比日均多：照写「比本月日均多」');
+  ok(/^支出 503\.00 比本月日均多 /.test(cell0(t2.$('uiSheetBody'))), '3 今天已经比日均多：照写「比本月日均多」');
 
   ok(!t.errs.length && !t2.errs.length, '没有报错 ' + t.errs.concat(t2.errs).join('|'));
   console.log(`1027-UI 一周 / 一天面板：${pass} 通过，${fail} 失败`);
