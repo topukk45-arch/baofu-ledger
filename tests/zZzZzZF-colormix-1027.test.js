@@ -1,9 +1,10 @@
-// 1027-UI7：老 WebView（Chrome 111 以前，安卓模拟器上常见）不认 color-mix()，整条声明丢掉、底色变透明（一周的柱子只剩数字）。
-//   每处 color-mix 前面要先写一条老 WebView 认得的颜色（先算好的 --c-mx-* / --c-shade-*），新 WebView 照旧用 color-mix，样子不变。
-// 1. app.css、www/app 下的 js、index.html 里每一处 color-mix(，同一条规则里它前面紧挨着有一条用 var(--c-mx-…) / var(--c-shade-…) 的同名属性
+// 1027-UI7 / UI8：老 WebView（Chrome 111 以前，安卓模拟器上常见）不认 color-mix()，底色变透明（一周的柱子只剩数字）。
+//   UI7 在每处前面先写一条兜底，模拟器上照样不行（带 var() 的 color-mix 解析时收下、算颜色时才作废，作废的整条变透明，不退回前一条），
+//   UI8 起样式表里不用 color-mix，混出来的颜色都在 buildPalette 里先算好（--c-mx-* / --c-shade-*）。
+// 1. app.css、www/app 下的 js、index.html 里没有 color-mix（注释除外），原来那几处改用先算好的颜色
 // 2. 用到的兜底变量在 :root 里都有默认值，默认值和雾松青（默认主题）算出来的一样
 // 3. 24 个预设下 buildPalette 都给这些变量，而且和 color-mix(in srgb …) 的算法一样（按 sRGB 通道线性混）
-// 4. 把 color-mix 那几条删掉（模拟老 WebView）以后，一周的柱子、「整周」那一排、置顶日子、按下、闪一下都还有底色
+// 4. 一周的柱子、置顶日子、按下、闪一下的底色直接是先算好的颜色
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
 const WWW = path.dirname(htmlFile), APP = path.join(WWW, 'app');
@@ -14,20 +15,22 @@ const css = fs.readFileSync(path.join(APP, 'app.css'), 'utf8');
 const sources = [['app.css', css], ['index.html', fs.readFileSync(htmlFile, 'utf8')]]
   .concat(fs.readdirSync(APP).filter(f => f.endsWith('.js')).map(f => [f, fs.readFileSync(path.join(APP, f), 'utf8')]));
 
-// ===== 1. 每处 color-mix 前面紧挨着有兜底 =====
+// ===== 1. 样式表、js、index.html 里不用 color-mix（注释里提到的不算） =====
+//   1027-UI7 在 color-mix 前面先写一条兜底，在模拟器上没用：带 var() 的 color-mix 解析时照样收下、算颜色时才发现不认，
+//   这时整条变成「没写」（透明），不会退回前面那条。所以干脆不用
 let n = 0;
 for (const [f, src] of sources) {
-  const re = /([a-z-]+)\s*:\s*color-mix\(/g; let m;
+  const re = /color-mix\(/g; let m;
   while ((m = re.exec(src))) {
-    const line = src.slice(src.lastIndexOf('\n', m.index) + 1, m.index);
-    if (/^\s*(\/\/|\*|\/\*)/.test(line)) continue;   // 注释里提到的不算
-    n++;
-    const before = src.slice(Math.max(0, m.index - 120), m.index);
-    const fb = new RegExp(m[1] + '\\s*:\\s*var\\(--c-(mx-[a-z0-9]+|shade-)[^;]*;\\s*$').test(before) || /var\(--c-shade-\$\{[^}]+\}\);\s*$/.test(before);
-    ok(fb, `1 ${f} 第 ${src.slice(0, m.index).split('\n').length} 行的 color-mix 前面有兜底：…${before.slice(-60)}`);
+    const lineStart = src.lastIndexOf('\n', m.index) + 1, line = src.slice(lineStart, m.index);
+    if (/^\s*(\/\/|\*|\/\*)/.test(line) || /\/\/|\/\*/.test(line)) continue;   // 注释里提到的不算
+    n++; ok(false, `1 ${f} 第 ${src.slice(0, m.index).split('\n').length} 行还在用 color-mix：${line.trim().slice(-60)}`);
   }
 }
-ok(n >= 11, '1 找到的 color-mix 一共 ' + n + ' 处');
+ok(n === 0, '1 没有地方用 color-mix');
+const usedVars = new Set((css.match(/var\(--c-(mx-[a-z0-9]+|shade-\d)\)/g) || []).map(x => x.slice(4, -1)));
+ok(['--c-mx-p8', '--c-mx-p10', '--c-mx-p40', '--c-mx-p12b', '--c-mx-p16b', '--c-mx-p22a', '--c-mx-t6a'].every(k => usedVars.has(k)), '1 原来 color-mix 的地方改用先算好的颜色：' + [...usedVars].join('、'));
+ok(/const shade=i=>`var\(--c-shade-\$\{i % CAT_SHADES\.length\}\)`/.test(fs.readFileSync(path.join(APP, 'detail.js'), 'utf8')), '1 一天面板分类的颜色用 --c-shade-N');
 
 // ===== 2 / 3. 默认值、24 个预设 =====
 function palette() {
@@ -63,12 +66,18 @@ for (const p of presets) {
 }
 ok(!bad.length, '3 24 个预设下兜底色都有、和 color-mix 算出来的一样：' + bad.slice(0, 5).join('、'));
 
-// ===== 4. 模拟老 WebView：把 color-mix 那几条删掉，几处照样有底色 =====
-const old = css.replace(/[a-z-]+\s*:\s*color-mix\([^;]*\);?/g, '');
-const decl = sel => { const i = old.indexOf(sel + ' {') >= 0 ? old.indexOf(sel + ' {') : old.indexOf(sel + '{'); if (i < 0) return ''; return old.slice(i, old.indexOf('}', i)); };
-for (const sel of ['.dw-bar i', '.wd-tabs', 'button.dc-item.pin', 'button.lg-gap.pressed']) ok(/background:var\(--c-mx-[a-z0-9]+\)/.test(decl(sel)), '4 老 WebView 下 ' + sel + ' 照样有底色：' + decl(sel).slice(0, 90));
-ok(/@keyframes rowFlash \{ 0%, 30% \{ background:var\(--c-mx-p22a\);/.test(old) && /@keyframes sfFlash \{ 0%,40% \{ background:var\(--c-mx-p22a\);/.test(old), '4 老 WebView 下闪一下照样有颜色');
-ok(!/color-mix/.test(old.replace(/\/\*[\s\S]*?\*\//g, '')), '4 删干净以后样式表里没有 color-mix 了（模拟对）');
+// ===== 4. 几处的底色直接是先算好的颜色（老 WebView 也认） =====
+const decl = sel => { const i = css.indexOf(sel + ' {') >= 0 ? css.indexOf(sel + ' {') : css.indexOf(sel + '{'); if (i < 0) return ''; return css.slice(i, css.indexOf('}', i)); };
+for (const sel of ['.dw-bar i', 'button.dc-item.pin', 'button.lg-gap.pressed']) ok(/background:var\(--c-mx-[a-z0-9]+\)/.test(decl(sel)), '4 ' + sel + ' 的底色是先算好的颜色：' + decl(sel).slice(0, 90));
+// 原来用 color-mix 的 11 处，一处一条：现在是先算好的颜色
+const SITES = [['日卡抬头', /border-radius:0; background:var\(--c-mx-p8\);/], ['没记账那条按下', /button\.lg-gap\.pressed \{ background:var\(--c-mx-t6a\); \}/],
+  ['今天还没记那条', /background:var\(--c-mx-p16b\); color:var\(--c-text\)/], ['刚记好闪一下', /rowFlash \{ 0%, 30% \{ background:var\(--c-mx-p22a\)/],
+  ['日卡抬头（第二处）', /background:var\(--c-mx-p8\); font-size:15px;/], ['「整周」那一排', /\.wd-tabs \{[^}]*background:var\(--c-mx-p10\);/],
+  ['一周的柱子', /\.dw-bar i \{[^}]*background:var\(--c-mx-p40\);/], ['置顶日子', /button\.dc-item\.pin \{ background:var\(--c-mx-p8\); \}/],
+  ['搜一笔翻到条件时闪一下', /sfFlash \{ 0%,40% \{ background:var\(--c-mx-p22a\)/], ['最近搜过那几块', /border-radius:8px; background:var\(--c-mx-p12b\);/]];
+for (const [nm, re] of SITES) ok(re.test(css), '4 ' + nm + '：用先算好的颜色');
+ok(/<i style="flex:\$\{v\};background:\$\{shade\(i\)\}"><\/i>/.test(fs.readFileSync(path.join(APP, 'detail.js'), 'utf8')), '4 一天面板分类叠条：用 shade(i)（= --c-shade-N）');
+ok(/@keyframes rowFlash \{ 0%, 30% \{ background:var\(--c-mx-p22a\); \}/.test(css) && /@keyframes sfFlash \{ 0%,40% \{ background:var\(--c-mx-p22a\); \}/.test(css), '4 闪一下用先算好的颜色');
 
-console.log(`1027-UI7 color-mix 兜底：${pass} 通过，${fail} 失败`);
+console.log(`1027-UI7 / UI8 不用 color-mix：${pass} 通过，${fail} 失败`);
 process.exit(fail ? 1 : 0);

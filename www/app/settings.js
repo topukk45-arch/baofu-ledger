@@ -311,8 +311,9 @@
                     '--c-on-primary':    T.on,
                     '--c-sel-border':    T.fill
                 });
-                // 1027-UI7：老 WebView（Chrome 111 以前，安卓模拟器上常见）不认 color-mix()，整条声明丢掉、底色变透明（一周的柱子只剩数字）：
-                //   样式表里每处 color-mix 前面先写一条用这几个先算好的颜色（算法和 color-mix(in srgb …) 一样），新 WebView 照旧用后面那条，样子不变
+                // 1027-UI7 / UI8：老 WebView（Chrome 111 以前，安卓模拟器上常见）不认 color-mix()：带 var() 的 color-mix 解析时照样收下，
+                //   到算颜色时才发现不认，这时整条变成「没写」（透明），不会退回前面那条兜底——1027-UI7「前面先写一条」因此没用。
+                //   所以样式表里不用 color-mix，这几种混出来的颜色都在这里先算好（算法和 color-mix(in srgb …) 一样），样式表直接用变量
                 const P=pal['--c-primary'], S0=pal['--c-surface'], B0=pal['--c-bg'], rgba=(h, a)=>{ const c=hexToRgb(h); return `rgba(${c.r},${c.g},${c.b},${a})`; };
                 Object.assign(pal, {
                     '--c-mx-p8':  mixHex(P, S0, 0.08), '--c-mx-p10': mixHex(P, S0, 0.10), '--c-mx-p40': mixHex(P, S0, 0.40),
