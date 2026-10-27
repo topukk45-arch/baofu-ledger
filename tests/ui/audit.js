@@ -1458,6 +1458,45 @@ async function run(cfg, port, browser) {
         await tab(pe, 'ledger'); await click(pe, '#daysCard'); await pe.waitForTimeout(600); await shot(pe, size, '收敛·雾松青', 'C 空状态·没有日子');
         await pe.close();
       }
+      // ===== 13 续：1027-UI5 第二轮 =====
+      //   d 24 个预设：日历四档相邻两档（和第 1 档和卡片底）对比 ≥ 1.12、画出来的格子上的字和格子底 ≥ 4.5；斜纹和条的底色、和实际的条（主题色 / 接近上限 / 超支）≥ 1.3；
+      //     超预算提示条的字和它的底 ≥ 4.5
+      //   e 截图：日历（雾松青、黄栌）、预算页（花得快的、花得慢的、超了的都有）、账单页的超预算提示
+      const ls13 = seedOf({ dev: true, recs: oldRecords(60).concat(EXTRA11), cats: BASE_CATS.slice(0, 16), tpls: TPLS, budgets: { '吃饭': 60, '购物': 5000, '出行': 120, '日用': 9000 }, extra: id => ({ ['days_' + id]: JSON.stringify(DAYS) }) });
+      const heatBad = [], paceBad = [], obBad = [];
+      for (const p of presets) {
+        const pg = await page11(412, 915, Object.assign({}, ls13, { app_appearance: JSON.stringify({ primary: p.color }) }));
+        await tab(pg, 'stats');
+        const r = await pg.evaluate(new Function(CONTRAST_FN + `const cs=getComputedStyle(document.documentElement), g=k=>cs.getPropertyValue(k).trim(), out={ heat:[], pace:[], ob:[] };
+          const h=[1,2,3,4].map(i=>g('--c-heat-'+i)), base=[g('--c-surface')].concat(h);
+          for(let i=1;i<base.length;i++){ const c=C(base[i], base[i-1]); if(c<1.12) out.heat.push('第 '+i+' 档和前一档 '+c.toFixed(2)); }
+          document.querySelectorAll('#statCal .day[class*="heat-"]').forEach(d=>{ const bg=getComputedStyle(d).backgroundColor; d.querySelectorAll('.dn, .da').forEach(x=>{ const c=C(getComputedStyle(x).color, bg); if(c<4.5) out.heat.push(d.className+' 「'+x.textContent+'」 '+c.toFixed(2)); }); });
+          const pa=g('--c-pace-a'); for(const [n, f] of [['底色', g('--c-chip')], ['主题色的条', g('--c-primary')], ['接近上限的条', g('--c-warn')], ['超支的条', g('--c-neg')]]){ const c=C(pa, f); if(c<1.3) out.pace.push('斜纹和'+n+' '+c.toFixed(2)); }
+          return out;`));
+        r.heat.slice(0, 3).forEach(x => heatBad.push(p.name + ' ' + x)); r.pace.forEach(x => paceBad.push(p.name + ' ' + x));
+        await tab(pg, 'ledger');
+        const ob = await pg.evaluate(new Function(CONTRAST_FN + `const b=document.getElementById('overBudget'); if(!b || b.hidden) return '没有超预算提示'; const cs=getComputedStyle(b), c=C(cs.color, cs.backgroundColor), r=b.getBoundingClientRect(); return (c<4.5 ? '字 '+c.toFixed(2) : '') + (Math.round(r.height)!==40 ? ' 高 '+Math.round(r.height) : '');`));
+        if (ob) obBad.push(p.name + ' ' + ob);
+        await pg.close();
+      }
+      results.push({ name: 'ui5-heat', cfg: '24 个预设', chk: true, label: '日历四档相邻两档 ≥ 1.12、格子上的字 ≥ 4.5', bad: heatBad, ok: !heatBad.length });
+      results.push({ name: 'ui5-pace', cfg: '24 个预设', chk: true, label: '斜纹和条的底色、实际的条 ≥ 1.3', bad: paceBad, ok: !paceBad.length });
+      results.push({ name: 'ui5-overbudget', cfg: '24 个预设', chk: true, label: '超预算提示的字 ≥ 4.5、高 40', bad: obBad, ok: !obBad.length });
+      for (const [w, h] of SIZES.slice(0, 3)) {
+        const size = w + 'x' + h;
+        for (const [nm, col] of [['雾松青', null], ['黄栌', '#e7b643']]) {
+          const pg = await page11(w, h, Object.assign({}, ls13, col ? { app_appearance: JSON.stringify({ primary: col }) } : {}));
+          await tab(pg, 'stats');
+          await pg.evaluate(() => { const c = document.getElementById('statCal'); c && c.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); }); await pg.waitForTimeout(300);
+          await shot(pg, size, '第二轮·' + nm, '1 统计页日历');
+          if (!col) {
+            await click(pg, '#statTabSeg button[data-v="budget"]'); await pg.waitForTimeout(300); await shot(pg, size, '第二轮·' + nm, '2 预算页');
+            await click(pg, '#statTabSeg button[data-v="flow"]');
+            await tab(pg, 'ledger'); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300); await shot(pg, size, '第二轮·' + nm, '3 账单页超预算提示');
+          }
+          await pg.close();
+        }
+      }
     }
     // 截图总表：一页，按页面 × 状态排，每张标上页面名、屏幕、状态
     if (SHOTS && sheetShots.length) {

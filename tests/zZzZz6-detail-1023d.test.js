@@ -63,7 +63,7 @@ const sumOf = b => { const u = b.querySelector('.ui-sum'); return u ? { main: sp
   let sm = sumOf(s.body);
   ok(sm.main === '支出 · 4 笔 217.00', '2 支出 · 几笔：' + sm.main);
   ok(sm.side === '收入 200.00' && sm.line === `净剩 −17.00 · 比本月日均多 ${(217 - avg).toFixed(2)}`, '2 收入在右，下面一行净剩 + 比本月日均多：' + sm.side + ' / ' + sm.line);
-  const cats = [...s.body.querySelectorAll('.dd-cat')].map(sp);
+  const cats = [...s.body.querySelectorAll('.dd-cat')].map(c => txt(c.querySelector('.dd-cat-n')) + ' ' + txt(c.querySelector('.dd-cat-v')));   // 1027-UI5：胶囊行尾多了 ›
   ok(cats.join('|') === '购物 197.00|吃饭 12.00|出行 8.00', '2 当天支出按分类、从大到小：' + cats.join('|'));
   const rows = [...s.body.querySelectorAll('.bl-row')].map(r => r.dataset.id);
   ok(rows.join() === 'w5,w4,w3,w2', '2 当天每一笔，新的在上：' + rows.join());

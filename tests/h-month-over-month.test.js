@@ -33,8 +33,8 @@ function bootSync(records, now){
     R('e0','2026-08-03T10:00',999,'expense','出行'),                                                     // 8 月的不算进 9 月
   ]);
   const g=t.find('游戏'), f=t.find('餐饮'), s=t.find('订阅'), x=t.find('出行');
-  ok(g.delta==='较上月 ↑20%' && g.cls.includes('bad'), '支出涨 → 红：'+g.delta+' '+g.cls);
-  ok(f.delta==='较上月 ↓75%' && f.cls.includes('good'), '支出降 → 绿：'+f.delta);
+  ok(g.delta==='较上月 ▲20%' && g.cls.includes('bad'), '支出涨 → 红：'+g.delta+' '+g.cls);
+  ok(f.delta==='较上月 ▼75%' && f.cls.includes('good'), '支出降 → 绿：'+f.delta);
   ok(s.delta==='与上月持平' && !s.cls.includes('bad') && !s.cls.includes('good'), '持平：灰');
   ok(x.delta==='上月无', '上月没有 → 上月无（不拿 8 月比）：'+x.delta);
   ok(g.amt==='−120.00' || g.amt.endsWith('120.00'), '金额照旧：'+g.amt);
@@ -50,14 +50,14 @@ function bootSync(records, now){
     R('af','2026-09-04T10:00',500,'expense','游戏','往来',{flow:true}),
     R('ai','2026-09-04T10:00',500,'income','游戏','收入类不混入'),
   ]);
-  ok(t.find('游戏').delta==='较上月 ↑100%', '上月只算计入的 50：'+t.find('游戏').delta);
+  ok(t.find('游戏').delta==='较上月 ▲100%', '上月只算计入的 50：'+t.find('游戏').delta);
 }
 
 // ===== 3. 跨年：1 月和去年 12 月比 =====
 {
   const t=await boot([ R('j','2027-01-05T10:00',90,'expense','餐饮'), R('dz','2026-12-20T10:00',100,'expense','餐饮'),
                  R('old','2026-01-20T10:00',10,'expense','餐饮') ], '2027-01-31T10:00:00');
-  ok(t.find('餐饮').delta==='较上月 ↓10%', '1 月对比去年 12 月：'+t.find('餐饮').delta);
+  ok(t.find('餐饮').delta==='较上月 ▼10%', '1 月对比去年 12 月：'+t.find('餐饮').delta);
 }
 
 // ===== 4. 收入口径：颜色反过来 =====
@@ -66,8 +66,8 @@ function bootSync(records, now){
                  R('o1','2026-10-10T10:00',50,'income','其他'),   R('o0','2026-09-10T10:00',100,'income','其他') ]);
   t.$('statMonthCatSeg').querySelector('[data-v="income"]').click();
   const w=t.find('工资'), o=t.find('其他');
-  ok(w.delta==='较上月 ↑20%' && w.cls.includes('good'), '收入涨 → 绿：'+w.delta+' '+w.cls);
-  ok(o.delta==='较上月 ↓50%' && o.cls.includes('bad'), '收入降 → 红');
+  ok(w.delta==='较上月 ▲20%' && w.cls.includes('good'), '收入涨 → 绿：'+w.delta+' '+w.cls);
+  ok(o.delta==='较上月 ▼50%' && o.cls.includes('bad'), '收入降 → 红');
 }
 
 // ===== 5. 超过 6 类：合并项名字不与「其他」分类撞名，且合并项也有对比 =====
@@ -80,7 +80,7 @@ function bootSync(records, now){
   const names=t.items().map(i=>i.name);
   ok(names.length===7 && names.includes('其他') && names[6]==='其余 2 类', '前 6 + 其余 2 类：'+names.join(','));
   // 合并项本月 = (100-6)+(100-7)=187，上月 20 → ↑835%
-  ok(t.find('其余 2 类').delta==='较上月 ↑835%', '合并项也算对比：'+t.find('其余 2 类').delta);
+  ok(t.find('其余 2 类').delta==='较上月 ▲835%', '合并项也算对比：'+t.find('其余 2 类').delta);
   ok(t.$('statMonthPie').innerHTML.length>0, '饼图照常画');
 }
 
@@ -88,7 +88,7 @@ function bootSync(records, now){
 {
   const t=await boot([ R('a','2026-10-02T10:00',1,'expense','餐饮'), R('b','2026-09-02T10:00',30,'expense','餐饮'), R('c','2026-08-02T10:00',60,'expense','餐饮') ]);
   t.w.JiwenStats.stepMonth(-1);   // 1023-H 起用月份浮条切
-  ok(t.find('餐饮').delta==='较上月 ↓50%', '9 月对比 8 月：'+t.find('餐饮').delta);
+  ok(t.find('餐饮').delta==='较上月 ▼50%', '9 月对比 8 月：'+t.find('餐饮').delta);
 }
 
 console.log(`\n1010-H 环比专项：${pass} 通过，${fail} 失败`); process.exit(fail?1:0);

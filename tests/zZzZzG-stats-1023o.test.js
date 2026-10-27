@@ -31,11 +31,11 @@ const CATS = ['未分类', '吃饭', '出行', '工资', '转账'];
 
   // 1. 上月同期
   ok(txt($('statOutCmp')) === '比 9月同期 多花 90.00', '1 这个月没过完：比 9 月 1–23 日（40），不拿 9 月下旬的 500 比：' + txt($('statOutCmp')));
-  ok(delta('吃饭') === '较上月同期 ↑150%', '1 分类占比也比同期：' + delta('吃饭'));
+  ok(delta('吃饭') === '较上月同期 ▲150%', '1 分类占比也比同期：' + delta('吃饭'));
   ok(delta('出行') === '上月同期无', '1 上月同期没有：写「上月同期无」：' + delta('出行'));
   w.JiwenStats.stepMonth(-1); await tick();
   ok(txt($('statOutCmp')) === '比 8月 多花 510.00', '1 过完的月份（9 月）：和整个 8 月比：' + txt($('statOutCmp')));
-  ok(delta('吃饭') === '较上月 ↑1700%', '1 过完的月份：写「较上月」：' + delta('吃饭'));
+  ok(delta('吃饭') === '较上月 ▲1700%', '1 过完的月份：写「较上月」：' + delta('吃饭'));
   w.JiwenStats.stepMonth(1); await tick();
   // 月底：上个月没那么多天，等于整月
   const t2 = await A.boot({ html, www: WWW, now: '2026-10-31T10:00:00', seed: A.seedOf(recs, CATS) });

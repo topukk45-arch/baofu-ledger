@@ -61,7 +61,7 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   const ov=t.$('bgOverview');
   ok(ov.querySelector('.bgo-num').textContent==='492.87 / 635.00' && ov.querySelector('.bgo-pct').textContent==='78%', '总览：已花 / 预算合计：'+ov.querySelector('.bgo-num').textContent);
   ok([...ov.querySelectorAll('.bgc')].map(e=>e.textContent).join()==='超支 1,接近上限 1,正常 1', '三类计数');
-  ok(ov.querySelector('.bgo-legend').textContent.startsWith('竖线是今天（10/31）'), '时间进度说明');
+  ok(ov.querySelector('.bgo-legend').textContent==='到今天的平均进度' && ov.querySelector('.bg-pace').style.width==='32.3%', '时间进度：斜纹到 10/31（1027-UI5 起不是竖线）');
   const g=t.groups();
   ok(g.length===3 && g[0].t==='已超支 · 1' && g[0].cats.join()==='游戏' && g[1].cats.join()==='餐饮' && g[2].cats.join()==='订阅', '分组：超支 → 接近 → 正常：'+JSON.stringify(g));
   // 某组为空时不出现
@@ -69,56 +69,53 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   ok(t2.groups().length===1 && t2.groups()[0].t==='正常 · 1', '空组不显示');
 }
 
-// ===== 3. 展开明细 =====
+// ===== 3. 点分类去搜一笔（1027-UI5 起预算页的分类不再原地展开，点了去搜一笔：这个月 + 支出 + 这个分类）=====
 {
   const t=await boot(B); t.tab('budget');
+  const S=()=>t.w.JiwenSearch.searchNow(), list=()=>[...t.$('searchList').querySelectorAll('.bl-row')];
   t.rowOf('游戏').click();
-  const det=t.$('bgGroups').querySelector('.bg-detail');
-  const items=[...det.querySelectorAll('.bl-row')];
-  ok(t.rowOf('游戏').classList.contains('open') && items.length===4, '展开：4 笔计入预算的游戏消费');
-  ok(items.map(i=>i.querySelector('.bl-time').textContent).join()==='10月9日 14:15,10月9日 14:14,10月6日 10:00,10月4日 16:20', '时间倒序');
-  ok(items[0].querySelector('.bl-t-x').textContent==='游戏充值' && items[0].querySelector('.bl-amt').textContent==='−98.97', '备注与金额');
-  ok(det.querySelector('.bg-detail-head span').textContent==='4 笔；另有 1 笔不计 / 往来，未算在内', '说明另有不计的');
-  ok(!det.textContent.includes('九月'), '不混入别的月份');
-  items[0].click();
+  ok(t.w.JiwenSearch.isOpen() && !t.rowOf('游戏').classList.contains('open') && !t.$('bgGroups').querySelector('.bg-detail'), '点了不展开，打开搜一笔');
+  ok(S().from==='2026-10-01' && S().to==='2026-10-31' && S().ios.join()==='expense' && S().cats.join()==='游戏', '带进来：10 月 + 支出 + 游戏');
+  const items=list();
+  ok(items.length===5, '5 笔 10 月的游戏（含 1 笔不计，搜一笔照样列出、写在合计下面）');
+  ok(!t.$('searchList').textContent.includes('九月'), '不混入别的月份');
+  ok(items.some(i=>i.querySelector('.bl-amt').textContent==='−98.97'), '金额');
+  ok(/1 笔不计/.test(t.$('summaryFilter').textContent), '写明其中 1 笔不计：'+t.$('summaryFilter').textContent);
+  items.find(i=>i.querySelector('.bl-amt').textContent==='−98.97').click();
   ok(t.$('detailMask').style.display==='flex' && t.$('detailRemark').textContent==='游戏充值' && t.$('detailEdit').style.display==='', '点一笔看详情，可修改');
   // 在详情里改金额 → 预算即时更新
   t.$('detailEdit').click(); t.$('editMoney').value='8.97'; t.$('saveEdit').click();
-  ok(t.rowOf('游戏').querySelector('.bg-num').textContent==='216.87 / 300.00' && t.rowOf('游戏').classList.contains('open'), '改完金额，预算重算、仍保持展开');
+  t.$('searchBack').click();
+  ok(!t.w.JiwenSearch.isOpen() && t.$('statPaneBudget').style.display==='', '‹ 回到预算页');
+  ok(t.rowOf('游戏').querySelector('.bg-num').textContent==='216.87 / 300.00', '改完金额，预算重算');
   ok(t.groups()[0].t==='正常 · 2' || t.groups().some(x=>x.cats.includes('游戏') && x.t.startsWith('正常')), '游戏从超支移到正常');
-  // 再点收起
-  t.rowOf('游戏').click();
-  ok(!t.$('bgGroups').querySelector('.bg-detail'), '再点收起');
-  // 【1013-E】可以同时展开多个
-  t.rowOf('餐饮').click(); t.rowOf('订阅').click();
-  ok(t.$('bgGroups').querySelectorAll('.bg-detail').length===2 && t.rowOf('订阅').classList.contains('open') && t.rowOf('餐饮').classList.contains('open'), '同时展开两个，互不收起');
   t.rowOf('餐饮').click();
-  ok(t.$('bgGroups').querySelectorAll('.bg-detail').length===1 && t.rowOf('订阅').classList.contains('open') && !t.rowOf('餐饮').classList.contains('open'), '收起一个，另一个还开着');
+  ok(S().cats.join()==='餐饮' && t.$('searchTags').querySelectorAll('.sp-tag.from').length===3, '点餐饮：带进来的 3 个条件标浅底');
+  t.$('searchBack').click();
+  ok(!t.$('bgGroups').querySelector('.bg-detail') && !t.rowOf('餐饮').classList.contains('open'), '回来以后照旧没有展开的明细');
+  ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 
-// ===== 4. 【1010-I2】去掉「在账单里查看」；未设预算的分类也能点开明细 =====
+// ===== 4. 【1010-I2】去掉「在账单里查看」；未设预算的分类也能点去看 =====
 {
   const t=await boot(B); t.tab('budget');
-  t.rowOf('游戏').click();
-  ok(!t.$('statPaneBudget').querySelector('[data-act="bgJump"]') && !t.$('statPaneBudget').textContent.includes('在账单里查看'), '明细里不再有「在账单里查看」');
-  ok(t.$('bgGroups').querySelector('.bg-detail-head span').textContent==='4 笔；另有 1 笔不计 / 往来，未算在内', '明细顶部说明：'+t.$('bgGroups').querySelector('.bg-detail-head span').textContent);
+  ok(!t.$('statPaneBudget').querySelector('[data-act="bgJump"]') && !t.$('statPaneBudget').textContent.includes('在账单里查看'), '没有「在账单里查看」');
+  ok(t.$('bgOverview').querySelector('[data-act="bgManage"]') && t.$('bgOverview').querySelector('[data-act="bgManage"]').textContent.startsWith('改预算'), '总览里有「改预算 ›」');
   // 未设预算：展开列表 → 点「出行」行
   t.$('bgUnsetCard').querySelector('[data-act="bgUnsetToggle"]').click();
   const urow=c=>[...t.$('bgUnsetCard').querySelectorAll('.bgu-row')].find(r=>r.dataset.cat===c);
   urow('出行').click();
-  const det=t.$('bgUnsetCard').querySelector('.bg-detail');
-  ok(det && det.querySelectorAll('.bl-row').length===1 && det.textContent.includes('火车站') && det.textContent.includes('−483.00'), '未设预算的出行可展开看明细');
-  ok(urow('出行').classList.contains('open') && t.rowOf('游戏').classList.contains('open') && t.$('bgGroups').querySelector('.bg-detail'), '【1013-E】上面已设预算的游戏照样开着');
-  ok(!det.querySelector('[data-act="bgSet"]'), '未设预算的明细里不放「改预算」（行上已有「设预算」）');
-  det.querySelector('.bl-row').click();
-  ok(t.$('detailMask').style.display==='flex' && t.$('detailRemark').textContent==='火车站', '明细条目点开详情');
-  t.$('detailClose').click();
-  // 点「设预算」不会顺带展开/收起这一行
+  ok(t.w.JiwenSearch.isOpen() && t.w.JiwenSearch.searchNow().cats.join()==='出行', '未设预算的出行：点了去搜一笔');
+  ok(t.$('searchList').querySelectorAll('.bl-row').length===1 && t.$('searchList').textContent.includes('火车站') && t.$('searchList').textContent.includes('−483.00'), '列出出行那 1 笔');
+  ok(!t.$('bgUnsetCard').querySelector('.bg-detail'), '不在预算页里展开');
+  t.$('searchList').querySelector('.bl-row').click();
+  ok(t.$('detailMask').style.display==='flex' && t.$('detailRemark').textContent==='火车站', '点一笔开详情');
+  t.$('detailClose').click(); t.$('searchBack').click();
+  // 点「设预算」不会顺带去搜一笔
   urow('其他').querySelector('[data-act="bgSet"]').click();
-  ok(t.$('askTitle').textContent==='分类预算' && !urow('其他').classList.contains('open'), '点「设预算」只弹设预算');
+  ok(t.$('askTitle').textContent==='分类预算' && !t.w.JiwenSearch.isOpen(), '点「设预算」只弹设预算');
   t.$('askCancel').click();
-  urow('出行').click();
-  ok(!t.$('bgUnsetCard').querySelector('.bg-detail'), '再点收起');
+  ok(!t.$('bgUnsetCard').querySelector('.bg-detail'), '没有展开的明细');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 
@@ -146,27 +143,26 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   ok(t.$('bgUnsetCard').style.display==='', '仍列出未设预算的分类，方便挑着设');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
-// ===== 6. 【1013-E】展开后就地改预算上限 =====
+// ===== 6. 改预算（1027-UI5 起从总览的「改预算 ›」进分类管理改；未设预算的那几行照旧就地「设预算」）=====
 {
   const t=await boot(B); t.tab('budget');
-  t.rowOf('游戏').click(); t.rowOf('订阅').click();
-  const btn=t.rowOf('游戏').nextElementSibling.querySelector('.bg-detail-head [data-act="bgSet"]');
-  ok(btn && btn.textContent==='改预算' && btn.dataset.cat==='游戏', '展开的明细顶部有「改预算」');
-  const det=t.rowOf('游戏').nextElementSibling;
-  ok(det.firstElementChild.classList.contains('bg-detail-head') && det.firstElementChild.contains(btn), '【1013-F】说明和「改预算」在明细最上面，不用滑到底');
+  const btn=t.$('bgOverview').querySelector('[data-act="bgManage"]');
+  ok(btn && /改预算/.test(btn.textContent), '总览里有「改预算 ›」');
   btn.click();
-  ok(t.$('askTitle').textContent==='分类预算' && t.$('askInput').value==='300', '弹出改预算，带着现在的上限 300');
-  ok(t.rowOf('游戏').classList.contains('open'), '点「改预算」不会把这一行收起');
+  ok(t.$('catMask').style.display==='flex', '点了打开分类管理（每个分类都能设预算）');
+  t.$('catMask').style.display='none';
+  ok(!t.w.JiwenSearch.isOpen(), '没有去搜一笔');
+  ok(t.rowOf('游戏') && t.rowOf('游戏').querySelector('.bg-num').textContent==='306.87 / 300.00', '列表照旧：游戏 306.87 / 300');
+  // 从未设预算的那几行就地设
+  t.$('bgUnsetCard').querySelector('[data-act="bgUnsetToggle"]').click();
+  t.$('bgUnsetCard').querySelector('[data-act="bgSet"][data-cat="其他"]').click();
+  ok(t.$('askTitle').textContent==='分类预算', '弹出设预算');
   t.$('askInput').value='500'; t.$('askOk').click();
-  const r=t.rowOf('游戏');
-  ok(r.querySelector('.bg-num').textContent==='306.87 / 500.00', '改完立即按新上限重算：'+r.querySelector('.bg-num').textContent);
-  ok(r.classList.contains('open') && t.rowOf('订阅').classList.contains('open'), '改完两个展开的都还开着');
+  const r=t.rowOf('其他');
+  ok(r && r.querySelector('.bg-num').textContent==='208.80 / 500.00', '设完立即出现、按新上限算：'+(r && r.querySelector('.bg-num').textContent));
   ok(t.$('catMask').style.display!=='flex', '没有跳去分类管理');
-  ok(JSON.parse(t.w.JiwenStore.ledgerGet(t.w.JiwenStore.storeKey())).archives['默认存档'].budgets['游戏']===500, '新上限存进了账本');
-  // 填 0 = 取消预算：游戏回到「未设预算」
-  t.rowOf('游戏').nextElementSibling.querySelector('[data-act="bgSet"]').click();
-  t.$('askInput').value='0'; t.$('askOk').click();
-  ok(!t.rowOf('游戏'), '填 0 取消预算，游戏不在已设预算的分组里了');
+  ok(JSON.parse(t.w.JiwenStore.ledgerGet(t.w.JiwenStore.storeKey())).archives['默认存档'].budgets['其他']===500, '新上限存进了账本');
+  ok(t.$('statPaneBudget').querySelector('.bg-pace') && !t.$('statPaneBudget').querySelector('.bg-mark'), '预算条：斜纹「到今天的平均进度」，没有竖线');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 

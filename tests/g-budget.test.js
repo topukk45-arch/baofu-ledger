@@ -65,7 +65,7 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
   const row=()=>t.$('bgGroups').querySelector('.bg-row');
   ok(row().querySelector('.bg-num').textContent==='158.87 / 200.00', '只算计入的支出：'+row().querySelector('.bg-num').textContent);
   ok(row().querySelector('.bg-fill').style.width==='79.4%' && row().querySelector('.bg-fill').className==='bg-fill ', '进度 79.4%，未到 80% 用主题色');
-  ok(row().querySelector('.bg-mark').style.left==='32.3%', '竖线在 10/31');
+  ok(row().querySelector('.bg-pace').style.width==='32.3%' && !row().querySelector('.bg-mark'), '到今天的平均进度（斜纹）到 10/31（1027-UI5 起不是竖线）');
   ok(row().querySelector('.bg-foot').textContent==='已用 79%还剩 41.13（花得偏快）', '比时间快时提醒');
   const t2=await boot(null,{'游戏':180}); t2.stats(); t2.$('statTabSeg').querySelector('[data-v="budget"]').click();
   ok(t2.$('bgGroups').querySelector('.bg-fill').classList.contains('warn'), '88% 用琥珀色');
@@ -73,7 +73,7 @@ const USED=round=>Math.round((29.91+29.99+98.97)*100)/100;   // 158.87
   const r3=t3.$('bgGroups').querySelector('.bg-row');
   ok(r3.querySelector('.bg-fill').classList.contains('over') && r3.querySelector('.bg-foot .over').textContent==='超出 8.87', '超支：红色、写明超出多少');
   t.w.JiwenStats.stepMonth(-1);   // 1023-H 起用月份浮条切（标题右边写年月）
-  ok(t.$('statMonthLabel').getAttribute('aria-label')==='2026年09月' && !t.$('bgGroups').querySelector('.bg-mark'), '看上个月：无竖线');
+  ok(t.$('statMonthLabel').getAttribute('aria-label')==='2026年09月' && !t.$('bgGroups').querySelector('.bg-pace'), '看上个月：没有「到今天的平均进度」');
   ok(t.$('bgGroups').querySelector('.bg-num').textContent==='300.00 / 200.00', '9 月按 9 月的记录算');
 }
 

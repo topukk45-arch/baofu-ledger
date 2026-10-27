@@ -80,14 +80,14 @@ const CATS = ['未分类', '吃饭', '购物', '工资', '转账', '其他'];
   w.JiwenStats.setStatTab('budget'); await tick();
   ok($('statMonthLabel').getAttribute('aria-label') === '2026年10月', '5 预算那栏共用标题上的年月');
   const row = [...$('bgGroups').querySelectorAll('.bg-row')].find(r => r.dataset.cat === '吃饭');
-  row.click(); await tick();
-  const det = $('bgGroups').querySelector('.bg-detail');
+  row.click(); await tick();   // 1027-UI5：预算的分类不再原地展开，点了去搜一笔（这个月 + 支出 + 吃饭），列表和账单页同一种画法
+  const det = $('searchList');
   const brs = [...det.querySelectorAll('.bl-row')];
-  ok(brs.map(r => r.dataset.id).join() === 'a1,a4' && txt(brs[0].querySelector('.bl-t')) === '周一午饭' && txt(brs[0].querySelector('.bl-sub')) === '吃饭 · 10月19日 12:00' && txt(brs[0].querySelector('.bl-amt')) === '−30.00', '5 一笔两行：备注 / 分类 · 日期时间、金额');
-  ok(det.querySelector('.bg-detail-head .bg-edit') && txt(det.querySelector('.bg-detail-head .bg-edit')) === '改预算', '5 「改预算」在说明那一行');
-  brs[0].click(); await tick();
+  ok(w.JiwenSearch.isOpen() && brs.map(r => r.dataset.id).sort().join() === 'a1,a4' && brs.some(r => txt(r.querySelector('.bl-t')) === '周一午饭' && txt(r.querySelector('.bl-amt')) === '−30.00'), '5 点分类：搜一笔列出这个月的两笔吃饭：' + brs.map(r => r.dataset.id).join());
+  ok($('bgOverview').querySelector('[data-act="bgManage"]') && /改预算/.test(txt($('bgOverview').querySelector('[data-act="bgManage"]'))), '5 「改预算 ›」在总览里');
+  brs.find(r => txt(r.querySelector('.bl-t')) === '周一午饭').click(); await tick();
   ok($('detailMask').style.display === 'flex' && txt($('detailRemark')) === '周一午饭', '5 点一笔：单笔详情');
-  w.JiwenDetail.closeDetail();
+  w.JiwenDetail.closeDetail(); $('searchBack').click(); await tick();
   w.JiwenStats.setStatTab('flow');
   ok(!t.errs.length, '没有报错 ' + t.errs.join('|'));
 

@@ -229,13 +229,14 @@ function bootSync(records, arcExtra){
   t.toStats(); t.$('statTabSeg').querySelector('[data-v="budget"]').click();
   const row=[...t.$('bgGroups').querySelectorAll('.bg-row')].find(r=>r.dataset.cat==='购物');
   ok(row.querySelector('.bg-num').textContent==='70.00 / 200.00', '预算已花扣掉退款：'+row.querySelector('.bg-num').textContent);
-  row.click();
-  const det=t.$('bgGroups').querySelector('.bg-detail');
-  ok(det.querySelectorAll('.bl-row').length===2 && det.querySelector('.io-refund') && det.textContent.includes('+30.00'), '预算明细列出退款');
+  row.click();   // 1027-UI5：预算的分类点了去搜一笔（这个月 + 支出 + 购物），退款算收入，所以列出来的是原单；退款照样挂在原单上
+  const det=t.$('searchList');
+  ok(t.w.JiwenSearch.isOpen() && det.querySelectorAll('.bl-row').length===1 && det.textContent.includes('100.00'), '点预算的分类：搜一笔列出这个月购物的那笔原单');
+  t.$('searchBack').click();
   ok(t.$('bgOverview').querySelector('.bgy-head .bgo-v').textContent.startsWith('170 /'), '年度已用 100+70：'+t.$('bgOverview').querySelector('.bgy-head .bgo-v').textContent);
   t.$('statTabSeg').querySelector('[data-v="flow"]').click();
   const it=[...t.$('statMonthCatList').querySelectorAll('.sc-item')].find(i=>i.querySelector('.sc-cat-name').textContent==='购物');
-  ok(it.querySelector('.sc-delta').textContent==='较上月同期 ↓30%', '环比按净额（今天 10 日，比 9 月 1–10 日，1023-O）：'+it.querySelector('.sc-delta').textContent);
+  ok(it.querySelector('.sc-delta').textContent==='较上月同期 ▼30%', '环比按净额（今天 10 日，比 9 月 1–10 日，1023-O）：'+it.querySelector('.sc-delta').textContent);
   const txt=t.w.JiwenAiExport.buildAiText(t.recs().filter(r=>r.time.startsWith('2026-10')),'2026年10月','按月');
   ok(txt.includes('支出 100.00 元') && txt.includes('含退款 1 笔共 30.00 元，已冲抵支出'), 'AI 总览');
   ok(txt.includes('购物：70.00 元') && txt.includes('退款 购物 30.00 元（备注：差价）【退款】'), 'AI 分类净额与明细标注');
