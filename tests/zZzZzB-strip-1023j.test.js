@@ -88,7 +88,7 @@ const R = (id, time, money, cat, remark) => ({ id, time, money, type: 'expense',
     w.dispatchEvent(new w.Event('scroll'));
     sTr.dispatchEvent(new w.Event('touchstart')); sTr.scrollLeft = at(1); sTr.dispatchEvent(new w.Event('scroll')); sTr.dispatchEvent(new w.Event('touchend'));
     await sleep(400);
-    ok($('statMonthLabel').textContent.includes('9月'), '1 统计页：左右拨松手也切月份');
+    ok($('statMonthLabel').getAttribute('aria-label').includes('9月'), '1 统计页：左右拨松手也切月份');
     w.JiwenStats.stepMonth(1); }
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await sleep(50);
 

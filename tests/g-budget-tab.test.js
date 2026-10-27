@@ -49,9 +49,9 @@ const B={'游戏':300,'餐饮':35,'订阅':300};
   ok(t.$('statPaneFlow').style.display==='', '切回收支');
   // 共用月份（1023-H 起月份由底栏上方的月份浮条切，标题右边写着年月）
   t.w.JiwenStats.stepMonth(-1); t.tab('budget');
-  ok(t.$('statMonthLabel').textContent==='2026年09月', '收支翻到 9 月，预算也是 9 月');
+  ok(t.$('statMonthLabel').getAttribute('aria-label')==='2026年09月', '收支翻到 9 月，预算也是 9 月');
   t.w.JiwenStats.stepMonth(1); t.tab('flow');
-  ok(t.$('statMonthLabel').textContent==='2026年10月', '预算翻回 10 月，收支也是 10 月');
+  ok(t.$('statMonthLabel').getAttribute('aria-label')==='2026年10月', '预算翻回 10 月，收支也是 10 月');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
 

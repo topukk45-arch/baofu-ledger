@@ -35,7 +35,7 @@ const R = (id, time, money, type, cat, remark) => ({ id, time, money, type, cat,
   ok(/button\.lg-bar \{[^}]*background:transparent/.test(css) && !/button\.lg-bar \{[^}]*position:sticky/.test(css), '1 不加底色、不吸顶');
   ok(/\.lg-bar-m \{[^}]*font-size:32px/.test(css), '1 「10月」大字');
   bar.click(); await tick();
-  ok(w.JiwenBase.currentTab === 'stats' && $('statMonthLabel').textContent === '2026年10月', '1 整行点了：统计页同一个月');
+  ok(w.JiwenBase.currentTab === 'stats' && $('statMonthLabel').getAttribute('aria-label') === '2026年10月', '1 整行点了：统计页同一个月');
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await tick();
 
   // 2. 周分隔线

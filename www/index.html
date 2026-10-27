@@ -57,12 +57,13 @@
             <!-- ========== 页面2：统计 ========== -->
             <div class="tab-page" id="pageStats" style="display:none">
                 <!-- 1023-H：标题「统计」右边常显当前年月（点了照旧弹年月选择）；月份由底栏上方的月份浮条切（和账单页同一个组件，收支、预算两个页签共用） -->
-                <div class="user-info st-title"><h3>统计</h3><button type="button" class="st-ym" id="statMonthLabel">2026年01月</button></div>
+                <!-- 1027-UI4：一级页头（32px）：月份大字 + 小字年份（点了照旧弹年月选择，读屏读「2026年10月」），右边「收支 | 预算」；原来的「统计」两个字去掉（底栏写着） -->
+                <div class="pg-h1 st-title"><button type="button" class="st-ym" id="statMonthLabel" aria-label="2026年01月"><span class="pg-h1-t" id="statMonthBig">1月</span><span class="pg-h1-y" id="statYearSmall">2026</span></button>
                 <!-- 页签：收支（日历/当月/分类）| 预算。两个页签共用 statYear/statMonth，切换时月份不变 -->
                 <div class="seg stat-tabs" id="statTabSeg">
                     <button data-v="flow" class="on">收支</button>
                     <button data-v="budget">预算</button>
-                </div>
+                </div></div>
                 <div id="statPaneFlow">
 
                 <!-- 1023-H：两格：当月支出（几笔、比上月多 / 少；1023-O 起这个月没过完时比上月同期）| 当月收入（本月净剩）；总结余 1023-O 挪到页面底部 -->
@@ -123,7 +124,7 @@
 
             <!-- ========== 页面3：设置 ========== -->
             <div class="tab-page" id="pageSettings" style="display:none">
-                <div class="user-info"><h3>设置</h3></div>
+                <div class="pg-h1"><h3 class="pg-h1-t">设置</h3></div>
                 <!-- 1023-A：「当前用户」从账单页挪到这里 -->
                 <div class="set-account" id="nowUser">当前用户：</div>
 

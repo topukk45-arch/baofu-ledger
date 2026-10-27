@@ -7,6 +7,8 @@
 // 3. 汇总块（jsdom 起整个 App）：统计页两格合成一个 .ui-sum（支出大字在左、收入在右、下面一行比较 · 净剩，id 照旧）；
 //    一天 / 一周面板里两格 + 当天净剩合成一个 .ui-sum（「支出 · N 笔」，副标题不再写笔数），一天的分类是叠起来的条 + 不能点的小胶囊，一周的柱子在块里；
 //    预算总览是 .ui-sum、预算外 / 年度预算在下面一张列表卡；日子页置顶那个是浅底（.ui-sum 同一种底），不是主题色实心
+// 4. 页头：统计、设置是 32px 一级页头（.pg-h1），统计页写「10月」大字 + 小字年份、完整年月在 aria-label，没有「统计」两个字，「收支 | 预算」在页头里；
+//    日子、搜一笔 20px 不画线；一天 / 一周面板标题 20px；账单页「10月」字重 700
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
 const APP = path.join(path.dirname(htmlFile), 'app');
@@ -102,6 +104,17 @@ function palette() {
     const css = fs.readFileSync(path.join(APP, 'app.css'), 'utf8');
     const heroRule = css.slice(css.lastIndexOf('#pageDays .day-item.day-hero {'));
     ok(/background:var\(--c-sum\)/.test(heroRule.slice(0, 300)), '3 日子置顶的卡片是浅底（--c-sum）');
+    // ===== 4. 页头 =====
+    ok($('statMonthBig') && txt($('statMonthBig')) === '10月' && txt($('statYearSmall')) === '2026' && $('statMonthLabel').getAttribute('aria-label') === '2026年10月', '4 统计页头：10月 + 2026，aria-label 完整年月');
+    ok($('statMonthLabel').closest('.pg-h1') && $('statMonthLabel').closest('.pg-h1').contains($('statTabSeg')), '4 「收支 | 预算」在页头里');
+    ok(!/统计/.test(txt(d.querySelector('#pageStats .pg-h1'))), '4 统计页头不写「统计」');
+    ok(d.querySelector('#pageSettings .pg-h1 .pg-h1-t') && txt(d.querySelector('#pageSettings .pg-h1')) === '设置', '4 设置页头');
+    const rule = sel => { const i = css.lastIndexOf(sel + ' {'); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
+    ok(/font-size:32px/.test(rule('h3.pg-h1-t, .pg-h1-t')) && /font-weight:700/.test(rule('h3.pg-h1-t, .pg-h1-t')), '4 一级页头 32px / 700');
+    ok(/font-size:20px/.test(rule('.days-title')) && /border-bottom:none/.test(rule('.days-head')), '4 日子页头 20px、不画线');
+    ok(/font-size:20px/.test(rule('.sp-title')) && /border-bottom:none/.test(rule('.sp-head')), '4 搜一笔页头 20px、不画线');
+    ok(/font-size:20px/.test(rule('.ui-sheet.wd-fixed #uiSheetTitle')), '4 一天 / 一周标题 20px');
+    ok(/font-weight:700/.test(rule('.lg-bar-m')), '4 账单页「10月」700');
     ok(!t.errs.length, '3 没有报错 ' + t.errs.join('|'));
   }
 

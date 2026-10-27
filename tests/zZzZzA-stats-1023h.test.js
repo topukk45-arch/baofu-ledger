@@ -35,7 +35,7 @@ const CATS = ['未分类', '吃饭', '购物', '工资', '转账', '其他'];
   toStats(); await tick();
 
   // 1. 标题、两格
-  ok(txt($('statMonthLabel')) === '2026年10月' && !$('statPrevM') && !$('statNextM'), '1 标题右边写年月，没有 ‹ ›');
+  ok($('statMonthLabel').getAttribute('aria-label') === '2026年10月' && !$('statPrevM') && !$('statNextM'), '1 标题右边写年月，没有 ‹ ›');
   ok(txt($('statOutK')) === '当月支出 · 3 笔' && txt($('statMonthOut')) === '277.00', '1 当月支出 277（往来不算）、3 笔：' + txt($('statOutK')));
   ok(txt($('statOutCmp')) === '比 9月同期 多花 177.00', '1 比上月（这个月没过完，1023-O 起比 9 月 1–23 日）：' + txt($('statOutCmp')));
   ok(txt($('statMonthIn')) === '+200.00' && txt($('statNet')) === '本月净剩 −77.00' && $('statNet').querySelector('b.out'), '1 当月收入、本月净剩（负的用正文色）');
@@ -45,12 +45,12 @@ const CATS = ['未分类', '吃饭', '购物', '工资', '转账', '其他'];
   ok(items().map(b => b.dataset.ym).join() === '2026-08,2026-09,2026-10', '2 月份：账本第一笔（8 月）到这个月');
   ok(items()[1].classList.contains('over') && !items()[2].classList.contains('over') && !items()[0].classList.contains('over'), '2 9 月吃饭 100 超过月预算 90：标红；10 月 80 没超');
   items()[1].click(); await tick();
-  ok(txt($('statMonthLabel')) === '2026年09月' && txt($('statMonthOut')) === '100.00' && txt($('statOutCmp')) === '8月 没有支出', '2 点 9 月：切过去；上个月没有支出写一句');
+  ok($('statMonthLabel').getAttribute('aria-label') === '2026年09月' && txt($('statMonthOut')) === '100.00' && txt($('statOutCmp')) === '8月 没有支出', '2 点 9 月：切过去；上个月没有支出写一句');
   d.querySelector('.tab-btn[data-tab="ledger"]').click(); await tick();
   ok(txt($('lgMonth')) === '9月', '2 统计页切了月份，账单页跟着是 9 月：' + txt($('lgMonth')));
   w.JiwenLedger.setYM('2026-10');
   $('billHead').click(); await tick();
-  ok(w.JiwenBase.currentTab === 'stats' && txt($('statMonthLabel')) === '2026年10月', '2 账单页「统计 ›」：进统计页，同一个月');
+  ok(w.JiwenBase.currentTab === 'stats' && $('statMonthLabel').getAttribute('aria-label') === '2026年10月', '2 账单页「统计 ›」：进统计页，同一个月');
 
   // 3. 日历周合计、点日子
   const wks = [...$('statCal').querySelectorAll('.wk-sum')];
@@ -78,7 +78,7 @@ const CATS = ['未分类', '吃饭', '购物', '工资', '转账', '其他'];
 
   // 5. 预算明细
   w.JiwenStats.setStatTab('budget'); await tick();
-  ok(txt($('statMonthLabel')) === '2026年10月', '5 预算那栏共用标题上的年月');
+  ok($('statMonthLabel').getAttribute('aria-label') === '2026年10月', '5 预算那栏共用标题上的年月');
   const row = [...$('bgGroups').querySelectorAll('.bg-row')].find(r => r.dataset.cat === '吃饭');
   row.click(); await tick();
   const det = $('bgGroups').querySelector('.bg-detail');

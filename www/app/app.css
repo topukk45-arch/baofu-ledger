@@ -190,7 +190,6 @@
         .user-info { display:flex; justify-content:space-between; align-items:center;
             margin-bottom:25px; padding-bottom:15px; border-bottom:1px solid var(--c-border); }
         .user-info h3 { color:var(--c-text); }
-        #pageStats > .user-info, #pageSettings > .user-info { min-height:calc(var(--ui-tap) + 16px); }   /* 1027-UI：统计页标题那行右边有 48 高的年月按钮，设置页没有，切页签时「统计」「设置」两个标题上下差 11px；两行都按 48 高 */
         .logout { padding:6px 15px; background:var(--c-fill);
             color:var(--c-on-fill); border:none; border-radius:6px; cursor:pointer; transition:0.3s; box-shadow:inset 0 0 0 1px var(--c-fill-edge); }
         .logout:hover { box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
@@ -499,7 +498,7 @@
             border-radius:14px; padding:14px; margin-bottom:12px; }
         .stat-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
         .stat-cal-head span { font-size:16px; font-weight:bold; color:var(--c-text); }
-        #statMonthLabel { cursor:pointer; padding:4px 12px; border-radius:9px; border:1px solid var(--c-border); }
+        #statMonthLabel { cursor:pointer; }   /* 1027-UI4：页头月份不再套框（原来 padding:4px 12px、圆角 9、细边） */
         #statMonthLabel:active { background:var(--c-chip); }
         .imp-empty-entry { display:block; width:100%; margin:0 0 10px; padding:8px 10px; font-size:13px; text-align:left; border:1px dashed var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-primary-deep); cursor:pointer; }
                 .stat-pend-banner { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:6px 10px; margin-bottom:10px; border:1px solid var(--c-border-mid); border-radius:9px; background:var(--c-surface); color:var(--c-text); }
@@ -1541,7 +1540,6 @@
         .cat-item .cat-budget { flex:0 0 auto; font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; }
 
         /* ===== 1010-G：统计页「收支 | 预算」页签 ===== */
-        .stat-tabs { margin:-10px 0 14px; }
         .stat-tabs button { flex:1 1 0; padding:9px 0; font-size:14.5px; }
         /* 收支页签里的一行预算入口 */
         .bg-entry { display:flex; align-items:center; gap:10px; cursor:pointer; }
@@ -2225,10 +2223,6 @@
         @media (prefers-reduced-motion: reduce){ .search-page.sp-in, .search-page.sp-out { animation:none; } }
 
         /* ===== 1023-H：统计页（标题右边年月、两格、总结余展开、日历周合计、月份浮条、支出正文色）===== */
-        .user-info.st-title { display:flex; align-items:center; justify-content:space-between; gap:8px; }
-        .st-title h3 { margin:0; }
-        button.st-ym { min-height:var(--ui-tap); padding:0 4px 0 12px; border:none; background:transparent; font-family:inherit; font-size:15px; font-weight:bold;
-            color:var(--c-primary-dark); cursor:pointer; font-variant-numeric:tabular-nums; }
         .stat-card.st-bal { display:block; padding:4px 14px 6px; }
         button.st-bal-head { display:flex; align-items:center; gap:10px; width:100%; min-height:var(--ui-tap); padding:6px 0; border:none; background:transparent;
             font-family:inherit; text-align:left; cursor:pointer; color:var(--c-text); }
@@ -2330,3 +2324,18 @@
         #pageDays .day-item.day-hero .dh-top, #pageDays .day-item.day-hero .dh-date, #pageDays .day-item.day-hero .dhn-w { color:var(--c-t1); opacity:1; }
         #pageDays .day-item.day-hero .di-star { color:var(--c-ink); }
         .bg-extra .bgo-rows { margin-top:0; border-top:none; }
+
+        /* ② 页头只留两种：一级页（账单、统计、设置）32px 大字，和账单页「10月」那一行同一个高度、同一个位置（切页签时标题不跳）；
+           二级页（日子、搜一笔）20px 标题带返回键，下面不画线；一天 / 一周面板的标题也是 20px */
+        .pg-h1 { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; min-height:64px; margin:10px 0 12px; padding:6px 4px 8px; border:none; }
+        h3.pg-h1-t, .pg-h1-t { margin:0; font-size:32px; line-height:36px; font-weight:700; color:var(--c-text); letter-spacing:.5px; }
+        .pg-h1-y { font-size:13px; line-height:18px; color:var(--c-t2); font-weight:400; margin-left:8px; padding-bottom:3px; }
+        button.st-ym { display:flex; align-items:flex-end; min-height:var(--ui-tap); padding:0; border:none; background:transparent; font-family:inherit; cursor:pointer;
+            font-variant-numeric:tabular-nums; text-align:left; }
+        .st-title .stat-tabs { flex:none; margin:0; align-self:center; }
+        .lg-bar-m { font-weight:700; }
+        .days-head { border-bottom:none; }
+        .days-title { font-size:20px; line-height:28px; font-weight:700; color:var(--c-text); letter-spacing:0; }
+        .sp-head { border-bottom:none; }
+        .sp-title { font-size:20px; line-height:28px; font-weight:700; color:var(--c-text); }
+        .ui-sheet.wd-fixed #uiSheetTitle { font-size:20px; line-height:28px; font-weight:700; color:var(--c-text); }

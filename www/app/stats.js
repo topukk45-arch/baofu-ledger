@@ -600,7 +600,9 @@
             return { pY, pM, cut, same, name:`${pM+1}月${same ? '同期' : ''}` };
         }
         function renderStatCalendar(){
-            $('statMonthLabel').textContent = `${statYear}年${pad(statMonth+1)}月`;
+            // 1027-UI4：页头写「10月」大字 + 小字年份；完整的「2026年10月」放在 aria-label（读屏、测试都读它）
+            $('statMonthBig').textContent = `${statMonth+1}月`; $('statYearSmall').textContent = String(statYear);
+            $('statMonthLabel').setAttribute('aria-label', `${statYear}年${pad(statMonth+1)}月`);
             renderPendBanner();
             // 【P4】取一次数、给每条只解析一次时间，几个消费点共用同一份（和 renderBill 同一个改法）
             const dec=decorateRecs(statRecords());

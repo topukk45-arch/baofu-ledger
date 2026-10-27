@@ -63,7 +63,7 @@ const B={'游戏':200,'餐饮':1200};
   ok(t.yrow().classList.contains('open'), '箭头转向');
   // 点 7 月：留在预算页签、切到 7 月、展开状态保留
   rs[1].click();
-  ok(t.$('statMonthLabel').textContent==='2026年07月' && t.$('statPaneBudget').style.display==='', '点 7 月 → 预算页签切到 7 月');
+  ok(t.$('statMonthLabel').getAttribute('aria-label')==='2026年07月' && t.$('statPaneBudget').style.display==='', '点 7 月 → 预算页签切到 7 月');
   ok(t.mrows().length===5 && t.mrows()[1].classList.contains('cur'), '列表还开着，7 月高亮');
   // 年度数字不随查看月份变化
   ok(t.yrow().querySelector('.bgo-v').textContent==='4167 / 9800 · 43%', '翻到 7 月，年度进度不变');
@@ -103,24 +103,24 @@ const B={'游戏':200,'餐饮':1200};
   t.toStats();
   ok(!t.fab(), '统计页、本月：没有');
   t.w.JiwenStats.stepMonth(-1);
-  ok(!t.fab() && t.$('statMonthLabel').textContent==='2026年09月', '翻到上月：没有回到本月 ✕（1023-O）');
+  ok(!t.fab() && t.$('statMonthLabel').getAttribute('aria-label')==='2026年09月', '翻到上月：没有回到本月 ✕（1023-O）');
   t.w.JiwenStats.stepMonth(1);
-  ok(t.$('statMonthLabel').textContent==='2026年10月' && !t.fab(), '再翻回本月');
+  ok(t.$('statMonthLabel').getAttribute('aria-label')==='2026年10月' && !t.fab(), '再翻回本月');
   // 预算页签同样
   t.$('statTabSeg').querySelector('[data-v="budget"]').click();
   t.w.JiwenStats.stepMonth(-1); t.w.JiwenStats.stepMonth(-1);
-  ok(!t.fab() && t.$('statMonthLabel').textContent==='2026年08月', '预算页签翻月：没有 ✕');
+  ok(!t.fab() && t.$('statMonthLabel').getAttribute('aria-label')==='2026年08月', '预算页签翻月：没有 ✕');
   t.w.JiwenStats.stepMonth(2);
-  ok(t.$('statMonthLabel').textContent==='2026年10月' && t.$('statPaneBudget').style.display==='' && !t.fab(), '预算页签里翻回本月，仍在预算页签');
+  ok(t.$('statMonthLabel').getAttribute('aria-label')==='2026年10月' && t.$('statPaneBudget').style.display==='' && !t.fab(), '预算页签里翻回本月，仍在预算页签');
   // 月度列表点月份
   t.yrow().click(); t.mrows()[0].click();
-  ok(!t.fab() && t.$('statMonthLabel').textContent==='2026年06月', '从年度列表跳到 6 月');
+  ok(!t.fab() && t.$('statMonthLabel').getAttribute('aria-label')==='2026年06月', '从年度列表跳到 6 月');
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
   ok(!t.fab(), '切到记账页');
   t.toStats();
-  ok(!t.fab() && t.$('statMonthLabel').textContent==='2026年06月', '回到统计页还在 6 月');
+  ok(!t.fab() && t.$('statMonthLabel').getAttribute('aria-label')==='2026年06月', '回到统计页还在 6 月');
   t.w.eval('JiwenStats.statYear=2025; JiwenStats.statMonth=9; JiwenStats.renderStats()');
-  ok(!t.fab() && t.$('statMonthLabel').textContent==='2025年10月', '去年同月');
+  ok(!t.fab() && t.$('statMonthLabel').getAttribute('aria-label')==='2025年10月', '去年同月');
   ok(/body\.kb-open \.clear-filter-fab/.test(html), '键盘弹出时一并隐藏（共用样式，账单页的圆钮还在用）');
   ok(t.errs.length===0, '无脚本错误 '+t.errs.join(';'));
 }
@@ -134,7 +134,7 @@ const B={'游戏':200,'餐饮':1200};
   ok(!/statTodayFab/.test(html), '代码、样式里也不再提它');
   t.w.dispatchEvent(new t.w.Event('scroll'));
   ok(!t.fab(), '滑动不出现');
-  ok(t.$('statMonthLabel').textContent==='2026年09月', '滑动不改月份');
+  ok(t.$('statMonthLabel').getAttribute('aria-label')==='2026年09月', '滑动不改月份');
   t.w.JiwenStats.stepMonth(1);
   t.w.dispatchEvent(new t.w.Event('scroll'));
   ok(!t.fab(), '在本月时滑动不出现');
