@@ -540,7 +540,8 @@
             // 1023-C：账单页「补一笔」：日期设成那天（钟点照现在）
             if(opt && /^\d{4}-\d{2}-\d{2}$/.test(opt.day||'')){ const n=new Date(); setDtInput(billTime, `${opt.day}T${pad(n.getHours())}:${pad(n.getMinutes())}`); }
             // 1023-D：详情里「再记一笔」：收支、分类、统计、备注照这一笔填好，金额空着、时间是现在（照模板那一套填）
-            if(opt && opt.from) applyTpl({ type:opt.from.type, cat:opt.from.cat, mode:recMode(opt.from), remark:opt.from.remark||'', money:null });
+            //   1027-UI6：长按菜单的「再记一笔」（opt.money）连金额一起照这一笔填，时间照旧是现在，不直接存
+            if(opt && opt.from) applyTpl({ type:opt.from.type, cat:opt.from.cat, mode:recMode(opt.from), remark:opt.from.remark||'', money:opt.money ? safeNum(opt.from.money) : null });
             if(opt && opt.opening) billOb=true;
             if(window.__openModalAfterKeyboard){
                 // 键盘先出来，弹窗再淡入（消除被键盘顶起的闪动）
@@ -778,6 +779,14 @@
         $('deleteInEdit').addEventListener('click', ()=>{
             const id=editId;
             if(id==null) return;
+            deleteRecord(id, { onDone:()=>closeEditModal({ refresh:true }), onUndo:()=>closeEditModal() });
+        });
+        // 删一条记录（修改账单里的「删除这条记录」、1027-UI6 长按菜单里的「删除」共用）：
+        //   导入的（开发开关开着）照旧 1024-G 四选一；opt.direct（长按菜单）且是手动记的：直接删 + 5 秒撤销（deleteWithUndo）；别的照旧确认一下。
+        //   opt.onDone：删了（或改成不计）以后；opt.onUndo：去撤销整批导入之前；opt.onCancel：哪个都没选
+        function deleteRecord(id, opt){
+            opt=opt||{};
+            const done=()=>{ if(opt.onDone) opt.onDone(); else window.JiwenTabs.refreshAllViews(); };
             const cur=getUserData();
             const me=cur.find(r=>r.id===id);
             const rs=me && me.type==='expense' ? refundsOf(cur, id) : [];
@@ -801,21 +810,22 @@
                     if(act==='one'){
                         const data=getUserData().filter(r=>r.id!==id && !(isRefund(r) && r.refundOf===id));
                         if(!saveUserData(data, true)){ customAlert('删除未能保存，这条记录仍然存在，请稍后重试。', '删除失败'); return; }
-                        closeEditModal({ refresh:true });
+                        done();
                     } else if(act==='forget'){
-                        window.JiwenImportStore.forgetRecord(id).then(()=>closeEditModal({ refresh:true }), e=>customAlert('没删成：' + (e && (e.code || e.message) || e) + '。账本没有动。', '删除失败'));
+                        window.JiwenImportStore.forgetRecord(id).then(()=>done(), e=>customAlert('没删成：' + (e && (e.code || e.message) || e) + '。账本没有动。', '删除失败'));
                     } else if(act==='skip'){
                         const data=getUserData(), i=data.findIndex(r=>r.id===id); if(i<0) return;
                         const n=Object.assign({}, data[i]); setRecMode(n, 'skip'); if(n.ob) delete n.ob; data[i]=n; syncRefunds(data, n);
                         if(!saveUserData(data)) return;
-                        closeEditModal({ refresh:true });
+                        done();
                     } else if(act==='undo'){
-                        closeEditModal();
+                        if(opt.onUndo) opt.onUndo();
                         loadImportUI().then(ui=>ui.undoFromLedger(me.batch)).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '撤销导入'));
                     }
-                }, '删除导入的记录', null, { layout:'list' });
+                }, '删除导入的记录', ()=>{ if(opt.onCancel) opt.onCancel(); }, { layout:'list' });
                 return;
             }
+            if(opt.direct && !iapp && !(me && me.src && EDIT_WARN_APP[me.src.app])){ deleteWithUndo(id); if(opt.onDone) opt.onDone(); return; }
             customConfirm(msg, ()=>{
                 const data=getUserData().filter(r=>r.id!==id && !(isRefund(r) && r.refundOf===id));
                 // 删除写盘失败时记录其实仍在。这里用 silent 保存：抑制通用提示，只弹一条
@@ -824,9 +834,31 @@
                     customAlert('删除未能保存，这条记录仍然存在，请稍后重试。', '删除失败');
                     return;
                 }
-                closeEditModal({ refresh:true });
-            }, '删除记录', { danger:true, okText });
-        });
+                done();
+            }, '删除记录', { danger:true, okText, onCancel:opt.onCancel });
+        }
+        // 1027-UI6：手动记的账（不是导入的）直接删、不问：底部小条「已删除「午饭 −15.00」 撤销」DEL_UNDO_MS（5 秒），撤销原样放回（id、时间、存的先后不变，
+        //   挂着的退款一起删一起回）。一次只留最后一次能撤：5 秒内再删一条，前一条就算删了，提示换成新的。删和撤销都走 saveUserData（照常排云备份）
+        const DEL_UNDO_MS=5000;
+        function recLabel(r){ return `${(r.remark||'').trim().split('\n')[0].slice(0, 12) || r.cat || '未分类'} ${r.type==='expense' ? '−' : '+'}${safeNum(r.money).toFixed(2)}`; }
+        function isImported(r){ return !!(r && !isRefund(r) && r.src && EDIT_WARN_APP[r.src.app]); }
+        function deleteWithUndo(id){
+            const data=getUserData(), gone=[];
+            data.forEach((r, i)=>{ if(r.id===id || (isRefund(r) && r.refundOf===id)) gone.push({ i, r }); });
+            if(!gone.length) return false;
+            const me=gone.find(x=>x.r.id===id).r, nRf=gone.length-1;
+            if(!saveUserData(data.filter(r=>!gone.some(x=>x.r===r)), true)){ customAlert('删除未能保存，这条记录仍然存在，请稍后重试。', '删除失败'); return false; }
+            window.JiwenTabs.refreshAllViews();
+            window.JiwenPanel.snack({ text:`已删除「${recLabel(me)}」`, sub: nRf ? `一起删了 ${nRf} 笔退款` : '', ms:DEL_UNDO_MS,
+                actions:[{ id:'snackUndo', text:'撤销', primary:true, onClick:()=>{
+                    const cur=getUserData();
+                    if(gone.some(x=>cur.some(r=>r.id===x.r.id))) return;
+                    gone.forEach(x=>cur.splice(Math.min(x.i, cur.length), 0, x.r));
+                    if(!saveUserData(cur, true)){ customAlert('没放回去：存不进去，请稍后再试。', '撤销失败'); return; }
+                    window.JiwenTabs.refreshAllViews();
+                } }] });
+            return true;
+        }
         // 禁止点击遮罩外部关闭，仅按钮可关闭
         // 导入简化 4a：改导入的（或已和账单对过账的）记录的金额 / 时间：先提醒一句「改了以后和账单对不上」，可以继续；能勾「以后不再提醒」
         //   （只在这台手机上记住，localStorage 的 app_imp_edit_warn_off）。改分类、备注不提醒。开发开关开着才有
@@ -937,5 +969,5 @@
             m.querySelectorAll('.cc, .day-switch').forEach(e=>parts.push(e.className));
             return JSON.stringify(parts);
         }
-        window.JiwenForms = { askCatRule, get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, openRefund, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenForms = { askCatRule, deleteRecord, deleteWithUndo, get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, openRefund, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();
