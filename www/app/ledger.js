@@ -1,6 +1,6 @@
 (function(){
-        const { $, billList, escapeHtml, pad, parseRecTime } = window.JiwenBase;   // 用到前面模块的
-        const { getUserData, impGetJson, impLogKey, impTarget, refundedMap, statContrib } = window.JiwenStore;   // 用到前面模块的
+        const { $, billList, escapeHtml, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
+        const { expSigned, getBudgets, getUserData, impGetJson, impLogKey, impTarget, refundedMap, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
         const { openAddModal } = window.JiwenForms;   // 用到前面模块的
@@ -307,10 +307,28 @@
             const ms=sumFen(mon);
             bar.innerHTML=`<span class="lg-bar-m" id="lgMonth">${ymLabel(ym)}</span><span class="lg-bar-s"><em>支出</em> <b class="lg-out ov-out">${ms.exp.toFixed(2)}</b></span><span class="lg-bar-s"><em>收入</em> <b class="pos lg-in ov-in">${ms.inc.toFixed(2)}</b></span><span class="lg-bar-go">统计 ›</span>`;   // 1023-K：页头，大字、不加底色不装框
             bar.setAttribute('aria-label', `到统计页看${ymLabel(ym)}`);
+            paintOverBudget(isNow ? mon : null);
             const first=allAsc.length ? (allAsc[0].time||'').slice(0,10) : cal.todayKey();   // 一笔都没有：只有今天那条
             billPainter.paint(listHtml(mon, { ym, first }));
             requestAnimationFrame(stripWake);   // 1023-J：换了月份 / 记了一笔，页面变长变短：看要不要一直显示浮条
         }
 
-        window.JiwenLedger = { curYM, listFlush, listHtml, makePainter, ovOff, renderBill, resetYM, setYM, stripWake, ymVersion };   // ledger 模块对外只有这一个入口
+        // 1027-UI5：本月有分类超预算时，月汇总下面一条提示「吃饭 本月超预算 212.00 · 看预算 ›」（超了几类写「吃饭等 2 类超预算」，先写超得最多的）；
+        //   看的不是本月、或者没有超支就不显示；列表行上不加任何标记。口径和预算页一样：计入的支出、退款抵扣（expSigned）。点了去预算页（tabs.js 绑）
+        function overBudget(mon){
+            const budgets=getBudgets(), used={};
+            mon.forEach(r=>{ const c=r.cat||'未分类'; if(!(safeNum(budgets[c])>0) || recMode(r)!=='normal') return; const e=expSigned(r); if(e) used[c]=(used[c]||0)+e; });
+            return Object.keys(used).map(c=>({ cat:c, over:round2(used[c]-safeNum(budgets[c])) })).filter(x=>x.over>0).sort((a, b)=>b.over-a.over);
+        }
+        function paintOverBudget(mon){
+            const box=$('overBudget'); if(!box) return;
+            const list = mon ? overBudget(mon) : [];
+            box.hidden=!list.length;
+            if(!list.length){ box.innerHTML=''; return; }
+            const what = list.length===1 ? `<b>${escapeHtml(list[0].cat)}</b> 本月超预算 ${list[0].over.toFixed(2)}` : `<b>${escapeHtml(list[0].cat)}</b>等 ${list.length} 类超预算`;
+            box.innerHTML=`<span class="ob-t">${what}</span><span class="ob-go">看预算 ›</span>`;
+            box.setAttribute('aria-label', (list.length===1 ? `${list[0].cat} 本月超预算 ${list[0].over.toFixed(2)}` : `${list[0].cat}等 ${list.length} 类超预算`) + '，看预算');
+        }
+
+        window.JiwenLedger = { curYM, listFlush, listHtml, makePainter, ovOff, overBudget, renderBill, resetYM, setYM, stripWake, ymVersion };   // ledger 模块对外只有这一个入口
 })();

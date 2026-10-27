@@ -7,6 +7,10 @@
         const { editBudget, openCatManager } = window.JiwenCats;   // 用到前面模块的
         const { aiFlagText, cal, closeDetail, openDay, openDetail, openWeek, rowHtml } = window.JiwenDetail;   // 用到前面模块的
         const { curYM, setYM, ymVersion } = window.JiwenLedger;   // 用到前面模块的
+        const { openSearch } = window.JiwenSearch;   // 用到前面模块的
+        // 1027-UI5：点分类去搜一笔，带上「看的这个月 + 支出 / 收入 + 这个分类」；返回键 / ‹ 回到统计页（搜一笔是盖在上面的一层，统计页的月份、页签、滚动位置都没动）
+        function statMonthRange(){ const a=`${statYear}-${pad(statMonth+1)}-01`; return [a, cal.monthEnd(a.slice(0,7))]; }
+        function searchCats(cats, io){ const [a, z]=statMonthRange(); openSearch({ preset:{ from:a, to:z, ios:[io], cats }, from:{ back:()=>{} } }); }
 
         // ===== 统计页：预算 =====
         // 一处算、两处用：computeBudget 给「收支」页签的一行入口和「预算」页签共用，口径永远一致。
@@ -44,7 +48,13 @@
                 .filter(u=>u.used>0).sort((a,b)=>b.used-a.used);
             return { rows, unsetList, isCur, dim, timePct, day:now.getDate() };
         }
-        // 单行预算（名称 / 已花 / 进度条 / 剩余或超出）。clickable=true 时可展开明细
+        // 1027-UI5：预算条三层：底色 → 斜纹区「按天数到今天该花到这」（宽 = 今天是第几天 ÷ 本月天数，只在看这个月时有）→ 实际花了的条叠在最上面、上下各缩 3px，
+        //   斜纹从实际条的上下两边露出来，看得出是两层（原来是一根竖线 + 一句「竖线是今天」）
+        function barHtml(pct, cls, timePct){
+            return `<div class="bg-bar">` + (timePct!=null ? `<div class="bg-pace" style="width:${Math.max(0,Math.min(100,timePct)).toFixed(1)}%"></div>` : '')
+                + `<div class="bg-fill ${cls||''}" style="width:${Math.max(0,Math.min(100,pct)).toFixed(1)}%"></div></div>`;
+        }
+        // 单行预算（名称 / 已花 / 进度条 / 剩余或超出）。clickable=true 时点了去搜一笔（1027-UI5 起不再原地展开）
         function budgetRowHtml(r, timePct, clickable, open){
             const cls = r.state==='ok' ? '' : r.state;
             const right = r.left>=0
@@ -53,9 +63,7 @@
             return `<div class="bg-row${clickable?' bg-click':''}${open?' open':''}"${clickable?` data-act="bgRow" data-cat="${escapeHtml(r.cat)}"`:''}>`
                 + `<div class="bg-top"><span class="bg-name">${escapeHtml(r.cat)}${clickable?'<i class="bg-chev">›</i>':''}</span>`
                 + `<span class="bg-num"><b>${r.used.toFixed(2)}</b> / ${r.limit.toFixed(2)}</span></div>`
-                + `<div class="bg-bar"><div class="bg-fill ${cls}" style="width:${Math.max(0,Math.min(100,r.pct)).toFixed(1)}%"></div>`
-                + (timePct!=null ? `<div class="bg-mark" style="left:${timePct.toFixed(1)}%"></div>` : '')
-                + `</div>`
+                + barHtml(r.pct, cls, timePct)
                 + `<div class="bg-foot"><span>已用 ${r.pct.toFixed(0)}%</span>${right}</div>`
                 + `</div>`;
         }
@@ -72,9 +80,12 @@
             if(n.over) parts.push(`超支 <b class="over">${n.over}</b>`);
             if(n.warn) parts.push(`接近 <b class="warn">${n.warn}</b>`);
             if(n.ok)   parts.push(`正常 <b>${n.ok}</b>`);
+            // 1027-UI5：下面加一根小预算条（设了预算的分类加起来花了多少 + 到今天的平均进度斜纹）
+            const lim=round2(B.rows.reduce((s,r)=>s+r.limit,0)), used=round2(B.rows.reduce((s,r)=>s+r.used,0)), pct = lim>0 ? used/lim*100 : 0;
             card.innerHTML=`<div class="bg-entry" data-act="toBudget">`
                 + `<span class="bg-entry-title">${B.isCur?'本月预算':`${statMonth+1}月预算`}</span>`
-                + `<span class="bg-entry-sum">${parts.join(' · ')}</span><span class="bg-go">›</span></div>`;
+                + `<span class="bg-entry-sum">${parts.join(' · ')}</span><span class="bg-go">›</span>`
+                + `<span class="bg-entry-bar">${barHtml(pct, pct>100 ? 'over' : (pct>=80 ? 'warn' : ''), B.timePct)}<span class="bg-entry-pct">${pct.toFixed(0)}%</span></span></div>`;
         }
         $('statBudgetCard').addEventListener('click', e=>{
             if(e.target.closest('[data-act="toBudget"]')) setStatTab('budget');
@@ -207,13 +218,12 @@
                     `<section class="ui-sum bg-sum" aria-label="预算汇总"><div class="bgo-main"><div class="bgo-total"><span class="bgo-k">合计 已用</span> `
                     + `<span class="bgo-num"><b>${used.toFixed(2)}</b> / ${lim.toFixed(2)}</span></div>`
                     + `<div class="bgo-pct ${st}">${pct.toFixed(0)}%</div></div>`
-                    + `<div class="bg-bar"><div class="bg-fill ${st}" style="width:${Math.max(0,Math.min(100,pct)).toFixed(1)}%"></div>`
-                    + (B.timePct!=null ? `<div class="bg-mark" style="left:${B.timePct.toFixed(1)}%"></div>` : '')
-                    + `</div>`
+                    + barHtml(pct, st, B.timePct)
                     + `<div class="bgo-chips">`
                     + `<span class="bgc over">超支 ${n.over}</span><span class="bgc warn">接近上限 ${n.warn}</span><span class="bgc ok">正常 ${n.ok}</span>`
+                    + (B.timePct!=null ? `<span class="bgo-legend"><i class="bg-pace-sw" aria-hidden="true"></i>到今天的平均进度</span>` : '')
                     + `</div>`
-                    + (B.timePct!=null ? `<div class="bgo-legend">竖线是今天（${B.day}/${B.dim}），条越过竖线就是花得偏快。</div>` : '')
+                    + `<button type="button" class="bgo-manage" data-act="bgManage">改预算 ›</button>`
                     + `</section>`
                     + (()=>{ const x=budgetExtraRowsHtml(dec, B); return x ? `<div class="stat-card bg-extra">${x}</div>` : ''; })();
 
@@ -349,9 +359,10 @@
             if(act==='detail'){
                 openDetail(el.dataset.id);
             } else if(act==='bgRow'){
-                const c=el.dataset.cat;
-                if(bgExpanded.has(c)) bgExpanded.delete(c); else bgExpanded.add(c);
-                renderStats();
+                // 1027-UI5：预算页的分类不再原地展开，点了去搜一笔（这个月 + 支出 + 这个分类），返回回到预算页；改预算走总览里的「改预算 ›」
+                searchCats([el.dataset.cat], 'expense');
+            } else if(act==='bgManage'){
+                openCatManager();
             } else if(act==='bgRec'){
                 openDetail(el.dataset.id);
             } else if(act==='bgUnsetToggle'){
@@ -607,7 +618,7 @@
             const dec=decorateRecs(statRecords());
 
             // 日净额 / 有无数据 / 当月收支汇总——一趟
-            const dayNet={}, dayHas={}, dayFlow={}, daySkip={}, dayRefund={};
+            const dayNet={}, dayHas={}, dayFlow={}, daySkip={}, dayRefund={}, dayExp={};
             let mIn=0, mOut=0, mOutN=0, pOut=0;
             const pp=prevPeriod(), pY=pp.pY, pM=pp.pM;   // 1023-O：这个月没过完时比上个月同期
             // 月份浮条：每个月超没超月预算（设了预算的分类里花的 > 这些预算加起来；当月没过完也实时算），超了的月份字下面一个小红点（1023-J 起不画小柱子）
@@ -630,6 +641,7 @@
                 if(isRefund(x.r)) dayRefund[x.d]=true;    // 1010-J2：这天的净额里含退款，标出来
                 const c=statContrib(x.r);
                 dayNet[x.d]=(dayNet[x.d]||0)+(c.inc-c.exp);
+                if(c.exp) dayExp[x.d]=(dayExp[x.d]||0)+c.exp;   // 1027-UI5：日历分档按这一天的支出
                 mIn+=c.inc; mOut+=c.exp; if(c.exp>0) mOutN++;
             });
             const nowYM=ymKey(new Date().getFullYear(), new Date().getMonth()), months=[];
@@ -663,6 +675,7 @@
             const todayMon = today.getDay()===1;
 
             const grid=$('statCal'); grid.innerHTML='';
+            const heat=heatTiers(dayExp);   // 1027-UI5：本月有支出的日子按四分位分四档
             const rows=Math.ceil((firstDow+daysInMonth)/7);
             for(let r=0; r<rows; r++){
                 let wkNet=0, wkAny=false, curWk=false;
@@ -676,6 +689,7 @@
                     // 当天有账、但全是不计 / 往来：换一种底色，一眼和「花了钱的日子」分开
                     const excl = has && dayNet[day]===undefined;
                     if(excl) cell.classList.add('excl');
+                    if(heat[day]) cell.classList.add('heat-'+heat[day]);   // 只有收入、没有支出的那天不着色
                     if(isThisMonth && today.getDate()===day){ cell.classList.add('today'); curWk=true; }
                     let inner=`<div class="dn">${day}</div>`;
                     // 当天只有不计的记录时 dayNet 没有这一天：只显示日期、不显示金额（否则会是 NaN）
@@ -711,6 +725,15 @@
 
             if(statTab==='budget') renderBudgetPane(dec);
             statSelDay=null;
+        }
+        // 1027-UI5：日历分四档。样本 = 本月有支出的日子（只有收入的不算），按排名分（不按金额线性分，所以一笔特别大的只占最深一档，别的日子照样分开）：
+        //   最少的那天第 1 档、最多的那天第 4 档，中间按 排名 ÷（样本数 − 1）落在第几个三分之一分到 1～3 档；一样多的按最靠前的名次算（同额的同一档）。
+        //   全部同额都是第 1 档；只有 1 天放第 2 档（一天没得比，不当成「花得最多」）
+        function heatTiers(dayExp){
+            const days=Object.keys(dayExp).filter(d=>round2(dayExp[d])>0);
+            const vals=days.map(d=>round2(dayExp[d])).sort((a, b)=>a-b), n=vals.length, out={};
+            days.forEach(d=>{ const rank=vals.indexOf(round2(dayExp[d])); out[d] = n===1 ? 2 : (rank===n-1 ? 4 : Math.min(3, Math.floor(rank/(n-1)*3)+1)); });
+            return out;
         }
 
         // 1023-C：总结余（原来在账单页总览最下面一行，搬过来）；1023-O 起挪到页面底部和分类汇总挨着（这两块是全部记录的，切月份不变）：
@@ -797,14 +820,14 @@
             const TOP=6;
             let items;
             if(cats.length>TOP){
-                const top=cats.slice(0,TOP).map(c=>({ name:c, val:byCat[c], prev:prevByCat[c]||0 }));
+                const top=cats.slice(0,TOP).map(c=>({ name:c, cats:[c], val:byCat[c], prev:prevByCat[c]||0 }));
                 const rest=cats.slice(TOP);
                 const restSum=rest.reduce((s,c)=>s+byCat[c],0);
                 const restPrev=rest.reduce((s,c)=>s+(prevByCat[c]||0),0);
-                // 合并项不叫「其他」：用户自己就有一个叫「其他」的分类，同名会混成两行「其他」
-                items=top.concat([{ name:`其余 ${rest.length} 类`, val:restSum, prev:restPrev }]);
+                // 合并项不叫「其他」：用户自己就有一个叫「其他」的分类，同名会混成两行「其他」；1027-UI5 起点了带上这几类一起搜
+                items=top.concat([{ name:`其余 ${rest.length} 类`, cats:rest, val:restSum, prev:restPrev }]);
             } else {
-                items=cats.map(c=>({ name:c, val:byCat[c], prev:prevByCat[c]||0 }));
+                items=cats.map(c=>({ name:c, cats:[c], val:byCat[c], prev:prevByCat[c]||0 }));
             }
 
             const total=items.reduce((s,it)=>s+it.val,0);
@@ -818,15 +841,22 @@
                 const pct=total>0 ? (it.val/total*100).toFixed(2) : '0.00';
                 const sign=isExp?'−':'+';
                 const cls=isExp?'out':'pos';   // 1023-H：花出去的用正文色（和账单页一样），红色只留给「有问题」的
-                return `<div class="sc-item">
+                // 1027-UI5：一行是一个按钮，行尾 ›，点了去搜一笔（这个月 + 支出 / 收入 + 这个分类）
+                return `<button type="button" class="sc-item sc-go" data-cats="${escapeHtml(JSON.stringify(it.cats))}">
                     <div class="sc-top">
                         <span class="sc-name"><span class="sc-dot" style="background:${colors[i]}"></span><span class="sc-cat-name">${escapeHtml(it.name)}</span></span>
                         <span class="sc-pct">${pct}%</span>
                     </div>
                     <div class="sc-bot">${monthDeltaHtml(it.val, it.prev, isExp)}<span class="sc-amt ${cls}">${sign}${it.val.toFixed(2)}</span></div>
-                </div>`;
+                    <span class="sc-chev" aria-hidden="true">›</span>
+                </button>`;
             }).join('');
         }
+        $('statMonthCatList').addEventListener('click', e=>{
+            const b=e.target.closest('.sc-go[data-cats]'); if(!b) return;
+            let cats=[]; try{ cats=JSON.parse(b.dataset.cats)||[]; }catch(_){}
+            if(cats.length) searchCats(cats, statMonthCatMode==='income' ? 'income' : 'expense');
+        });
         // 「较上月 ↑12%」。支出涨了标红、降了标绿；收入相反。上月为 0 时写「上月无」。
         let prevSame=false;   // 1023-O：这一次比的是上月同期（这个月没过完）
         function monthDeltaHtml(cur, prev, isExp){
@@ -836,7 +866,8 @@
             const pct=Math.round((cur-prev)/prev*100);
             if(pct===0) return `<span class="sc-delta">与${w}持平</span>`;
             const up=pct>0, bad = isExp ? up : !up;
-            return `<span class="sc-delta ${bad?'bad':'good'}">较${w} ${up?'↑':'↓'}${Math.abs(pct)}%</span>`;
+            // 1027-UI5：空间紧的地方统一 ▲▼、只用正文色（不再红绿；bad / good 类名照留）
+            return `<span class="sc-delta ${bad?'bad':'good'}">较${w} ${up?'▲':'▼'}${Math.abs(pct)}%</span>`;
         }
 
         // 支出/收入胶囊切换：只改口径 + 就地重渲染（复用缓存的 recs，不重跑整页统计）
@@ -1075,5 +1106,5 @@
                  + `<span class="${cls}-num${fut}">${c.n}</span>`
                  + `<span class="${cls}-unit">天</span>`;
         }
-        window.JiwenStats = { get bgSuggestOpen(){ return bgSuggestOpen; }, set bgSuggestOpen(v){ bgSuggestOpen=v; }, calcDay, dayNumHtml, fmtDayDate, openAiFlagList, renderStats, saveDays, setStatTab, setStatYM, sortedDays, stepMonth, statStripWake, get statMonth(){ return statMonth; }, set statMonth(v){ statMonth=v; }, get statMonthCatMode(){ return statMonthCatMode; }, get statSelDay(){ return statSelDay; }, set statSelDay(v){ statSelDay=v; }, get statTab(){ return statTab; }, get statYear(){ return statYear; }, set statYear(v){ statYear=v; } };   // stats 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenStats = { get bgSuggestOpen(){ return bgSuggestOpen; }, set bgSuggestOpen(v){ bgSuggestOpen=v; }, calcDay, dayNumHtml, fmtDayDate, heatTiers, openAiFlagList, renderStats, saveDays, setStatTab, setStatYM, sortedDays, stepMonth, statStripWake, get statMonth(){ return statMonth; }, set statMonth(v){ statMonth=v; }, get statMonthCatMode(){ return statMonthCatMode; }, get statSelDay(){ return statSelDay; }, set statSelDay(v){ statSelDay=v; }, get statTab(){ return statTab; }, get statYear(){ return statYear; }, set statYear(v){ statYear=v; } };   // stats 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();

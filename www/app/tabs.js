@@ -353,7 +353,7 @@
             $('actionBar').style.display = tab==='ledger' ? 'flex':'none';
             if(tab!=='ledger'){
                 const tt=$('toTopBtn'); if(tt) tt.classList.remove('show');
-                if(JiwenSearch.isOpen()) JiwenSearch.closeSearch();   // 1023-G：换页签时搜一笔收起来
+                if(JiwenSearch.isOpen()) JiwenSearch.closeSearch({ noBack:true });   // 1023-G：换页签时搜一笔收起来（1027-UI5：不回来源页）
             }
             document.body.classList.toggle('tab-ledger', tab==='ledger');
             document.body.classList.toggle('tab-stats', tab==='stats');
@@ -383,6 +383,12 @@
             const ym=JiwenLedger.curYM();
             JiwenStats.statYear=+ym.slice(0,4); JiwenStats.statMonth=+ym.slice(5,7)-1; JiwenStats.statSelDay=null;
             switchTab('stats');
+        });
+        // 1027-UI5：账单页的超预算提示：去统计页的预算那一栏（本月）
+        $('overBudget').addEventListener('click', ()=>{
+            const ym=JiwenLedger.curYM();
+            JiwenStats.statYear=+ym.slice(0,4); JiwenStats.statMonth=+ym.slice(5,7)-1; JiwenStats.statSelDay=null;
+            switchTab('stats'); JiwenStats.setStatTab('budget');
         });
 
         // 回到顶部：滚动超过一屏且在记账页时显示

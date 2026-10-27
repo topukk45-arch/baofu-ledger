@@ -34,6 +34,9 @@
             --c-sum:#f6fdfc;           /* 汇总块的底：从页面底往白里推到对比 ≥ 1.035，不画边框 */
             --c-sum-edge:transparent;  /* 推到白还分不开时的细边（24 个预设都用不上） */
             --c-track:#d6ebe9;         /* 滑块槽；选中的滑块是 --c-surface 底、--c-ink 字 */
+            /* 1027-UI5：统计页日历四档、格子上的字；预算条「到今天的平均进度」斜纹的两种颜色（buildPalette 按主题算，下面是雾松青的值） */
+            --c-heat-1:#dcf2f0; --c-heat-2:#c8e7e4; --c-heat-3:#b4dcd8; --c-heat-4:#9fd1cc; --c-heat-ink:#285b57; --c-heat-pos:#1e6010;
+            --c-pace-a:#add0cd; --c-pace-b:#ccebe8;
             /* 1027-UI4：圆角只留三档、行高两种（全圆胶囊按高度一半、圆点 50%、≤ 8px 的小条、底部面板顶角 18 不算） */
             --r-s:9px;                 /* 小胶囊、标签 */
             --r-m:12px;                /* 按钮、选项、提示条、滑块槽 */
@@ -2408,3 +2411,55 @@
         .bg-empty { padding:0; }
         #pageDays .days-empty { padding:24px 0; color:inherit; }
         .bg-empty button.ui-empty-btn { margin-top:0; }
+
+        /* ===== 1027-UI5：界面收敛第二轮 ===== */
+        /* 点分类去搜一笔：饼图旁的分类、预算的分类行、一天面板的分类胶囊行尾加 ›；带进来的条件在条件卡里用滑块槽的浅底分开 */
+        button.sc-item.sc-go { position:relative; display:flex; width:100%; padding:6px 22px 6px 0; border:none; border-bottom:1px dashed var(--c-border); background:transparent;
+            font:inherit; color:inherit; text-align:left; cursor:pointer; }
+        .stat-cat-list button.sc-item.sc-go:last-child { border-bottom:none; }
+        .sc-chev { position:absolute; right:2px; top:50%; transform:translateY(-50%); color:var(--c-border-mid); font-size:18px; line-height:1; }
+        button.dd-cat { border:none; font-family:inherit; cursor:pointer; position:relative; }
+        button.dd-cat::after { content:''; position:absolute; left:0; right:0; top:-8px; bottom:-8px; }
+        .dd-cats { gap:8px 6px; }
+        .dd-cat-go { color:var(--c-border-mid); font-size:15px; line-height:1; margin-left:-2px; }
+        .sp-tag.from { background:var(--c-track); color:var(--c-ink); box-shadow:none; }
+        /* 「较上月 ▲12%」：只用正文色，不用红绿（类名 bad / good 照留） */
+        .sc-delta, .sc-delta.bad, .sc-delta.good { color:var(--c-t1); }
+        /* 统计页日历四档：本月有支出的日子按四分位着色，只变深浅；格子上的字用 --c-heat-ink / --c-heat-pos（最深一档上也 ≥ 4.5） */
+        .stat-cal .day.heat-1 { background:var(--c-heat-1); }
+        .stat-cal .day.heat-2 { background:var(--c-heat-2); }
+        .stat-cal .day.heat-3 { background:var(--c-heat-3); }
+        .stat-cal .day.heat-4 { background:var(--c-heat-4); }
+        .stat-cal .day[class*="heat-"] { border-color:transparent; }
+        .stat-cal .day[class*="heat-"] .dn, .stat-cal .day[class*="heat-"] .da.out { color:var(--c-heat-ink); }
+        .stat-cal .day[class*="heat-"] .da.pos { color:var(--c-heat-pos); }
+        .stat-cal .day.today .dn { font-weight:700; }
+        .cal-legend { display:flex; align-items:center; flex-wrap:wrap; gap:4px 6px; margin-top:10px; font-size:12px; line-height:16px; color:var(--c-t2); }
+        .cal-legend .cl-sw { width:14px; height:14px; border-radius:4px; display:inline-block; }
+        .cal-legend .cl-sw.heat-1 { background:var(--c-heat-1); box-shadow:inset 0 0 0 1px var(--c-border); }
+        .cal-legend .cl-sw.heat-2 { background:var(--c-heat-2); }
+        .cal-legend .cl-sw.heat-3 { background:var(--c-heat-3); }
+        .cal-legend .cl-sw.heat-4 { background:var(--c-heat-4); }
+        .cal-legend .cl-note { margin-left:auto; }
+        /* 预算条三层：底色（--c-chip）→ 斜纹「到今天的平均进度」→ 实际花了的条（上下各缩 3px，斜纹从上下露出来）；原来的竖线 .bg-mark 不用了 */
+        .bg-bar { position:relative; height:12px; border-radius:6px; background:var(--c-chip); overflow:hidden; }
+        .bg-pace { position:absolute; left:0; top:0; bottom:0; background:repeating-linear-gradient(135deg, var(--c-pace-a) 0 3px, var(--c-pace-b) 3px 6px); }
+        .bg-fill { position:absolute; left:0; top:3px; bottom:3px; height:auto; border-radius:3px; background:var(--c-primary); }
+        .bg-fill.warn { background:var(--c-warn); }
+        .bg-fill.over { background:var(--c-neg); }
+        .bg-pace-sw { display:inline-block; width:22px; height:10px; border-radius:3px; vertical-align:-1px; margin-right:6px; background:repeating-linear-gradient(135deg, var(--c-pace-a) 0 3px, var(--c-pace-b) 3px 6px); }
+        .bgo-chips .bgo-legend { margin:0 0 0 auto; display:inline-flex; align-items:center; font-size:12px; color:var(--c-t2); }
+        button.bgo-manage { align-self:flex-start; min-height:var(--ui-tap); padding:0; margin-top:-6px; border:none; background:transparent; font:inherit; font-size:14px; color:var(--c-ink); cursor:pointer; }
+        .bg-entry { flex-wrap:wrap; }
+        .bg-entry-bar { flex:1 0 100%; display:flex; align-items:center; gap:8px; }
+        .bg-entry-bar .bg-bar { flex:1 1 auto; height:10px; border-radius:5px; }
+        .bg-entry-bar .bg-fill { top:2px; bottom:2px; border-radius:2px; }
+        .bg-entry-pct { font-size:12px; color:var(--c-t2); font-variant-numeric:tabular-nums; }
+        /* 超预算提示（账单页月汇总下面）：语义红的浅底、语义红的字，圆角 12、高 40（点击区 48） */
+        button.over-budget { position:relative; display:flex; align-items:center; gap:8px; width:100%; height:40px; margin:0 0 10px; padding:0 12px; border:none; border-radius:var(--r-m);
+            background:#fbeee9; color:var(--c-neg); font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+        button.over-budget[hidden] { display:none; }
+        button.over-budget::after { content:''; position:absolute; left:0; right:0; top:-4px; bottom:-4px; }
+        button.over-budget b { font-weight:500; }
+        .over-budget .ob-t { flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .over-budget .ob-go { flex:none; font-weight:500; }

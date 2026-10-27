@@ -195,6 +195,8 @@
             const DEFAULT_HUE=175;   // 默认主色 #3f6f6b 的色相：没色相、又没记过上一次的色相时用它
             // 1027-UI4：两档浅色字之间提亮多少（OKLCH 亮度）、汇总块和页面底至少要多少对比（真机看了不清楚再提到 1.05 左右，仍然靠推底色）
             const T2_STEP=0.07, SUM_MIN=1.035;
+            // 1027-UI5：日历四档相邻两档至少要多少对比、斜纹和底色 / 实际的条至少要多少对比（不是字，是看得出「不一样」的色块，定成这两个数，手机上看了再调）
+            const HEAT_GAP=1.12, PACE_GAP=1.3;
             function mixHex(a, b, p){ const A=hexToRgb(a), B=hexToRgb(b); return rgbToHex(A.r*p+B.r*(1-p), A.g*p+B.g*(1-p), A.b*p+B.b*(1-p)); }   // a 占 p
             // 从一个主色推导整套主题变量（保证浅底深字、对比足够）
             //   hue：选色面板记着的色相（拖条时用它，不从色值反推）；不给时从色值反推，色值没有色相的用 hueFallback（上一次的色相）
@@ -278,6 +280,26 @@
                     '--c-sum-edge':      _contrast(sum, T.bg) < SUM_MIN ? pal['--c-border'] : 'transparent',
                     '--c-track':         pal['--c-accent-soft']   // 滑块槽（选中的滑块用卡片底 --c-surface，字用 --c-ink）
                 });
+                // 1027-UI5：统计页日历四档（同色相，从浅到深）：第 1 档离卡片底、相邻两档之间对比都 ≥ HEAT_GAP（不够就把深的那档往深推）；
+                //   格子上的日期、金额用 --c-heat-ink（正文色，最深一档上不到 4.5 往深推）、进账用 --c-heat-pos（收入绿，同样推到 ≥ 4.5）
+                const oh=JiwenTheme.oklch(line), hC=Math.min(Math.max(oh.C, 0.03), 0.08);
+                const heats=[]; let hL=0.955;
+                for(let i=0;i<4;i++){
+                    const prev = i ? heats[i-1] : pal['--c-surface'];
+                    let c=JiwenTheme.ok2hex(hL, hC*(0.45+0.18*i), oh.H), g3=0;
+                    while(_contrast(c, prev) < HEAT_GAP && hL>0.3 && g3++<80){ hL-=0.005; c=JiwenTheme.ok2hex(hL, hC*(0.45+0.18*i), oh.H); }
+                    heats.push(c); hL-=0.04;
+                }
+                heats.forEach((c, i)=>{ pal['--c-heat-'+(i+1)]=c; });
+                pal['--c-heat-ink']=deepenFine(pal['--c-text'], heats);
+                pal['--c-heat-pos']=deepenFine('#2f7023', heats);
+                // 1027-UI5：预算条「到今天的平均进度」斜纹：两种颜色相间（--c-pace-a 深一点、--c-pace-b 浅一点），画在条的底色（--c-chip）上；
+                //   深的那种和底色对比 ≥ PACE_GAP、和实际花了的条（线的颜色）对比也 ≥ PACE_GAP（不够就在两头之间挪）
+                let pk=0.30, pa=mixHex(line, pal['--c-chip'], pk), g4=0;
+                while(_contrast(pa, pal['--c-chip']) < PACE_GAP && pk<0.9 && g4++<60){ pk+=0.02; pa=mixHex(line, pal['--c-chip'], pk); }
+                while(_contrast(pa, line) < PACE_GAP && pk>0.1 && g4++<120){ pk-=0.02; pa=mixHex(line, pal['--c-chip'], pk); }
+                pal['--c-pace-a']=pa;
+                pal['--c-pace-b']=mixHex(line, pal['--c-chip'], pk*0.35);
                 Object.assign(pal, {
                     '--c-fill':          T.fill,
                     '--c-on-fill':       T.on,

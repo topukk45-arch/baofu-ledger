@@ -50,6 +50,8 @@
                     <svg class="dc-go" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
                 </div>
                 <button type="button" class="lg-bar" id="billHead"></button>
+                <!-- 1027-UI5：本月有分类超预算时的一条提示（ledger.js 的 paintOverBudget 画，点了去预算页，tabs.js 绑） -->
+                <button type="button" class="over-budget" id="overBudget" hidden></button>
 
                 <div class="bill-list" id="billList"></div>
             </div>
@@ -82,6 +84,8 @@
                         <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span><span class="st-wk-h">周合计</span>
                     </div>
                     <div class="stat-cal st-cal8" id="statCal"></div>
+                    <!-- 1027-UI5：日历按本月有支出的日子分四档的图例 -->
+                    <div class="cal-legend" id="calLegend"><span>花得少</span><i class="cl-sw heat-1"></i><i class="cl-sw heat-2"></i><i class="cl-sw heat-3"></i><i class="cl-sw heat-4"></i><span>花得多</span><span class="cl-note">按本月记过账的日子分四档</span></div>
                 </div>
 
                 <!-- 预算入口：一行摘要，点开切到「预算」页签。没设任何预算时隐藏 -->
