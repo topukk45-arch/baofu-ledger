@@ -2387,3 +2387,9 @@
         button.days-back, button.lg-wk, button.lg-bar { border-radius:var(--r-m); }
         button.dw-bar { border-radius:var(--r-s); }
         .ms-track { border-radius:var(--r-l); }
+
+        /* ⑥ 金额字重：列表里的金额一律 500（账单一行、一天里每一笔、一周里每天、分类汇总、饼图旁的分类、预算各分类、日卡抬头的当天合计）；
+           汇总大字和「合计」行 700（汇总块、周分隔线的合计、周合计、分类汇总的合计行）；柱子上的小数字 400 */
+        .bl-amt, .dw-day-v, .cs-amt, .sc-amt, .bgu-amt, .bgo-v, .bg-num b, .bl-day-sum b { font-weight:500; }
+        .cs-row.cs-total .cs-amt { font-weight:700; }
+        .dw-v { font-weight:400; }
