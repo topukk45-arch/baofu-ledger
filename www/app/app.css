@@ -1972,6 +1972,11 @@
         .dd-rows.lg-dc { margin-top:0; content-visibility:visible; }
         .dd-rows .bl-row:first-child { border-top:none; }
         .dd-empty { padding:24px 0; text-align:center; color:var(--c-text-soft); font-size:14px; }
+        /* 1027-UI：一天详情两格下面单独一行「当天净剩」 */
+        .dd-net { display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:var(--ui-tap); padding:0 14px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
+        .dd-net-k { font-size:14px; color:var(--c-text-soft); }
+        .dd-net-v { font-size:17px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; }
+        .dd-net-v.pos { color:var(--c-pos); }
         /* 1027-UI：一周 / 一天面板定高（detail.js 的 fitHeight）：面板竖排，内容区撑满、按钮排在最底下；内容少的「这天没记账」在中间，多的在面板里滚；
            换到更高的一周时 0.2 秒长高（滑入动画照旧） */
         .ui-sheet.wd-fixed { display:flex; flex-direction:column; transition:transform var(--sheet-ms) var(--sheet-ease), height .2s var(--sheet-ease); }

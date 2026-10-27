@@ -412,8 +412,10 @@
                 const dAvg=round2(s.exp-avg), cmp = (passed>0 && list.length && !(k===today && dAvg<0)) ? moreLess(dAvg, '本月日均') : '';
                 let h=`<div class="dd-cells">`
                     + cellHtml('支出', s.exp.toFixed(2), cmp)
-                    + cellHtml('收入', s.inc.toFixed(2), `当天净剩 ${net<0 ? '−' : '+'}${Math.abs(net).toFixed(2)}`, 'pos')
-                    + `</div>`;
+                    + cellHtml('收入', s.inc.toFixed(2), '', 'pos')
+                    + `</div>`
+                    // 1027-UI：「当天净剩」从收入那格挪出来，两格下面单独一行
+                    + `<div class="dd-net"><span class="dd-net-k">当天净剩</span><span class="dd-net-v${net<0 ? ' neg' : net>0 ? ' pos' : ''}">${net<0 ? '−' : net>0 ? '+' : ''}${Math.abs(net).toFixed(2)}</span></div>`;
                 // 当天支出按分类（退完了的不列）
                 const byCat=new Map();
                 list.forEach(r=>{ const e=statContrib(r).exp; if(e) byCat.set(r.cat||'未分类', (byCat.get(r.cat||'未分类')||0)+e); });
