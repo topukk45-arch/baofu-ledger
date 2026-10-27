@@ -328,7 +328,7 @@
         // 1027-UI4：当天分类：一根叠起来的条（按金额分段，颜色是主题色的几档深浅）+ 下面每个分类一个小胶囊（第一轮不能点，第二轮点了去搜一笔）
         const CAT_SHADES=[100, 72, 50, 34, 22];
         function catsHtml(cats){
-            const shade=i=>`color-mix(in srgb, var(--c-primary) ${CAT_SHADES[i % CAT_SHADES.length]}%, var(--c-surface))`;
+            const shade=i=>`var(--c-shade-${i % CAT_SHADES.length});background:color-mix(in srgb, var(--c-primary) ${CAT_SHADES[i % CAT_SHADES.length]}%, var(--c-surface))`;   // 1027-UI7：先写算好的颜色，老 WebView 不认 color-mix 时用它
             return `<div class="dd-stack" aria-hidden="true">` + cats.map(([c, v], i)=>`<i style="flex:${v};background:${shade(i)}"></i>`).join('') + `</div>`
                 + `<div class="dd-cats">` + cats.map(([c, v], i)=>`<button type="button" class="dd-cat" data-cat="${escapeHtml(c)}" aria-label="看这一天的「${escapeHtml(c)}」"><i class="dd-cat-dot" style="background:${shade(i)}"></i><span class="dd-cat-n">${escapeHtml(c)}</span><em class="dd-cat-v">${v.toFixed(2)}</em><span class="dd-cat-go" aria-hidden="true">›</span></button>`).join('') + `</div>`;
         }

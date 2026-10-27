@@ -197,6 +197,7 @@
             const T2_STEP=0.07, SUM_MIN=1.035;
             // 1027-UI5：日历四档相邻两档至少要多少对比、斜纹和底色 / 实际的条至少要多少对比（不是字，是看得出「不一样」的色块，定成这两个数，手机上看了再调）
             const HEAT_GAP=1.12, PACE_GAP=1.3;
+            const CAT_SHADES=[100, 72, 50, 34, 22];   // 1027-UI7：一天面板分类叠条的几档深浅（和 detail.js 的 CAT_SHADES 一样，那边用 --c-shade-0～4 兜底）
             function mixHex(a, b, p){ const A=hexToRgb(a), B=hexToRgb(b); return rgbToHex(A.r*p+B.r*(1-p), A.g*p+B.g*(1-p), A.b*p+B.b*(1-p)); }   // a 占 p
             // 从一个主色推导整套主题变量（保证浅底深字、对比足够）
             //   hue：选色面板记着的色相（拖条时用它，不从色值反推）；不给时从色值反推，色值没有色相的用 hueFallback（上一次的色相）
@@ -310,6 +311,15 @@
                     '--c-on-primary':    T.on,
                     '--c-sel-border':    T.fill
                 });
+                // 1027-UI7：老 WebView（Chrome 111 以前，安卓模拟器上常见）不认 color-mix()，整条声明丢掉、底色变透明（一周的柱子只剩数字）：
+                //   样式表里每处 color-mix 前面先写一条用这几个先算好的颜色（算法和 color-mix(in srgb …) 一样），新 WebView 照旧用后面那条，样子不变
+                const P=pal['--c-primary'], S0=pal['--c-surface'], B0=pal['--c-bg'], rgba=(h, a)=>{ const c=hexToRgb(h); return `rgba(${c.r},${c.g},${c.b},${a})`; };
+                Object.assign(pal, {
+                    '--c-mx-p8':  mixHex(P, S0, 0.08), '--c-mx-p10': mixHex(P, S0, 0.10), '--c-mx-p40': mixHex(P, S0, 0.40),
+                    '--c-mx-p12b': mixHex(P, B0, 0.12), '--c-mx-p16b': mixHex(P, B0, 0.16),
+                    '--c-mx-p22a': rgba(P, 0.22), '--c-mx-t6a': rgba(pal['--c-text'], 0.06)
+                });
+                CAT_SHADES.forEach((v, i)=>{ pal['--c-shade-'+i]=mixHex(P, S0, v/100); });
                 return pal;
             }
             function applyPrimary(primaryHex, hue){
