@@ -56,7 +56,7 @@ const CATS = ['未分类', '吃饭', '出行', '工资', '转账'];
   const wks = [...$('statCal').querySelectorAll('.wk-sum')];
   ok(wks.every(b => !b.querySelector('.wk-n')) && wks.every(b => b.children.length === 1 && b.firstElementChild.classList.contains('wk-v')), '3 周合计格子里只有数字');
   ok(wks.find(b => b.classList.contains('cur')).dataset.mon === '2026-10-19', '3 本周那格 cur');
-  ok(/button\.wk-sum\.cur \{ background:var\(--c-primary-dark\); \}/.test(css) && /\.wk-sum\.cur \.wk-v[^{]*\{ color:var\(--c-on-primary\); \}/.test(css), '3 本周那格深底白字');
+  ok(/button\.wk-sum\.cur \{ background:var\(--c-fill\);[^}]*\}/.test(css) && /\.wk-sum\.cur \.wk-v[^{]*\{ color:var\(--c-on-fill\); \}/.test(css), '3 本周那格主色底、配好的字（1027-UI：--c-fill / --c-on-fill）');
   ok(wks.every(b => /点了看一周$/.test(b.getAttribute('aria-label'))), '3 读屏文字写「点了看一周」');
 
   // 4. 总结余：一行，整行点了展开算式

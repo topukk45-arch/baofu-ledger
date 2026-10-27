@@ -48,11 +48,16 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   ok(!sheetOpen() && saved() === '#2e7d32' && primary() === '#2e7d32', '4 应用：存下来了');
   ok($('customColorVal').textContent === '#2e7d32', '4 外观设置那一行跟着变');
 
-  // 5. 太浅太亮：自动加深照旧，面板里写实际用的是哪个
+  // 5. 1027-UI：浅色不再压深，按钮就是选的颜色、配深字；字怎么配都不够清楚的（卡在中间）才挪一点，面板里写挪到哪个
   await open();
+  const fill = () => w.document.documentElement.style.getPropertyValue('--c-fill').trim().toLowerCase();
+  const onFill = () => w.document.documentElement.style.getPropertyValue('--c-on-fill').trim().toLowerCase();
   hex.value; const h2 = $('cpHex'); h2.value = '#ffff66'; h2.dispatchEvent(new w.Event('input', { bubbles: true })); await wait(50);
-  ok(/实际会用深一点的 #[0-9a-f]{6}/.test($('cpNote').textContent), '5 太亮的颜色：写明实际会用深一点的 ' + $('cpNote').textContent.slice(0, 30));
-  ok(primary() !== '#ffff66' && /^#[0-9a-f]{6}$/.test(primary()), '5 实际用的是加深过的 ' + primary());
+  ok(fill() === '#ffff66' && !/挪了一点/.test($('cpNote').textContent), '5 浅黄：按钮就是 #ffff66，不加深 ' + fill());
+  ok(w.JiwenTheme.con(fill(), onFill()) >= 4.5 && w.JiwenTheme.con(onFill(), '#000000') < w.JiwenTheme.con(onFill(), '#ffffff'), '5 浅黄的按钮配深字、对比 ≥ 4.5 ' + onFill());
+  ok($('cpName').textContent && $('cpVerdict').textContent.includes('按钮配深字'), '5 面板里写名字和短评：' + $('cpName').textContent + ' / ' + $('cpVerdict').textContent);
+  h2.value = '#0077dd'; h2.dispatchEvent(new w.Event('input', { bubbles: true })); await wait(50);
+  ok(/挪了一点的 #[0-9a-f]{6}/.test($('cpNote').textContent) && fill() !== '#0077dd', '5 卡在中间的蓝：写明按钮会用挪了一点的 ' + fill());
 
   // 6. 返回键：恢复（不存）
   await t.back(); await wait(50);
@@ -77,8 +82,8 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   // 8. 恢复默认、预设照旧
   $('resetThemeBtn').click(); await wait(30);
   ok(saved() === '#3f6f6b' && $('customColorVal').textContent === '#3f6f6b', '8 恢复默认照旧，那一行跟着变');
-  [...$('themePresets').children][1].click(); await wait(30);
-  ok(saved() === '#8a7f66' && $('customColorVal').textContent === '#8a7f66', '8 点预设照旧，那一行跟着变');
+  [...$('themePresets').querySelectorAll('.theme-swatch')][1].click(); await wait(30);
+  ok(saved() === '#dcb1b3' && $('customColorVal').textContent === '#dcb1b3' && $('customColorName').textContent === '退红', '8 点预设（1027-UI 起第二个是退红）照旧，那一行跟着变、写名字');
 
   ok(t.errs.length === 0, '没有报错 ' + t.errs.join('；'));
   console.log(`\n${pass} 通过，${fail} 失败`);

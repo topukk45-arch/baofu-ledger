@@ -8,14 +8,14 @@
     <meta name="format-detection" content="telephone=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#f1f9f8">
+    <meta name="theme-color" content="#eafbf9">
     <meta name="color-scheme" content="light">
     <title>记问</title>
-    <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成默认主题的底色（1025-UX 起是雾松青的 #f1f9f8，原来是米黄），从源头消除白闪。
+    <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成默认主题的底色（1025-UX 起是雾松青；1027-UI 起页面底按拆色算，#eafbf9，原来是米黄），从源头消除白闪。
          不依赖 CSS 变量，避免极早期合成时变量尚未解析。 -->
     <style>
-        html { background-color:#f1f9f8 !important; color-scheme:light; }
-        html, body { background-color:#f1f9f8; }
+        html { background-color:#eafbf9 !important; color-scheme:light; }
+        html, body { background-color:#eafbf9; }
     </style>
 
     <link rel="stylesheet" href="app/app.css?v=1025-UX">
@@ -33,7 +33,8 @@
                 <input type="file" id="loginImportFile" accept=".json" style="display:none">
             </div>
             <!-- 1025-UX：登录页也能换主题色（打开和设置里同一个外观弹窗），下面一句写进去以后在哪改 -->
-            <button type="button" class="login-theme-btn" id="loginThemeBtn"><span class="login-theme-dot" id="loginThemeDot" aria-hidden="true"></span><span class="login-theme-k">主题色</span><span class="login-theme-v" id="loginThemeCur">雾松青</span><span class="login-theme-go">换一个 ›</span></button>
+            <!-- 1027-UI：名字下一行短评（自己调的颜色按方案页四步起名） -->
+            <button type="button" class="login-theme-btn" id="loginThemeBtn"><span class="login-theme-dot" id="loginThemeDot" aria-hidden="true"></span><span class="theme-name-col"><span class="login-theme-l1"><span class="login-theme-k">主题色</span><span class="login-theme-v" id="loginThemeCur">雾松青</span></span><span class="theme-verdict" id="loginThemeVerdict"></span></span><span class="login-theme-go">换一个 ›</span></button>
             <div class="login-theme-hint">进去以后在「设置 → 外观」也能改</div>
         </div>
 
@@ -132,7 +133,8 @@
                 <div class="set-group">
                     <div class="set-group-title">外观和偏好</div>
                     <!-- 1025-UX：「外观主题」从「账户」那组最底下挪到这里第一行，右边写现在用的颜色 -->
-                    <button class="set-item" id="themeBtn"><span>外观主题</span><span class="set-arrow set-theme-cur"><i class="set-theme-dot" id="themeCurDot" aria-hidden="true"></i><span id="themeCur">雾松青</span> ›</span></button>
+                    <!-- 1027-UI：右边写现在的颜色名，下一行短评 -->
+                    <button class="set-item set-theme-item" id="themeBtn"><span class="theme-name-col"><span class="set-theme-l1"><span>外观主题</span><span class="set-theme-cur"><i class="set-theme-dot" id="themeCurDot" aria-hidden="true"></i><span id="themeCur">雾松青</span></span></span><span class="theme-verdict" id="themeCurVerdict"></span></span><span class="set-arrow">›</span></button>
                     <div class="set-item set-static">
                         <span>默认进入页面</span>
                         <div class="seg" id="defaultTabSeg">
@@ -612,14 +614,12 @@
             </div>
 
             <div class="field" style="margin-top:14px;">
-                <label class="field-label">自定义主色</label>
-                <!-- 1020-E：不再用系统的选色框（安卓上是白底的，和 App 不搭），点这一行打开 App 自己的选色面板 -->
-                <button type="button" class="theme-pick-row" id="customColorBtn"><span class="theme-pick-dot" id="customColorDot"></span><span class="theme-pick-txt">自己调一个颜色</span><span class="theme-pick-val" id="customColorVal">#3f6f6b</span><span class="rec-time-arrow" aria-hidden="true">›</span></button>
+                <!-- 1027-UI：「恢复默认」放在「自定义主色」这一行右边（原来单独一个小按钮靠左） -->
+                <div class="theme-custom-head"><label class="field-label">自定义主色</label><button type="button" class="theme-reset" id="resetThemeBtn">恢复默认</button></div>
+                <!-- 1020-E：不再用系统的选色框（安卓上是白底的，和 App 不搭），点这一行打开 App 自己的选色面板；1027-UI：写现在的颜色名，下一行短评 -->
+                <button type="button" class="theme-pick-row" id="customColorBtn" aria-label="自己调一个颜色"><span class="theme-pick-dot" id="customColorDot"></span><span class="theme-name-col"><span class="theme-pick-l1"><b class="theme-pick-name" id="customColorName">雾松青</b><span class="theme-pick-val" id="customColorVal">#3f6f6b</span></span><span class="theme-verdict" id="customColorVerdict"></span></span><span class="theme-pick-go">自己调一个 ›</span></button>
                 <input type="hidden" id="customColor" value="#3f6f6b">
-                <div class="theme-custom-row">
-                    <button class="ui-btn small" id="resetThemeBtn">恢复默认</button>
-                </div>
-                <p class="theme-tip">提示：太浅或太亮的颜色会自动加深，按钮文字也会自动配黑/白，保证清晰。</p>
+                <p class="theme-tip">按钮就用你选的颜色，按钮上的字自动配同色的深字或浅字，保证看得清。</p>
             </div>
 
             <div class="dialog-btn ui-stack form-btns">
@@ -832,6 +832,8 @@
         })();
     </script>
     <script src="app/base.js?v=1025-UX"></script>
+    <script src="app/theme-data.js?v=1025-UX"></script>
+    <script src="app/theme.js?v=1025-UX"></script>
     <script src="app/store.js?v=1025-UX"></script>
     <script src="app/select.js?v=1025-UX"></script>
     <script src="app/keypad.js?v=1025-UX"></script>

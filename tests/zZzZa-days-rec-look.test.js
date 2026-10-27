@@ -58,7 +58,7 @@ const days = [{ id: 'd1', name: '虚构纪念日', date: '2026-12-25' }, { id: '
   [...io.children].find(c => c.textContent === '收入').click();
   ok(/sel-in/.test([...io.children].find(c => c.textContent === '收入').className) && !/sel-out/.test([...io.children].find(c => c.textContent === '支出').className), '二 改选收入：收入选中，支出取消');
   // 1020-G：收支是两个一样大的按钮，选中的主色实心、白字，不用红绿
-  ok(/\.io-chips\.io-pair \.cc\.sel-out, \.io-chips\.io-pair \.cc\.sel-in(, \.io-chips\.io-pair \.cc\.sel)? \{ background:var\(--c-primary-dark\)[^}]*color:var\(--c-on-primary\)/.test(css) && !/io-pair[^{]*sel-(out|in)[^{]*\{[^}]*--c-(neg|pos)/.test(css), '二 1020-G：选中的（支出、收入一样）主色实心、白字，不用红绿');
+  ok(/\.io-chips\.io-pair \.cc\.sel-out, \.io-chips\.io-pair \.cc\.sel-in(, \.io-chips\.io-pair \.cc\.sel)? \{ background:var\(--c-fill\)[^}]*color:var\(--c-on-fill\)/.test(css) && !/io-pair[^{]*sel-(out|in)[^{]*\{[^}]*--c-(neg|pos)/.test(css), '二 1020-G：选中的（支出、收入一样）主色实心、白字，不用红绿（1027-UI：按钮底色 --c-fill + 按钮字 --c-on-fill）');
   $('addMask').style.display = 'none'; await wait(400);
 
   // 三、字居中

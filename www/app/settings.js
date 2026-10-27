@@ -162,18 +162,11 @@
 
         // ===== 外观：主题色（全局，所有账号共用，存 localStorage）=====
         (function(){
-            const DEFAULT_PRIMARY='#3f6f6b';
+            const DEFAULT_PRIMARY=JiwenThemeData.DEFAULT_COLOR;   // 雾松青
+            const HEX_RE=/^#[0-9a-fA-F]{6}$/;
             // 预设：每套只给一个主色，其余色由算法从主色推导，保证整体协调
-            const PRESETS=[
-                { name:'雾松青', color:'#3f6f6b' },
-                { name:'素墨米', color:'#8a7f66' },
-                { name:'黛紫烟', color:'#6b5a82' },
-                { name:'宣纸灰', color:'#5f5b54' },
-                { name:'赭石红', color:'#a8553f' },
-                { name:'黛蓝', color:'#3a5a7a' },
-                { name:'橄榄绿', color:'#6b7245' },
-                { name:'豆沙粉', color:'#9c5b63' }
-            ];
+            // 1027-UI：24 个预设（4 组，一组一行 6 个）、色名词典、兜底起名表在 app/theme-data.js；拆色、起名在 app/theme.js
+            const PRESETS=JiwenThemeData.PRESETS;
 
             // —— 颜色工具：hex<->hsl，按亮度派生整套变量 ——
             function hexToRgb(h){ h=h.replace('#',''); if(h.length===3)h=h.split('').map(c=>c+c).join('');
@@ -194,33 +187,35 @@
             function _contrast(a,b){ const l1=_lum(a),l2=_lum(b); return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05); }
 
             // 1020-J：主色真正会用的那一段（选色面板的深浅条、鲜艳条两头就是它）：亮度 PAL_L_MIN～PAL_L_MAX、饱和度 PAL_S_MIN～100
+            //   1027-UI：这一段只给装饰色（卡片、面板、边框、选中底……）当基准用了；按钮底色就是选的颜色，选色面板放开到 PICK_L_MIN～PICK_L_MAX，浅色也能选
             const PAL_L_MIN=20, PAL_L_MAX=56, PAL_S_MIN=12;
+            const PICK_L_MIN=6, PICK_L_MAX=94, PICK_S_MIN=0;
             // 黑 / 白 / 灰没有色相（rgbToHsl 给 0 = 红，原来再被「饱和度至少 12」提上去，配出来的浅底是粉色）；太黑太白时取整也把色相弄乱了
             function noHue(hsl){ return hsl.s<1 || hsl.l<2 || hsl.l>98; }
             const DEFAULT_HUE=175;   // 默认主色 #3f6f6b 的色相：没色相、又没记过上一次的色相时用它
             // 从一个主色推导整套主题变量（保证浅底深字、对比足够）
             //   hue：选色面板记着的色相（拖条时用它，不从色值反推）；不给时从色值反推，色值没有色相的用 hueFallback（上一次的色相）
             function buildPalette(primaryHex, hue, hueFallback){
-                let { h,s,l } = rgbToHsl(hexToRgb(primaryHex));
+                // 1027-UI：主色拆色（JiwenTheme.themeNew，方案页定稿）：按钮底色就是选的颜色（--c-fill，不再压深），
+                //   按钮上的字（--c-on-fill）同色相浅字 / 深字取对比高的，强调字（--c-ink）同色相、在页面底和各种浅底上都 ≥ 4.5:1，
+                //   页面底（--c-bg）同色相很浅很淡；按钮底色和页面底太接近（< 1.6）时按钮加一道强调字颜色的细边（--c-fill-edge）。
+                //   下面那些装饰用的颜色（卡片、面板、边框、选中底……）照旧按「压深以后的主色」推，和原来一样；
+                //   老变量名留作别名：--c-on-primary = --c-on-fill；--c-primary = 线、条、点用的颜色（选的颜色够深就是它，太浅用强调字颜色）。
+                const T=JiwenTheme.themeNew(primaryHex);
+                let { h,s,l } = rgbToHsl(hexToRgb(T.fill));
                 if(hue!=null && isFinite(hue)) h=hue;
                 else if(noHue({ h,s,l })) h=(hueFallback!=null && isFinite(hueFallback)) ? hueFallback : DEFAULT_HUE;
                 if(s<PAL_S_MIN) s=PAL_S_MIN;         // 太灰会显脏，给个下限
-                // 主色亮度收进可读区间：PAL_L_MIN～PAL_L_MAX（1020-J 起也有下限：拉到最黑也是看得出色相的深色）
+                // 装饰色的基准：主色亮度收进 PAL_L_MIN～PAL_L_MAX，再压到白字 ≥ 2.4（原来的主色算法，只给装饰色当基准用）
                 let pL=Math.max(PAL_L_MIN, Math.min(l,PAL_L_MAX));
-                // 关键兜底：黄/青等高亮色相即使压到 56 白字仍可能发虚，
-                // 逐步压暗直到「白字 / 主色」对比≥2.4，保证按钮文字任何选色下都看得清
                 let primary=hslToHex(h,s,pL);
                 let guard=0;
                 while(_whiteContrast(primary) < 2.4 && pL > 20 && guard++ < 40){
                     pL -= 2; primary=hslToHex(h,s,pL);
                 }
                 const primaryMid=hslToHex(h,Math.min(s+4,90),Math.min(pL+6,60));
-                // 主色按钮上的文字：黑/白哪个对主色对比更高就用哪个（比单纯按亮度判断更稳）
-                const {r,g,b}=hexToRgb(primary);
-                const onPrimary = _contrast(primary,'#ffffff') >= _contrast(primary,'#2a2200')
-                    ? '#ffffff' : '#2a2200';
-                return {
-                    '--c-primary':       primary,
+                const {r,g,b}=hexToRgb(T.fill);
+                const pal = {
                     '--c-primary-mid':   primaryMid,
                     '--c-primary-dark':  hslToHex(h,Math.min(s+6,90),Math.max(pL-14,26)),
                     '--c-primary-deep':  hslToHex(h,Math.min(s+10,92),Math.max(pL-26,20)),
@@ -235,19 +230,36 @@
                     '--c-border-mid':    hslToHex(h,Math.min(s+4,60),68),
                     '--c-surface':       hslToHex(h,40,98),
                     '--c-surface-2':     hslToHex(h,45,98.5),
-                    '--c-bg':            hslToHex(h,42,96),
+                    '--c-bg':            T.bg,
                     '--c-card-1':        hslToHex(h,55,95),
                     '--c-card-2':        hslToHex(h,62,88),
                     '--c-sheet':         hslToHex(h,60,91.5),   // 1019-T：底部面板底色（卡片两头渐变色的中间）
                     '--c-chip':          hslToHex(h,70,92),
-                    '--c-on-primary':    onPrimary,
                     '--c-shadow-rgb':    `${r},${g},${b}`,
                     // 选中态：底色取中浅染（亮度 82，明显深于未选中的 --c-chip≈92），
                     // 纯色块即可清晰区分，无需边框；文字用深主色保证可读。
                     '--c-sel-bg':        hslToHex(h,Math.min(s+14,74),82),
-                    '--c-sel-border':    primary,
                     '--c-sel-text':      hslToHex(h,Math.min(s+10,92),Math.max(pL-22,22))
                 };
+                // 1027-UI：强调字和几种深字在页面底、白卡，以及 App 里会垫在字下面的几种浅底（面板、卡片、选中底……）上都要 ≥ 4.5:1，
+                //   不够就同色相往深里推（themeNew 只保证页面底和白卡；App 的卡片、面板底色比页面底深一点）
+                const lights=['#ffffff', T.bg, pal['--c-surface'], pal['--c-card-1'], pal['--c-card-2'], pal['--c-sheet'], pal['--c-chip'], pal['--c-accent-soft']];
+                const deepen=(c, bgs)=>{ const o=JiwenTheme.oklch(c); let L=o.L, x=c, g2=0;
+                    while(bgs.some(b=>_contrast(x,b)<4.5) && L>0.05 && g2++<80){ L-=0.01; x=JiwenTheme.ok2hex(L, o.C, o.H); }
+                    return x; };
+                const ink=deepen(T.ink, lights);
+                ['--c-primary-dark','--c-primary-deep','--c-text','--c-text-soft'].forEach(k=>{ pal[k]=deepen(pal[k], lights); });
+                pal['--c-sel-text']=deepen(pal['--c-sel-text'], [pal['--c-sel-bg']]);
+                Object.assign(pal, {
+                    '--c-fill':          T.fill,
+                    '--c-on-fill':       T.on,
+                    '--c-ink':           ink,
+                    '--c-fill-edge':     T.edge ? ink : 'transparent',
+                    '--c-primary':       _contrast(T.fill, T.bg) >= 3 ? T.fill : ink,
+                    '--c-on-primary':    T.on,
+                    '--c-sel-border':    T.fill
+                });
+                return pal;
             }
             function applyPrimary(primaryHex, hue){
                 const pal=buildPalette(primaryHex, hue, savedHue());
@@ -275,41 +287,56 @@
 
             // —— 弹窗交互 ——
             const themeMask=$('themeMask');
-            // 1025-UX：每个预设一格：色块 + 下面写名字（原来只有 42px 的圆、没名字，点击区不到 48），一行 4 格
+            // 1025-UX：每个预设一格：色块 + 下面写名字；1027-UI：24 个分 4 组，一组一行 6 个（组名写在这一行上面），
+            //   选中的：色块外一圈强调字颜色的环、色块里一个按那个颜色配好的勾（深底浅勾、浅底深勾）、名字加粗
+            const CHECK_SVG='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
             function renderPresets(activeColor){
                 const box=$('themePresets'); box.innerHTML='';
-                PRESETS.forEach(p=>{
-                    const sw=document.createElement('button'); sw.type='button';
-                    sw.className='theme-swatch';
-                    const dot=document.createElement('span'); dot.className='theme-swatch-dot';
-                    dot.style.background=`linear-gradient(135deg, ${p.color}, ${hslToHex(rgbToHsl(hexToRgb(p.color)).h, rgbToHsl(hexToRgb(p.color)).s, Math.max(rgbToHsl(hexToRgb(p.color)).l-16,22))})`;
-                    const nm=document.createElement('span'); nm.className='theme-swatch-name'; nm.textContent=p.name;
-                    sw.appendChild(dot); sw.appendChild(nm);
-                    sw.title=p.name;
-                    const on=!!(activeColor && p.color.toLowerCase()===activeColor.toLowerCase());
-                    if(on) sw.classList.add('active');
-                    sw.setAttribute('aria-pressed', on ? 'true' : 'false');
-                    sw.onclick=()=>{
-                        applyPrimary(p.color);
-                        const pf=loadPrefs(); pf.primary=p.color; pf.hue=Math.round(rgbToHsl(hexToRgb(p.color)).h*10)/10; pf.hueOf=p.color; savePrefs(pf);
-                        renderPresets(p.color);
-                        $('customColor').value=p.color; paintCustomRow();
-                        paintLoginTheme();
-                    };
-                    box.appendChild(sw);
+                JiwenThemeData.GROUPS.forEach(g=>{
+                    const grp=document.createElement('div'); grp.className='theme-group';
+                    const lab=document.createElement('div'); lab.className='theme-group-t'; lab.textContent=g;
+                    const row=document.createElement('div'); row.className='theme-row';
+                    PRESETS.filter(p=>p.group===g).forEach(p=>{
+                        const sw=document.createElement('button'); sw.type='button';
+                        sw.className='theme-swatch';
+                        const dot=document.createElement('span'); dot.className='theme-swatch-dot';
+                        dot.style.background=p.color;
+                        dot.style.color=JiwenTheme.themeNew(p.color).on;   // 勾的颜色：这个颜色当按钮时配的字色
+                        dot.innerHTML=CHECK_SVG;
+                        const nm=document.createElement('span'); nm.className='theme-swatch-name'; nm.textContent=p.name;
+                        sw.appendChild(dot); sw.appendChild(nm);
+                        sw.title=p.name;
+                        const on=!!(activeColor && p.color.toLowerCase()===activeColor.toLowerCase());
+                        if(on) sw.classList.add('active');
+                        sw.setAttribute('aria-pressed', on ? 'true' : 'false');
+                        sw.onclick=()=>{
+                            applyPrimary(p.color);
+                            const pf=loadPrefs(); pf.primary=p.color; pf.hue=Math.round(rgbToHsl(hexToRgb(p.color)).h*10)/10; pf.hueOf=p.color; savePrefs(pf);
+                            renderPresets(p.color);
+                            $('customColor').value=p.color; paintCustomRow();
+                            paintLoginTheme();
+                        };
+                        row.appendChild(sw);
+                    });
+                    grp.appendChild(lab); grp.appendChild(row); box.appendChild(grp);
                 });
             }
-            // 1025-UX：登录页「换个主题色」那一行：写现在用的是哪个（预设的名字，自己调的写「自己调的」）
-            function themeName(){
-                const c=(loadPrefs().primary||DEFAULT_PRIMARY).toLowerCase();
-                const p=PRESETS.find(x=>x.color.toLowerCase()===c);
-                return p ? p.name : '自己调的';
+            // 1025-UX：登录页「换个主题色」那一行写现在用的是哪个；1027-UI：预设写预设名，自己调的按方案页四步起名（JiwenTheme.nameOf），
+            //   名字下一行短评（冷暖 · 浓淡 · 深浅 · 按钮配什么字），不再写「自己调的」。
+            //   三处：设置「外观主题」、外观弹窗「自己调一个颜色」、登录页「主题色」；选色面板里拖动时按正在看的颜色实时改（paintThemeNames(色值)）
+            function curColor(){ const c=loadPrefs().primary; return (HEX_RE.test(c||'') ? c : DEFAULT_PRIMARY).toLowerCase(); }
+            function themeName(){ return JiwenTheme.colorName(curColor()).name; }
+            function paintThemeNames(hex){
+                const n=JiwenTheme.colorName(hex||curColor());
+                [['loginThemeCur','loginThemeVerdict'], ['themeCur','themeCurVerdict'], ['customColorName','customColorVerdict']].forEach(([a,b])=>{
+                    if($(a)) $(a).textContent=n.name;
+                    if($(b)) $(b).textContent=n.verdict;
+                });
             }
             function paintLoginTheme(){
-                const v=$('loginThemeCur'), dot=$('loginThemeDot');
-                if(v) v.textContent=themeName();
-                if($('themeCur')) $('themeCur').textContent=themeName();   // 设置页「外观主题」那一行也写现在用的颜色
-                if(dot) dot.style.background=getComputedStyle(document.documentElement).getPropertyValue('--c-primary').trim() || DEFAULT_PRIMARY;
+                paintThemeNames();
+                const dot=$('loginThemeDot');
+                if(dot) dot.style.background=curColor();
             }
             function openTheme(){
                 const pf=loadPrefs();
@@ -325,6 +352,7 @@
             function paintCustomRow(){
                 const c=$('customColor').value;
                 $('customColorDot').style.background=c; $('customColorVal').textContent=c;
+                paintThemeNames(c);
             }
             $('themeBtn').addEventListener('click', openTheme);
             // 1025-UX：登录页也能换主题色（新用户不用先进去再找设置）；外观弹窗关了把登录页那一行的名字跟上
@@ -335,9 +363,9 @@
             //   共用底部面板 JiwenSheet：一排常用色块 + 色相条 + 深浅条 + 鲜艳条，下面写现在选的色值、能直接输入色值；
             //   选的时候整个 App 实时跟着变（applyPrimary，只改样子不存），「应用」才存（和原来「应用此色」一样存选的色值），
             //   「取消」、往下拉、返回键都恢复打开前的颜色。「太浅太亮自动加深」照旧在 buildPalette 里，这里写出实际用的是哪个色。
-            const CP_COMMON=['#3f6f6b','#8a7f66','#6b5a82','#5f5b54','#a8553f','#3a5a7a','#6b7245','#9c5b63',
-                '#b0413e','#c26a2b','#1565c0','#ad1457'];   // 前 8 个是预设主题，后 4 个补几种常见的；两排
-            const HEX_RE=/^#[0-9a-fA-F]{6}$/;
+            //   1027-UI：两排常用色块：几个预设（深的、浅的都有）+ 原来是预设的豆沙粉、橄榄绿、素墨米（以前选过的人好找）+ 几种常见的
+            const CP_COMMON=['#3f6f6b','#95b6ce','#e7b643','#b2392b','#374f9d','#c4d580','#ada4cd','#292e34',
+                '#9c5b63','#6b7245','#8a7f66','#1565c0'];
             function openColorPicker(){
                 const pf=loadPrefs();
                 const orig=HEX_RE.test(pf.primary||'') ? pf.primary.toLowerCase() : DEFAULT_PRIMARY;
@@ -353,30 +381,38 @@
                 const origStyle=root.getAttribute('style'), origMeta=meta ? meta.getAttribute('content') : null;
                 const restore=()=>{ if(raf){ cancelAnimationFrame(raf); raf=0; }
                     if(origStyle==null) root.removeAttribute('style'); else root.setAttribute('style', origStyle);
-                    if(meta && origMeta!=null) meta.setAttribute('content', origMeta); };
+                    if(meta && origMeta!=null) meta.setAttribute('content', origMeta);
+                    restoreNames(); };
                 const preview=()=>{ if(raf) return; raf=requestAnimationFrame(()=>{ raf=0; applyPrimary(cur, hsl.h); }); };
+                const restoreNames=()=>{ paintThemeNames(); const d=$('customColorDot'), v=$('customColorVal'), c=$('customColor').value; if(d) d.style.background=c; if(v) v.textContent=c; };
                 const setHex=(hex, fromHsl)=>{
                     cur=hex.toLowerCase();
                     if(!fromHsl){ const n=rgbToHsl(hexToRgb(cur)); if(noHue(n)) n.h=hsl.h; hsl=n; }
                     paint(); preview();
                 };
-                // 1020-J：深浅条、鲜艳条的两头就是 App 真正会用的最深 / 最浅、最灰 / 最艳（和 buildPalette 的上下限一样）；
-                //   条上的颜色按 buildPalette 实际会用的主色画（太亮被加深的那段条上也是加深以后的颜色）
-                const used=(h, s0, l0)=>buildPalette(hslToHex(h, s0, l0), h)['--c-primary'];
+                // 1027-UI：按钮底色就是选的颜色，三条的两头放开（深浅 PICK_L_MIN～PICK_L_MAX，浅色也能选；鲜艳从 0 起，灰也能选）；
+                //   条上画的就是 App 会用的按钮底色（只有「字怎么配都不够清楚」那一小段会被挪一点，themeNew 的 nudged）
+                const used=(h, s0, l0)=>JiwenTheme.themeNew(hslToHex(h, s0, l0)).fill;
                 const bars=[
-                    { k:'h', label:'色相', min:0, max:360, grad:()=>`linear-gradient(to right, ${[0,30,60,90,120,150,180,210,240,270,300,330,360].map(h=>used(h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,35),PAL_L_MAX))).join(',')})` },
-                    { k:'l', label:'深浅', min:PAL_L_MIN, max:PAL_L_MAX, grad:()=>`linear-gradient(to right, ${[0,0.25,0.5,0.75,1].map(f=>used(hsl.h,hsl.s,PAL_L_MIN+f*(PAL_L_MAX-PAL_L_MIN))).join(',')})` },
-                    { k:'s', label:'鲜艳', min:PAL_S_MIN, max:100, grad:()=>`linear-gradient(to right, ${[0,0.5,1].map(f=>used(hsl.h,PAL_S_MIN+f*(100-PAL_S_MIN),Math.min(Math.max(hsl.l,PAL_L_MIN),PAL_L_MAX))).join(',')})` }
+                    { k:'h', label:'色相', min:0, max:360, grad:()=>`linear-gradient(to right, ${[0,30,60,90,120,150,180,210,240,270,300,330,360].map(h=>used(h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,30),75))).join(',')})` },
+                    { k:'l', label:'深浅', min:PICK_L_MIN, max:PICK_L_MAX, grad:()=>`linear-gradient(to right, ${[0,0.2,0.4,0.6,0.8,1].map(f=>used(hsl.h,hsl.s,PICK_L_MIN+f*(PICK_L_MAX-PICK_L_MIN))).join(',')})` },
+                    { k:'s', label:'鲜艳', min:PICK_S_MIN, max:100, grad:()=>`linear-gradient(to right, ${[0,0.5,1].map(f=>used(hsl.h,PICK_S_MIN+f*(100-PICK_S_MIN),Math.min(Math.max(hsl.l,PICK_L_MIN),PICK_L_MAX))).join(',')})` }
                 ];
                 const frac=b=>Math.max(0, Math.min(1, (hsl[b.k]-b.min)/(b.max-b.min)));
                 function paint(){
                     bars.forEach(b=>{ const e=els[b.k]; if(!e) return; e.track.style.background=b.grad(); e.thumb.style.left=(frac(b)*100)+'%';
-                        e.thumb.style.background=b.k==='h' ? used(hsl.h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,35),PAL_L_MAX)) : buildPalette(cur, hsl.h)['--c-primary']; });
+                        e.thumb.style.background=b.k==='h' ? used(hsl.h,Math.max(hsl.s,35),Math.min(Math.max(hsl.l,30),75)) : JiwenTheme.themeNew(cur).fill; });
                     if(els.dot) els.dot.style.background=cur;
                     if(els.hex && document.activeElement!==els.hex){ els.hex.value=cur; els.hex.classList.remove('bad'); }
                     if(els.sw) [...els.sw.children].forEach(x=>x.classList.toggle('on', x.dataset.c===cur));
-                    if(els.note){ const used=buildPalette(cur, hsl.h)['--c-primary'].toLowerCase();
-                        els.note.textContent = used!==cur ? `这个颜色太浅或太亮，按钮上看不清字，实际会用深一点的 ${used}。` : '整个 App 已经换成这个颜色看看效果，点「应用」才存。'; }
+                    const nm=JiwenTheme.colorName(cur);
+                    if(els.name){ els.name.textContent=nm.name; els.verdict.textContent=nm.verdict; }
+                    paintThemeNames(cur);   // 外观弹窗、设置、登录页那几处名字跟着拖动实时变（取消时放回）
+                    if($('customColorDot')) $('customColorDot').style.background=cur;
+                    if($('customColorVal')) $('customColorVal').textContent=cur;
+                    if(els.note){ const T=nm.t;
+                        els.note.textContent = T.nudged ? `这个颜色卡在不深不浅的中间，按钮上的字怎么配都不够清楚，按钮会用挪了一点的 ${T.fill}。`
+                            : '整个 App 已经换成这个颜色看看效果，点「应用」才存。'; }
                 }
                 window.JiwenSheet.open({ title:'自定义主色', sub:'点色块，或者拖下面的条；整个 App 跟着变，点「应用」才存', tall:true,   // 1020-J：原来 72% 高装不下，色相 / 深浅条被「应用」挡住半截
                     onDismiss(){ restore(); },
@@ -397,7 +433,7 @@
                                 const f=Math.max(0, Math.min(1, (e.clientX-r.left)/r.width));
                                 hsl[b.k]=Math.round((b.min+f*(b.max-b.min))*10)/10;
                                 // 另外两个数不在范围里的（从色值进来的太浅、太灰）先收进范围，条上看到的就是实际用的
-                                hsl.l=Math.max(PAL_L_MIN, Math.min(PAL_L_MAX, hsl.l)); hsl.s=Math.max(PAL_S_MIN, hsl.s);
+                                hsl.l=Math.max(PICK_L_MIN, Math.min(PICK_L_MAX, hsl.l)); hsl.s=Math.max(PICK_S_MIN, hsl.s);
                                 setHex(hslToHex(hsl.h,hsl.s,hsl.l), true); };
                             bar.addEventListener('pointerdown', e=>{ dragging=true; try{ bar.setPointerCapture(e.pointerId); }catch(_){} at(e); });
                             bar.addEventListener('pointermove', e=>{ if(dragging) at(e); });
@@ -412,7 +448,13 @@
                         hex.addEventListener('input', ()=>{ let v=hex.value.trim(); if(v && v[0]!=='#') v='#'+v;
                             if(HEX_RE.test(v)){ hex.classList.remove('bad'); setHex(v); } else hex.classList.toggle('bad', v.length>=7); });
                         hex.addEventListener('blur', ()=>{ hex.value=cur; hex.classList.remove('bad'); });
-                        now.appendChild(dot); now.appendChild(hex); box.appendChild(now);
+                        // 1027-UI：色值框旁边写这个颜色的名字、下一行短评，拖的时候实时变
+                        const nmBox=document.createElement('div'); nmBox.className='cp-name-box';
+                        const nmT=document.createElement('div'); nmT.className='cp-name'; nmT.id='cpName';
+                        const nmV=document.createElement('div'); nmV.className='theme-verdict cp-verdict'; nmV.id='cpVerdict';
+                        nmBox.appendChild(nmT); nmBox.appendChild(nmV);
+                        now.appendChild(dot); now.appendChild(hex); box.appendChild(now); box.appendChild(nmBox);
+                        els.name=nmT; els.verdict=nmV;
                         const note=document.createElement('p'); note.className='cp-note'; note.id='cpNote'; box.appendChild(note);
                         Object.assign(els, { dot, hex, note });
                         paint();

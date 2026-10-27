@@ -30,7 +30,7 @@ const recs = [{ id: 'r1', time: '2026-12-01T12:00', money: 18, type: 'expense', 
   // 换主题：底色跟着换
   d.querySelector('.tab-btn[data-tab="settings"]').click();
   $('themeBtn').click(); await t.idle();
-  const sw = [...$('themePresets').children].find(e => e.title === '黛紫烟');
+  const sw = [...$('themePresets').querySelectorAll('.theme-swatch')].find(e => e.title === '黛紫烟');
   ok(sw, '1 有黛紫烟'); sw && sw.click();
   const v = d.documentElement.style.getPropertyValue('--c-sheet');
   ok(/^#[0-9a-f]{6}$/i.test(v.trim()) && v.trim().toLowerCase() !== '#dcf6f4', '1 换成黛紫烟：面板底色跟着换（默认雾松青是 #dcf6f4，1025-UX 前默认金黄 #fff5d4）' + v);

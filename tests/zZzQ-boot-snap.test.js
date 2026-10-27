@@ -97,7 +97,7 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   [...t.$('defaultTabSeg').children].find(b => b.dataset.v === 'ledger').click();
   await hide(t); ok(snap(t), '4 切后台：又有了');
   t.$('themeBtn').click(); await t.idle();
-  [...t.$('themePresets').children][1].click();
+  [...t.$('themePresets').querySelectorAll('.theme-swatch')][1].click();
   ok(!snap(t), '4 换主题：快照删掉');
   t.$('themeMask').style.display = 'none';
 

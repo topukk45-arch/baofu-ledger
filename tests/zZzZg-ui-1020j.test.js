@@ -186,8 +186,10 @@ const hueDiff = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 
   $('themeBtn').click(); await wait(20);
   $('customColorBtn').click(); await wait(30);
   ok(w.JiwenSheet._sheet().classList.contains('ui-sheet-tall') && /\.ui-sheet\.ui-sheet-tall \{ max-height:88vh; max-height:88dvh; \}/.test(cssAll), '八 选色面板能到 88% 屏幕高（原来 72% 装不下，色相条被「应用」挡住半截）');
-  const bg = () => d.documentElement.style.getPropertyValue('--c-bg').trim();
-  const prim = () => d.documentElement.style.getPropertyValue('--c-primary').trim();
+  // 1027-UI：页面底色（--c-bg）改按拆色算（灰色配中性的底，不再记色相）；记着色相的是面板、卡片这些装饰色，这里看面板底色 --c-sheet；
+  //   按钮底色就是选的颜色，看 --c-fill（--c-primary 现在是线、条、点用的别名）
+  const bg = () => d.documentElement.style.getPropertyValue('--c-sheet').trim();
+  const prim = () => d.documentElement.style.getPropertyValue('--c-fill').trim();
   const drag = async (k, f) => {
     const bar = $('cpBar' + k), tr = bar.querySelector('.cp-track');
     tr.getBoundingClientRect = () => ({ left: 0, right: 300, width: 300, top: 0, bottom: 48, height: 48 });
@@ -206,13 +208,13 @@ const hueDiff = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 
       if (hb != null && hueDiff(hb, 340) < 25 && hueDiff(want, 340) > 40) pink++;
     }
   }
-  ok(worst <= 6, '八 色相放在几个位置，深浅 / 鲜艳各拉到两头：整个 App 底色的色相和选的一致（最多差 ' + Math.round(worst * 10) / 10 + '°）');
+  ok(worst <= 6, '八 色相放在几个位置，深浅 / 鲜艳各拉到两头：整个 App 面板底色的色相和选的一致（最多差 ' + Math.round(worst * 10) / 10 + '°）');
   ok(!pink, '八 不出现粉色');
   // 深浅条的两头就是 App 真正会用的最深 / 最浅：拉到最浅时没被加深（不写「实际会用深一点的」）
   await drag('H', 0.6); await drag('S', 0.5); await drag('L', 1);
   ok(!/实际会用深一点的/.test($('cpNote').textContent) && prim().toLowerCase() === $('cpHex').value.toLowerCase(), '八 深浅拉到最浅：就是实际用的颜色，不另说「实际会用深一点的」 ' + prim() + ' ' + $('cpHex').value);
   await drag('L', 0);
-  ok(prim().toLowerCase() === $('cpHex').value.toLowerCase() && hueDiff(hueOf(prim()), 216) <= 6, '八 深浅拉到最深：也看得出色相（不是纯黑）' + prim());
+  ok(prim().toLowerCase() === $('cpHex').value.toLowerCase() && hueOf(prim()) != null && hueDiff(hueOf(prim()), 216) <= 6, '八 深浅拉到最深：就是选的颜色、也看得出色相（不是纯黑）' + prim());
   // 输入没有色相的（黑 / 白）：保留上一次的色相
   const hx = $('cpHex'); hx.value = '#000000'; hx.dispatchEvent(new w.Event('input', { bubbles: true }));
   await new Promise(r => w.requestAnimationFrame(() => r())); await wait(5);
@@ -225,10 +227,10 @@ const hueDiff = (a, b) => { const d = Math.abs(a - b) % 360; return Math.min(d, 
 
   // 再开一次 App：存的是黑色，按存下的色相配色
   const t2 = await A.boot({ html, www: WWW, seed: Object.assign(A.seedOf(recs, CATS), { app_appearance: JSON.stringify({ primary: '#000000', hue: 216, hueOf: '#000000' }) }) });
-  const bg2 = t2.d.documentElement.style.getPropertyValue('--c-bg').trim();
+  const bg2 = t2.d.documentElement.style.getPropertyValue('--c-sheet').trim();
   ok(hueDiff(hueOf(bg2), 216) <= 6, '八 重开 App：黑色按存下的色相配（' + bg2 + '）');
   const t3 = await A.boot({ html, www: WWW, seed: Object.assign(A.seedOf(recs, CATS), { app_appearance: JSON.stringify({ primary: '#ffffff' }) }) });
-  const bg3 = t3.d.documentElement.style.getPropertyValue('--c-bg').trim();
+  const bg3 = t3.d.documentElement.style.getPropertyValue('--c-sheet').trim();
   ok(hueOf(bg3) != null && hueDiff(hueOf(bg3), 0) > 40, '八 老的白色（没存色相）：不再配成粉色（' + bg3 + '）');
 
   ok(t.errs.length === 0, '没有脚本错误 ' + t.errs.join(';'));
