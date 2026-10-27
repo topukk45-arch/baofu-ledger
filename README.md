@@ -10,11 +10,11 @@ https://github.com/topukk45-arch/baofu-ledger/releases/download/latest-build/jiw
 
 它指向 **main 上**最新一次打包（测试版）：只有 main 有新提交才会更新，别的分支上做的改动不在这个包里。下载前可以在 Releases 页面看「最新测试版」的标题，写着它是哪一版（比如「最新测试版 1024-X」）。正式版在仓库的 Releases 页面里，标着「Latest」的那个。
 
-**体验版（还没合回 main 的改版）**：在分支上做的界面改版，每一版单独发一个预发布，标题是「版本号 体验版」，比 main 上的测试版新。现在最新的是 **1027-UI7 体验版**（界面收敛第一到第三轮，加上老 WebView / 模拟器上颜色不显示的修复），直接下载：
+**体验版（还没合回 main 的改版）**：在分支上做的界面改版，每一版单独发一个预发布，标题是「版本号 体验版」，比 main 上的测试版新。现在最新的是 **1027-UI8 体验版**（界面收敛第一到第三轮，加上老 WebView / 模拟器上颜色不显示的修复），直接下载：
 
-https://github.com/topukk45-arch/baofu-ledger/releases/download/1027-UI7/jiwen-1027-UI7.apk
+https://github.com/topukk45-arch/baofu-ledger/releases/download/1027-UI8/jiwen-1027-UI8.apk
 
-体验版和测试版、正式版签名一样，可以互相覆盖安装，账本不动。装的是哪一版，看登录页标题下面（或设置页最底下）的版本号，比如 `build 1027-UI7`。
+体验版和测试版、正式版签名一样，可以互相覆盖安装，账本不动。装的是哪一版，看登录页标题下面（或设置页最底下）的版本号，比如 `build 1027-UI8`。
 
 现在的正式版是 **记问 1021 β**（贝塔版，账单导入经过两轮真账单实测，入口还在开发开关里），直接下载：
 
