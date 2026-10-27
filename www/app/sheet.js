@@ -344,11 +344,14 @@
 
         // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====
         (function(){
+            // 1027-UI2：原来只认启动时就在页面里的弹窗；共用面板（一周 / 一天、分类抽屉、选色、确认面板……）和导入页的面板是后来才加进来的，
+            //   打开时背景没锁住，在面板里滑到头就带着下面的页面一起滚（10-27 手机上看到的）。现在后来加进来的 .mask 也盯上
             const masks=Array.from(document.querySelectorAll('.mask'));
             let savedScrollY=0, locked=false;
 
             function anyMaskOpen(){
                 return masks.some(m=>{
+                    if(!m.isConnected || m.classList.contains('sheet-ghost')) return false;
                     const d=getComputedStyle(m).display;
                     return d && d!=='none';
                 });
@@ -376,9 +379,16 @@
             function update(){ anyMaskOpen()?lock():unlock(); }
 
             // 监听每个弹窗的显示状态变化
-            masks.forEach(m=>{
-                new MutationObserver(update).observe(m, {attributes:true, attributeFilter:['style']});
-            });
+            const watch=m=>{ if(m.__lockWatch) return; m.__lockWatch=1; if(!masks.includes(m)) masks.push(m);
+                new MutationObserver(update).observe(m, {attributes:true, attributeFilter:['style', 'class']}); };
+            masks.forEach(watch);
+            new MutationObserver(recs=>{
+                let hit=false;
+                recs.forEach(r=>r.addedNodes.forEach(n=>{ if(n.nodeType!==1) return;
+                    if(n.classList.contains('mask')){ watch(n); hit=true; }
+                    n.querySelectorAll && n.querySelectorAll('.mask').forEach(x=>{ watch(x); hit=true; }); }));
+                if(hit) update();
+            }).observe(document.body, { childList:true, subtree:true });
 
             // 弹窗内列表（可滚动区域）到顶/到底时，阻止滚动冒泡到背景，进一步防穿透
             // 1020-C：.cat-list（分类管理、常用模板的列表）、.ask-msg 不再拦：拦了以后面板收不到手指在列表里的移动，

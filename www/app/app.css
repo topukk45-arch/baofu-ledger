@@ -758,7 +758,8 @@
             padding:8px 18px calc(20px + env(safe-area-inset-bottom));
             max-height:85dvh; overflow-y:auto;
             transform:translateY(100%); transition:transform var(--sheet-ms) var(--sheet-ease); }   /* 1019-N：打开往上滑入；1019-Z3 起和收起同一个时长、先快后慢 */
-        .sheet-mask.open .sheet { transform:translateY(0); }   /* 打开时滑入 */
+        .sheet-mask.open .sheet { transform:translateY(0); }
+        .sheet { overscroll-behavior:contain; }   /* 1027-UI3：面板里滑到头，不把滚动交给下面的页面 */   /* 打开时滑入 */
         .sheet-handle { width:40px; height:4px; border-radius:2px; background:var(--c-border-mid);
             margin:6px auto 12px; }
         /* 顶部抓手区：把手 + 标题行作为下滑关闭的拖拽区。touch-action:none 让浏览器
@@ -2082,7 +2083,7 @@
         /* ===== 1023-G：搜一笔（结果页 + 筛选条件抽屉）===== */
         .act-filter.active-filter::after { display:none; }
         /* 结果页：从右边滑进来，盖住底栏；里面自己滚 */
-        .search-page { position:fixed; inset:0; z-index:960; display:flex; flex-direction:column; background:var(--c-bg); }
+        .search-page { position:fixed; inset:0; z-index:960; display:flex; flex-direction:column; background:var(--c-bg); overflow:hidden; overscroll-behavior:contain; }   /* 1027-UI3：在顶上、条件卡这些不能滚的地方滑，不带着下面的账单页一起滚 */
         .search-page[hidden] { display:none; }
         .search-page.sp-in { animation:spIn .32s var(--sheet-ease) both; }
         .search-page.sp-out { animation:spOut .24s ease-in both; pointer-events:none; }
