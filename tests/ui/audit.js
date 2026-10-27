@@ -1490,6 +1490,36 @@ async function run(cfg, port, browser) {
           await pg.evaluate(() => { const c = document.getElementById('statCal'); c && c.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); }); await pg.waitForTimeout(300);
           await shot(pg, size, '第二轮·' + nm, '1 统计页日历');
           if (!col) {
+            // ===== 13 续：1027-UI6 第三轮：长按一笔的菜单不出屏幕、三项点击区 ≥ 48；删除以后底部撤销条 =====
+            await tab(pg, 'ledger'); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300);
+            const row = await pg.$('#billList .bl-row[data-id]');
+            const bb = await row.boundingBox();
+            await pg.mouse.move(bb.x + bb.width / 2, bb.y + bb.height / 2); await pg.mouse.down(); await pg.waitForTimeout(650); await pg.mouse.up(); await pg.waitForTimeout(500);
+            const mb = await pg.evaluate(() => {
+              const m = document.getElementById('rowMenu'); if (!m) return ['没弹菜单'];
+              const bad = [], W = innerWidth;
+              [m, ...m.querySelectorAll('.rm-act, .bl-row'), document.getElementById('rmCancel')].forEach(e => { if (!e) return; const r = e.getBoundingClientRect(); if (r.left < 0 || r.right > W + 0.5) bad.push((e.id || e.className) + ' 出屏幕 ' + Math.round(r.left) + '～' + Math.round(r.right)); });
+              const acts = [...m.querySelectorAll('.rm-act')]; if (acts.length !== 3) bad.push('不是三项：' + acts.length);
+              acts.concat([document.getElementById('rmCancel')]).forEach(e => { const r = e.getBoundingClientRect(); if (r.height < 48 || r.width < 48) bad.push(e.textContent + ' 点击区 ' + Math.round(r.width) + '×' + Math.round(r.height)); });
+              for (let i = 1; i < acts.length; i++) { const g = acts[i].getBoundingClientRect().top - acts[i - 1].getBoundingClientRect().bottom; if (g < 8) bad.push('两项之间 ' + Math.round(g)); }
+              return bad;
+            });
+            results.push({ name: 'ui6-rowmenu', cfg: size, chk: true, label: '长按菜单不出屏幕、三项点击区 ≥ 48、间距 ≥ 8', bad: mb, ok: !mb.length });
+            await shot(pg, size, '第三轮·雾松青', '1 长按菜单');
+            const del = await pg.$('#rowMenu .rm-act[data-v="del"]');
+            if (del) {
+              await del.click(); await pg.waitForTimeout(500);
+              const sb = await pg.evaluate(new Function(CONTRAST_FN + `const s=document.getElementById('uiSnack'); if(!s || !s.classList.contains('show')) return ['没有撤销条'];
+                const bad=[], u=document.getElementById('snackUndo'); if(!u) bad.push('没有「撤销」'); else { const r=u.getBoundingClientRect(); if(r.height<48) bad.push('撤销 高 '+Math.round(r.height)); if(r.right>innerWidth+0.5) bad.push('撤销 出屏幕'); }
+                const r=s.getBoundingClientRect(); if(r.left<0 || r.right>innerWidth+0.5) bad.push('撤销条出屏幕');
+                return bad;`));
+              results.push({ name: 'ui6-undo-snack', cfg: size, chk: true, label: '删除后的撤销条在屏幕里、「撤销」高 ≥ 48', bad: sb, ok: !sb.length });
+              await shot(pg, size, '第三轮·雾松青', '2 删除后的撤销条');
+              await pg.evaluate(() => { const u = document.getElementById('snackUndo'); if (u) u.click(); }); await pg.waitForTimeout(300);
+            }
+            await tab(pg, 'stats');
+          }
+          if (!col) {
             await click(pg, '#statTabSeg button[data-v="budget"]'); await pg.waitForTimeout(300); await shot(pg, size, '第二轮·' + nm, '2 预算页');
             await click(pg, '#statTabSeg button[data-v="flow"]');
             await tab(pg, 'ledger'); await pg.evaluate(() => window.scrollTo(0, 0)); await pg.waitForTimeout(300); await shot(pg, size, '第二轮·' + nm, '3 账单页超预算提示');
