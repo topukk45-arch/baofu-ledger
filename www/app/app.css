@@ -2393,3 +2393,18 @@
         .bl-amt, .dw-day-v, .cs-amt, .sc-amt, .bgu-amt, .bgo-v, .bg-num b, .bl-day-sum b { font-weight:500; }
         .cs-row.cs-total .cs-amt { font-weight:700; }
         .dw-v { font-weight:400; }
+
+        /* ⑦ 空状态统一一种：48px 图标块（圆角 16，滑块槽的浅底、强调字颜色的线条图标）+ 一句 14px 的话 + 一个主按钮（高 40、圆角 12，--c-fill / --c-on-fill，点击区撑到 48），
+           按钮直接带人去做下一步。用在：搜一笔搜不到（放宽条件 / 记一笔）、这天没记账（给这天补一笔）、没设预算（设个预算）、没有日子（添加日子） */
+        .ui-empty { display:flex; flex-direction:column; align-items:center; gap:10px; padding:28px 16px; text-align:center; }
+        .ui-empty-ic { width:48px; height:48px; border-radius:var(--r-l); background:var(--c-track); color:var(--c-ink); display:flex; align-items:center; justify-content:center; flex:none; }
+        .ui-empty-ic svg { width:24px; height:24px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+        .ui-empty-t { margin:0; font-size:14px; line-height:20px; color:var(--c-t1); font-weight:400; }
+        button.ui-empty-btn { position:relative; height:40px; padding:0 18px; border:none; border-radius:var(--r-m); background:var(--c-fill); color:var(--c-on-fill);
+            box-shadow:inset 0 0 0 1px var(--c-fill-edge); font-family:inherit; font-size:14px; font-weight:500; cursor:pointer; }
+        button.ui-empty-btn::after { content:''; position:absolute; left:0; right:0; top:-4px; bottom:-4px; }
+        .sp-empty { padding:24px 8px 0; gap:0; }
+        .dd-empty { padding:0; color:inherit; }
+        .bg-empty { padding:0; }
+        #pageDays .days-empty { padding:24px 0; color:inherit; }
+        .bg-empty button.ui-empty-btn { margin-top:0; }

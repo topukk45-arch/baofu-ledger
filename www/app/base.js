@@ -248,6 +248,19 @@
             if(mode==='skip') r.skip=true; else if(mode==='flow') r.flow=true;
         }
         // HTML 转义，防止备注/名称里的特殊字符破坏页面
+        // 1027-UI4：空状态统一一种写法：48px 图标块（圆角 16）+ 一句话 + 一个主按钮（高 40、圆角 12），按钮直接带人去做下一步。
+        //   icon 是下面 EMPTY_ICONS 里的名字（先用现成的 Lucide 线条图标，以后换插图只换这一块）；btn { text, attrs } 不给就没有按钮
+        const EMPTY_ICONS={
+            search:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+            calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+            chart:'<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/>',
+            star:'<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
+        };
+        function emptyHtml(icon, text, btn){
+            return `<div class="ui-empty"><span class="ui-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24">${EMPTY_ICONS[icon]||''}</svg></span>`
+                + `<p class="ui-empty-t">${text}</p>`
+                + (btn ? `<button type="button" class="ui-empty-btn"${btn.attrs ? ' '+btn.attrs : ''}>${btn.text}</button>` : '') + `</div>`;
+        }
         function escapeHtml(s){
             return String(s).replace(/[&<>"']/g, c => ({
                 '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -362,5 +375,5 @@
         let currentArchive = '';
         let currentTab = 'ledger';
         let curPage = 1;
-        window.JiwenBase = { txtNudge, setTxtNudge, applyTxtNudge, get currentUser(){ return currentUser; }, set currentUser(v){ currentUser=v; }, get currentArchive(){ return currentArchive; }, set currentArchive(v){ currentArchive=v; }, get currentTab(){ return currentTab; }, set currentTab(v){ currentTab=v; }, get curPage(){ return curPage; }, set curPage(v){ curPage=v; }, $, DEFAULT_CATS, MODE_HINT, PAGE_SIZE, SHEET_MS, addBill, afterOpenAnim, archiveSelect, billCat, billList, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, escapeHtml, fabHold, fabWake, fillSelect, fitNums, isDirtyTime, isFlow, isSkip, loginBox, logoutBtn, mainBox, normMoney, nowDtValue, nowUser, pad, parseRecTime, recMode, repairTime, round2, safeNum, sanitizeMoney, saveEdit, setRecMode };   // base 模块对外只有这一个入口
+        window.JiwenBase = { txtNudge, setTxtNudge, applyTxtNudge, get currentUser(){ return currentUser; }, set currentUser(v){ currentUser=v; }, get currentArchive(){ return currentArchive; }, set currentArchive(v){ currentArchive=v; }, get currentTab(){ return currentTab; }, set currentTab(v){ currentTab=v; }, get curPage(){ return curPage; }, set curPage(v){ curPage=v; }, $, DEFAULT_CATS, MODE_HINT, PAGE_SIZE, SHEET_MS, addBill, afterOpenAnim, archiveSelect, billCat, billList, billMoney, billRemark, billTime, billType, cancelEdit, editCat, editMask, editMoney, editRemark, editTime, editType, emptyHtml, escapeHtml, fabHold, fabWake, fillSelect, fitNums, isDirtyTime, isFlow, isSkip, loginBox, logoutBtn, mainBox, normMoney, nowDtValue, nowUser, pad, parseRecTime, recMode, repairTime, round2, safeNum, sanitizeMoney, saveEdit, setRecMode };   // base 模块对外只有这一个入口
 })();

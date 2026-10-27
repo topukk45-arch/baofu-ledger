@@ -1,5 +1,5 @@
 (function(){
-        const { $, escapeHtml, fabHold, fabWake, fitNums, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
+        const { $, emptyHtml, escapeHtml, fabHold, fabWake, fitNums, isFlow, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
         const { balContrib, catSigned, curArchive, daysKey, expSigned, getBudgets, getCats, getUserData, impGetJson, impPendKey, impTarget, isOpening, isRefund, loadStore, modeAmtCls, odScheduleSync, refundedMap, saveStoreSafe, statContrib } = window.JiwenStore;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
         const { DT_YEAR_MAX, DT_YEAR_MIN, attachSwipe, playSlide } = window.JiwenDate;   // 用到前面模块的
@@ -192,9 +192,8 @@
 
             // —— 总览 ——
             if(!B.rows.length){
-                $('bgOverview').innerHTML=`<div class="bg-empty">还没有给任何分类设预算。<br>`
-                    + `设好之后，这里会按月显示哪些分类超了、哪些还有余量。<br>`
-                    + `<button class="mini-btn gold" data-act="bgSetup">去设置预算</button></div>`;
+                // 1027-UI4：空状态统一写法（图标块 + 一句话 + 一个按钮），按钮照旧去设置预算
+                $('bgOverview').innerHTML=`<div class="stat-card bg-empty">` + emptyHtml('chart', '还没有给任何分类设预算', { text:'设个预算', attrs:'data-act="bgSetup"' }) + `</div>`;
                 $('bgGroups').innerHTML='';
             } else {
                 const lim=round2(B.rows.reduce((s,r)=>s+r.limit,0));

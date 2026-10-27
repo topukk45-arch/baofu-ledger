@@ -1,12 +1,12 @@
 (function(){
-        const { $, MODE_HINT, escapeHtml, isFlow, isSkip, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
+        const { $, MODE_HINT, emptyHtml, escapeHtml, isFlow, isSkip, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
         const { getCats, getUserData, isRefund, recentCats, saveUserData, syncRefunds } = window.JiwenStore;   // 用到前面模块的
         const { bindSheetDrag } = window.JiwenPanel;   // 用到前面模块的
         const { askCancel, customAlert, customChoose, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { openDtPickerDate } = window.JiwenDate;   // 用到前面模块的
         const { cal, openDay, openDetail, openWeek, sumFen } = window.JiwenDetail;   // 用到前面模块的
         const { listHtml, makePainter } = window.JiwenLedger;   // 用到前面模块的
-        const { askCatRule } = window.JiwenForms;   // 用到前面模块的
+        const { askCatRule, openAddModal } = window.JiwenForms;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
 
         // ===== 搜索状态：备注 / 金额 / 日期 / 收支 / 统计 / 分类（1023-F 定的口径，1023-G 从账单页搬到搜一笔）=====
@@ -250,14 +250,20 @@
             const empty=!asc.length;
             $('searchEmpty').hidden=!empty;
             if(empty){
-                $('searchEmpty').querySelector('.sp-empty-t').textContent = any ? '没有找到相关的账' : '账本里还没有记录';
-                $('searchEmpty').querySelector('.sp-empty-s').textContent = any ? '点下面的条件把它去掉，或者改条件' : '记了账以后，在这里按条件找';
+                // 1027-UI4：有条件：「没有找到相关的账」+「放宽条件」（打开条件抽屉）；空账本：「账本里还没有记录」+「记一笔」
+                $('searchEmpty').innerHTML = any ? emptyHtml('search', '没有找到相关的账', { text:'放宽条件', attrs:'data-empty="sheet"' })
+                    : emptyHtml('search', '账本里还没有记录', { text:'记一笔', attrs:'data-empty="add"' });
                 painter.paint([]);
             } else painter.paint(listHtml(asc, {}));
             fitCard();
             paintSheet();
         }
         function searchFlush(){ painter.flush(); }
+        $('searchEmpty').addEventListener('click', e=>{
+            const b=e.target.closest('[data-empty]'); if(!b) return;
+            if(b.dataset.empty==='sheet') openSheet();
+            else { closeSearch(); openAddModal(); }
+        });
         $('searchTags').addEventListener('click', e=>{
             const ha=e.target.closest('[data-act^="h"]');
             if(ha){

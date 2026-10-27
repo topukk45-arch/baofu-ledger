@@ -11,6 +11,7 @@
 //    日子、搜一笔 20px 不画线；一天 / 一周面板标题 20px；账单页「10月」字重 700
 // 5. 切换控件：.seg 是浅底滑块（槽 40 / 12、滑块 34 / 9）；「整周 一…日」40 高、圆角 12、实心选中块；设置页每组一张列表卡 .set-list，
 //    7 个滑块都在（id 不变），「默认进入页面」那一行滑块在名字下面
+// 6. 空状态：四处（搜一笔搜不到 / 空账本、这天没记账、没设预算、没有日子）都是 .ui-empty：图标块 + 一句话 + 一个按钮，按钮带人去下一步
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
 const APP = path.join(path.dirname(htmlFile), 'app');
@@ -128,7 +129,40 @@ function palette() {
     ok(groups.length === 5 && groups.every(g => g.querySelector(':scope > .set-group-title + .set-list') && !g.querySelector(':scope > .set-item')), '5 设置页每组：组名 + 一张列表卡，行都在卡里');
     ok($('defaultTabSeg').parentElement.classList.contains('set-col'), '5 「默认进入页面」滑块放在名字下面');
     ok(/border-radius:var\(--r-l\)/.test(rule('.set-list')) && /min-height:var\(--row-1\)/.test(rule('.set-list > .set-item')), '5 列表卡圆角 16、每行 48');
+    // ===== 6. 空状态 =====
+    const emptyOk = (box, text, btn) => { const e = box && box.querySelector('.ui-empty'); return !!(e && e.querySelector('.ui-empty-ic svg') && txt(e.querySelector('.ui-empty-t')) === text && e.querySelectorAll('button').length === 1 && txt(e.querySelector('button')) === btn); };
+    w.JiwenDetail.openDay('2026-10-21'); await tick();
+    ok(emptyOk($('uiSheetBody').querySelector('.dd-empty'), '这天没记账', '给这天补一笔'), '6 这天没记账：图标 + 一句话 + 「给这天补一笔」');
+    $('uiSheetBody').querySelector('.ui-empty-btn').click(); await tick();
+    ok($('addMask').style.display === 'flex' && ($('billTime').dataset.value || '').startsWith('2026-10-21T'), '6 点了记一笔、日子是那天');
+    $('closeAdd').click(); await tick();
+    w.JiwenSearch.openSearch(); await tick(); w.JiwenSearch.closeSheet && w.JiwenSearch.closeSheet(); await tick();
+    $('searchKeyword').value = '虚构的不存在的备注'; $('searchKeyword').dispatchEvent(new w.Event('input', { bubbles: true })); await tick();
+    w.JiwenSearch.searchFlush && w.JiwenSearch.searchFlush();
+    const se = $('searchEmpty');
+    ok(!se.hidden && emptyOk(se, '没有找到相关的账', '放宽条件'), '6 搜一笔搜不到：「没有找到相关的账」+「放宽条件」：' + txt(se));
+    se.querySelector('.ui-empty-btn').click(); await tick();
+    ok($('filterSheetMask').style.display === 'flex' || $('filterSheetMask').classList.contains('open'), '6 「放宽条件」打开条件抽屉');
+    w.JiwenSearch.closeSheet && w.JiwenSearch.closeSheet(); w.JiwenSearch.closeSearch(); await tick();
     ok(!t.errs.length, '3 没有报错 ' + t.errs.join('|'));
+  }
+
+  // 6 续：没设预算、没有日子（另起一个空账本）
+  {
+    const html = fs.readFileSync(htmlFile, 'utf8');
+    const t = await A.boot({ html, www: path.dirname(htmlFile), now: '2026-10-23T10:00:00', seed: A.seedOf([]) });
+    const { $, d, w } = t; const tick = () => new Promise(r => setTimeout(r, 0));
+    const txtq = e => (e ? e.textContent : '').replace(/\s+/g, ' ').trim();
+    const emptyOk = (box, text, btn) => { const e = box && box.querySelector('.ui-empty'); return !!(e && e.querySelector('.ui-empty-ic svg') && txtq(e.querySelector('.ui-empty-t')) === text && e.querySelectorAll('button').length === 1 && txtq(e.querySelector('button')) === btn); };
+    d.querySelector('.tab-btn[data-tab="stats"]').click(); await tick();
+    d.querySelector('#statTabSeg button[data-v="budget"]').click(); await tick();
+    ok(emptyOk($('bgOverview'), '还没有给任何分类设预算', '设个预算') && $('bgOverview').querySelector('.ui-empty-btn[data-act="bgSetup"]'), '6 没设预算：「设个预算」（照旧去设预算）');
+    d.querySelector('.tab-btn[data-tab="ledger"]').click(); await tick();
+    $('daysCard').click(); await tick();
+    ok($('daysEmpty').style.display === 'block' && emptyOk($('daysEmpty'), '还没有记录任何日子', '添加日子'), '6 没有日子：「添加日子」');
+    $('daysEmpty').querySelector('.ui-empty-btn').click(); await tick();
+    ok($('dayMask') && $('dayMask').style.display === 'flex', '6 点了打开添加日子');
+    ok(!t.errs.length, '6 没有报错 ' + t.errs.join('|'));
   }
 
   console.log(`1027-UI4 界面收敛：${pass} 通过，${fail} 失败`);

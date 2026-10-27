@@ -1,5 +1,5 @@
 (function(){
-        const { $, escapeHtml, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
+        const { $, emptyHtml, escapeHtml, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
         const { IMP_APPS, balContrib, getUserData, isOpening, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData, statContrib, syncRefunds } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { devImportOn } = window.JiwenImportEntry;   // 用到前面模块的
@@ -428,7 +428,7 @@
                 const netHtml=`<span class="dd-net">净剩 <b class="dd-net-v${net<0 ? ' neg' : net>0 ? ' pos' : ''}">${net<0 ? '−' : net>0 ? '+' : ''}${Math.abs(net).toFixed(2)}</b></span>`;
                 let h=sumBlockHtml({ k:`支出 · ${list.length} 笔`, v:s.exp.toFixed(2), sk:'收入', sv:s.inc.toFixed(2), sc:'pos',
                     line: netHtml + (cmp ? `<span class="dd-cmp"> · ${cmp}</span>` : ''), extra: cats.length ? catsHtml(cats) : '' });
-                h+= list.length ? `<div class="lg-dc dd-rows">` + list.map(r=>rowHtml(r, rMap)).join('') + `</div>` : `<div class="dd-empty">这天没记账</div>`;
+                h+= list.length ? `<div class="lg-dc dd-rows">` + list.map(r=>rowHtml(r, rMap)).join('') + `</div>` : `<div class="dd-empty">${emptyHtml('calendar', '这天没记账', { text:'给这天补一笔', attrs:`data-add="${k}"` })}</div>`;   // 1027-UI4：空状态统一写法
                 return h;
             }
             function paintFoot(){

@@ -134,7 +134,7 @@ const link = (uri)=>JSON.stringify({ uri, name:'b.json', lastSyncAt:1, lastError
         const sf = $(t.d,'summaryFilter');
         ok(t.w.JiwenSearch.isOpen() && $(t.d,'billHead').style.display !== 'none' && !$(t.d,'summaryOverall') && $(t.d,'billList').querySelector('.lg-gap-today, .bl-row, .lg-wk'), '搜一笔在结果页里，账单页照旧按月（1023-G）；总览没有了（1023-C：总结余搬去统计页）');
         ok(sf.hidden && $(t.d,'searchCount').textContent === '0 笔', '没结果：不写合计，顶上写 0 笔');
-        ok(!$(t.d,'searchEmpty').hidden && $(t.d,'searchEmpty').textContent.includes('没有找到相关的账') && $(t.d,'searchEmpty').textContent.includes('把它去掉'), '没结果：缺省页写怎么去掉条件');
+        ok(!$(t.d,'searchEmpty').hidden && $(t.d,'searchEmpty').textContent.includes('没有找到相关的账') && $(t.d,'searchEmpty').querySelector('button[data-empty="sheet"]') && $(t.d,'searchEmpty').textContent.includes('放宽条件'), '没结果：缺省页一句话 + 「放宽条件」按钮（1027-UI4 起空状态统一写法，原来是第二句「把它去掉」）');
         ok(!$(t.d,'pagerBottom') && !$(t.d,'pagerPad'), '没有翻页了（1023-C 起按月一直往下排）');
     }
     // ---------- 4b. 存档完全为空：汇总区隐藏 ----------
