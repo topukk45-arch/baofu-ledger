@@ -2414,7 +2414,7 @@
 
         /* ===== 1027-UI5：界面收敛第二轮 ===== */
         /* 点分类去搜一笔：饼图旁的分类、预算的分类行、一天面板的分类胶囊行尾加 ›；带进来的条件在条件卡里用滑块槽的浅底分开 */
-        button.sc-item.sc-go { position:relative; display:flex; width:100%; padding:6px 22px 6px 0; border:none; border-bottom:1px dashed var(--c-border); background:transparent;
+        button.sc-item.sc-go { position:relative; display:flex; width:100%; box-sizing:border-box; height:var(--row-2); line-height:inherit; padding:0 22px 0 0; border:none; border-bottom:1px dashed var(--c-border); background:transparent;
             font:inherit; color:inherit; text-align:left; cursor:pointer; }
         .stat-cat-list button.sc-item.sc-go:last-child { border-bottom:none; }
         .sc-chev { position:absolute; right:2px; top:50%; transform:translateY(-50%); color:var(--c-border-mid); font-size:18px; line-height:1; }
@@ -2435,7 +2435,7 @@
         .stat-cal .day[class*="heat-"] .da.pos { color:var(--c-heat-pos); }
         .stat-cal .day.today .dn { font-weight:700; }
         .cal-legend { display:flex; align-items:center; flex-wrap:wrap; gap:4px 6px; margin-top:10px; font-size:12px; line-height:16px; color:var(--c-t2); }
-        .cal-legend .cl-sw { width:14px; height:14px; border-radius:4px; display:inline-block; }
+        .cal-legend .cl-sw { width:16px; height:8px; border-radius:4px; display:inline-block; }   /* 小条（≤ 8px 高，圆角规矩里的例外） */
         .cal-legend .cl-sw.heat-1 { background:var(--c-heat-1); box-shadow:inset 0 0 0 1px var(--c-border); }
         .cal-legend .cl-sw.heat-2 { background:var(--c-heat-2); }
         .cal-legend .cl-sw.heat-3 { background:var(--c-heat-3); }
