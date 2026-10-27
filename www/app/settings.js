@@ -254,7 +254,8 @@
                     '--c-fill':          T.fill,
                     '--c-on-fill':       T.on,
                     '--c-ink':           ink,
-                    '--c-fill-edge':     T.edge ? ink : 'transparent',
+                    // 1027-UI：细边的条件除了页面底（方案页的 edge），按钮还常放在面板底、白卡上，选中的块挨着没选中的块（--c-chip）：哪个对比 < 1.6 都加
+                    '--c-fill-edge':     (T.edge || [pal['--c-sheet'], pal['--c-surface'], pal['--c-chip']].some(c=>_contrast(T.fill, c)<1.6)) ? ink : 'transparent',
                     '--c-primary':       _contrast(T.fill, T.bg) >= 3 ? T.fill : ink,
                     '--c-on-primary':    T.on,
                     '--c-sel-border':    T.fill
