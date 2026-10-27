@@ -46,7 +46,7 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');
   ok(sh().classList.contains('wd-fixed') && sh().style.height === h0, '1 换到上一周：高度不变（打开时上一周、下一周已经量进去了）');
   $('weekPrev').click(); await tick(); $('weekNext').click(); await tick(); $('weekNext').click(); await tick();
   ok(sh().style.height === h0, '1 再往前翻、翻回来：高度一直不变');
-  ok(parseFloat(h0) <= 800 * 0.85, '1 不超过屏幕 85%：' + h0);
+  ok(parseFloat(h0) <= 800 - 56, '1 顶上至少留 56px：' + h0);
   ok(navT() === '左右滑动看上一周、下一周', '2 第 1 次打开：写着左右滑动的说明');
   w.JiwenSheet.close();
   // 10-27 手机上看到的：打开本周内容少的一天（周一），点 ‹ 退到上一周的周日（上一周内容多），面板变长一下 → 打开时上一周也量进去，不变

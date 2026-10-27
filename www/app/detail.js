@@ -342,9 +342,9 @@
             openWD(cal.monOf(mon), null, opt);
         }
         const WD_MS=260;   // 1025-UX：一周 / 一天切换的滑动时长（比面板收起的 300 毫秒略短，切得利落）
-        // 1027-UI：面板高度：打开时按这一周和前后一周里内容最多的那一页取最高（不超过屏幕 WD_MAX_H），之后切天、切整周、左右滑、换周都不变，顶边不动；
+        // 1027-UI：面板高度：打开时按这一周和前后一周里内容最多的那一页取最高（顶上至少留 WD_TOP_GAP），之后切天、切整周、左右滑、换周都不变，顶边不动；
         //   再往前翻也不长高（放不下的在面板里滚）。内容少的（这天没记账）在中间
-        const WD_MAX_H=0.85;
+        const WD_TOP_GAP=56;   // 1027-UI3：面板最高到屏幕顶上只留这么一条（原来最高 85%，内容多的天要滚；用户说再高一点就全显示了）
         // 1027-UI：「左右滑动看前一天、后一天」这句说明只在前 WD_HINT_N 次打开时写，之后只留 ‹ ›（次数记在这台手机上，不进备份）
         const WD_HINT_N=3, WD_HINT_KEY='app_wd_hint_n';
         function wdHintCount(add){
@@ -453,12 +453,12 @@
                 else mon=C.addDay(mon, 7*d);
                 slide(d, from||0); return true;
             }
-            // 1027-UI：面板定高（见 WD_MAX_H）：打开时把这一周、上一周、下一周（不晚于本周）的整周和每一天（到今天为止）挨个画一遍量高度，取最高的；
+            // 1027-UI：面板定高（见 WD_TOP_GAP）：打开时把这一周、上一周、下一周（不晚于本周）的整周和每一天（到今天为止）挨个画一遍量高度，取最高的；
             //   之后不再改（原来换周时内容更多会长高一次：从本周的一天点 ‹ 退到上一周的周日，面板变长一下，10-27 手机上看到的）。放不下的在面板里滚
             function fitHeight(){
                 const sh=document.getElementById('uiSheet'), mk=document.getElementById('uiSheetMask');
                 if(!sh || !mk || !bodyBox || !mk.clientHeight) return;
-                const keepDay=day, keepMon=mon, cap=Math.floor(mk.clientHeight*WD_MAX_H);
+                const keepDay=day, keepMon=mon, cap=Math.max(200, mk.clientHeight-WD_TOP_GAP);
                 const views=[];
                 [C.addDay(keepMon, -7), keepMon, C.addDay(keepMon, 7)].forEach(m=>{
                     if(m>thisMon) return;
@@ -489,14 +489,14 @@
             function slide(d, from){
                 const oldPane=bodyBox && bodyBox.querySelector('.wd-pane');
                 const ghost = (oldPane && !noMotion() && bodyBox.clientWidth) ? oldPane.cloneNode(true) : null;
-                const top = oldPane ? oldPane.offsetTop : 0, left = oldPane ? oldPane.offsetLeft : 0, wid = oldPane ? oldPane.offsetWidth : 0;
+                const top = oldPane ? oldPane.offsetTop : 0, left = oldPane ? oldPane.offsetLeft : 0, wid = oldPane ? oldPane.offsetWidth : 0, hgt = oldPane ? oldPane.offsetHeight : 0;
                 render();
                 const pane=bodyBox.querySelector('.wd-pane');
                 if(!ghost || !pane) return;
                 const W=bodyBox.clientWidth;
                 ghost.classList.add('wd-ghost'); ghost.removeAttribute('id');
                 ghost.querySelectorAll('[id]').forEach(x=>x.removeAttribute('id'));
-                ghost.style.top=top+'px'; ghost.style.left=left+'px'; ghost.style.width=wid+'px'; ghost.style.transform=`translateX(${from}px)`;
+                ghost.style.top=top+'px'; ghost.style.left=left+'px'; ghost.style.width=wid+'px'; ghost.style.height=hgt+'px'; ghost.style.transform=`translateX(${from}px)`;
                 bodyBox.appendChild(ghost);
                 pane.style.transition='none'; pane.style.transform=`translateX(${from + d*W}px)`;
                 void pane.offsetWidth;

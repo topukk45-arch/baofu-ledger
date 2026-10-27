@@ -1310,7 +1310,7 @@ async function run(cfg, port, browser) {
         await pg.evaluate(() => document.querySelector('#uiSheetBody .wd-tab[data-v="2026-10-19"]').click()); await pg.waitForTimeout(450);
         await pg.evaluate(() => document.getElementById('weekPrev').click()); await pg.waitForTimeout(500); seq.push(['一天里点 ‹（跨到上一周）', await top()]);
         const info = await pg.evaluate(() => { const sh = document.getElementById('uiSheet'), mk = document.getElementById('uiSheetMask'), e = document.querySelector('#uiSheetBody .dd-empty');
-          return { h: sh.offsetHeight, max: Math.floor(mk.clientHeight * 0.85), fixed: sh.classList.contains('wd-fixed') }; });
+          return { h: sh.offsetHeight, max: mk.clientHeight - 56, fixed: sh.classList.contains('wd-fixed') }; });
         // 切天、切整周、换周（滑 / ‹ › 跨周）：顶边完全相同（10-27 起换周也不许长高：打开时前后一周已经量进去了）
         const bad = seq.filter(x => x[1] !== seq[0][1]).map(x => `${x[0]} ${x[1]}（开始 ${seq[0][1]}）`);
         // 10-27 手机上看到的：从本周内容少的一天打开，点 ‹ 退到上一周，面板不许变长
@@ -1321,7 +1321,7 @@ async function run(cfg, port, browser) {
         const t2 = await top(); seq.push(['从本周一打开 ' + t1 + '，点 ‹ 到上一周', t2]);
         if (t1 !== t2) bad.push(`从本周一打开点 ‹ 到上一周：${t1} → ${t2}`);
         if (!info.fixed) bad.push('面板没有定高');
-        if (info.h > info.max + 1) bad.push(`面板 ${info.h} 高过屏幕 85%（${info.max}）`);
+        if (info.h > info.max + 1) bad.push(`面板 ${info.h} 顶上留不到 56px（${info.max}）`);
         results.push({ name: 'wd-top-1027ui', cfg: size, chk: true, label: '周 / 日面板顶边：' + seq.map(x => x[0] + ' ' + x[1]).join(' → '), bad, ok: !bad.length });
         // 0 笔那天「这天没记账」在中间
         await pg.evaluate(() => document.querySelector('#uiSheetBody .wd-tab[data-v="2026-10-16"]') || null);
