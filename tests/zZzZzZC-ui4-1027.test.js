@@ -2,6 +2,8 @@
 // 1. 色板（不起页面，直接跑 settings.js 里的 buildPalette）：24 个预设都有 --c-t1 / --c-t2 / --c-sum / --c-sum-edge / --c-track；
 //    t1、t2 在页面底、白、卡片、面板底、chip、日卡抬头、「整周」槽上都 ≥ 4.5；t2 不比 t1 深；--c-text-soft 就是 t1；
 //    汇总块底和页面底对比 ≥ 1.035、不加边（推到白还分不开才加）
+// 2. 语义色（支出红、收入绿、接近上限黄、不计灰、往来灰蓝）固定不跟主题，24 个预设的页面底、卡片、面板底、卡片渐变浅端、汇总块底上都 ≥ 4.5；
+//    样式表里不再写死老色值
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const htmlFile = process.argv[2] || path.join(__dirname, '..', 'www', 'index.html');
 const APP = path.join(path.dirname(htmlFile), 'app');
@@ -48,6 +50,18 @@ function palette() {
     const mm = css.match(new RegExp(k.replace(/-/g, '\\-') + ':(#[0-9a-f]{6})'));
     ok(mm && mm[1] === m[k], `:root 里 ${k} 的默认值和雾松青一样（${mm && mm[1]} / ${m[k]}）`);
   }
+
+  // ===== 2. 语义色 =====
+  for (const k of ['--c-pos', '--c-neg', '--c-warn', '--c-skip', '--c-flow']) {
+    const mm = css.match(new RegExp(k.replace(/-/g, '\\-') + ':(#[0-9a-f]{6})'));
+    ok(mm, `:root 有 ${k}`); if (!mm) continue;
+    let worst = 99, where = '';
+    for (const p of presets) { const x = bp(p.color);
+      for (const b of [x['--c-bg'], x['--c-surface'], x['--c-sheet'], x['--c-card-1'], x['--c-sum'], '#ffffff']) { const c = con(mm[1], b); if (c < worst) { worst = c; where = p.name + ' ' + b; } } }
+    ok(worst >= 4.5, `${k} ${mm[1]} 在 24 个预设上都 ≥ 4.5（最低 ${worst.toFixed(2)}，${where}）`);
+  }
+  for (const old of ['#b5482e', '#3a7a2e', '#b07a1c', '#9a6a12', '#767676', '#666666', '#56677c', '#4b6380', '#c0392b', '#d05a52'])
+    ok(!css.replace(/\/\*[\s\S]*?\*\//g, '').toLowerCase().includes(old), `样式表里没有老色值 ${old}`);
 
   console.log(`1027-UI4 界面收敛：${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

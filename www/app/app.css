@@ -42,8 +42,11 @@
             --row-2:54px;              /* 两行的行 */
             --c-primary-mid:#468781;  /* 渐变起始/次要描边 */
             --c-shadow-rgb:63,111,107;/* 阴影/光晕用的主色 RGB */
-            --c-pos:#3a7a2e;          /* 收入/正值（语义色，固定） */
-            --c-neg:#b5482e;          /* 支出/负值（语义色，固定） */
+            --c-pos:#2f7023;          /* 收入/正值（语义色，固定；1027-UI4 从 #3a7a2e 压深：24 个预设的页面底、卡片、面板底、汇总块底上都 ≥ 4.5） */
+            --c-neg:#ab3f25;          /* 支出/负值、超支（语义色，固定；1027-UI4 从 #b5482e 压深，同上） */
+            --c-warn:#8c5800;         /* 1027-UI4：接近上限、花得偏快（语义色，固定；原来 #b07a1c / #9a6a12 两种，24 个预设都不到 4.5） */
+            --c-skip:#636363;         /* 1027-UI4：不计的字（原来 #666 / #767676 / #5e5e5e 几种） */
+            --c-flow:#536479;         /* 1027-UI4：往来的字（原来 #56677c / #4b6380） */
             /* ===== 选中态专属语义色：日历选中、以及后续任何「当前选中」处统一复用 =====
                跟主色同色系但固定为明快的一档（不随主色深浅漂移），保证选中格清爽好看、
                红/绿盈亏字在其上始终清晰。由 buildPalette 按主题自动派生。 */
@@ -298,19 +301,19 @@
             flex:1 1 0; text-align:center; padding:13px 0; font-size:15px; }
         .io-chips .cc.sel-out {
             background:linear-gradient(135deg,#c25a3e,#a8432b); color:#fff;
-            border-color:#a8432b; box-shadow:0 0 8px rgba(181,72,46,0.35); }
+            border-color:#a8432b; box-shadow:0 0 8px rgba(171,63,37,0.35); }
         .io-chips .cc.sel-in {
             background:linear-gradient(135deg,#4a9a3c,#357a2a); color:#fff;
-            border-color:#357a2a; box-shadow:0 0 8px rgba(58,122,46,0.35); }
+            border-color:#357a2a; box-shadow:0 0 8px rgba(47,112,35,0.35); }
 
         /* 收入/支出选择行 */
 
         /* 收支标签与正负金额颜色 */
         .io-tag { display:inline-block; border-radius:10px; padding:2px 9px; font-size:13px; }
-        .io-in  { background:#e3f3e0; border:1px solid #b9e0b0; color:#3a7a2e; }
-        .io-out { background:#fdf0ec; border:1px solid #f0c2b4; color:#b5482e; }   /* 1027-UI：底色原来 #fbe6e0，字只有 4.45:1，底色调浅一点到 4.8:1 */
-        .pos { color:#3a7a2e; }
-        .neg { color:#b5482e; }
+        .io-in  { background:#e3f3e0; border:1px solid #b9e0b0; color:var(--c-pos); }
+        .io-out { background:#fdf0ec; border:1px solid #f0c2b4; color:var(--c-neg); }   /* 1027-UI：底色原来 #fbe6e0，字只有 4.45:1，底色调浅一点到 4.8:1 */
+        .pos { color:var(--c-pos); }
+        .neg { color:var(--c-neg); }
 
         .add-btn { padding:12px; background:var(--c-fill);
             color:var(--c-on-fill); border:none; border-radius:8px; cursor:pointer; font-size:15px; transition:0.3s; box-shadow:inset 0 0 0 1px var(--c-fill-edge); }
@@ -336,7 +339,7 @@
             border-color:transparent; font-weight:bold; box-shadow:inset 0 0 0 1px var(--c-fill-edge), 0 3px 10px rgba(var(--c-shadow-rgb),0.35); }
         .ui-btn.danger { color:var(--c-neg); }
         /* 1017-O：危险操作的确认按钮（覆盖、删除、清空、撤销、恢复、批量改）：警示色实心，文案写清做什么 */
-        .ui-btn.warn { background:var(--c-neg); color:#fff; border-color:transparent; font-weight:bold; box-shadow:0 3px 10px rgba(181,72,46,0.3); }
+        .ui-btn.warn { background:var(--c-neg); color:#fff; border-color:transparent; font-weight:bold; box-shadow:0 3px 10px rgba(171,63,37,0.3); }
         /* 底部面板里的说明文字：左对齐、分段，第一段是结论，后面一条一条写影响 */
         .ui-msg { text-align:left; font-size:15px; line-height:1.6; color:var(--c-text); }
         .ui-msg p { margin:0 0 8px; }
@@ -403,7 +406,7 @@
             color:var(--c-on-fill); box-shadow:inset 0 0 0 1px var(--c-fill-edge), 0 4px 14px rgba(var(--c-shadow-rgb),0.45); }
         /* 有筛选生效时，筛选按钮右上角小红点提示 */
         .act-filter.active-filter::after { content:""; position:absolute; top:7px; right:9px;
-            width:9px; height:9px; border-radius:50%; background:var(--c-neg,#d05a52);
+            width:9px; height:9px; border-radius:50%; background:var(--c-neg);
             border:1.5px solid var(--c-surface); }
 
         /* 回到顶部按钮：滚动后出现，位于操作栏上方右侧 */
@@ -478,8 +481,8 @@
             color:var(--c-text); transition:0.15s; }
         .set-item:hover { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.25); }
         .set-item .set-arrow { color:var(--c-text-soft); font-size:18px; }
-        .set-item.set-danger { color:var(--c-neg, #d05a52); }
-        .set-item.set-danger .set-arrow { color:var(--c-neg, #d05a52); }
+        .set-item.set-danger { color:var(--c-neg); }
+        .set-item.set-danger .set-arrow { color:var(--c-neg); }
         .set-item.set-static { cursor:default; }
         .set-item.set-static:hover { border-color:var(--c-border); box-shadow:none; }
         /* 1015-A：设置页最底下的版本号。连点 5 次开关「导入（开发中）」 */
@@ -570,8 +573,8 @@
         .sf-time { flex:0 0 auto; font-size:12px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
         .sf-io { flex:0 0 auto; font-size:11px; line-height:1; padding:2px 5px; border-radius:3px;
             border:1px solid var(--c-accent-soft); }
-        .sf-io.in { color:#3a7a2e; background:rgba(58,122,46,0.08); }
-        .sf-io.out { color:#b5482e; background:rgba(181,72,46,0.08); }
+        .sf-io.in { color:var(--c-pos); background:rgba(47,112,35,0.08); }
+        .sf-io.out { color:var(--c-neg); background:rgba(171,63,37,0.08); }
         .sf-cat { flex:0 0 auto; font-size:13px; color:var(--c-text); font-weight:600;
             overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:96px; }
         /* 备注：宽度跟着文字走（虚线只包住文字，不拖满整行），过长则在上限内省略号；仍带虚线，跟记账详情统一 */
@@ -757,8 +760,8 @@
         .cancel { flex:1; padding:10px; background:var(--c-border); color:#5c4500; border:none;
             border-radius:6px; cursor:pointer; }
         .edit-del-btn { width:100%; margin-top:10px; padding:9px; background:none; border:none;
-            color:#b5482e; font-size:13px; cursor:pointer; border-radius:6px; transition:0.2s; }
-        .edit-del-btn:hover { background:rgba(181,72,46,0.08); }
+            color:var(--c-neg); font-size:13px; cursor:pointer; border-radius:6px; transition:0.2s; }
+        .edit-del-btn:hover { background:rgba(171,63,37,0.08); }
 
         /* ===== 筛选浮层（bottom sheet）：从底部上滑 ===== */
         .sheet-mask { align-items:flex-end; justify-content:center; padding:0; }
@@ -1130,7 +1133,7 @@
         #askInput { width:100%; margin:12px 0 4px; padding:12px; border:1px solid var(--c-primary);
             border-radius:8px; outline:none; background:var(--c-surface); font-size:15px; font-family:inherit; }
         #askInput:focus { border-color:var(--c-accent); box-shadow:0 0 8px rgba(var(--c-shadow-rgb),0.4); }
-        .ask-err { color:#c0392b; font-size:13px; margin:4px 0 0; text-align:left; }
+        .ask-err { color:var(--c-neg); font-size:13px; margin:4px 0 0; text-align:left; }
 
         /* ===== 外观设置弹窗 ===== */
         /* 1025-UX：每格色块 + 名字，整格能点（至少 48 高）
@@ -1388,9 +1391,9 @@
         /* ===== 不计 / 批量操作（1010-B）=====
            「不计」一律用中性灰：它既不是收入也不是支出，不该沾语义色的红/绿。 */
         .io-skip { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
-            background:#efefef; border:1px solid #d6d6d6; color:#5e5e5e; }   /* 1027-UI：字原来 #888（3:1） */
-        .amt-skip, .pos.amt-skip, .neg.amt-skip { color:#666666 !important; }   /* 1027-UI：原来 #9a9a9a，在浅底上只有 2.7:1，看不清；改深到 ≥ 4.5:1 */
-        .sf-io.skip { color:#5e5e5e; background:#efefef; border-color:#d6d6d6; }
+            background:#efefef; border:1px solid #d6d6d6; color:var(--c-skip); }   /* 1027-UI：字原来 #888（3:1）；1027-UI4 统一成 --c-skip */
+        .amt-skip, .pos.amt-skip, .neg.amt-skip { color:var(--c-skip) !important; }   /* 1027-UI：原来 #9a9a9a，在浅底上只有 2.7:1，看不清；改深到 ≥ 4.5:1 */
+        .sf-io.skip { color:var(--c-skip); background:#efefef; border-color:#d6d6d6; }
         .skip-hint { font-size:11.5px; color:var(--c-text-soft); line-height:1.5; }
         .summary-filter { flex-wrap:wrap; }
         .summary-filter .filter-nums { min-width:0; flex:1 1 auto; }
@@ -1400,7 +1403,7 @@
         .io-flow { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
             background:#e8eef5; border:1px solid #c9d5e3; color:#5a6f87; }
         .sf-io.flow { color:#5a6f87; background:#e8eef5; border-color:#c9d5e3; }
-        .amt-flow, .pos.amt-flow, .neg.amt-flow { color:#56677c !important; }   /* 1027-UI：原来 #7d8ea3（3.2:1），改深到 ≥ 4.5:1，还是灰蓝 */
+        .amt-flow, .pos.amt-flow, .neg.amt-flow { color:var(--c-flow) !important; }   /* 1027-UI：原来 #7d8ea3（3.2:1），改深到 ≥ 4.5:1，还是灰蓝 */
         .mode-chips { flex-wrap:nowrap; gap:8px; }
         .mode-chips .cc { flex:1 1 0; text-align:center; padding:9px 0; font-size:14px; }
         /* 确认弹窗里的记录清单：四列固定（时间 / 分类 / 备注 / 金额），
@@ -1490,8 +1493,8 @@
         .stat-cal .day .da { font-size:10.5px; line-height:1.2; }
         .day-tags { display:flex; flex-direction:column; align-items:center; gap:2px; margin-top:1px; }
         .dtag { font-size:9px; line-height:1; padding:2px 4px; border-radius:4px; white-space:nowrap; }
-        .dtag.flow { background:#e1e9f3; color:#4b6380; }
-        .dtag.skip { background:#e9e9e9; color:#767676; }
+        .dtag.flow { background:#e1e9f3; color:var(--c-flow); }
+        .dtag.skip { background:#e9e9e9; color:var(--c-skip); }
         .stat-cal .day.sel .dtag.flow { background:#d2deec; }
         .stat-cal .day.sel .dtag.skip { background:#dcdcdc; }
         .dtag.refund { background:#dcefea; color:#2f7a6a; }
@@ -1532,7 +1535,7 @@
         .bg-foot { display:flex; justify-content:space-between; gap:10px; margin-top:5px;
             font-size:12px; color:var(--c-text-soft); font-variant-numeric:tabular-nums; }
         .bg-foot .over { color:var(--c-neg); font-weight:600; }
-        .bg-foot .fast { color:#b07a1c; }
+        .bg-foot .fast { color:var(--c-warn); }
 
         /* 分类管理：每行显示当前预算 */
         .cat-item .cat-budget { flex:0 0 auto; font-size:11.5px; color:var(--c-text-soft); white-space:nowrap; }
@@ -1547,7 +1550,7 @@
             white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .bg-entry-sum b { font-size:14px; }
         .bg-entry-sum .over { color:var(--c-neg); }
-        .bg-entry-sum .warn { color:#b07a1c; }
+        .bg-entry-sum .warn { color:var(--c-warn); }
         .bg-go { flex-shrink:0; color:var(--c-text-soft); font-size:18px; line-height:1; }
         /* 预算页签：总览 */
         .bgo-main { display:flex; justify-content:space-between; align-items:flex-end; gap:10px; margin:6px 0 8px; }
@@ -1555,11 +1558,11 @@
         .bgo-num b { font-size:24px; color:var(--c-primary-deep); }
         .bgo-pct { font-size:22px; font-weight:bold; font-variant-numeric:tabular-nums; color:var(--c-text); }
         .bgo-pct.over { color:var(--c-neg); }
-        .bgo-pct.warn { color:#b07a1c; }
+        .bgo-pct.warn { color:var(--c-warn); }
         .bgo-chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
         .bgc { font-size:12px; padding:3px 9px; border-radius:10px; border:1px solid var(--c-border); color:var(--c-text-soft); background:var(--c-surface); }
         .bgc.over { color:var(--c-neg); border-color:#f0c2b4; background:#fdf0ec; }
-        .bgc.warn { color:#9a6a12; border-color:#ecd5a6; background:#fbf1dc; }
+        .bgc.warn { color:var(--c-warn); border-color:#ecd5a6; background:#fbf1dc; }
         .bgc.ok { color:var(--c-pos); border-color:#b9e0b0; background:#e3f3e0; }
         .bgo-legend { margin-top:8px; font-size:11.5px; color:var(--c-text-soft); }
         /* 预算页签：分组 */
@@ -1625,7 +1628,7 @@
         .refund-sum .rs-nums { display:flex; justify-content:space-between; gap:8px; margin-top:6px; font-size:12.5px;
             color:var(--c-text-soft); flex-wrap:wrap; }
         .refund-sum .rs-nums b { color:var(--c-text); font-variant-numeric:tabular-nums; }
-        .refund-sum .rs-nums b.pos { color:#3a7a2e; }
+        .refund-sum .rs-nums b.pos { color:var(--c-pos); }
         #refundMoney.ro { background:transparent; color:var(--c-text-soft); }
 
         .detail-refund { display:block; }
@@ -1660,7 +1663,7 @@
         .bgo-v { text-align:right; font-size:13.5px; font-variant-numeric:tabular-nums; }
         .bgo-v.neg { color:var(--c-neg); }
         .bgo-v .over { color:var(--c-neg); }
-        .bgo-v .warn { color:#b07a1c; }
+        .bgo-v .warn { color:var(--c-warn); }
         .bgo-sub { grid-column:1 / -1; font-size:11.5px; color:var(--c-text-soft); padding-top:3px; }
         .bgo-row.bgo-click:not(.bgy-head) .bgo-sub::after { content:' ›'; }
         .bgo-sub .over { color:var(--c-neg); }
