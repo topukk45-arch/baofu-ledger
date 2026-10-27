@@ -1280,7 +1280,7 @@ async function run(cfg, port, browser) {
         })));
         await pg.close();
       }
-      // c. 周 / 日面板：同一个面板里切天、切整周、左右滑、换周，面板顶边 y 坐标完全相同（换到更高的一周时才许长高）
+      // c. 周 / 日面板：同一个面板里切天、切整周、左右滑、换周，面板顶边 y 坐标完全相同
       for (const [w, h] of [[412, 970], [360, 780], [412, 915]]) {
         const pg = await page11(w, h); const size = w + 'x' + h;
         await tab(pg, 'ledger');
@@ -1311,10 +1311,15 @@ async function run(cfg, port, browser) {
         await pg.evaluate(() => document.getElementById('weekPrev').click()); await pg.waitForTimeout(500); seq.push(['一天里点 ‹（跨到上一周）', await top()]);
         const info = await pg.evaluate(() => { const sh = document.getElementById('uiSheet'), mk = document.getElementById('uiSheetMask'), e = document.querySelector('#uiSheetBody .dd-empty');
           return { h: sh.offsetHeight, max: Math.floor(mk.clientHeight * 0.85), fixed: sh.classList.contains('wd-fixed') }; });
-        // 同一周里切天、切整周：顶边完全相同；换周（滑 / ‹ › 跨周）只许长高（顶边往上），这以后同样不动；变矮（顶边往下）一律算错
-        const bad = []; let cur = seq[0][1];
-        seq.slice(1).forEach(([k, y]) => { const wk = /滑|›|‹/.test(k);
-          if (y === cur) return; if (wk && y < cur) { cur = y; return; } bad.push(`${k} ${y}（之前 ${cur}）`); });
+        // 切天、切整周、换周（滑 / ‹ › 跨周）：顶边完全相同（10-27 起换周也不许长高：打开时前后一周已经量进去了）
+        const bad = seq.filter(x => x[1] !== seq[0][1]).map(x => `${x[0]} ${x[1]}（开始 ${seq[0][1]}）`);
+        // 10-27 手机上看到的：从本周内容少的一天打开，点 ‹ 退到上一周，面板不许变长
+        await closeAll(pg);
+        await pg.evaluate(() => window.JiwenDetail.openDay('2026-10-19')); await pg.waitForTimeout(700);
+        const t1 = await top();
+        await pg.evaluate(() => document.getElementById('weekPrev').click()); await pg.waitForTimeout(500);
+        const t2 = await top(); seq.push(['从本周一打开 ' + t1 + '，点 ‹ 到上一周', t2]);
+        if (t1 !== t2) bad.push(`从本周一打开点 ‹ 到上一周：${t1} → ${t2}`);
         if (!info.fixed) bad.push('面板没有定高');
         if (info.h > info.max + 1) bad.push(`面板 ${info.h} 高过屏幕 85%（${info.max}）`);
         results.push({ name: 'wd-top-1027ui', cfg: size, chk: true, label: '周 / 日面板顶边：' + seq.map(x => x[0] + ' ' + x[1]).join(' → '), bad, ok: !bad.length });

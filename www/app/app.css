@@ -1984,14 +1984,13 @@
         .dd-net-k { font-size:14px; color:var(--c-text-soft); }
         .dd-net-v { font-size:17px; font-weight:bold; color:var(--c-text); font-variant-numeric:tabular-nums; }
         .dd-net-v.pos { color:var(--c-pos); }
-        /* 1027-UI：一周 / 一天面板定高（detail.js 的 fitHeight）：面板竖排，内容区撑满、按钮排在最底下；内容少的「这天没记账」在中间，多的在面板里滚；
-           换到更高的一周时 0.2 秒长高（滑入动画照旧） */
-        .ui-sheet.wd-fixed { display:flex; flex-direction:column; transition:transform var(--sheet-ms) var(--sheet-ease), height .2s var(--sheet-ease); }
+        /* 1027-UI：一周 / 一天面板定高（detail.js 的 fitHeight，打开时定好、之后不变）：面板竖排，内容区撑满、按钮排在最底下；
+           内容少的「这天没记账」在中间，多的在面板里滚 */
+        .ui-sheet.wd-fixed { display:flex; flex-direction:column; }
         .ui-sheet.wd-fixed > * { flex:none; }
         .ui-sheet.wd-fixed > .wd-body { flex:1 0 auto; }
         .ui-sheet.wd-fixed .wd-pane { flex:1 0 auto; }
         .ui-sheet.wd-fixed .dd-empty { flex:1 0 auto; display:flex; align-items:center; justify-content:center; }
-        @media (prefers-reduced-motion: reduce) { .ui-sheet.wd-fixed { transition:none; } }
         .dw-chart { display:flex; flex-direction:column; gap:6px; padding:12px 14px 10px; border:1px solid var(--c-border); border-radius:14px; background:var(--c-surface); }
         /* 1023-L：大柱子（能点，点了换成那一天），每根上面写那天的金额；顶上一行 ‹ 左右滑动看上一周、下一周 › */
         /* 1025-UX：一周 / 一天同一个面板：顶上「整周 一 … 日」一行切换（选中的深色底，今天的日子数字主色），下面的内容 .wd-pane */

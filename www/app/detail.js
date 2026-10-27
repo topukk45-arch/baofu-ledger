@@ -342,8 +342,8 @@
             openWD(cal.monOf(mon), null, opt);
         }
         const WD_MS=260;   // 1025-UX：一周 / 一天切换的滑动时长（比面板收起的 300 毫秒略短，切得利落）
-        // 1027-UI：面板高度：打开时按这一周里内容最多的那一天和整周取最高（不超过屏幕 WD_MAX_H），之后切天、切整周、左右滑、换周都不变，顶边不动；
-        //   换到的那一周要更高时才长高（0.2 秒过渡，见 .ui-sheet.wd-fixed），矮了不缩。内容少的（这天没记账）在中间，多的在面板里滚
+        // 1027-UI：面板高度：打开时按这一周和前后一周里内容最多的那一页取最高（不超过屏幕 WD_MAX_H），之后切天、切整周、左右滑、换周都不变，顶边不动；
+        //   再往前翻也不长高（放不下的在面板里滚）。内容少的（这天没记账）在中间
         const WD_MAX_H=0.85;
         // 1027-UI：「左右滑动看前一天、后一天」这句说明只在前 WD_HINT_N 次打开时写，之后只留 ‹ ›（次数记在这台手机上，不进备份）
         const WD_HINT_N=3, WD_HINT_KEY='app_wd_hint_n';
@@ -449,30 +449,29 @@
             function can(d){ return d<0 || (day ? day<today : mon<thisMon); }
             function go(d, from){
                 if(!can(d)) return false;
-                const m0=mon;
                 if(day){ day=C.addDay(day, d); mon=C.monOf(day); }
                 else mon=C.addDay(mon, 7*d);
-                if(mon!==m0) fitHeight(true);   // 换了一周：这一周要更高才长高
                 slide(d, from||0); return true;
             }
-            // 1027-UI：面板定高（见 WD_MAX_H）：把这一周的整周和每一天（到今天为止）挨个画一遍量高度，取最高的；grow：只许长高（换周时）
-            let fixedH=0;
-            function fitHeight(grow){
+            // 1027-UI：面板定高（见 WD_MAX_H）：打开时把这一周、上一周、下一周（不晚于本周）的整周和每一天（到今天为止）挨个画一遍量高度，取最高的；
+            //   之后不再改（原来换周时内容更多会长高一次：从本周的一天点 ‹ 退到上一周的周日，面板变长一下，10-27 手机上看到的）。放不下的在面板里滚
+            function fitHeight(){
                 const sh=document.getElementById('uiSheet'), mk=document.getElementById('uiSheetMask');
                 if(!sh || !mk || !bodyBox || !mk.clientHeight) return;
-                const keep=day, cap=Math.floor(mk.clientHeight*WD_MAX_H);
-                const views=[null]; for(let i=0;i<7;i++){ const k=C.addDay(mon, i); if(k<=today) views.push(k); }
-                const oldH=sh.style.height; sh.classList.remove('wd-fixed'); sh.style.height='';
+                const keepDay=day, keepMon=mon, cap=Math.floor(mk.clientHeight*WD_MAX_H);
+                const views=[];
+                [C.addDay(keepMon, -7), keepMon, C.addDay(keepMon, 7)].forEach(m=>{
+                    if(m>thisMon) return;
+                    views.push([m, null]);
+                    for(let i=0;i<7;i++){ const k=C.addDay(m, i); if(k<=today) views.push([m, k]); }
+                });
+                sh.classList.remove('wd-fixed'); sh.style.height='';
                 let mx=0;
-                views.forEach(v=>{ day=v; render(); mx=Math.max(mx, sh.scrollHeight); });
-                day=keep; render();
+                views.forEach(([m, v])=>{ mon=m; day=v; render(); mx=Math.max(mx, sh.scrollHeight); });
+                mon=keepMon; day=keepDay; render();
                 const h=Math.min(cap, Math.ceil(mx));
-                const nh = grow ? Math.max(h, fixedH) : h;
-                if(grow && fixedH){ sh.style.height=fixedH+'px'; void sh.offsetHeight; }   // 从原来的高度接着过渡
-                else if(oldH) sh.style.height=oldH;
-                sh.classList.add('wd-fixed');
-                fixedH=nh; sh.style.height=nh+'px';
-                sh.dataset.wdH=String(nh);
+                sh.classList.add('wd-fixed'); sh.style.height=h+'px';
+                sh.dataset.wdH=String(h);
             }
             // fromWeek：这一天是从整周点进来的（返回键 / 往下拉先回整周）；一打开就是某一天的（账单页点日期抬头）没有这一层
             function show(v){
@@ -554,7 +553,7 @@
                     box.addEventListener('click', e=>{ if(box.__swiped && Date.now()-box.__swiped<400){ e.stopImmediatePropagation(); e.preventDefault(); } }, true);   // 滑完那一下不算点
                 },
                 foot(box, done){ footBox=box; doneFn=done; render(); } });
-            fitHeight(false);
+            fitHeight();
         }
         window.JiwenDetail = { CHEV, aiFlagText, balanceAfter, cal, closeDetail, openDay, openDetail, openWeek, rowHtml, sumFen, sumHtml };   // detail 模块对外只有这一个入口
 })();

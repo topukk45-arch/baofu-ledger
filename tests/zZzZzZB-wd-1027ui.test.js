@@ -43,14 +43,23 @@ const sp = e => [...e.children].map(txt).filter(Boolean).join(' ');
   await tabTo('2026-10-22'); await tabTo('2026-10-20'); await tabTo('week');
   ok(sh().style.height === h0 && sh().classList.contains('wd-fixed'), '1 切天、切整周：高度不变');
   $('weekPrev').click(); await tick();
-  ok(sh().classList.contains('wd-fixed') && parseFloat(sh().style.height) >= parseFloat(h0), '1 换到上一周（内容少）：只会长高、不会变矮');
+  ok(sh().classList.contains('wd-fixed') && sh().style.height === h0, '1 换到上一周：高度不变（打开时上一周、下一周已经量进去了）');
+  $('weekPrev').click(); await tick(); $('weekNext').click(); await tick(); $('weekNext').click(); await tick();
+  ok(sh().style.height === h0, '1 再往前翻、翻回来：高度一直不变');
   ok(parseFloat(h0) <= 800 * 0.85, '1 不超过屏幕 85%：' + h0);
   ok(navT() === '左右滑动看上一周、下一周', '2 第 1 次打开：写着左右滑动的说明');
+  w.JiwenSheet.close();
+  // 10-27 手机上看到的：打开本周内容少的一天（周一），点 ‹ 退到上一周的周日（上一周内容多），面板变长一下 → 打开时上一周也量进去，不变
+  w.JiwenDetail.openDay('2026-10-19'); await tick();
+  const hd = sh().style.height;
+  $('weekPrev').click(); await tick();
+  ok(/10月18日/.test($('uiSheetTitle').textContent) && sh().style.height === hd, '1 从本周一点 ‹ 到上一周的周日：面板高度不变 ' + hd + ' / ' + sh().style.height);
   w.JiwenSheet.pick({ title: '虚构的一个选择', options: [{ value: 'a', label: 'a' }] }); await tick();
   ok(!sh().classList.contains('wd-fixed') && !sh().style.height, '1 换成别的面板：定的高去掉');
   w.JiwenSheet.close();
 
   // 2. 说明只写前 3 次
+  w.localStorage.setItem('app_wd_hint_n', '1');   // 上面第 1 段一共算打开了 1 次（中间那次 10-27 的情形另算，这里放回）
   w.JiwenDetail.openDay('2026-10-22'); await tick();
   ok(navT() === '左右滑动看前一天、后一天', '2 第 2 次打开（一天）：写着');
   $('uiSheetBody').querySelector('.bl-row[data-id]').click(); await tick();
