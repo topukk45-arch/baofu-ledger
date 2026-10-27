@@ -2364,3 +2364,26 @@
         .set-list > .set-item.set-col { flex-direction:column; align-items:stretch; gap:8px; }
         .set-list > .set-item.set-col > .seg { display:flex; width:100%; }
         .set-list > .set-item.set-col > .seg button { flex:1 1 0; padding:0 6px; }
+
+        /* ⑤ 行高两种：两行的行 54（账单一行、日子卡里一条、预算外这种带小字的行），一行的行 48（一周里每天一行、日卡抬头、分类汇总、饼图旁的分类、设置）；
+           带滑块的行按内容撑高；日子页 72 高的大数字行、预算里带进度条的分类行（按内容撑高）不在此列 */
+        .dw-day { min-height:var(--row-1); }
+        button.lg-dh, .lg-dc-noday .lg-dh { min-height:var(--row-1); }
+        .cs-row { min-height:var(--row-1); padding-top:0; padding-bottom:0; }
+        .stat-cat-list .sc-item { min-height:var(--row-1); justify-content:center; }
+        button.dc-item { min-height:var(--row-2); }
+        .bgo-row { min-height:var(--row-2); align-content:center; padding:6px 0; }
+        /* 圆角只留三档：9 小胶囊、标签；12 按钮、选项、提示条；16 卡片、汇总块、列表（全圆胶囊按高度一半、圆点 50%、≤ 8px 的小条、图表柱子、底部面板顶角 18 不算） */
+        .container { border-radius:var(--r-l); }
+        @media (max-width: 600px) { .container { border-radius:var(--r-l); } }
+        .stat-card, .lg-dc, .days-card, .cat-card { border-radius:var(--r-l); }
+        .mstrip, .sp-card { border-radius:var(--r-l); }
+        .mini-btn, .cs-display { border-radius:var(--r-m); }
+        .bgc { border-radius:var(--r-s); }
+        .dtag { border-radius:var(--r-s); }
+        .sc-dot { border-radius:50%; }
+        .stat-cal .day, button.wk-sum { border-radius:var(--r-s); }
+        /* 按下时才露出底色的几处，圆角也按三档：返回键、周分隔线、月份页头 12；柱子 9；月份浮条里的滚动槽跟浮条 16 */
+        button.days-back, button.lg-wk, button.lg-bar { border-radius:var(--r-m); }
+        button.dw-bar { border-radius:var(--r-s); }
+        .ms-track { border-radius:var(--r-l); }
