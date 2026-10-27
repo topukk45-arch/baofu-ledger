@@ -407,22 +407,46 @@
             //   滑动时手指碰到日卡片、周小计不会闪一下。很快点一下（没等到）松手时补一下按下的样子
             const PRESS_DELAY=90, PRESS_SLOP=8;
             let cur=null, timer=null, sx=0, sy=0;
+            // 1027-UI6：长按一笔（.bl-row[data-id]：账单列表、搜一笔结果、一天面板）：和上面按下反馈同一套计时——按下起算，LONG_MS 毫秒里
+            //   手指没挪过 PRESS_SLOP、页面没滚、没松手，就在这一行上发一个 jw-longpress 事件（冒泡，detail.id），由页面那层弹菜单；
+            //   紧跟着的那一下 click 吞掉（不再进详情）。左右滑、往下拉面板都是先挪手指，挪了就作废，不打架
+            const LONG_MS=450;
+            let longT=null, eatClick=0;
+            function longStart(t){
+                clearTimeout(longT); longT=null;
+                const row=t && t.closest && t.closest('.bl-row[data-id]');
+                if(!row) return;
+                longT=setTimeout(()=>{
+                    longT=null;
+                    if(cur!==t) return;
+                    t.classList.remove('pressed'); cur=null; clearTimeout(timer); timer=null;
+                    eatClick=performance.now();
+                    row.dispatchEvent(new CustomEvent('jw-longpress', { bubbles:true, detail:{ id:row.dataset.id } }));
+                }, LONG_MS);
+            }
+            function longStop(){ clearTimeout(longT); longT=null; }
+            document.addEventListener('click', e=>{
+                if(eatClick && performance.now()-eatClick<800 && e.target.closest && e.target.closest('.bl-row[data-id]')){ e.preventDefault(); e.stopPropagation(); eatClick=0; }
+            }, true);
+            document.addEventListener('contextmenu', e=>{ if(e.target.closest && e.target.closest('.bl-row[data-id]')) e.preventDefault(); });
             function press(e){
                 const t=e.target.closest(SEL);
                 if(!t || t.disabled) return;
                 cancel();
                 const p=(e.touches && e.touches[0]) || e; cur=t; sx=p.clientX||0; sy=p.clientY||0;
                 timer=setTimeout(()=>{ timer=null; if(cur) cur.classList.add('pressed'); }, PRESS_DELAY);
+                longStart(t);
             }
             function move(e){
                 if(!cur) return;
                 if(Math.abs((e.clientX||0)-sx)>PRESS_SLOP || Math.abs((e.clientY||0)-sy)>PRESS_SLOP) cancel();
             }
             function cancel(){
-                clearTimeout(timer); timer=null;
+                clearTimeout(timer); timer=null; longStop();
                 if(cur){ cur.classList.remove('pressed'); cur=null; }
             }
             function release(){
+                longStop();
                 if(!cur) return;
                 const t=cur;
                 if(timer){ clearTimeout(timer); timer=null; t.classList.add('pressed'); cur=null; setTimeout(()=>t.classList.remove('pressed'), 90); return; }
@@ -692,7 +716,7 @@
         //   手指按着它不收、松手重新计时；点了里面的按钮就收起。一次只有一条，新的顶掉旧的。系统「减少动画」时不上移、只淡入淡出。
         //   snack({ text, sub, actions:[{ id, text, primary, onClick }] })
         const SNACK_MS=4000;
-        let snackEl=null, snackT=null;
+        let snackEl=null, snackT=null, snackMs=SNACK_MS;
         function snackHide(){ clearTimeout(snackT); if(snackEl) snackEl.classList.remove('show'); }
         function snack(o){
             o=o||{};
@@ -700,7 +724,7 @@
                 snackEl=document.createElement('div'); snackEl.className='snack'; snackEl.id='uiSnack'; snackEl.setAttribute('role', 'status'); snackEl.setAttribute('aria-live', 'polite');
                 document.body.appendChild(snackEl);
                 snackEl.addEventListener('pointerdown', ()=>clearTimeout(snackT));
-                ['pointerup', 'pointercancel'].forEach(ev=>snackEl.addEventListener(ev, ()=>{ if(snackEl.classList.contains('show')){ clearTimeout(snackT); snackT=setTimeout(snackHide, SNACK_MS); } }));
+                ['pointerup', 'pointercancel'].forEach(ev=>snackEl.addEventListener(ev, ()=>{ if(snackEl.classList.contains('show')){ clearTimeout(snackT); snackT=setTimeout(snackHide, snackMs); } }));
             }
             snackEl.textContent='';
             const tx=document.createElement('div'); tx.className='snack-tx';
@@ -714,7 +738,7 @@
             });
             void snackEl.offsetWidth;
             snackEl.classList.add('show');
-            clearTimeout(snackT); snackT=setTimeout(snackHide, o.ms || SNACK_MS);
+            snackMs=o.ms || SNACK_MS; clearTimeout(snackT); snackT=setTimeout(snackHide, snackMs);
         }
         window.JiwenPanel = { bindSheetDrag, copyText, sheetGhostsFinish, snack, snackHide };   // sheet 模块对外只有这一个入口
 })();
