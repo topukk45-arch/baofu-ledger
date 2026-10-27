@@ -5,6 +5,7 @@
 // 不是自动测试（不进 run-all，打包机上没有浏览器），改界面前后手动跑一遍对比：
 //   NODE_PATH=$(npm root -g) node tests/ui/audit.js 输出目录 [--only 配置名] [--part 段号,段号] [--shots]
 //   1020-J：第 11 段是这一轮新加的几项检查 + 截图总表（--only main --part 11 --shots，总表写到 tests/ui/out/<版本号>/sheet.png）
+//   1027-UI4：第 13 段是界面收敛第一轮的检查（24 个预设的 t1 / t2、汇总块、圆角和行高）+ 4 个主题的截图（--only main --part 13 --shots）
 //   配置：main（412×970 浅色）、narrow（360×780）、dark（412×970、系统深色）、big（412×970、字号 ×1.15）
 // 结果：输出目录/audit-<配置>.json、summary.md；--shots 时每页一张截图 <配置>-<页面>.png。
 // 数据全是虚构的（tests/helpers/bills.js 生成账单，手记、分类、对方名都是编的）。
@@ -777,7 +778,8 @@ async function run(cfg, port, browser) {
   //   f 换主题以后根底色和页面底色一样（日子页下半截不露别的颜色）；
   //   截图：改到的页面在 412×915、412×970、360×780 下各一张（平时 / 键盘弹出来 / 叠层打开），拼成一页 sheet.png（--shots 时）。
   // 1027-UI：第 12 段（主题色拆色、周 / 日面板定高）用第 11 段的样例数据和截图总表，--part 12 只跑它
-  if ((want(11) || want(12)) && cfg.name === 'main') {
+  // 1027-UI4：第 13 段（界面收敛第一轮）也用第 11 段的样例数据和截图总表，--part 13 只跑它
+  if ((want(11) || want(12) || want(13)) && cfg.name === 'main') {
     const SIZES = [[412, 970], [360, 780], [412, 915], [360, 640]];
     const SHEET_SIZES = ['412x915', '412x970', '360x780'];
     const sheetShots = [];   // [{ file, page, size, state }]
@@ -1091,7 +1093,7 @@ async function run(cfg, port, browser) {
         const fab = document.querySelector('#pageStats .to-top.show');   // 1023-O：「回到本月」✕ 去掉了
         if (fab) { const f = fab.getBoundingClientRect(); if (f.bottom > s.top - 4 && f.top < s.bottom) bad.push('右下角圆钮压着月份浮条'); }
         document.querySelectorAll('#statCal .wk-sum').forEach(w => { const r = w.getBoundingClientRect(); if (r.right > innerWidth - 8) bad.push('周合计那一格贴边 / 出了屏幕'); const v = w.querySelector('.wk-v'); if (v && v.scrollWidth > w.clientWidth + 0.5) bad.push('周合计「' + v.textContent + '」放不下'); });
-        document.querySelectorAll('.st-cells .st-cell, .st-cells > *').forEach(c => { [...c.children].forEach(x => { if (x.scrollWidth > c.clientWidth + 0.5) bad.push('两格里「' + x.textContent.slice(0, 12) + '」放不下'); }); });
+        document.querySelectorAll('.st-sum .ui-sum-main, .st-sum .ui-sum-side').forEach(c => { [...c.children].forEach(x => { if (x.scrollWidth > c.clientWidth + 0.5) bad.push('汇总块里「' + x.textContent.slice(0, 12) + '」放不下'); }); });   // 1027-UI4：两格合成了汇总块
         return { bad: [...new Set(bad)].slice(0, 6), ok: !bad.length };
       })));
       // 超预算的月份有小红点，选中的深色格子上也看得见（白圈）；只有往来 / 不计的日子格换底色、有标签
@@ -1342,6 +1344,119 @@ async function run(cfg, port, browser) {
         }
       }
     }
+    }
+
+    // ===== 13. 1027-UI4 界面收敛第一轮 =====
+    //   a 24 个预设逐个套上：--c-t1 / --c-t2 在页面底、白、卡片、面板底上都 ≥ 4.5；页面上真画出来、颜色是 t1 / t2 的字，和它下面真的底色比也 ≥ 4.5
+    //     （账单页、统计页、预算、设置、一天面板）；汇总块和页面底对比 ≥ 1.035，不到时要有细边
+    //   b 圆角只用 9 / 12 / 16（全圆胶囊按高度一半、圆点、≤ 8px 的小条、图表柱子、底部面板顶角 18、看不见的不算）；
+    //     行高：一行的行 48、两行的行 54（按类名认：一周每天、日卡抬头、分类汇总、饼图旁分类、设置一行 = 48；账单一行、日子卡一条、预算外那几行 = 54）
+    //   c 截图：天青、黛蓝、黄栌、松烟墨 × 账单页、统计页、一天面板、设置页；默认主题下这一轮改到的页面（统计、预算、一周、日子、搜一笔、四种空状态）
+    if (want(13)) {
+      const CONTRAST_FN = `const L=h=>{h=(h||'').trim();let r,g,b;const m=h.match(/rgba?\\(([^)]+)\\)/), q=h.match(/color\\(srgb ([^)/]+)/);if(m){[r,g,b]=m[1].split(',').map(Number);}else if(q){[r,g,b]=q[1].trim().split(/\\s+/).map(v=>Math.round(+v*255));}else{const n=parseInt(h.slice(1),16);r=n>>16&255;g=n>>8&255;b=n&255;}
+        return [r,g,b].map(v=>{v/=255;return v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4)}).reduce((s,v,i)=>s+v*[.2126,.7152,.0722][i],0)};
+        const C=(a,b)=>{const x=L(a),y=L(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05)};`;
+      const presets = JSON.parse(await (async () => { const pg = await page11(412, 915); const r = await pg.evaluate(() => JSON.stringify(window.JiwenThemeData.PRESETS)); await pg.close(); return r; })());
+      const scanSmall = (fn) => new Function(fn + `
+        const cs0=getComputedStyle(document.documentElement), t1=cs0.getPropertyValue('--c-t1').trim(), t2=cs0.getPropertyValue('--c-t2').trim();
+        const rgb=h=>{const n=parseInt(h.slice(1),16);return 'rgb('+(n>>16&255)+', '+(n>>8&255)+', '+(n&255)+')';};
+        const want=new Set([rgb(t1), rgb(t2)]), bad=[];
+        const bgOf=e=>{ for(let x=e;x;x=x.parentElement){ const c=getComputedStyle(x); if(c.backgroundImage && c.backgroundImage!=='none' && /gradient/.test(c.backgroundImage)) return null; const b=c.backgroundColor; if(b && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(b)) { if(/rgba|\\/ ?0?\\.\\d/.test(b)) return null; return b; } } return getComputedStyle(document.body).backgroundColor; };
+        document.querySelectorAll('body *').forEach(e=>{ const r=e.getBoundingClientRect(); if(r.width<1||r.height<1) return; if(!e.childNodes.length || ![...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim())) return;
+          if(e.closest('.boot-snap,[hidden]')) return; const cs=getComputedStyle(e); if(cs.visibility==='hidden'||+cs.opacity<1) return; if(!want.has(cs.color)) return;
+          const b=bgOf(e); if(!b) return; const c=C(cs.color,b); if(c<4.5) bad.push((e.className||e.tagName)+'「'+e.textContent.trim().slice(0,8)+'」'+c.toFixed(2)+' 底 '+b); });
+        return bad;`);
+      const scanFn = scanSmall(CONTRAST_FN);
+      const varBad = [], drawBad = [], sumBad = [];
+      for (const p of presets) {
+        const pg = await page11(412, 915, { app_appearance: JSON.stringify({ primary: p.color }) });
+        const v = await pg.evaluate(new Function(CONTRAST_FN + `const cs=getComputedStyle(document.documentElement), g=k=>cs.getPropertyValue(k).trim();
+          const o={}; for(const k of ['--c-t1','--c-t2','--c-bg','--c-surface','--c-sheet','--c-sum','--c-sum-edge']) o[k]=g(k);
+          o.c=[]; for(const t of ['--c-t1','--c-t2']) for(const b of [o['--c-bg'],'#ffffff',o['--c-surface'],o['--c-sheet']]) o.c.push([t,b,C(o[t],b)]);
+          o.sum=C(o['--c-sum'],o['--c-bg']); return o;`));
+        v.c.filter(x => x[2] < 4.5).forEach(x => varBad.push(`${p.name} ${x[0]} 在 ${x[1]} 上 ${x[2].toFixed(2)}`));
+        if (v.sum < 1.035 && v['--c-sum-edge'] === 'transparent') sumBad.push(`${p.name} 汇总块和页面底 ${v.sum.toFixed(3)}、没有边`);
+        for (const [where, go] of [['账单页', async () => tab(pg, 'ledger')], ['统计页', async () => tab(pg, 'stats')],
+          ['预算', async () => { await click(pg, '#statTabSeg button[data-v="budget"]'); await pg.waitForTimeout(300); }],
+          ['设置页', async () => { await click(pg, '#statTabSeg button[data-v="flow"]'); await tab(pg, 'settings'); }],
+          ['一天面板', async () => { await pg.evaluate(() => window.JiwenDetail.openDay('2026-10-19')); await pg.waitForTimeout(700); }]]) {
+          await go(); (await pg.evaluate(scanFn)).slice(0, 4).forEach(x => drawBad.push(`${p.name} ${where} ${x}`));
+        }
+        await pg.close();
+      }
+      results.push({ name: 'ui4-t12-vars', cfg: '24 个预设', chk: true, label: 't1 / t2 在页面底、白、卡片、面板底上 ≥ 4.5', bad: varBad, ok: !varBad.length });
+      results.push({ name: 'ui4-t12-drawn', cfg: '24 个预设', chk: true, label: '画出来的 t1 / t2 小字和下面的底色 ≥ 4.5', bad: drawBad, ok: !drawBad.length });
+      results.push({ name: 'ui4-sum', cfg: '24 个预设', chk: true, label: '汇总块和页面底 ≥ 1.035，不到要有边', bad: sumBad, ok: !sumBad.length });
+      // b. 圆角、行高
+      const GEO_FN = () => {
+        const bad = [];
+        const ROW48 = ['dw-day', 'lg-dh', 'cs-row'], ROW54 = ['bl-row', 'dc-item', 'bgo-row', 'sc-item'];
+        document.querySelectorAll('body *').forEach(e => {
+          const r = e.getBoundingClientRect(); if (r.width < 1 || r.height < 1 || e.closest('.boot-snap,[hidden],#impPage,.imp-page')) return;
+          const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || cs.opacity === '0') return;
+          const cls = typeof e.className === 'string' ? e.className : '';
+          const rad = parseFloat(cs.borderTopLeftRadius), h = r.height, w = r.width;
+          const seen = !/rgba\(0, 0, 0, 0\)/.test(cs.backgroundColor) || parseFloat(cs.borderTopWidth) > 0 || /\bpressable|lg-wk|lg-bar|days-back|dw-bar\b/.test(cls);
+          if (seen && rad > 0 && !cs.borderTopLeftRadius.includes('%') && ![9, 12, 16].includes(rad) && rad < Math.min(h, w) / 2 - 0.6 && Math.min(h, w) > 8
+            && !(e.matches('.sheet, .ui-sheet') && rad === 18) && !e.closest('.dw-bars i, .stat-pie-holder')) bad.push(`圆角 ${rad} ${e.tagName.toLowerCase()}.${cls.split(' ').join('.')}`);
+          const hit = (list) => list.find(c => e.classList.contains(c));
+          const r48 = hit(ROW48), r54 = hit(ROW54);
+          if (r48 && Math.abs(h - 48) > 1.5 && !(e.classList.contains('cs-row') && e.classList.contains('cs-total') && h >= 48)) bad.push(`一行的行 ${r48} 高 ${Math.round(h)}`);
+          if (r54 && Math.abs(h - 54) > 1.5 && !(r54 === 'bgo-row' && h > 54)) bad.push(`两行的行 ${r54} 高 ${Math.round(h)}`);
+          if (e.matches('.set-list > .set-item:not(.set-static)') && Math.abs(h - 48) > 1.5) bad.push(`设置一行高 ${Math.round(h)}`);
+        });
+        return [...new Set(bad)];
+      };
+      for (const [w, h] of [[412, 915], [360, 780]]) {
+        const pg = await page11(w, h); const size = w + 'x' + h, bad = [];
+        const look = async (where) => (await pg.evaluate(GEO_FN)).forEach(x => bad.push(where + '：' + x));
+        await tab(pg, 'ledger'); await look('账单页');
+        await tab(pg, 'stats'); await look('统计页');
+        await click(pg, '#statTabSeg button[data-v="budget"]'); await pg.waitForTimeout(300); await look('预算');
+        await click(pg, '#statTabSeg button[data-v="flow"]');
+        await tab(pg, 'settings'); await look('设置页');
+        await pg.evaluate(() => window.JiwenDetail.openDay('2026-10-19')); await pg.waitForTimeout(700); await look('一天面板');
+        await closeAll(pg);
+        await pg.evaluate(() => window.JiwenDetail.openWeek('2026-10-19')); await pg.waitForTimeout(700); await look('一周面板');
+        await closeAll(pg);
+        await tab(pg, 'ledger'); await click(pg, '#daysCard'); await pg.waitForTimeout(600); await look('日子页');
+        await pg.evaluate(() => window.JiwenTabs.switchTab('ledger')); await pg.waitForTimeout(400);
+        await pg.evaluate(() => window.JiwenSearch.openSearch({ noSheet: true })); await pg.waitForTimeout(600); await look('搜一笔');
+        await closeAll(pg);
+        results.push({ name: 'ui4-radius-rows', cfg: size, chk: true, label: '圆角只用 9 / 12 / 16、行高 48 / 54', bad, ok: !bad.length });
+        await pg.close();
+      }
+      // c. 截图
+      for (const [nm, col] of [['天青', '#95b6ce'], ['黛蓝', '#3a5a7a'], ['黄栌', '#e7b643'], ['松烟墨', '#292e34']]) {
+        for (const [w, h] of [[412, 915], [360, 780]]) {
+          const pg = await page11(w, h, { app_appearance: JSON.stringify({ primary: col }) }); const size = w + 'x' + h;
+          await tab(pg, 'ledger'); await shot(pg, size, '收敛·' + nm, '1 账单页');
+          await tab(pg, 'stats'); await shot(pg, size, '收敛·' + nm, '2 统计页');
+          await pg.evaluate(() => window.JiwenDetail.openDay('2026-10-19')); await pg.waitForTimeout(700); await shot(pg, size, '收敛·' + nm, '3 一天面板');
+          await closeAll(pg);
+          await tab(pg, 'settings'); await shot(pg, size, '收敛·' + nm, '4 设置页');
+          await pg.close();
+        }
+      }
+      for (const [w, h] of SIZES.slice(0, 3)) {
+        const pg = await page11(w, h); const size = w + 'x' + h;
+        await tab(pg, 'stats'); await click(pg, '#statTabSeg button[data-v="budget"]'); await pg.waitForTimeout(300); await shot(pg, size, '收敛·雾松青', '5 预算');
+        await click(pg, '#statTabSeg button[data-v="flow"]');
+        await pg.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); await pg.waitForTimeout(400); await shot(pg, size, '收敛·雾松青', '6 统计页下半');
+        await pg.evaluate(() => window.JiwenDetail.openWeek('2026-10-19')); await pg.waitForTimeout(700); await shot(pg, size, '收敛·雾松青', '7 一周面板');
+        await closeAll(pg);
+        await pg.evaluate(() => window.JiwenDetail.openDay('2026-10-18')); await pg.waitForTimeout(700); await shot(pg, size, '收敛·雾松青', '8 空状态·这天没记账');
+        await closeAll(pg);
+        await tab(pg, 'ledger'); await click(pg, '#daysCard'); await pg.waitForTimeout(600); await shot(pg, size, '收敛·雾松青', '9 日子页');
+        await pg.evaluate(() => window.JiwenTabs.switchTab('ledger')); await pg.waitForTimeout(400);
+        await pg.evaluate(() => { window.JiwenSearch.openSearch({ noSheet: true }); const k = document.getElementById('searchKeyword'); k.value = '虚构的不存在的备注'; k.dispatchEvent(new Event('input', { bubbles: true })); }); await pg.waitForTimeout(600);
+        await shot(pg, size, '收敛·雾松青', 'A 空状态·搜不到');
+        await closeAll(pg); await pg.close();
+        const pe = await page11(w, h, { ['store_' + ID]: JSON.stringify({ archives: { '默认存档': { cats: BASE_CATS.slice(0, 8), records: [] } }, last: '默认存档', accountName: '小明' }), ['days_' + ID]: '[]' });
+        await tab(pe, 'stats'); await click(pe, '#statTabSeg button[data-v="budget"]'); await pe.waitForTimeout(300); await shot(pe, size, '收敛·雾松青', 'B 空状态·没设预算');
+        await tab(pe, 'ledger'); await click(pe, '#daysCard'); await pe.waitForTimeout(600); await shot(pe, size, '收敛·雾松青', 'C 空状态·没有日子');
+        await pe.close();
+      }
     }
     // 截图总表：一页，按页面 × 状态排，每张标上页面名、屏幕、状态
     if (SHOTS && sheetShots.length) {

@@ -136,14 +136,16 @@ function palette() {
     $('uiSheetBody').querySelector('.ui-empty-btn').click(); await tick();
     ok($('addMask').style.display === 'flex' && ($('billTime').dataset.value || '').startsWith('2026-10-21T'), '6 点了记一笔、日子是那天');
     $('closeAdd').click(); await tick();
-    w.JiwenSearch.openSearch(); await tick(); w.JiwenSearch.closeSheet && w.JiwenSearch.closeSheet(); await tick();
+    w.JiwenSearch.openSearch({ noSheet: true }); await tick();
     $('searchKeyword').value = '虚构的不存在的备注'; $('searchKeyword').dispatchEvent(new w.Event('input', { bubbles: true })); await tick();
     w.JiwenSearch.searchFlush && w.JiwenSearch.searchFlush();
     const se = $('searchEmpty');
     ok(!se.hidden && emptyOk(se, '没有找到相关的账', '放宽条件'), '6 搜一笔搜不到：「没有找到相关的账」+「放宽条件」：' + txt(se));
+    const sheetOn = () => $('filterSheetMask').style.display === 'flex' || $('filterSheetMask').classList.contains('open');
+    ok(!sheetOn(), '6 （点之前条件抽屉是收着的）');
     se.querySelector('.ui-empty-btn').click(); await tick();
-    ok($('filterSheetMask').style.display === 'flex' || $('filterSheetMask').classList.contains('open'), '6 「放宽条件」打开条件抽屉');
-    w.JiwenSearch.closeSheet && w.JiwenSearch.closeSheet(); w.JiwenSearch.closeSearch(); await tick();
+    ok(sheetOn(), '6 「放宽条件」打开条件抽屉');
+    w.JiwenSearch.closeSearch(); await tick();
     ok(!t.errs.length, '3 没有报错 ' + t.errs.join('|'));
   }
 
