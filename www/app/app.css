@@ -1188,7 +1188,7 @@
         .cp-hex { flex:1 1 auto; min-width:0; min-height:var(--ui-tap); padding:0 12px; font-size:18px; font-family:inherit; letter-spacing:1px;
             border:1px solid var(--c-border-mid); border-radius:12px; background:var(--c-surface); color:var(--c-text); text-transform:lowercase; }
         .cp-hex.bad { border-color:var(--c-neg); }
-        .cp-note { font-size:13px; color:var(--c-text-soft); line-height:1.6; margin:6px 0 0; min-height:21px; }
+        .cp-note { font-size:13px; color:var(--c-text-soft); line-height:1.6; margin:6px 0 0; min-height:42px; }   /* 1027-UI：固定留两行，拖到「挪了一点」那种颜色时面板不跳 */
         .theme-tip { color:var(--c-text-soft); font-size:12px; margin-top:8px; }
 
         /* ===== 日子（倒数日）=====

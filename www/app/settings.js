@@ -412,7 +412,7 @@
                     if($('customColorDot')) $('customColorDot').style.background=cur;
                     if($('customColorVal')) $('customColorVal').textContent=cur;
                     if(els.note){ const T=nm.t;
-                        els.note.textContent = T.nudged ? `这个颜色卡在不深不浅的中间，按钮上的字怎么配都不够清楚，按钮会用挪了一点的 ${T.fill}。`
+                        els.note.textContent = T.nudged ? `按钮上的字怎么配都不够清楚，按钮会用挪了一点的 ${T.fill}。`
                             : '整个 App 已经换成这个颜色看看效果，点「应用」才存。'; }
                 }
                 window.JiwenSheet.open({ title:'自定义主色', sub:'点色块，或者拖下面的条；整个 App 跟着变，点「应用」才存', tall:true,   // 1020-J：原来 72% 高装不下，色相 / 深浅条被「应用」挡住半截
