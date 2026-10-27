@@ -64,7 +64,9 @@ for (const p of presets) {
   if (!(a.length === 4 && near(a.slice(0, 3), rgb(pal['--c-primary'])) && a[3] === 0.22)) bad.push(p.name + ' --c-mx-p22a');
   if (!(t.length === 4 && near(t.slice(0, 3), rgb(pal['--c-text'])) && t[3] === 0.06)) bad.push(p.name + ' --c-mx-t6a');
 }
-ok(!bad.length, '3 24 个预设下兜底色都有、和 color-mix 算出来的一样：' + bad.slice(0, 5).join('、'));
+const VARS = Object.keys(SPEC).concat(SHADES.map((v, i) => '--c-shade-' + i), ['--c-mx-p22a', '--c-mx-t6a']);
+for (const k of VARS) { const b = bad.filter(x => x.endsWith(' ' + k)); ok(!b.length, '3 24 个预设下 ' + k + ' 都有、和 color-mix 算法一样：' + b.slice(0, 3).join('、')); }
+ok(bad.every(x => VARS.some(k => x.endsWith(' ' + k))), '3 没有别的出错');
 
 // ===== 4. 几处的底色直接是先算好的颜色（老 WebView 也认） =====
 const decl = sel => { const i = css.indexOf(sel + ' {') >= 0 ? css.indexOf(sel + ' {') : css.indexOf(sel + '{'); if (i < 0) return ''; return css.slice(i, css.indexOf('}', i)); };
