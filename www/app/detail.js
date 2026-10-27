@@ -3,7 +3,7 @@
         const { IMP_APPS, balContrib, getUserData, isOpening, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData, statContrib, syncRefunds } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { devImportOn } = window.JiwenImportEntry;   // 用到前面模块的
-        const { askCatRule, openAddModal, openRefund, refundLineHtml } = window.JiwenForms;   // 用到前面模块的
+        const { askCatRule, deleteRecord, openAddModal, openRefund, refundLineHtml } = window.JiwenForms;   // 用到前面模块的
 
         // 清单行 → 只读详情。批量确认还没执行，此时允许改记录会让清单和即将执行的范围对不上，
         // 所以从这里进的详情隐藏「修改」按钮，只看不改。
@@ -527,6 +527,8 @@
                         const row=e.target.closest('.bl-row[data-id]'); if(row){ done(); openDetail(row.dataset.id, { onClose:reopen }); return; }
                         const d=e.target.closest('[data-day]'); if(d) show(d.dataset.day);
                     });
+                    // 1027-UI6：长按这一天里的一笔：收起面板弹菜单，取消 / 删完回到这一天
+                    box.addEventListener('jw-longpress', e=>{ const row=e.target.closest('.bl-row[data-id]'); if(!row) return; e.stopPropagation(); done(); openRowMenu(row.dataset.id, { back:reopen }); });
                     // 左右滑：横着挪了 50px 以上、而且比竖着挪得多，就换（往右滑看前面的，往左滑看后面的）。
                     //   1025-UX：手指横着挪的时候内容跟着手指走（到头了只挪三成，拉不动的感觉），松手够了就接着滑过去，不够就弹回原处
                     let sx=null, sy=0, lock=null, pdx=0;
@@ -561,5 +563,37 @@
                 foot(box, done){ footBox=box; doneFn=done; render(); } });
             fitHeight();
         }
-        window.JiwenDetail = { CHEV, aiFlagText, balanceAfter, cal, closeDetail, openDay, openDetail, openWeek, rowHtml, sumFen, sumHtml };   // detail 模块对外只有这一个入口
+        // 1027-UI6：长按一笔弹的菜单（账单列表、搜一笔结果、一天面板共用）：顶上是这一笔（和列表同一行的画法），下面三项「修改 / 再记一笔 / 删除」，
+        //   最下面「取消」。退款没有「再记一笔」（和单笔详情一样，分类跟着原账单走）。删除：手动记的直接删 + 5 秒撤销，导入的照旧四选一（JiwenForms.deleteRecord）。
+        //   back：从一天面板进来的，取消 / 往下拉 / 返回键 / 删完回到那一天；去修改、去再记一笔就不回了（和单笔详情一样）
+        function openRowMenu(id, opt){
+            const back=opt && opt.back;
+            const all=getUserData(), rec=all.find(r=>r.id===id);
+            if(!rec) return;
+            const acts=[['edit', '修改'], ...(isRefund(rec) ? [] : [['again', '再记一笔']]), ['del', '删除']];
+            window.JiwenSheet.open({ title:'这一笔', onDismiss:()=>{ if(back) back(); },
+                body(box, done){
+                    const w=document.createElement('div'); w.id='rowMenu'; w.className='row-menu';
+                    w.innerHTML=`<div class="lg-dc rm-rec">${rowHtml(rec, refundedMap(all), { date:true })}</div>`
+                        + `<div class="ui-stack rm-acts">${acts.map(([v, t])=>`<button type="button" class="ui-btn block rm-act${v==='del' ? ' warn' : ''}" data-v="${v}">${t}</button>`).join('')}</div>`;
+                    w.addEventListener('click', e=>{
+                        const b=e.target.closest('.rm-act'); if(!b) return;
+                        done();
+                        if(b.dataset.v==='edit') window.openEdit(id);
+                        else if(b.dataset.v==='again') openAddModal({ from:rec, money:true });
+                        else deleteRecord(id, { direct:true, onDone:()=>{ if(back) back(); }, onCancel:()=>{ if(back) back(); } });
+                    });
+                    box.appendChild(w);
+                },
+                foot(box){
+                    const c=document.createElement('button'); c.type='button'; c.className='ui-btn block'; c.id='rmCancel'; c.textContent='取消';
+                    c.addEventListener('click', ()=>{ window.JiwenSheet.close(); if(back) back(); });
+                    box.appendChild(c);
+                } });
+        }
+        document.addEventListener('jw-longpress', e=>{
+            const row=e.target.closest('.bl-row[data-id]'); if(!row) return;
+            if(row.closest('#billList, #searchList')) openRowMenu(row.dataset.id);
+        });
+        window.JiwenDetail = { CHEV, aiFlagText, openRowMenu, balanceAfter, cal, closeDetail, openDay, openDetail, openWeek, rowHtml, sumFen, sumHtml };   // detail 模块对外只有这一个入口
 })();

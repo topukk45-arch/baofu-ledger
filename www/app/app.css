@@ -2463,3 +2463,11 @@
         button.over-budget b { font-weight:500; }
         .over-budget .ob-t { flex:1 1 auto; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
         .over-budget .ob-go { flex:none; font-weight:500; }
+
+        /* ===== 1027-UI6：界面收敛第三轮 ===== */
+        /* 长按一笔的菜单：顶上是这一笔（和列表同一行的画法，不能点），下面三项竖排，删除警示色 */
+        .row-menu { display:flex; flex-direction:column; gap:16px; padding-bottom:4px; }
+        .row-menu .rm-rec { margin:0; }
+        .row-menu .rm-rec .bl-row { pointer-events:none; }
+        .row-menu .rm-acts { display:flex; flex-direction:column; gap:8px; }
+        .row-menu .rm-act { min-height:48px; }
