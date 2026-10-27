@@ -43,6 +43,12 @@
 
 ## 界面检查
 - 真浏览器（Chromium）里按住 650 毫秒弹菜单、按 150 毫秒进详情、按住挪 30px 两样都不出，删除 → 撤销后条数一样。
+- 全部测试 181 组 6084 条通过（这一轮开工时 180 组 6050 条；三轮开工前 178 组 5119 条）。
+- `audit.js --only main --part 11,12,13 --shots`（在 `2f20b63` 上）：ui6-rowmenu / ui6-undo-snack 在 412×970、360×780、412×915 都是 0 处；第二轮的 ui5-heat / pace / overbudget 0 处；第二轮查出的行高、圆角两处没了；被盖住 / 半截露 / 压字 / 截断：没有。截图总表 `tests/ui/out/1027-UI6/sheet.png`。
+
+## 发版
+- 「1027-UI5 体验版」https://github.com/topukk45-arch/baofu-ledger/releases/tag/1027-UI5 ：打包 #316 成功（推送 `6cc3b1e`），安装包 `jiwen-1027-UI5.apk`（4631633 字节，sha256 `3187d92fd10273093077cadbf8b4d1b457c324e23becf882d476f31c15f7bfac`）。
+- 「1027-UI6 体验版」https://github.com/topukk45-arch/baofu-ledger/releases/tag/1027-UI6 ：由这次带截图总表的提交打包（版本提交 `2f20b63` 后面跟的是 `[skip ci]` 的交接提交，那次推送 GitHub 整个跳过了打包，所以这个提交不带 `[skip ci]`）。
 
 # 1027-UI5 界面收敛第二轮（在 1027-UI4 `b83939e` 上接着做）
 
