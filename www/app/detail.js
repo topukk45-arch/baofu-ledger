@@ -345,13 +345,21 @@
         // 1027-UI：面板高度：打开时按这一周里内容最多的那一天和整周取最高（不超过屏幕 WD_MAX_H），之后切天、切整周、左右滑、换周都不变，顶边不动；
         //   换到的那一周要更高时才长高（0.2 秒过渡，见 .ui-sheet.wd-fixed），矮了不缩。内容少的（这天没记账）在中间，多的在面板里滚
         const WD_MAX_H=0.85;
+        // 1027-UI：「左右滑动看前一天、后一天」这句说明只在前 WD_HINT_N 次打开时写，之后只留 ‹ ›（次数记在这台手机上，不进备份）
+        const WD_HINT_N=3, WD_HINT_KEY='app_wd_hint_n';
+        function wdHintCount(add){
+            let n=0; try{ n=parseInt(localStorage.getItem(WD_HINT_KEY)||'0', 10)||0; if(add){ n++; localStorage.setItem(WD_HINT_KEY, String(n)); } }catch(_){}
+            return n;
+        }
         function openWD(mon, day, opt){
             if(!window.JiwenSheet) return;
             const C=cal;
             const back=opt && opt.onClose;
             const today=C.todayKey(), thisMon=C.monOf(today);
             let bodyBox=null, footBox=null, doneFn=null, fromWeek=!!(opt && opt.fromWeek);
-            const reopen=()=>openWD(mon, day, Object.assign({}, opt, { fromWeek }));
+            const reopen=()=>openWD(mon, day, Object.assign({}, opt, { fromWeek, again:true }));
+            // 从单笔详情回来（again）不算又打开了一次
+            const showHint = (opt && opt.again) ? wdHintCount(false)<=WD_HINT_N : wdHintCount(true)<=WD_HINT_N;
             function setHead(t, sub){
                 const te=document.getElementById('uiSheetTitle'); if(te) te.textContent=t;
                 const se=document.getElementById('uiSheetSub'); if(se){ se.textContent=sub||''; se.style.display=sub ? '' : 'none'; }
@@ -367,7 +375,7 @@
             function navHtml(){
                 const canNext = day ? day<today : mon<thisMon;
                 return `<div class="dw-nav"><button type="button" class="dw-prev" id="weekPrev" aria-label="${day ? '前一天' : '上一周'}">‹</button>`
-                    + `<span class="dw-nav-t">${day ? '左右滑动看前一天、后一天' : '左右滑动看上一周、下一周'}</span>`
+                    + `<span class="dw-nav-t">${!showHint ? '' : day ? '左右滑动看前一天、后一天' : '左右滑动看上一周、下一周'}</span>`
                     + `<button type="button" class="dw-next" id="weekNext" aria-label="${day ? '后一天' : '下一周'}"${canNext ? '' : ' disabled'}>›</button></div>`;
             }
             function weekHtml(){
