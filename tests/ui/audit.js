@@ -776,7 +776,8 @@ async function run(cfg, port, browser) {
   //   e 页面上不许有点了会弹系统数字输入法的框；
   //   f 换主题以后根底色和页面底色一样（日子页下半截不露别的颜色）；
   //   截图：改到的页面在 412×915、412×970、360×780 下各一张（平时 / 键盘弹出来 / 叠层打开），拼成一页 sheet.png（--shots 时）。
-  if (want(11) && cfg.name === 'main') {
+  // 1027-UI：第 12 段（主题色拆色、周 / 日面板定高）用第 11 段的样例数据和截图总表，--part 12 只跑它
+  if ((want(11) || want(12)) && cfg.name === 'main') {
     const SIZES = [[412, 970], [360, 780], [412, 915], [360, 640]];
     const SHEET_SIZES = ['412x915', '412x970', '360x780'];
     const sheetShots = [];   // [{ file, page, size, state }]
@@ -808,6 +809,7 @@ async function run(cfg, port, browser) {
       await page.screenshot({ path: path.join(shotsDir, file) });
       sheetShots.push({ file, page: pg, size, state, inSheet: SHEET_SIZES.includes(size) });
     };
+    if (want(11)) {
     // a. 数字键盘
     const KP_PLACES = [
       ['记一笔', 'billMoney', async p => { await tab(p, 'ledger'); await click(p, '.act-add'); await p.waitForTimeout(800); }],
@@ -1189,6 +1191,153 @@ async function run(cfg, port, browser) {
         await pg.close();
       }
     }
+    }
+    // ===== 1027-UI：主题色拆色、周 / 日面板定高 =====
+    if (want(12)) {
+    // 量对比度（页面里跑）：字的颜色（带透明的按底色混）对它下面的底色（往上找第一层不透明的；渐变取每个颜色、算最差的）
+    const CONTRAST = sels => {
+      const P = c => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null; const a = m[1].split(/[\s,\/]+/).filter(Boolean).map(Number); return { r: a[0], g: a[1], b: a[2], a: a.length > 3 ? a[3] : 1 }; };
+      const mix = (f, b) => ({ r: f.r * f.a + b.r * (1 - f.a), g: f.g * f.a + b.g * (1 - f.a), b: f.b * f.a + b.b * (1 - f.a), a: 1 });
+      const L = c => { const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b); };
+      const C = (x, y) => { const a = L(x), b = L(y); return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05); };
+      const hex = c => '#' + [c.r, c.g, c.b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
+      const bgsOf = el => {   // 从下往上叠：找到第一层不透明的（或渐变），上面透明的几层盖上去
+        const over = [];
+        for (let a = el; a; a = a.parentElement) {
+          const cs = getComputedStyle(a);
+          const stops = (cs.backgroundImage.match(/rgba?\([^)]+\)/g) || []).map(P).filter(Boolean);
+          const bc = P(cs.backgroundColor);
+          let base = null;
+          if (stops.length && stops.every(x => x.a > 0.99)) base = stops;
+          else if (bc && bc.a > 0.99) base = [bc];
+          if (base) return base.map(b => over.reduceRight((acc, f) => mix(f, acc), b));
+          if (bc && bc.a > 0) over.push(bc);
+        }
+        return [over.reduceRight((acc, f) => mix(f, acc), { r: 255, g: 255, b: 255, a: 1 })];
+      };
+      const out = [];
+      Object.entries(sels).forEach(([kind, sel]) => document.querySelectorAll(sel).forEach(el => {
+        const r = el.getBoundingClientRect(); if (!r.width || !r.height || !el.textContent.trim()) return;
+        const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || +cs.opacity === 0) return;
+        let op = 1; for (let a = el; a; a = a.parentElement) op *= +getComputedStyle(a).opacity;
+        const fg0 = P(cs.color); if (!fg0) return;
+        const bgs = bgsOf(el);
+        const worst = Math.min(...bgs.map(b => C(mix({ ...fg0, a: fg0.a * op }, b), b)));
+        out.push({ kind, t: el.textContent.trim().slice(0, 8), c: Math.round(worst * 100) / 100, fg: hex(fg0), bg: hex(bgs[0]) });
+      }));
+      return out;
+    };
+    const CSEL = {
+      '按钮字': '.ui-btn.primary, .act-add, .kp-ok, .io-chips .cc.sel-out, .io-chips .cc.sel-in, .cat-grid4 .cc.sel, button.wd-tab.on, .sp-tag, button.snack-b.primary, button.wk-sum.cur .wk-v, .rv-chip.on',
+      '强调字': '.lg-gap-go, .lg-bar-go, .theme-reset, .theme-pick-go, .login-theme-go, .dc-all, .theme-swatch.active .theme-swatch-name',
+      '页签': '.tab-btn.active, .tab-btn.active span',
+      '金额': '.bl-amt, .lg-bar .ov-out, .lg-bar .ov-in, .dd-v, .dd-net-v, #statMonthOut, #statMonthIn, .st-bal-v, .rec-money-row input, #billMoney',
+      '外框按钮': '.ui-btn:not(.primary):not(.warn), .act-filter, .sp-batch, .lg-gap-btn',
+    };
+    {
+      // a. 24 个预设逐个套上：账单页、一天详情、记一笔（选了支出）、统计页、外观弹窗里每一对字和底色 ≥ 4.5:1
+      const presets = await (async () => { const pg = await page11(412, 970); const l = await pg.evaluate(() => window.JiwenThemeData.PRESETS.map(p => [p.name, p.color])); await pg.close(); return l; })();
+      for (const [nm, col] of presets) {
+        const pg = await page11(412, 970, { app_appearance: JSON.stringify({ primary: col }) });
+        const rows = [];
+        const grab = async where => { (await pg.evaluate(CONTRAST, CSEL)).forEach(x => rows.push(Object.assign({ where }, x))); };
+        try {
+          await tab(pg, 'ledger'); await grab('账单页');
+          await pg.evaluate(() => window.JiwenDetail.openDay('2026-10-19')); await pg.waitForTimeout(600); await grab('一天详情');
+          await closeAll(pg);
+          await click(pg, '.act-add'); await pg.waitForTimeout(800); await pg.evaluate(() => window.kpClose()); await pg.waitForTimeout(300);
+          await pg.evaluate(() => { const c = document.querySelector('#addMask .io-chips .cc'); c && c.click(); }); await pg.waitForTimeout(200); await grab('记一笔');
+          await closeAll(pg);
+          await tab(pg, 'stats'); await grab('统计页');
+          await tab(pg, 'settings'); await click(pg, '#themeBtn'); await pg.waitForTimeout(600); await grab('外观弹窗');
+        } catch (e) { rows.push({ where: '出错', kind: '', t: String(e.message || e).slice(0, 80), c: 0 }); }
+        const bad = rows.filter(x => x.c < 4.5);
+        const kinds = [...new Set(rows.map(x => x.kind))];
+        results.push({ name: 'contrast-' + nm, cfg: '412x970', chk: true, label: '字和底色对比（' + kinds.join('、') + '，共 ' + rows.length + ' 对）',
+          bad: bad.slice(0, 8).map(x => `${x.where}·${x.kind}「${x.t}」${x.fg}/${x.bg} ${x.c}`), ok: !bad.length && kinds.length === Object.keys(CSEL).length });
+        await pg.close();
+      }
+      // b. 外观弹窗 360 宽：一组一行 6 个、名字不折行、「恢复默认」在「自定义主色」那一行右边
+      for (const [w, h] of [[360, 780], [412, 970]]) {
+        const pg = await page11(w, h); const size = w + 'x' + h;
+        await tab(pg, 'settings'); await click(pg, '#themeBtn'); await pg.waitForTimeout(700);
+        await shot(pg, size, '外观弹窗', '24 个预设');
+        results.push(Object.assign({ name: 'theme-sheet-1027ui', cfg: size, chk: true, label: '外观弹窗' }, await pg.evaluate(() => {
+          const bad = [], rows = [...document.querySelectorAll('#themePresets .theme-row')];
+          if (rows.length !== 4) bad.push('不是 4 组：' + rows.length);
+          rows.forEach((r, i) => {
+            const sw = [...r.querySelectorAll('.theme-swatch')]; if (sw.length !== 6) bad.push(`第 ${i + 1} 组 ${sw.length} 个`);
+            const tops = new Set(sw.map(b => Math.round(b.getBoundingClientRect().top))); if (tops.size !== 1) bad.push(`第 ${i + 1} 组没排成一行`);
+            sw.forEach(b => { const n = b.querySelector('.theme-swatch-name'), q = n.getBoundingClientRect(); if (q.height > parseFloat(getComputedStyle(n).lineHeight) + 1) bad.push(n.textContent + ' 折行了'); if (n.scrollWidth > b.clientWidth + 0.5) bad.push(n.textContent + ' 出了格子'); if (b.getBoundingClientRect().height < 48) bad.push(n.textContent + ' 不到 48 高'); });
+          });
+          const lab = document.querySelector('.theme-custom-head .field-label').getBoundingClientRect(), rs = document.getElementById('resetThemeBtn').getBoundingClientRect(), row = document.getElementById('customColorBtn').getBoundingClientRect();
+          if (!(rs.left > lab.right && Math.abs((rs.top + rs.bottom) / 2 - (lab.top + lab.bottom) / 2) < 2)) bad.push('「恢复默认」不在「自定义主色」右边');
+          if (rs.right > row.right + 0.5) bad.push('「恢复默认」出了右边');
+          if (rs.height < 48) bad.push('「恢复默认」不到 48 高');
+          if (!document.querySelector('.theme-swatch.active')) bad.push('没有标出选中的');
+          if (document.documentElement.scrollWidth > innerWidth) bad.push('横着出屏幕');
+          return { bad, ok: !bad.length };
+        })));
+        await pg.close();
+      }
+      // c. 周 / 日面板：同一个面板里切天、切整周、左右滑、换周，面板顶边 y 坐标完全相同（换到更高的一周时才许长高）
+      for (const [w, h] of [[412, 970], [360, 780], [412, 915]]) {
+        const pg = await page11(w, h); const size = w + 'x' + h;
+        await tab(pg, 'ledger');
+        const top = () => pg.evaluate(() => Math.round(document.getElementById('uiSheet').getBoundingClientRect().top * 10) / 10);
+        await pg.evaluate(() => window.JiwenDetail.openWeek('2026-10-19')); await pg.waitForTimeout(700);
+        const seq = [['打开整周', await top()]];
+        await shot(pg, size, '周 / 日面板切换', '1 整周（切换前）');
+        // 这一周里 0 笔的那天（样例数据随机，现找）
+        const emptyDay = await pg.evaluate(() => { const ks = new Set(window.JiwenStore.getUserData().map(r => (r.time || '').slice(0, 10))); return ['2026-10-19', '2026-10-20'].find(k => !ks.has(k)) || null; });
+        for (const v of ['2026-10-19', '2026-10-20', 'week']) {
+          await pg.evaluate(v => { const b = document.querySelector(`#uiSheetBody .wd-tab[data-v="${v}"]`); b && b.click(); }, v); await pg.waitForTimeout(450);
+          seq.push(['点' + (v === 'week' ? '整周' : v.slice(5)), await top()]);
+          if (v === '2026-10-20') await shot(pg, size, '周 / 日面板切换', '2 点进今天（切换后）');
+          if (v === emptyDay) {
+            await shot(pg, size, '周 / 日面板切换', '3 0 笔的那天');
+            const ce = await pg.evaluate(() => { const e = document.querySelector('#uiSheetBody .dd-empty'), t = document.createRange(); if (!e) return null; t.selectNodeContents(e); const a = e.getBoundingClientRect(), b = t.getBoundingClientRect(); return Math.round(((b.top + b.bottom) / 2 - (a.top + a.bottom) / 2) * 10) / 10; });
+            if (ce == null || Math.abs(ce) > 1) seq.push(['「这天没记账」不在中间（差 ' + ce + '）', -1]);
+          }
+        }
+        // 左右滑：真手指事件往右滑一段（上一周）
+        const box = await pg.evaluate(() => { const r = document.getElementById('uiSheetBody').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + 200 }; });
+        await pg.evaluate(({ x, y }) => { const b = document.getElementById('uiSheetBody'); const ev = (t, dx) => b.dispatchEvent(new PointerEvent(t, { bubbles: true, clientX: x + dx, clientY: y, pointerId: 7 })); ev('pointerdown', 0); for (let i = 1; i <= 8; i++) ev('pointermove', i * 15); ev('pointerup', 120); }, box);
+        await pg.waitForTimeout(500); seq.push(['往右滑（上一周）', await top()]);
+        await pg.evaluate(() => { document.getElementById('uiSheetBody').__swiped = 0; });   // 这里的时钟是定住的，「滑完那一下不算点」按 Date.now 算会一直挡着，手动清掉
+        await shot(pg, size, '周 / 日面板切换', '4 换到上一周');
+        await pg.evaluate(() => document.getElementById('weekNext').click()); await pg.waitForTimeout(500); seq.push(['点 ›（下一周）', await top()]);
+        await pg.evaluate(() => document.querySelector('#uiSheetBody .wd-tab[data-v="2026-10-19"]').click()); await pg.waitForTimeout(450);
+        await pg.evaluate(() => document.getElementById('weekPrev').click()); await pg.waitForTimeout(500); seq.push(['一天里点 ‹（跨到上一周）', await top()]);
+        const info = await pg.evaluate(() => { const sh = document.getElementById('uiSheet'), mk = document.getElementById('uiSheetMask'), e = document.querySelector('#uiSheetBody .dd-empty');
+          return { h: sh.offsetHeight, max: Math.floor(mk.clientHeight * 0.85), fixed: sh.classList.contains('wd-fixed') }; });
+        // 同一周里切天、切整周：顶边完全相同；换周（滑 / ‹ › 跨周）只许长高（顶边往上），这以后同样不动；变矮（顶边往下）一律算错
+        const bad = []; let cur = seq[0][1];
+        seq.slice(1).forEach(([k, y]) => { const wk = /滑|›|‹/.test(k);
+          if (y === cur) return; if (wk && y < cur) { cur = y; return; } bad.push(`${k} ${y}（之前 ${cur}）`); });
+        if (!info.fixed) bad.push('面板没有定高');
+        if (info.h > info.max + 1) bad.push(`面板 ${info.h} 高过屏幕 85%（${info.max}）`);
+        results.push({ name: 'wd-top-1027ui', cfg: size, chk: true, label: '周 / 日面板顶边：' + seq.map(x => x[0] + ' ' + x[1]).join(' → '), bad, ok: !bad.length });
+        // 0 笔那天「这天没记账」在中间
+        await pg.evaluate(() => document.querySelector('#uiSheetBody .wd-tab[data-v="2026-10-16"]') || null);
+        await pg.close();
+      }
+      // d. 截图：天青、黛蓝、黄栌、松烟墨下的账单页、周 / 日面板、记一笔
+      for (const [nm, col] of [['天青', '#95b6ce'], ['黛蓝', '#3a5a7a'], ['黄栌', '#e7b643'], ['松烟墨', '#292e34']]) {
+        for (const [w, h] of [[412, 915], [360, 780]]) {
+          const pg = await page11(w, h, { app_appearance: JSON.stringify({ primary: col }) }); const size = w + 'x' + h;
+          await tab(pg, 'ledger'); await shot(pg, size, '主题·' + nm, '1 账单页');
+          await pg.evaluate(() => window.JiwenDetail.openWeek('2026-10-19')); await pg.waitForTimeout(700); await shot(pg, size, '主题·' + nm, '2 一周');
+          await pg.evaluate(() => document.querySelector('#uiSheetBody .wd-tab[data-v="2026-10-19"]').click()); await pg.waitForTimeout(500); await shot(pg, size, '主题·' + nm, '3 一天');
+          await closeAll(pg);
+          await click(pg, '.act-add'); await pg.waitForTimeout(800); await pg.evaluate(() => window.kpClose()); await pg.waitForTimeout(300);
+          await pg.evaluate(() => { const c = document.querySelector('#addMask .io-chips .cc'); c && c.click(); }); await pg.waitForTimeout(200);
+          await shot(pg, size, '主题·' + nm, '4 记一笔');
+          await pg.close();
+        }
+      }
+    }
+    }
     // 截图总表：一页，按页面 × 状态排，每张标上页面名、屏幕、状态
     if (SHOTS && sheetShots.length) {
       const inSheet = sheetShots.filter(x => x.inSheet);
@@ -1234,6 +1383,7 @@ async function run(cfg, port, browser) {
       if (m.swipe) { md.push(`| ${m.name} | ${m.what} 能滚 ${m.max}px | ${m.err || ''}滑到底 ${m.bottom ? '✓' : '✗'} | 滑回顶 ${m.top ? '✓' : '✗'}${m.openAfterDown === false ? '（面板被关掉了）' : ''} | 顶上往下拉关面板 ${m.closed ? '✓' : '✗'} | ${m.ok === false ? '有问题' : ''} | | |`); return; }
       if (m.kp) { md.push(`| ${m.name}（${m.cfg}） | 键盘顶边 ${m.kTop ?? '-'} | 按键 ${m.keyH ?? '-'}px | 压到 ${m.cut ? m.cut.join('、') || '无' : '-'} | 正在输的露在上面 ${m.fieldShown ? '✓' : '✗'} | ${m.ok ? '' : '有问题 ' + (m.err || '')} | | |`); return; }
       if (m.foot) { md.push(`| ${m.name}（${m.cfg}） | 贴底按钮排 | ${m.rows.map(x => `${x.m} 滚到 ${x.scroll}：下面露 ${x.gap}px`).join('；') || '没有贴底的'} | | | ${m.ok ? '' : '有问题'} | | |`); return; }
+      if (m.chk) { md.push(`| ${m.name}（${m.cfg}） | ${m.label} | ${m.bad.length} 处 | ${m.bad.join('；')} | | ${m.ok ? '' : '有问题'} | | |`); return; }
       if (m.clip) { md.push(`| ${m.name}（${m.cfg}） | 字被切 | ${m.bad.length} 处 | ${m.bad.join('；')} | | ${m.ok ? '' : '有问题'} | | |`); return; }
       if (m.stack) { md.push(`| ${m.name}（${m.cfg}） | 叠层顶边 | ${m.tops.map(x => x.id + ' ' + x.top).join(' → ')} | 差 ${m.diffs.join(' / ')} | | ${m.ok ? '' : '有问题'} | | |`); return; }
       if (m.sysnum) { md.push(`| 系统数字输入法（${m.cfg}） | | ${m.bad.length} 个 | ${m.bad.join('、')} | | ${m.ok ? '' : '有问题'} | | |`); return; }
