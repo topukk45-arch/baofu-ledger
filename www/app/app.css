@@ -1370,9 +1370,9 @@
         /* ===== 不计 / 批量操作（1010-B）=====
            「不计」一律用中性灰：它既不是收入也不是支出，不该沾语义色的红/绿。 */
         .io-skip { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
-            background:#efefef; border:1px solid #d6d6d6; color:#888; }
-        .amt-skip, .pos.amt-skip, .neg.amt-skip { color:#9a9a9a !important; }
-        .sf-io.skip { color:#888; background:#efefef; border-color:#d6d6d6; }
+            background:#efefef; border:1px solid #d6d6d6; color:#5e5e5e; }   /* 1027-UI：字原来 #888（3:1） */
+        .amt-skip, .pos.amt-skip, .neg.amt-skip { color:#666666 !important; }   /* 1027-UI：原来 #9a9a9a，在浅底上只有 2.7:1，看不清；改深到 ≥ 4.5:1 */
+        .sf-io.skip { color:#5e5e5e; background:#efefef; border-color:#d6d6d6; }
         .skip-hint { font-size:11.5px; color:var(--c-text-soft); line-height:1.5; }
         .summary-filter { flex-wrap:wrap; }
         .summary-filter .filter-nums { min-width:0; flex:1 1 auto; }
@@ -1382,7 +1382,7 @@
         .io-flow { display:inline-block; margin-left:4px; border-radius:10px; padding:2px 7px; font-size:12px;
             background:#e8eef5; border:1px solid #c9d5e3; color:#5a6f87; }
         .sf-io.flow { color:#5a6f87; background:#e8eef5; border-color:#c9d5e3; }
-        .amt-flow, .pos.amt-flow, .neg.amt-flow { color:#7d8ea3 !important; }
+        .amt-flow, .pos.amt-flow, .neg.amt-flow { color:#56677c !important; }   /* 1027-UI：原来 #7d8ea3（3.2:1），改深到 ≥ 4.5:1，还是灰蓝 */
         .mode-chips { flex-wrap:nowrap; gap:8px; }
         .mode-chips .cc { flex:1 1 0; text-align:center; padding:9px 0; font-size:14px; }
         /* 确认弹窗里的记录清单：四列固定（时间 / 分类 / 备注 / 金额），
