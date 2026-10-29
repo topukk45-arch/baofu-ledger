@@ -1,6 +1,6 @@
 package com.baofu.ledger;
 
-import android.graphics.Color;
+import androidx.core.content.ContextCompat;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Process;
@@ -14,20 +14,21 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
-    // 与网页默认主题底色一致的米黄。键盘弹起 / 切换不同高度输入法时，
+    // 与网页默认主题底色一致（1029-A 起直接用 colors.xml 的 appWindowBackground，和启动画面同一个色）。键盘弹起 / 切换不同高度输入法时，
     // WebView 与键盘之间可能露出一条间隙；把窗口根视图和 WebView 自身的
-    // 背景都钉成米黄，可确保露出的间隙不是刺眼的白色（“白图”）。
-    private static final int BG = Color.parseColor("#FDF8E8");
+    // 背景都钉成这个底色，可确保露出的间隙不是刺眼的白色（“白图”）。
+    private int bg;
 
     // 1019-U：启动画面最多留这么久（毫秒）。网页层首屏画出来就调 Launch.ready()，通常用不到这么久
-    private static final long SPLASH_MAX_MS = 1000;
+    // 1029-A：1 秒 → 2 秒。没快照、手机慢时首屏 1 秒画不完，启动画面被收掉会先露一段空底、页面再突然出来；现在等首屏画好再淡出
+    private static final long SPLASH_MAX_MS = 2000;
 
     // 1021-T28：启动画面淡出用多久（毫秒）
     private static final long SPLASH_FADE_MS = 200;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // 1019-U：启动画面等网页首屏画好再收（原来系统画出第一帧就收，那时网页还是一片底色），最多 1 秒。
+        // 1019-U：启动画面等网页首屏画好再收（原来系统画出第一帧就收，那时网页还是一片底色），最多 SPLASH_MAX_MS（1029-A 起 2 秒）。
         //   installSplashScreen 必须在 super.onCreate() 之前调；主题里 AppTheme.NoActionBarLaunch 本来就是 Theme.SplashScreen。
         // 1019-X：记下原生那段的时间点（给网页的性能记录）；去掉安卓 12 起启动画面自带的退场动画（收的时候直接拿掉）；
         //   开发开关「启动画面等首屏」关掉时（存在 SharedPreferences）整段不装，回到 1019-U 之前「系统画出第一帧就收」。
@@ -62,12 +63,13 @@ public class MainActivity extends BridgeActivity {
         // 1016-Z3：「用记问打开」账单文件（csv / xlsx）
         registerPlugin(OpenFilePlugin.class);
         super.onCreate(savedInstanceState);
+        bg = ContextCompat.getColor(this, R.color.appWindowBackground);
         LaunchPlugin.webReady = SystemClock.uptimeMillis();   // 1019-X：Capacitor 在 super.onCreate 里建好 WebView、开始加载网页
 
         // 1) 窗口根视图（decorView）背景：兜住一切层级最底下的露出
         try {
             View decor = getWindow().getDecorView();
-            if (decor != null) decor.setBackgroundColor(BG);
+            if (decor != null) decor.setBackgroundColor(bg);
             getWindow().setBackgroundDrawableResource(R.color.appWindowBackground);
         } catch (Exception ignored) {}
 
@@ -75,9 +77,9 @@ public class MainActivity extends BridgeActivity {
         try {
             WebView wv = getBridge() != null ? getBridge().getWebView() : null;
             if (wv != null) {
-                wv.setBackgroundColor(BG);
+                wv.setBackgroundColor(bg);
                 View parent = (View) wv.getParent();
-                if (parent != null) parent.setBackgroundColor(BG);
+                if (parent != null) parent.setBackgroundColor(bg);
             }
         } catch (Exception ignored) {}
     }

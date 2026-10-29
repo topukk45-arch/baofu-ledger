@@ -630,11 +630,26 @@
                     return (how||age) ? `快照：${[how, age].filter(Boolean).join('，')}；` : ''; }
                 return e.snapMiss ? `没用上快照：${SNAP_MISS[e.snapMiss]||e.snapMiss}；` : '';
             }
+            // 1029-A：最近 30 次启动用上快照几次、没用上的各个原因几次；「版本不对」单列、命中率里不算它（开发时天天装新版，不代表平常）
+            function snapStatLine(list){
+                const bs=list.filter(e=>e && e.kind==='启动').slice(-30);
+                if(!bs.length) return '';
+                let hit=0, build=0, unk=0; const why={};
+                bs.forEach(e=>{ if(e.snap!=null) hit++; else if(e.snapMiss==='build') build++; else if(e.snapMiss) why[e.snapMiss]=(why[e.snapMiss]||0)+1; else unk++; });
+                const miss=Object.keys(why).sort((a, b)=>why[b]-why[a]).map(k=>`${SNAP_MISS[k]||k} ${why[k]}`);
+                if(unk) miss.push(`没记原因 ${unk}`);
+                const base=bs.length-build;
+                return `启动快照（最近 ${bs.length} 次启动）：用上 ${hit} 次`+(miss.length ? `，没用上：${miss.join('、')}` : '')+
+                    (build ? `；版本不对 ${build} 次（不算进命中率）` : '')+
+                    `；命中率 ${base ? Math.round(hit/base*100)+'%' : '-'}（${hit}/${base}）`;
+            }
+            // 1029-B：脚本开始之前的几段（老记录没有就不写）
+            function pre(e){ return (e.hd!=null ? `head 开始 ${e.hd} · ` : '')+(e.css!=null ? `CSS 好了 ${e.css} · ` : '')+(e.sn!=null ? `快照那段开始 ${e.sn} · ` : ''); }
             function fmt(e){
                 if(typeof e.ts==='number') e=Object.assign({}, e, { at:P.localAt(e.ts) });   // 1019-Z4：有时间戳的按当地时间重新写（老记录没有，照原样）
                 if(e.kind==='启动' && e.nat){ const n=e.nat, v=x=>x!=null ? x : '-';
-                    return `${e.at} 启动全程（${n.proc ? '从点图标' : '从 Activity 创建'}算）：Activity 创建 ${v(n.act)} · WebView 建好 ${v(n.web)} · 网页开始 ${v(n.page)} · 首屏画好 ${v(n.first)} · ${n.ask!=null ? '网页说画好了 '+v(n.ask)+' · 页面进了绘制 '+v(n.ready) : '收到画好了 '+v(n.ready)} · 启动画面收起 ${n.wait ? v(n.gone) : '（没等首屏，系统第一帧就收）'}｜网页里：${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}${e.n!=null?'；':''}${snapNote(e)}`; }
-                if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}${e.n!=null?'；':''}${snapNote(e)}）`;
+                    return `${e.at} 启动全程（${n.proc ? '从点图标' : '从 Activity 创建'}算）：Activity 创建 ${v(n.act)} · WebView 建好 ${v(n.web)} · 网页开始 ${v(n.page)} · 首屏画好 ${v(n.first)} · ${n.ask!=null ? '网页说画好了 '+v(n.ask)+' · 页面进了绘制 '+v(n.ready) : '收到画好了 '+v(n.ready)} · 启动画面收起 ${n.wait ? v(n.gone) : '（没等首屏，系统第一帧就收）'}｜网页里：${pre(e)}${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}${e.n!=null?'；':''}${snapNote(e)}`; }
+                if(e.kind==='启动') return `${e.at} 启动 ${e.ms}ms（${pre(e)}${e.snap!=null?'快照先出来 '+e.snap+' · ':''}脚本开始 ${e.script} · 数据库 ${e.db!=null?e.db:'-'} · 读完账本 ${e.read!=null?e.read:'-'} · 画好 ${e.render!=null?e.render:'-'} · 首屏出来 ${e.paint}；${e.n!=null?e.n+' 条':''}${e.n!=null?'；':''}${snapNote(e)}）`;
                 if(e.kind==='点输入框') return `${e.at} 点输入框到能输入 ${e.ms}ms（${e.what}）`;
                 if(e.kind==='键盘') return `${e.at} 键盘 面板位置变了 ${e.moves} 次${e.blank!=null ? `，露出空白 ${e.blank} 帧` : ''}，最慢一帧 ${e.maxFrame}ms、平均 ${e.avgFrame}ms，可视区 ${e.vv}（${e.what}）`;
                 if(e.kind==='打开面板' || e.kind==='关闭面板') return `${e.at} ${e.kind} ${e.ms}ms（${e.what}）`;
@@ -677,10 +692,11 @@
             }
             function openPerfPage(){
                 const rows=P.list().slice().reverse();
-                const fc=fontCenterLine();
-                const text=['记问性能记录（'+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1')+'）'].concat(fc ? [fc] : []).concat(rows.map(fmt)).join('\n');
+                const fc=fontCenterLine(), ss=snapStatLine(P.list());
+                const head=(fc ? [fc] : []).concat(ss ? [ss] : []);   // 第一行照旧是字上下差多少（老测试按它认），快照汇总排第二
+                const text=['记问性能记录（'+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1')+'）'].concat(head).concat(rows.map(fmt)).join('\n');
                 window.JiwenSheet.open({ title:'性能记录（开发中）', sub:rows.length ? `最近 ${rows.length} 条，新的在上（最多留 50 条，只在这台手机）` : '还没有记录：关掉 App 再打开、点几个输入框、开关几个面板，这里就有了。',
-                    body(box){ const pre=document.createElement('pre'); pre.id='perfList'; pre.className='perf-list'; pre.textContent=(fc ? [fc] : []).concat(rows.map(fmt)).join('\n'); box.appendChild(pre); },
+                    body(box){ const pre=document.createElement('pre'); pre.id='perfList'; pre.className='perf-list'; pre.textContent=head.concat(rows.map(fmt)).join('\n'); box.appendChild(pre); },
                     foot(box, done){
                         const st=document.createElement('div'); st.className='ui-stack';
                         const cp=document.createElement('button'); cp.type='button'; cp.className='ui-btn primary block'; cp.id='perfCopy'; cp.textContent='复制全部';

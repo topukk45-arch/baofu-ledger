@@ -345,7 +345,10 @@
             }
             // 1020-J：上一次的色相（存在 app_appearance 的 hue 里，和那时存的色值 hueOf 成对；不进备份）
             function savedHue(){ const p=loadPrefs(); return (typeof p.hue==='number' && isFinite(p.hue)) ? p.hue : null; }
-            function savePrefs(p){ localStorage.setItem('app_appearance', JSON.stringify(p)); try{ snapDrop(); }catch(_){} }   // 1019-U：换了主题，快照作废
+            function savePrefs(p){ localStorage.setItem('app_appearance', JSON.stringify(p)); bootBgSave(); try{ snapDrop(); }catch(_){} }   // 1019-U：换了主题，快照作废
+            // 1029-A：存了的主题底色另抄一份 app_boot_bg（只在这台手机、不进备份），index.html 最前面那段在主题脚本之前读出来钉到 html 上，
+            //   打开 App 时没快照也不露默认底色。选色面板里预览不算（只在存了主题、启动时套用之后写，和存的一样就不写）
+            function bootBgSave(){ try{ const bg=document.documentElement.style.getPropertyValue('--c-bg').trim(); if(/^#[0-9a-f]{6}$/i.test(bg) && localStorage.getItem('app_boot_bg')!==bg) localStorage.setItem('app_boot_bg', bg); }catch(_){} }
 
             // —— 弹窗交互 ——
             const themeMask=$('themeMask');
@@ -544,7 +547,7 @@
 
             // —— 启动时应用已保存的外观 ——
             const pf=loadPrefs();
-            if(pf.primary) applyPrimary(pf.primary, pf.hueOf===pf.primary ? savedHue() : null);
+            if(pf.primary){ applyPrimary(pf.primary, pf.hueOf===pf.primary ? savedHue() : null); bootBgSave(); }
             paintLoginTheme();
         })();
 

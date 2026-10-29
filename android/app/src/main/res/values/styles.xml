@@ -21,6 +21,10 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:windowBackground">@color/appWindowBackground</item>
         <item name="windowSplashScreenBackground">@color/appWindowBackground</item>
+        <!-- 1029-A：启动画面的图标只用前景（只有字、透明底），图标底色和启动画面同色：安卓 12 起不设的话拿 App 图标画，
+             图标自己的米黄底在青色启动画面上显出一个浅色圆片 -->
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">@color/appWindowBackground</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>
