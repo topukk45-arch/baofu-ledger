@@ -13,7 +13,7 @@
             --c-border-mid:#e6c86a;   /* 中边框 */
             --c-surface:#fffdf0;      /* 输入框/卡片底 */
             --c-surface-2:#fffdf3;    /* 浮层底 */
-            --c-bg:#fdf8e8;           /* 页面背景 */
+            --c-bg:#f1f9f8;           /* 页面背景 */
             --c-card-1:#fff9e6;       /* 卡片渐变浅 */
             --c-card-2:#fff1c1;       /* 卡片渐变深 */
             --sheet-ms:300ms;          /* 1019-Z3：底部面板打开 / 收起的时长（和脚本里的 SHEET_MS 一致，脚本启动时按它重写一次） */

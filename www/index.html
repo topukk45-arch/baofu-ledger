@@ -11,20 +11,25 @@
     <meta name="theme-color" content="#f1f9f8">
     <meta name="color-scheme" content="light">
     <title>记问</title>
-    <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成米黄，从源头消除白闪。
+    <!-- 键盘弹起瞬间 WebView 会用默认 canvas 底色（白）填一帧；这里把根底色钉成默认主题的底色（1029-A 起和启动画面一样，#f1f9f8），从源头消除白闪。
          不依赖 CSS 变量，避免极早期合成时变量尚未解析。 -->
     <style>
-        html { background-color:#fdf8e8 !important; color-scheme:light; }
-        html, body { background-color:#fdf8e8; }
+        html { background-color:#f1f9f8 !important; color-scheme:light; }
+        html, body { background-color:#f1f9f8; }
     </style>
+    <!-- 1029-A：用了别的主题的，换主题时另存了一份底色（app_boot_bg，只在这台手机），这里先钉到 html 上（带 !important，盖过上面的默认色），
+         没快照也跑；快照那段换 html 的 style 时，存的样式里本来就带着同一个底色 -->
+    <script>
+        (function(){ try{ var bg=localStorage.getItem('app_boot_bg'); if(bg && /^#[0-9a-f]{6}$/i.test(bg)) document.documentElement.style.setProperty('background-color', bg, 'important'); }catch(_){} })();
+    </script>
 
-    <link rel="stylesheet" href="app/app.css?v=1024-X">
+    <link rel="stylesheet" href="app/app.css?v=1029-A">
 </head>
 <body>
     <div class="container">
         <div class="login-box" id="loginBox" style="visibility:hidden">
             <h2>记问</h2>
-            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1024-X</div>
+            <div id="loginBuild" style="text-align:center; font-size:11px; color:var(--c-text-soft); margin:-22px 0 22px;">build 1029-A</div>
             <!-- 1010-K7：不再输入名字登录。已有账号点一下进入，没有就新建 -->
             <div class="recent-users" id="recentUsers"></div>
             <button class="login-btn" id="newAccountBtn">新建账号</button>
@@ -821,29 +826,29 @@
             }catch(e){ window.__bootSnapMiss='bad'; try{ var x=document.getElementById('bootSnap'); if(x) x.remove(); }catch(_){} }
         })();
     </script>
-    <script src="app/base.js?v=1024-X"></script>
-    <script src="app/store.js?v=1024-X"></script>
-    <script src="app/select.js?v=1024-X"></script>
-    <script src="app/keypad.js?v=1024-X"></script>
-    <script src="app/text.js?v=1024-X"></script>
-    <script src="app/sheet.js?v=1024-X"></script>
-    <script src="app/ask.js?v=1024-X"></script>
-    <script src="app/date.js?v=1024-X"></script>
-    <script src="app/monthstrip.js?v=1024-X"></script>
-    <script src="app/ai-export.js?v=1024-X"></script>
-    <script src="app/import-entry.js?v=1024-X"></script>
-    <script src="app/forms.js?v=1024-X"></script>
-    <script src="app/detail.js?v=1024-X"></script>
-    <script src="app/ledger.js?v=1024-X"></script>
-    <script src="app/search.js?v=1024-X"></script>
-    <script src="app/cats.js?v=1024-X"></script>
-    <script src="app/stats.js?v=1024-X"></script>
-    <script src="app/days.js?v=1024-X"></script>
-    <script src="app/settings.js?v=1024-X"></script>
-    <script src="app/tabs.js?v=1024-X"></script>
-    <script src="app/login.js?v=1024-X"></script>
-    <script src="app/back.js?v=1024-X"></script>
-    <script src="app/boot.js?v=1024-X"></script>
+    <script src="app/base.js?v=1029-A"></script>
+    <script src="app/store.js?v=1029-A"></script>
+    <script src="app/select.js?v=1029-A"></script>
+    <script src="app/keypad.js?v=1029-A"></script>
+    <script src="app/text.js?v=1029-A"></script>
+    <script src="app/sheet.js?v=1029-A"></script>
+    <script src="app/ask.js?v=1029-A"></script>
+    <script src="app/date.js?v=1029-A"></script>
+    <script src="app/monthstrip.js?v=1029-A"></script>
+    <script src="app/ai-export.js?v=1029-A"></script>
+    <script src="app/import-entry.js?v=1029-A"></script>
+    <script src="app/forms.js?v=1029-A"></script>
+    <script src="app/detail.js?v=1029-A"></script>
+    <script src="app/ledger.js?v=1029-A"></script>
+    <script src="app/search.js?v=1029-A"></script>
+    <script src="app/cats.js?v=1029-A"></script>
+    <script src="app/stats.js?v=1029-A"></script>
+    <script src="app/days.js?v=1029-A"></script>
+    <script src="app/settings.js?v=1029-A"></script>
+    <script src="app/tabs.js?v=1029-A"></script>
+    <script src="app/login.js?v=1029-A"></script>
+    <script src="app/back.js?v=1029-A"></script>
+    <script src="app/boot.js?v=1029-A"></script>
 
 </body>
 </html>

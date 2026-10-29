@@ -590,6 +590,19 @@
                     return (how||age) ? `快照：${[how, age].filter(Boolean).join('，')}；` : ''; }
                 return e.snapMiss ? `没用上快照：${SNAP_MISS[e.snapMiss]||e.snapMiss}；` : '';
             }
+            // 1029-A：最近 30 次启动用上快照几次、没用上的各个原因几次；「版本不对」单列、命中率里不算它（开发时天天装新版，不代表平常）
+            function snapStatLine(list){
+                const bs=list.filter(e=>e && e.kind==='启动').slice(-30);
+                if(!bs.length) return '';
+                let hit=0, build=0, unk=0; const why={};
+                bs.forEach(e=>{ if(e.snap!=null) hit++; else if(e.snapMiss==='build') build++; else if(e.snapMiss) why[e.snapMiss]=(why[e.snapMiss]||0)+1; else unk++; });
+                const miss=Object.keys(why).sort((a, b)=>why[b]-why[a]).map(k=>`${SNAP_MISS[k]||k} ${why[k]}`);
+                if(unk) miss.push(`没记原因 ${unk}`);
+                const base=bs.length-build;
+                return `启动快照（最近 ${bs.length} 次启动）：用上 ${hit} 次`+(miss.length ? `，没用上：${miss.join('、')}` : '')+
+                    (build ? `；版本不对 ${build} 次（不算进命中率）` : '')+
+                    `；命中率 ${base ? Math.round(hit/base*100)+'%' : '-'}（${hit}/${base}）`;
+            }
             function fmt(e){
                 if(typeof e.ts==='number') e=Object.assign({}, e, { at:P.localAt(e.ts) });   // 1019-Z4：有时间戳的按当地时间重新写（老记录没有，照原样）
                 if(e.kind==='启动' && e.nat){ const n=e.nat, v=x=>x!=null ? x : '-';
@@ -637,10 +650,11 @@
             }
             function openPerfPage(){
                 const rows=P.list().slice().reverse();
-                const fc=fontCenterLine();
-                const text=['记问性能记录（'+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1')+'）'].concat(fc ? [fc] : []).concat(rows.map(fmt)).join('\n');
+                const fc=fontCenterLine(), ss=snapStatLine(P.list());
+                const head=(fc ? [fc] : []).concat(ss ? [ss] : []);   // 第一行照旧是字上下差多少（老测试按它认），快照汇总排第二
+                const text=['记问性能记录（'+navigator.userAgent.replace(/^.*?\(([^)]*)\).*$/, '$1')+'）'].concat(head).concat(rows.map(fmt)).join('\n');
                 window.JiwenSheet.open({ title:'性能记录（开发中）', sub:rows.length ? `最近 ${rows.length} 条，新的在上（最多留 50 条，只在这台手机）` : '还没有记录：关掉 App 再打开、点几个输入框、开关几个面板，这里就有了。',
-                    body(box){ const pre=document.createElement('pre'); pre.id='perfList'; pre.className='perf-list'; pre.textContent=(fc ? [fc] : []).concat(rows.map(fmt)).join('\n'); box.appendChild(pre); },
+                    body(box){ const pre=document.createElement('pre'); pre.id='perfList'; pre.className='perf-list'; pre.textContent=head.concat(rows.map(fmt)).join('\n'); box.appendChild(pre); },
                     foot(box, done){
                         const st=document.createElement('div'); st.className='ui-stack';
                         const cp=document.createElement('button'); cp.type='button'; cp.className='ui-btn primary block'; cp.id='perfCopy'; cp.textContent='复制全部';

@@ -4,7 +4,7 @@
   "webDir": "www",
   "android": {
     "allowMixedContent": false,
-    "backgroundColor": "#fdf8e8"
+    "backgroundColor": "#f1f9f8"
   },
   "plugins": {
     "Keyboard": {
