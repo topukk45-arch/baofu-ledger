@@ -16,7 +16,7 @@
             touchAccount(id);
             localStorage.setItem('app_logged_in_user', id);   // 记住当前登录账号（编号），下次自动进入
             const store = loadStore();
-            saveStoreSafe(store);
+            saveStoreSafe(store, undefined, { keepSnap:true });   // 1029-D：原样写回，账本没变，首屏快照不作废（不然打开 App 每次都把快照删了）
             JiwenBase.currentArchive = store.last || Object.keys(store.archives)[0];
             // 兜底：若 last 指向一个已不存在的存档（导入/迁移等异常路径下可能发生），
             // 回退到第一个存档，避免 curArchive() 返回 undefined 导致主界面白屏
@@ -127,8 +127,8 @@
         //   账本一改（saveStore）、换账号 / 存档、恢复、导入、撤销、换主题、改默认页都删（snapDrop），停下来（1020-B）或切后台再存。
         const SNAP_MAX=400000;
         const SNAP_BODY_SKIP=['kb-open','login-mode','days-selecting','days-page'];
-        // 1020-B：停下来就先存（见下面 idleKick）
-        const SNAP_IDLE_MS=1500, FORM_IDLE_MS=1000, SNAP_GAP_MS=20000, RESUME_REFRESH_MS=10*60*1000;
+        // 1020-B：停下来就先存（见下面 idleKick）；1029-D：1.5 秒改成 0.5 秒（删了快照以后早点重存，localStorage 还要攒一会儿才落盘）
+        const SNAP_IDLE_MS=500, FORM_IDLE_MS=1000, SNAP_GAP_MS=20000, RESUME_REFRESH_MS=10*60*1000;
         let snapLast=null, resumeLast=null, formLast=null, idleT=null, formT=null;
         function snapDropOnly(){
             snapLast=null;

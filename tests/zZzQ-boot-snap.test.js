@@ -68,7 +68,7 @@ const snap = t => { try { return JSON.parse(t.w.localStorage.getItem(KEY) || 'nu
   ok(seen && seen.pe === 'none', '2 快照不接点击（pointer-events:none，1019-Z4-M26）：真的首屏出来之前点它什么都不发生 ' + (seen && seen.pe));
   ok(!t.$('bootSnap'), '2 真的首屏画好以后快照拿掉了');
   ok(seen && t.w.__real && seen.text === t.w.__real.text && seen.text.length > 50, '2 快照和真的首屏一字不差（结余、分类汇总、账单列表）');
-  ok(!snap(t), '2 打开以后（进账号写了一次存档）旧快照删了，下次切后台再存');
+  ok(!!snap(t), '2 打开以后（进账号原样写回存档）旧快照还在、没删（1029-D 起；原来进账号就删）');
 
   // 3. 改了账本（记一笔）：快照删掉；切后台再存的是新的
   tab(t, 'ledger');

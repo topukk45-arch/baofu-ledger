@@ -1,6 +1,6 @@
 // 1020-B 停下来就先存（jsdom，账单、手记全是虚构的）。node -r ./tools/inline-hook.js zZzY-idle-save.test.js [index.html]
 // 手机上 localStorage 写进去以后要过几秒才真的落盘，切到后台马上被划掉，切后台那一下存的就丢了。
-// 所以页面停下来（约 1.5 秒没有操作）先存一份首屏快照和「停在哪」，记一笔 / 修改填过东西、停下来 1 秒先存一份填到一半的；
+// 所以页面停下来（约 1.5 秒没有操作，1029-D 起 0.5 秒）先存一份首屏快照和「停在哪」，记一笔 / 修改填过东西、停下来 1 秒先存一份填到一半的；
 // 这里模拟「切后台以后马上被杀」：切后台那一次什么都不存（不发 pagehide / visibilitychange），重开照样用上停下来时存的那份。
 // 停下来存的时候照现在的条件判断（开着筛选就删掉），和上次一样的不重写；性能记录「启动」写快照怎么存的、没用上的写原因。
 const fs = require('fs'), path = require('path');
@@ -44,11 +44,11 @@ const perfLast = t => { try { const a = JSON.parse(t.w.localStorage.getItem('app
   // 1. 停下来 1.5 秒：先存快照和「停在哪」（不用等切后台）
   let t = await bootWith(A.seedOf(recs, null, null), null);
   tab(t, 'ledger'); poke(t);
+  await wait(200);
+  ok(!snap(t), '1 刚点完、还没停够 0.5 秒（1029-D 起，原来 1.5 秒）：还没存');
   await wait(600);
-  ok(!snap(t), '1 刚点完、还没停够 1.5 秒：还没存');
-  await wait(1200);
   const s1 = snap(t);
-  ok(s1 && s1.src === 'idle' && s1.tab === 'ledger', '1 停下来 1.5 秒：存了快照（停下来时存的）');
+  ok(s1 && s1.src === 'idle' && s1.tab === 'ledger', '1 停下来 0.5 秒：存了快照（停下来时存的）');
   ok(!!t.w.localStorage.getItem(RKEY), '1 「停在哪」也存了');
 
   // 2. 和上次一样的不重写：再点几下、再停几次，快照只写过一次

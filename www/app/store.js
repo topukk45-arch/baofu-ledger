@@ -534,8 +534,8 @@
             }
             return { recs, seqs, idx };
         }
-        function ledgerApply(e, store){
-            snapDrop();   // 1019-U：账本（内存里）要改了，首屏快照作废
+        function ledgerApply(e, store, opt){
+            if(!(opt && opt.keepSnap)) snapDrop();   // 1019-U：账本（内存里）要改了，首屏快照作废（1029-D：进账号那次原样写回的不删，见 saveStore）
             e.ver++;
             const archives=store.archives || {};
             const names=Object.keys(archives);
@@ -2687,10 +2687,13 @@
         }
         // 写存档：先改内存（只标出改动涉及的月份），马上排队写 IndexedDB。写库是异步的，失败时由 ledgerWriteSoon 提示，
         //   内存里的修改留着，下次保存 / 切后台时再写。必须确认写进去才能往下走的地方用 saveStoreDurable。
-        function saveStore(store, user){
-            snapDrop();   // 1019-U：账本改了，快照作废
+        // 1029-D：opt.keepSnap = 这次不作废首屏快照（只给进账号时那次原样写回用：账本内容没变，旧快照还是对的）；
+        //   真有改动（迁移、修了脏数据）时 ledgerKick 往库里写那一下照旧会删
+        function saveStore(store, user, opt){
+            const keep=!!(opt && opt.keepSnap);
+            if(!keep) snapDrop();   // 1019-U：账本改了，快照作废
             const key=storeKey(user);
-            ledgerApply(ledgerEntryForWrite(key), store);
+            ledgerApply(ledgerEntryForWrite(key), store, keep ? { keepSnap:true } : null);
             ledgerWriteSoon(key);
             return true;
         }
@@ -2700,9 +2703,9 @@
         //   收在这里统一触发：saveStoreSafe 是所有「当前用户」写存档的必经之路。
         //   带 user 参数且不是当前用户的（导入到别的账号）不触发，避免把 A 的操作
         //   记成 B 的同步时机。odScheduleSync 本身有 1.5s 防抖，连续操作不会打满。
-        function saveStoreSafe(store, user){
+        function saveStoreSafe(store, user, opt){
             try{
-                const ok = saveStore(store, user);
+                const ok = saveStore(store, user, opt);
                 if(ok && (user===undefined || user===JiwenBase.currentUser)) odScheduleSync();
                 return ok;
             }

@@ -28,7 +28,7 @@ const log = w => JSON.parse(w.localStorage.getItem('app_perf_log') || '[]');
   // 2. 打开面板：记一条（没有动画时最多等 450 毫秒兜底）
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click();
   $('fabAdd').click();
-  await wait(520); await t.idle();
+  await wait(520); await t.idle(); await wait(400);   // 1029-D：停 0.5 秒存快照正好落在这段里（jsdom 克隆整页慢），多等一会儿兜底那一帧
   ok(log(w).some(e => e.kind === '打开面板' && e.what === 'addMask' && e.ms >= 0), '2 打开记一笔：记了「打开面板」');
 
   // 3. 点输入框到能输入

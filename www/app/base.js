@@ -30,9 +30,27 @@
                     ['snap','script','db','read','render','paint'].forEach(k=>{ if(boot[k]!=null) e[k]=boot[k]; });
                     // 1029-B：「网页开始 → 脚本开始」拆开：head 开始、CSS 好了、快照那段开始（index.html 里几行内联脚本记的）
                     const bt=window.__bootT; if(bt){ if(bt.head!=null) e.hd=bt.head; if(bt.css!=null) e.css=bt.css; if(bt.snap!=null) e.sn=bt.snap; }
+                    try{ const fx=fetchInfo(); if(fx) e.fx=fx; }catch(_){}
                     e.n=window.__perfRecs;
                     nativeInto(e, 0).then(()=>add(e), ()=>add(e)); };
                 if(window.requestAnimationFrame) requestAnimationFrame(()=>setTimeout(f, 0)); else setTimeout(f, 0);
+            }
+            // 1029-D：取文件花了多久（都从网页开始算、取整毫秒）：index.html 收完 doc；app.css 开始要 cq、收完 ce；
+            //   app/*.js 里最早开始要 jq、最晚收完 je、比 app.css 先收完的 jn 个。没有 Resource Timing（老 WebView）就不记
+            function fetchInfo(){
+                const P=window.performance; if(!P || typeof P.getEntriesByType!=='function') return null;
+                const r=n=>Math.round(n), o={};
+                const nav=(P.getEntriesByType('navigation')||[])[0]; if(nav && nav.responseEnd>0) o.doc=r(nav.responseEnd);
+                const res=P.getEntriesByType('resource')||[];
+                const path=x=>{ try{ return new URL(x.name, location.href).pathname; }catch(_){ return ''; } };
+                const css=res.find(x=>/\/app\/app\.css$/.test(path(x)));
+                if(css){ o.cq=r(css.requestStart||css.startTime); o.ce=r(css.responseEnd); }
+                const js=res.filter(x=>/\/app\/[^/]+\.js$/.test(path(x)));
+                if(js.length){
+                    o.jq=r(Math.min(...js.map(x=>x.requestStart||x.startTime))); o.je=r(Math.max(...js.map(x=>x.responseEnd)));
+                    if(css) o.jn=js.filter(x=>x.responseEnd<css.responseEnd).length;
+                }
+                return Object.keys(o).length ? o : null;
             }
             // 1019-X：原生那段（从点图标起）：问原生层要时间点，换到同一把尺子上（都从进程启动算），记进同一条「启动」。
             //   网页的 performance 时间从网页开始加载算，换算：网页开始 = timeOrigin（系统时间）换成开机以来的毫秒。
