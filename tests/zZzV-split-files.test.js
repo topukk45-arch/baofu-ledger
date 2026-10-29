@@ -37,9 +37,9 @@ const ok = (c, n) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n); 
   const links = [...raw.matchAll(/<link rel="stylesheet" href="(app\/[^"]+)">/g)];
   ok(links.length === 1 && links[0][1] === 'app/app.css?v=' + build, '1 样式一个 <link>：app/app.css?v=' + build);
   ok(files.every(f => fs.existsSync(path.join(WWW, f))) && fs.existsSync(path.join(WWW, 'app/app.css')), '1 引用的文件都在');
-  const bigInline = [...raw.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(x => !/^\s*\(function\(\)\{ try\{ var bg=localStorage\.getItem\('app_boot_bg'\)/.test(x));   // 1029-A：head 里读主题底色的一行另算（下面单独查）
+  const bigInline = [...raw.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]).filter(x => !(x.length < 700 && /__bootT/.test(x) && !/bootSnap/.test(x)));   // 1029-A / B：head 里读主题底色、量时间的两行另算（下面单独查）
   ok(bigInline.length === 1 && /bootSnap/.test(bigInline[0]) && raw.indexOf(bigInline[0]) < raw.indexOf(tags[0][0]), '1 只剩首屏快照那一小段内联脚本，留在原位（在 app 脚本前面）');
-  ok([...raw.matchAll(/<script>([\s\S]*?)<\/script>/g)].length === 2 && raw.indexOf('app_boot_bg') < raw.indexOf('</head>'), '1 1029-A：另外只有 head 里读主题底色（app_boot_bg）的一行');
+  ok([...raw.matchAll(/<script>([\s\S]*?)<\/script>/g)].length === 3 && raw.indexOf('app_boot_bg') < raw.indexOf('app/app.css') && raw.indexOf('__bootT.css') > raw.indexOf('app/app.css') && raw.indexOf('__bootT.css') < raw.indexOf('</head>'), '1 1029-A / B：另外只有 head 里两行：最前面读主题底色（app_boot_bg）、记 head 开始，app.css 后面记 CSS 好了');
 
   // 2. 全局重名
   const codes = files.map(f => fs.readFileSync(path.join(WWW, f), 'utf8'));

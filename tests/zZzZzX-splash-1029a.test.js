@@ -1,5 +1,5 @@
 // @serial
-// 1029-A 启动页第一版：默认底色几处一样、主题底色另存给启动时用、性能记录页顶上的快照命中率（jsdom，记录全是虚构的）
+// 1029-A / B 启动页：默认底色几处一样、主题底色另存给启动时用、性能记录页顶上的快照命中率（jsdom，记录全是虚构的）
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
 const ROOT = path.join(__dirname, '..');
@@ -36,11 +36,17 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   for (let i = 0; i < 4; i++) boots.push(mk(false, 'build'));
   boots.push(mk(false, 'day'), mk(false, 'none'), mk(false, 'none'), { kind: '打开面板', ms: 30, what: 'x' });
   const t = await A.boot({ html, www: WWW, seed: A.seedOf([{ id: 'r1', time: '2026-12-01T12:00', money: 18, type: 'expense', cat: '吃饭', remark: '虚构午饭' }]),
-    before(w) { w.localStorage.setItem('app_boot_bg', '#f3f0fa'); w.localStorage.setItem('app_perf_log', JSON.stringify(boots)); } });
+    before(w) { w.localStorage.setItem('app_boot_bg', '#f3f0fa'); w.localStorage.setItem('app_perf_log', JSON.stringify(boots));
+      // 1029-B：在「CSS 好了」那一刻看 html 的底色（启动后会套用默认主题，把底色换掉）
+      let o; Object.defineProperty(w, '__bootT', { configurable: true, get() { return o; }, set(v) { o = new w.Proxy(v, { set(x, k, val) { if (k === 'css') { const st = w.document.documentElement.style; w.__bgAtCss = st.getPropertyValue('background-color').replace(/\s/g, '') + '!' + st.getPropertyPriority('background-color'); } x[k] = val; return true; } }); } }); } });
   const { $, w, d } = t;
-  ok(d.documentElement.style.getPropertyValue('background-color').replace(/\s/g, '') === 'rgb(243,240,250)' && d.documentElement.style.getPropertyPriority('background-color') === 'important', '2 app_boot_bg 钉到 html 上（带 !important）');
+  ok(w.__bgAtCss === 'rgb(243,240,250)!important', '2 app_boot_bg 最早钉到 html 上（带 !important）' + w.__bgAtCss);
+  // 1029-B：没存过主题也套用默认主题（不写 app_appearance），底色另存成默认的
+  const st0 = d.documentElement.style, pri0 = st0.getPropertyValue('--c-primary').trim();
+  ok(st0.getPropertyValue('--c-bg').trim() === '#f1f9f8' && /^#[0-9a-f]{6}$/i.test(pri0) && w.localStorage.getItem('app_appearance') === null && w.localStorage.getItem('app_boot_bg') === '#f1f9f8', '4 没存过主题：启动套用雾松青（--c-bg #f1f9f8、有主色），不写 app_appearance，app_boot_bg 改成默认底色 ' + pri0);
   $('resetThemeBtn').click();   // 恢复默认主题也是「存了主题」
   const bg = d.documentElement.style.getPropertyValue('--c-bg').trim();
+  ok(d.documentElement.style.getPropertyValue('--c-primary').trim() === pri0, '4 启动套用的主色就是默认主题算出来的主色');
   ok(bg === '#f1f9f8' && w.localStorage.getItem('app_boot_bg') === bg, '2 存主题时另存底色（默认主题就是 #f1f9f8）' + bg + ' / ' + w.localStorage.getItem('app_boot_bg'));
 
   // 3. 性能记录页顶上一行：最近 30 次启动，版本不对单列、不算命中率
@@ -54,6 +60,11 @@ const wait = ms => new Promise(r => setTimeout(r, ms));
   const hit = L.filter(e => e.snap != null).length, bd = L.filter(e => e.snapMiss === 'build').length;
   ok(first.includes(`用上 ${hit} 次`) && first.includes(`版本不对 ${bd} 次（不算进命中率）`) && first.includes(`（${hit}/${L.length - bd}）`), '3 数对得上 ' + first);
   ok(/没有快照 \d/.test(first) && /不是今天存的 1/.test(first), '3 没用上的按原因数');
+  // 1029-B：「启动」那条拆开量 head 开始、CSS 好了、快照那段开始
+  const me = L[L.length - 1] || {};
+  ok(me.hd != null && me.css != null && me.sn != null && me.hd <= me.css && me.css <= me.sn && me.sn <= me.script, '5 启动那条记了 head 开始 ≤ CSS 好了 ≤ 快照那段开始 ≤ 脚本开始 ' + JSON.stringify([me.hd, me.css, me.sn, me.script]));
+  ok(new RegExp(`head 开始 ${me.hd} · CSS 好了 ${me.css} · 快照那段开始 ${me.sn} · 脚本开始`).test($('perfList').textContent), '5 页面上写成「head 开始 x · CSS 好了 x · 快照那段开始 x · 脚本开始 …」');
+  ok(/启动 300ms（脚本开始/.test($('perfList').textContent) || !/head 开始 undefined/.test($('perfList').textContent), '5 老记录没有这几个数照原样');
   t.dom.window.close();
   console.log(`${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

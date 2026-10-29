@@ -28,6 +28,8 @@
                     if(window.__bootSnap){ e.snapSrc=window.__bootSnap.src||''; if(window.__bootSnap.age!=null) e.snapAge=Math.round(window.__bootSnap.age/1000); }
                     else if(window.__bootSnapMiss) e.snapMiss=window.__bootSnapMiss;
                     ['snap','script','db','read','render','paint'].forEach(k=>{ if(boot[k]!=null) e[k]=boot[k]; });
+                    // 1029-B：「网页开始 → 脚本开始」拆开：head 开始、CSS 好了、快照那段开始（index.html 里几行内联脚本记的）
+                    const bt=window.__bootT; if(bt){ if(bt.head!=null) e.hd=bt.head; if(bt.css!=null) e.css=bt.css; if(bt.snap!=null) e.sn=bt.snap; }
                     e.n=window.__perfRecs;
                     nativeInto(e, 0).then(()=>add(e), ()=>add(e)); };
                 if(window.requestAnimationFrame) requestAnimationFrame(()=>setTimeout(f, 0)); else setTimeout(f, 0);

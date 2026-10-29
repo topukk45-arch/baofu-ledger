@@ -203,7 +203,7 @@ GitHub Actions 每次打包前都会先跑 `npm test`，不通过就不出包（
 | `zZzZzY-orders-cloud-13.test.js` | 1024-R（13）：单号表那一行不藏在开发开关后面、连主云备份时顺带问、导入备份后问恢复单号表；验收：恢复到新存档再导以前的文件全部被拦下 |
 | `zZzZzZ-ai-group-14.test.js` | 1024-S（14）：AI 按组整理：groupText（打码）/ parseGroupReply、勾选卡、of '*' by aigroup 写入和撤销 |
 | `zZzZzZA-raw-15.test.js` | 1024-T（15）：账单原文 raw：新建的带、指纹不含、详情能看、AI 导出不带、备份带并洗、以前导入的再导到时补上（全部导过时另给一个按钮）、撤销拿掉 |
-| `zZzZzX-splash-1029a.test.js` | 1029-A 启动页第一版：colors.xml、capacitor.config.json、index.html 开头、app.css `--c-bg` 默认底色一样（#f1f9f8）；MainActivity 用 colors.xml 的底色、启动画面最多等 2 秒；启动画面图标只用前景、底色同启动画面；head 里读 `app_boot_bg` 钉到 html 上（带 !important，在快照那段前面），存主题时另存；性能记录页顶上快照命中率（最近 30 次、按原因数、版本不对单列不算命中率）。（`zZzV` 多认 head 里读主题底色那一行内联脚本） |
+| `zZzZzX-splash-1029a.test.js` | 1029-B：没存过主题也套用默认雾松青（--c-bg #f1f9f8、主色和「恢复默认」一样、不写 app_appearance）；「启动」那条记 head 开始 ≤ CSS 好了 ≤ 快照那段开始 ≤ 脚本开始，页面上写出来；app_boot_bg 在 CSS 好了那一刻已钉上。1029-A 启动页第一版：colors.xml、capacitor.config.json、index.html 开头、app.css `--c-bg` 默认底色一样（#f1f9f8）；MainActivity 用 colors.xml 的底色、启动画面最多等 2 秒；启动画面图标只用前景、底色同启动画面；head 里读 `app_boot_bg` 钉到 html 上（带 !important，在快照那段前面），存主题时另存；性能记录页顶上快照命中率（最近 30 次、按原因数、版本不对单列不算命中率）。（`zZzV` 多认 head 里读主题底色那一行内联脚本） |
 | （1021-T25 加在 zZzZz3、zZzZz2 里） | 定了的那一项挪进「已处理」时，它下面的「看这 N 笔 / 某某 N 笔」跟着挪（`data-of`）；只对账清单点一行（不是勾选框）开这笔账单的详情，点勾选框只勾 |
 | `zz-import-golden.test.js` | 1016-F「导入以后的账本」逐字节对比：固定的虚构手记 + 账单真导一遍（多笔合一确认、转账往来标不计入），账单列表、分类汇总、统计、当日明细、备份文件和 `fixtures/import-golden.json` 一致；同一版本跑两次一样。有意改了导入行为时 `UPDATE_GOLDEN=1` 重新生成。1016-U 起导入记录多了 `rng`（每个来源的账单起止）；1016-K 起导入记录多了 `h`（指纹含批次号，跟时区走，换成「<指纹 N 个>」占位）、`now`、`cpEnd` / `pmEnd` |
 

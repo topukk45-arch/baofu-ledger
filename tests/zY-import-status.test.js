@@ -36,14 +36,15 @@ const TX = () => [
 ];
 
 (async () => {
-  for (const theme of [null, '#3f6f6b']) {
-    const seed = A.seedOf(MANUAL); if (theme) seed.app_appearance = JSON.stringify({ primary: theme });
+  // 1029-B：没存过主题的启动也套用默认雾松青了，金色那次显式存成金色主题（app.css :root 的老金色 #d4af37）
+  for (const theme of ['#d4af37', '#3f6f6b']) {
+    const seed = A.seedOf(MANUAL); seed.app_appearance = JSON.stringify({ primary: theme });
     const t = await A.boot({ html, www: WWW, seed });
     const q = s => t.d.querySelector(s), raw = id => t.d.getElementById(id), S = () => t.S();
     await pick(t, bill(TX())); const UI = t.w.JiwenImportUI;
     const pend = t.d.documentElement.style.getPropertyValue('--st-pend');
-    ok(theme ? pend === '#b4660e' : pend === '#b9520a', '0 琥珀按主色算：' + (theme ? '雾松青用 #b4660e' : '金色离琥珀太近，挪到 #b9520a') + '：' + pend);
-    if (theme) { ok(!t.errs.length, '0 雾松青主题无报错 ' + t.errs.join('|')); continue; }
+    ok(theme === '#3f6f6b' ? pend === '#b4660e' : pend === '#b9520a', '0 琥珀按主色算：' + (theme === '#3f6f6b' ? '雾松青用 #b4660e' : '金色离琥珀太近，挪到 #b9520a') + '：' + pend);
+    if (theme === '#3f6f6b') { ok(!t.errs.length, '0 雾松青主题无报错 ' + t.errs.join('|')); continue; }
     // ===== 1. 多笔合一：已选收成一行「✓ 已选：…… · 改」，点「改」变回待选 =====
     UI._goStep('match');
     const box = () => q('#impSums [data-sum]');

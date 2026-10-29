@@ -274,7 +274,7 @@
             function savePrefs(p){ localStorage.setItem('app_appearance', JSON.stringify(p)); bootBgSave(); try{ snapDrop(); }catch(_){} }   // 1019-U：换了主题，快照作废
             // 1029-A：存了的主题底色另抄一份 app_boot_bg（只在这台手机、不进备份），index.html 最前面那段在主题脚本之前读出来钉到 html 上，
             //   打开 App 时没快照也不露默认底色。选色面板里预览不算（只在存了主题、启动时套用之后写）
-            function bootBgSave(){ try{ const bg=document.documentElement.style.getPropertyValue('--c-bg').trim(); if(/^#[0-9a-f]{6}$/i.test(bg)) localStorage.setItem('app_boot_bg', bg); }catch(_){} }
+            function bootBgSave(){ try{ const bg=document.documentElement.style.getPropertyValue('--c-bg').trim(); if(/^#[0-9a-f]{6}$/i.test(bg) && localStorage.getItem('app_boot_bg')!==bg) localStorage.setItem('app_boot_bg', bg); }catch(_){} }
 
             // —— 弹窗交互 ——
             const themeMask=$('themeMask');
@@ -417,7 +417,9 @@
 
             // —— 启动时应用已保存的外观 ——
             const pf=loadPrefs();
-            if(pf.primary){ applyPrimary(pf.primary, pf.hueOf===pf.primary ? savedHue() : null); bootBgSave(); }
+            // 1029-B：没存过主题的也套用默认主题（只套用、不写 app_appearance）：app.css :root 里是老金色配色，1029-A 起底色已是雾松青，不套用会金色卡片配青白底
+            if(pf.primary) applyPrimary(pf.primary, pf.hueOf===pf.primary ? savedHue() : null); else applyPrimary(DEFAULT_PRIMARY);
+            bootBgSave();
         })();
 
         // 1016-V：设置里「存储已用 x%」，超过 70% 提醒。按浏览器给这个 App 的配额算（navigator.storage.estimate，账本在 IndexedDB 里）。
