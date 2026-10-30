@@ -1935,7 +1935,7 @@
                 const recs=liveRecs((t.e.archs.get(t.aid)||{ recs:[] }).recs), cps=(ledgerAssembleArchive(t.e, t.aid).cps)||[];
                 const hasRf=new Set(recs.filter(r=>r.refundOf).map(r=>r.refundOf));
                 return recs.filter(r=>r.rv===1 && !r.refundOf && !hasRf.has(r.id))
-                    .map(r=>({ id:r.id, time:r.time, fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', app:(r.src && r.src.app) || '', oc:r.oc||'', remark:(r.remark||'').split('\n')[0].slice(0, 60), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', skip:!!r.skip }));
+                    .map(r=>({ id:r.id, time:r.time, fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', app:(r.src && r.src.app) || '', oc:r.oc||'', remark:(r.remark||'').split('\n')[0].slice(0, 60), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', rcp:(r.raw && r.raw.cp) || '', skip:!!r.skip }));   // 1030-RV5：rcp 账单原文里的对方（没进名单的那几笔用它）
             },
             // ---- 1016-Z2：「当作退款，挂到某一笔」的候选（只读）：账本里的支出，时间不晚于这笔、180 天以内、还没退完的够挂；新的在前，最多 50 条
             refundTargets(q, archive){

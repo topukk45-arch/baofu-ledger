@@ -272,10 +272,11 @@
   // ---------- 导入简化第 14 版：AI 按组整理（原方案三-4）----------
   //   待确认分类的记录按收支 + 对方（平台按商品说明、个人按对方 + 商品说明）分成组，一组一行交给 AI（见下面 groupLine）；
   //   AI 回一行一组「G号 | 改成的分类 | 理由」，放在 ```记问 代码块里、第一行原样抄 groupHead(导出时间)。只能改分类，分类要在名单里。
-  //   d = { at, cats, groups:[{ g, cp, desc, io, n, fen, cat, items:[{ time, fen }] }], rest:[{ time, cp, io, fen }] }，opts = { mask }
+  //   d = { at, cats, groups:[{ g, cp, desc, io, oc, person, n, fen, cat, items:[{ time, fen }] }] }，opts = { mask, alias }
   //   1030-RV3：对方名原样发（不再把个人换成「个人」，AI 要靠名字判断），mask() 照旧打手机号、长串数字、邮箱；
   //   每组多给几样统计（均、单笔范围、日期范围、常见时段、常见日类型、疑似月固定扣款），时间都从 time 字符串里截、不用 Date；
-  //   rest 是个人转账、没写用途、只有 1～2 笔的，列在最后、不带 G 号、AI 不用回
+  //   1030-RV5：去掉文末「个人转账且没有说明」那一段（这种也编 G 号）；alias（隐藏真实姓名）：个人对方写成「个人A」「个人B」，同一个名字同一个号；
+  //   没有对方的组在对方那一栏写「（没写对方，交易类型：…）」
   var GROUP_HEAD = '记问分组建议 v1';
   // 泛化说明：等于没写用途的几种（trim 后整句比）
   var GENERIC_DESC = ['', '—', '/', '收钱码收款', '转账', '扫二维码付款', '扫码付款'];
@@ -317,8 +318,9 @@
     return Math.max.apply(null, ds) - Math.min.apply(null, ds) <= 6;
   }
   // 一组一行（缺的字段整段不写）
-  function groupLine(g, mk) {
-    var cp = mk ? mask(g.cp || '') : (g.cp || ''), ds = mk ? mask(g.desc || '') : (g.desc || '');
+  function groupLine(g, mk, name) {
+    var cp = name != null ? name : (mk ? mask(g.cp || '') : (g.cp || '')), ds = mk ? mask(g.desc || '') : (g.desc || '');
+    if (!cp && g.oc) cp = '（没写对方，交易类型：' + g.oc + '）';
     var io = g.io === 'income' ? '收入' : '支出', items = (g.items || []).slice().sort(function (a, b) { return String(a.time) < String(b.time) ? -1 : String(a.time) > String(b.time) ? 1 : 0; });
     var ps = items.map(function (x) { return tParts(x.time); }), c = ['G' + g.g, cp || '—', ds || '—', io, g.n + '笔'];
     if (g.n === 1) { c.push(gYuan(g.fen) + '元'); if (ps[0] && ps[0].day) c.push(whenText(ps[0])); }
@@ -337,8 +339,21 @@
     c.push(g.cat || '未分类');
     return c.join(' | ');
   }
+  // 1030-RV5：隐藏真实姓名用的编号：A…Z、AA、AB…
+  function letters(i) { var t = ''; i++; while (i > 0) { var m = (i - 1) % 26; t = String.fromCharCode(65 + m) + t; i = Math.floor((i - 1) / 26); } return t; }
+  // 1030-RV5：名字一看就知道的，不交给 AI：「群红包」「发出群红包」「收到群红包」→ redpack；「发给某某」→ transfer；别的 ''
+  //   先看对方名，对方名没有再看商品说明（账单里对方写「/」的那几笔名字在商品说明里）
+  function namePre(cp, desc) {
+    var one = function (s) { s = String(s || '').trim(); if (/^(发出|收到)?群红包/.test(s)) return 'redpack'; if (/^发给\S/.test(s)) return 'transfer'; return ''; };
+    return one(cp) || (String(cp || '').trim() ? '' : one(desc));
+  }
   function groupText(d, opts) {
-    opts = opts || {}; var mk = opts.mask !== false, rest = d.rest || [];
+    opts = opts || {}; var mk = opts.mask !== false;
+    var alias = {}, an = 0, nameOf = function (g) {
+      if (!opts.alias || !g.person || !g.cp) return null;
+      if (!alias[g.cp]) alias[g.cp] = '个人' + letters(an++);
+      return alias[g.cp];
+    };
     var L = [];
     L.push('记问 · 待确认分类按组整理（导出 ' + d.at + '）');
     L.push('');
@@ -354,18 +369,10 @@
     L.push('- 「多在…」是大部分交易落在的时段或日子（工作日 / 周末），「分散」「都有」就是没有明显规律；只有 1～2 笔的直接写了每笔的时间和星期');
     L.push('- 「疑似月固定扣款」是每月一笔、日子差不多');
     L.push('- 「个人转账」是给个人转钱、账单里没写用途的，请结合对方名字、金额规律、时段判断（比如每月固定金额可能是房租、家里人）；拿不准就不写');
-    if (rest.length) L.push('- 最后「以下 N 笔为个人转账且没有说明」那几行没有 G 号，不用回');
+    if (opts.alias) L.push('- 「个人A」「个人B」是我隐藏了真名的个人，同一个编号是同一个人');
     L.push('');
     L.push('分组：');
-    d.groups.forEach(function (g) { L.push(groupLine(g, mk)); });
-    if (rest.length) {
-      L.push('');
-      L.push('--- 以下 ' + rest.length + ' 笔为个人转账且没有说明，AI 不用处理，建议在 App 里逐条确认 ---');
-      rest.slice().sort(function (a, b) { return String(a.time) < String(b.time) ? -1 : String(a.time) > String(b.time) ? 1 : 0; }).forEach(function (r) {
-        var p = tParts(r.time);
-        L.push(p.day + ' ' + p.hm + ' | ' + ((mk ? mask(r.cp || '') : (r.cp || '')) || '—') + ' | ' + (r.io === 'income' ? '收入' : '支出') + ' | ' + gYuan(r.fen) + '元');
-      });
-    }
+    d.groups.forEach(function (g) { L.push(groupLine(g, mk, nameOf(g))); });
     return L.join('\n');
   }
   // ctx = { at, cats, n（几组）}：→ { ok, why, items:[{ g, cat, why }], bad:[{ line, why }] }
@@ -400,5 +407,5 @@
 
   return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, changesOf: changesOf, HEAD: HEAD, MODE_NAME: MODE_NAME, MODE_OF: MODE_OF, FLAG_OF: FLAG_OF, REMARK_MAX: REMARK_MAX,
            mask: mask, personal: personal, exportText: exportText, replyHead: replyHead, parseReply: parseReply,
-           GROUP_HEAD: GROUP_HEAD, groupHead: groupHead, groupText: groupText, groupLine: groupLine, isGenericDesc: isGenericDesc, GENERIC_DESC: GENERIC_DESC, parseGroupReply: parseGroupReply };
+           GROUP_HEAD: GROUP_HEAD, groupHead: groupHead, groupText: groupText, groupLine: groupLine, isGenericDesc: isGenericDesc, namePre: namePre, GENERIC_DESC: GENERIC_DESC, parseGroupReply: parseGroupReply };
 });

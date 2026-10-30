@@ -578,7 +578,7 @@
         //   「没问题」（去掉标记）、「改成…」（常用分类小标签，点一下就改，改了问一句以后也这么记吗）、「跳过」；处理完自动到下一条。
         //   成组确认：按分类分组「餐饮 · 42 笔（瑞幸 18、果切 9…）[这组都没问题]」，点开看每一笔、勾掉个别的；确认走批量那套，能撤销
         function rvList(){ return getUserData().filter(r=>r.rv===1 && filterMatch(r)).map((r, i)=>({ r, i, ts:parseRecTime(r.time).getTime() })).sort((a, b)=>(b.ts-a.ts) || (b.i-a.i)).map(x=>x.r); }
-        function cpName(r){ try{ const a=window.JiwenStore.loadStore(JiwenBase.currentUser).archives[JiwenBase.currentArchive]; return Number.isInteger(r.cp) ? ((a.cps||[])[r.cp]||'') : ''; }catch(_){ return ''; } }
+        function cpName(r){ try{ const a=window.JiwenStore.loadStore(JiwenBase.currentUser).archives[JiwenBase.currentArchive]; return (Number.isInteger(r.cp) ? ((a.cps||[])[r.cp]||'') : '') || (r.raw && r.raw.cp) || ''; }catch(_){ return (r.raw && r.raw.cp) || ''; } }   // 1030-RV5：名单里没有的用账单原文
         let rvIds=null;
         function setRec(id, fn){
             const data=getUserData(), i=data.findIndex(r=>r.id===id); if(i<0) return null;
@@ -665,7 +665,7 @@
             if(!RG.ui || !RG.ui.aiGroupsOf) return null;
             let cps=[]; try{ cps=window.JiwenStore.loadStore(JiwenBase.currentUser).archives[JiwenBase.currentArchive].cps||[]; }catch(_){}
             const rows=g.rs.filter(r=>!isRefund(r)).map(r=>({ id:r.id, time:r.time, fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', oc:r.oc||'',
-                remark:(r.remark||'').split('\n')[0].slice(0, 60), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', skip:false }));   // 退款跟着原单走，不单列（原单改了它一起改）
+                remark:(r.remark||'').split('\n')[0].slice(0, 60), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', rcp:(r.raw && r.raw.cp) || '', skip:false }));   // 退款跟着原单走，不单列（原单改了它一起改）
             return RG.ui.aiGroupsOf(rows);
         }
         function rgUncatEl(g, el, top, open){

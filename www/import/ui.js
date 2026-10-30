@@ -3355,7 +3355,8 @@
     + '.imp-paste-ta.ro{font-size:13px;}'
     + '.imp-paste-info{margin-top:6px;font-size:13px;color:var(--c-text-soft);font-variant-numeric:tabular-nums;}'
     + '.imp-paste-msg{margin-top:6px;font-size:14px;line-height:1.5;color:var(--c-neg);font-weight:bold;}.imp-paste-msg:empty{display:none;}'
-    + '.imp-paste-act{margin-top:8px;}.imp-paste-act[hidden]{display:none;}';
+    + '.imp-paste-act{margin-top:8px;}.imp-paste-act[hidden]{display:none;}'
+    + '.imp-aig-opt{display:flex;align-items:center;gap:10px;min-height:48px;margin:6px 0;font-size:15px;color:var(--c-text);}.imp-aig-opt input{width:20px;height:20px;flex:none;}.imp-aig-opt small{display:block;font-size:13px;color:var(--c-text-soft);}';
   function pasteCss() { if (document.getElementById('impPasteStyle')) return; var st = el('style'); st.id = 'impPasteStyle'; st.textContent = PASTE_CSS; document.head.appendChild(st); }
   function pasteFit(ta) {
     var max = Math.max(171, Math.round((window.innerHeight || 700) * 0.36));
@@ -3943,20 +3944,23 @@
   //   待确认分类的记录（rvRows，不计的不算）按组拼成一段交给 AI（ai.js 的 groupText，默认打码）；
   //   AI 回「G号 | 分类 | 理由」（parseGroupReply），每组一张勾选卡（默认勾），「改这 N 条」照 AI 修改那套写（of '*'、by 'aigroup'，自动备份，能撤销，撤销时待确认放回）
   //   1030-RV3 分法：先按收支分开；商户按对方（商品说明发这组里出现最多的那个，泛化说明不算，一样多取最近一笔的，全是泛化的写「—」）；
-  //   平台（AIG_PLAT）、没有对方的按商品说明；个人（ai.js 的 personal()）按对方 + 商品说明，商品说明是泛化说明的只按对方、写「个人转账」，
-  //   这种只有 1～2 笔的不交给 AI（special，不编 G 号、排在最后，groupText 列进末尾那一段）。每组带 items [{ time, fen }] 给 groupText 算统计
+  //   平台（AIG_PLAT）、没有对方的按商品说明；个人（ai.js 的 personal()）按对方 + 商品说明，商品说明是泛化说明的只按对方、写「个人转账」（bare）。
+  //   每组带 items [{ time, fen }] 给 groupText 算统计
+  //   1030-RV5：bare 的不再挑出来列在文末，和别的一样编 G 号；对方名先用名单里的、名单里没有用账单原文的（rcp，待处理里后来作为新增的那几笔没带 cp）；
+  //   真没有对方的（账单里写「/」）按商品说明 + 交易类型归，交易类型给 AI 看（g.oc）
   var AIG = null, AIG_PLAT = /淘宝|天猫|京东|拼多多|抖音|唯品会|美团|饿了么|盒马|闪购|交易猫|闲鱼|快手/;
   function aiGroupsOf(rows) {
     var AI = window.JiwenImportAI, by = {}, order = [];
     var generic = function (s) { return AI && AI.isGenericDesc ? AI.isGenericDesc(s) : !String(s || '').trim(); };
     var isPerson = function (cp, oc, desc) { return AI && AI.personal ? AI.personal(cp, oc, desc) : cp.indexOf('*') >= 0; };
     rows.filter(function (r) { return !r.skip; }).forEach(function (r) {
-      var cp = cpShow(r.cp || ''), desc = String(r.remark || '').trim().slice(0, 24), io = r.type === 'income' ? 'income' : 'expense', gen = generic(desc);
+      var cp = cpShow(r.cp || r.rcp || ''), desc = String(r.remark || '').trim().slice(0, 24), io = r.type === 'income' ? 'income' : 'expense', gen = generic(desc);
       var k, kind;
-      if (isPerson(cp, r.oc, r.remark)) { kind = 'person'; k = gen ? '人：' + cp : '人：' + cp + '｜' + desc; }
-      else if ((!cp || AIG_PLAT.test(cp)) && !gen) { kind = 'desc'; k = '品：' + desc; }
+      if (cp && isPerson(cp, r.oc, r.remark)) { kind = 'person';   // 1030-RV5：没有对方名的不算个人（不然一组「个人转账」却没名字）
+        k = gen ? '人：' + cp : '人：' + cp + '｜' + desc; }
+      else if ((!cp || AIG_PLAT.test(cp)) && !gen) { kind = 'desc'; k = '品：' + desc + (cp ? '' : '｜' + (r.oc || '')); }
       else if (cp) { kind = 'cp'; k = '方：' + cp; }
-      else { kind = 'desc'; k = '品：—'; }
+      else { kind = 'desc'; k = '品：—｜' + (r.oc || ''); }
       k = io + '｜' + k;
       var g = by[k];
       if (!g) {
@@ -3975,12 +3979,29 @@
         g.desc = best ? best.d : '—';
       }
       delete g.descs;
-      g.special = g.bare && g.n <= 2;
       g.cat = Object.keys(g.cats).sort(function (a, b) { return g.cats[b] - g.cats[a]; })[0];
     });
-    var main = gs.filter(function (g) { return !g.special; }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; });
-    main.forEach(function (g, i) { g.g = i + 1; });
-    return main.concat(gs.filter(function (g) { return g.special; }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; }));
+    return gs.sort(function (a, b) { return b.n - a.n || b.fen - a.fen; }).map(function (g, i) { g.g = i + 1; return g; });
+  }
+  // 1030-RV5：名字一看就知道的（ai.js 的 namePre：群红包 → 红包、发给某某 → 转账）不交给 AI，导出前直接定；
+  //   落到存档里同名的分类，没有就找名字里带它的（「转账红包」），都没有就新建（aiApply 的 newCats）。按 收支 + 对方 一组
+  function preCat(kind, cats) {
+    var want = kind === 'redpack' ? '红包' : '转账';
+    if (cats.indexOf(want) >= 0) return { cat: want };
+    var hit = cats.filter(function (c) { return c.indexOf(want) >= 0; })[0];
+    return hit ? { cat: hit } : { cat: want, fresh: true };
+  }
+  function preOf(rows, cats) {
+    var AI = window.JiwenImportAI, by = {}, out = [], ids = {};
+    rows.forEach(function (r) {
+      var cp = cpShow(r.cp || r.rcp || ''), kind = AI && AI.namePre ? AI.namePre(cp, r.remark) : '';
+      if (!kind) return;
+      var io = r.type === 'income' ? 'income' : 'expense', k = io + '｜' + kind + '｜' + (cp || r.remark || '');
+      var g = by[k]; if (!g) { var pc = preCat(kind, cats); g = by[k] = { kind: kind, cp: cp || String(r.remark || '').trim(), io: io, cat: pc.cat, fresh: !!pc.fresh, n: 0, fen: 0, ids: [], cats: {} }; out.push(g); }
+      g.n++; g.fen += r.fen; g.ids.push(r.id); g.cats[r.cat] = (g.cats[r.cat] || 0) + 1; ids[r.id] = 1;
+    });
+    out.forEach(function (g) { g.cur = Object.keys(g.cats).sort(function (a, b) { return g.cats[b] - g.cats[a]; })[0]; });
+    return { groups: out.filter(function (g) { return g.cur !== g.cat; }), ids: ids };
   }
   function aiStamp() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
   // 1030-RV4：opt = { ids:[记录 id], label:'未分类 · 支出' }：从成组确认的某一组点进来的只发这一组（不给就是全部待确认分类）
@@ -3988,22 +4009,29 @@
     var J = window.JiwenSheet, AI = window.JiwenImportAI; if (!J || !AI) return;
     opt = opt || {};
     var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); if (opt.ids) { var only = {}; opt.ids.forEach(function (id) { only[id] = 1; }); rows = rows.filter(function (r) { return only[r.id]; }); } } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e) + '\n\n账本没有改动。关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。', 'AI 按组整理'); return; }
-    var all = aiGroupsOf(rows), gs = all.filter(function (g) { return !g.special; }), rest = [];
-    all.forEach(function (g) { if (g.special) g.items.forEach(function (x) { rest.push({ time: x.time, fen: x.fen, cp: g.cp, io: g.io }); }); });
-    if (!all.length) { alertMsg('没有待确认分类的记录。', 'AI 按组整理'); return; }
-    if (!gs.length) { alertMsg('这 ' + rest.length + ' 笔都是没写用途的个人转账，每个人只有一两笔，AI 也判断不了。建议在「逐条确认」里一笔一笔看。', 'AI 按组整理'); return; }
-    AIG = { at: aiStamp(), groups: gs, cats: info.cats, off: {}, opt: opt };
-    var text = AI.groupText({ at: AIG.at, cats: info.cats, groups: gs, rest: rest }, { mask: true });
-    AIG.text = text;
-    J.open({ title: 'AI 按组整理', tall: true, sub: (opt.label ? opt.label + '：' : '') + gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类' + (rest.length ? '（另有 ' + rest.length + ' 笔个人转账留给你逐条确认）' : ''), onDismiss: function () { AIG = null; },
+    rows = rows.filter(function (r) { return !r.skip && r.fen; });   // 1030-RV5：0 元的不进导出
+    var pre = preOf(rows, info.cats || []);
+    var gs = aiGroupsOf(rows.filter(function (r) { return !pre.ids[r.id]; }));
+    if (!gs.length && !pre.groups.length) { alertMsg('没有要整理的待确认分类记录（0 元的不算）。', 'AI 按组整理'); return; }
+    AIG = { at: aiStamp(), groups: gs, pre: pre.groups, cats: info.cats, off: {}, offP: {}, opt: opt, alias: false };
+    if (!gs.length) { AIG.reply = { ok: true, items: [], bad: [] }; paintAiGroups(); return; }   // 只有按名字定的：直接列出来
+    var textOf = function () { return AI.groupText({ at: AIG.at, cats: info.cats, groups: gs }, { mask: true, alias: AIG.alias }); };
+    AIG.text = textOf();
+    var preN = pre.groups.reduce(function (s, g) { return s + g.n; }, 0);
+    J.open({ title: 'AI 按组整理', tall: true, sub: (opt.label ? opt.label + '：' : '') + gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类', onDismiss: function () { AIG = null; },
       body: function (box) {
         box.appendChild(el('div', 'imp-soft', '把下面这段整个复制给 AI（豆包、Kimi、ChatGPT 都行），让它按组挑分类；再把它的回复整段粘贴回来。手机号、长串数字已经打码，只发了每组的对方、商品说明、收支、笔数、金额和时间规律。'));
+        if (preN) box.appendChild(el('div', 'imp-soft imp-aig-pre', '另有 ' + preN + ' 笔看名字就知道（' + pre.groups.map(function (g) { return cut(g.cp, 8) + ' → ' + g.cat; }).slice(0, 3).join('、') + (pre.groups.length > 3 ? '…' : '') + '），不发给 AI，读回 AI 的回复时一起列出来。'));
         pasteCss();
-        var ta = document.createElement('textarea'); ta.id = 'impAiGrpText'; ta.readOnly = true; ta.value = text; ta.className = 'imp-ai-text imp-paste-ta ro'; box.appendChild(ta);
+        var lb = el('label', 'imp-aig-opt'), ck = document.createElement('input'); ck.type = 'checkbox'; ck.id = 'impAiGrpAlias'; ck.checked = AIG.alias;
+        var tt = el('span', 'grow', '隐藏真实姓名'); tt.appendChild(el('small', null, '个人对方写成「个人A」「个人B」，同一个人编号一样；读回来按组号对回原来的记录'));
+        lb.appendChild(ck); lb.appendChild(tt); box.appendChild(lb);
+        var ta = document.createElement('textarea'); ta.id = 'impAiGrpText'; ta.readOnly = true; ta.value = AIG.text; ta.className = 'imp-ai-text imp-paste-ta ro'; box.appendChild(ta);
+        ck.addEventListener('change', function () { if (!AIG) return; AIG.alias = ck.checked; AIG.text = textOf(); ta.value = AIG.text; var c = document.getElementById('impAiGrpCopy'); if (c) c.textContent = '复制全文'; });
       },
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
-        var cp = btn('复制全文', 'ui-btn primary block', function () { UI._lastCopy = text; copyText(text).then(function () { cp.textContent = '✓ 已复制'; }); }); cp.id = 'impAiGrpCopy';
+        var cp = btn('复制全文', 'ui-btn primary block', function () { var tx = AIG ? AIG.text : ''; UI._lastCopy = tx; copyText(tx).then(function () { cp.textContent = '✓ 已复制'; }); }); cp.id = 'impAiGrpCopy';
         var ps = btn('粘贴 AI 的回复', 'ui-btn block', function () { done(); aiGroupPaste(); }); ps.id = 'impAiGrpPaste';
         var cl = btn('关闭', 'ui-btn block', function () { done(); AIG = null; }); cl.id = 'impAiGrpClose';
         col.appendChild(cp); col.appendChild(ps); col.appendChild(cl); box.appendChild(col);
@@ -4029,7 +4057,7 @@
           if (!text.trim()) { P.clear(); msg.textContent = '还没粘贴。'; return; }
           var r = window.JiwenImportAI.parseGroupReply(text, { at: A.at, cats: A.cats, n: A.groups.length });
           if (!r.ok) { P.fail(AIG_WHY[r.why] || ['读不出来。', 'again'], recopy); return; }
-          if (!r.items.filter(function (x) { var g = A.groups[x.g - 1]; return g && g.cat !== x.cat; }).length) { P.fail(['AI 没提能用的建议' + (r.bad.length ? '（' + r.bad.length + ' 行没看懂）' : '') + '。', 'recopy'], recopy); return; }
+          if (!A.pre.length && !r.items.filter(function (x) { var g = A.groups[x.g - 1]; return g && g.cat !== x.cat; }).length) { P.fail(['AI 没提能用的建议' + (r.bad.length ? '（' + r.bad.length + ' 行没看懂）' : '') + '。', 'recopy'], recopy); return; }
           A.reply = r; done(); paintAiGroups();
         }); go.id = 'impAiGrpRead';
         var no = btn('取消', 'ui-btn block', function () { done(); AIG = null; }); no.id = 'impAiGrpCancel';
@@ -4039,8 +4067,11 @@
   function paintAiGroups() {
     var J = window.JiwenSheet, A = AIG; if (!J || !A || !A.reply) return;
     var its = A.reply.items.filter(function (x) { var g = A.groups[x.g - 1]; return g && g.cat !== x.cat; });
-    var on = its.filter(function (x) { return !A.off[x.g]; }), n = on.reduce(function (s, x) { return s + A.groups[x.g - 1].n; }, 0);
-    J.open({ title: 'AI 的分组建议', tall: true, sub: 'AI 提了 ' + A.reply.items.length + ' 组，能用的 ' + its.length + ' 组' + (A.reply.bad.length ? '，没看懂 ' + A.reply.bad.length + ' 行' : ''), onDismiss: function () { AIG = null; },
+    var on = its.filter(function (x) { return !A.off[x.g]; }), onP = A.pre.filter(function (g, i) { return !A.offP[i]; });
+    var n = on.reduce(function (s, x) { return s + A.groups[x.g - 1].n; }, 0) + onP.reduce(function (s, g) { return s + g.n; }, 0);
+    var sub = A.groups.length ? 'AI 提了 ' + A.reply.items.length + ' 组，能用的 ' + its.length + ' 组' + (A.reply.bad.length ? '，没看懂 ' + A.reply.bad.length + ' 行' : '') : '';
+    if (A.pre.length) sub += (sub ? '；' : '') + '按名字定的 ' + A.pre.length + ' 组';
+    J.open({ title: A.groups.length ? 'AI 的分组建议' : '按名字就能定的', tall: true, sub: sub, onDismiss: function () { AIG = null; },
       body: function (box) {
         its.forEach(function (x) {
           var g = A.groups[x.g - 1], row = el('label', 'rvg-row imp-aig-row'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !A.off[x.g]; row.dataset.g = x.g;
@@ -4051,16 +4082,34 @@
           row.appendChild(tx); row.appendChild(el('span', 'rvg-a', yuan(g.fen)));
           box.appendChild(row);
         });
+        if (A.pre.length) {
+          if (its.length) box.appendChild(el('div', 'imp-soft', '下面这几组看名字就知道，没发给 AI：'));
+          A.pre.forEach(function (g, i) {
+            var row = el('label', 'rvg-row imp-aig-row imp-aig-prerow'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !A.offP[i]; row.dataset.p = i;
+            cb.addEventListener('change', function () { if (cb.checked) delete A.offP[i]; else A.offP[i] = 1; paintAiGroups(); });
+            row.appendChild(cb);
+            var tx = el('span', 'rvg-r'); tx.appendChild(document.createTextNode(cut(g.cp, 16) + ' · ' + (g.io === 'income' ? '收入 ' : '支出 ') + g.n + ' 笔：' + g.cur + ' → ' + g.cat + (g.fresh ? '（新建）' : '')));
+            tx.appendChild(el('div', 'imp-soft', g.kind === 'redpack' ? '名字是群红包，直接记成红包' : '名字是「发给…」，直接记成转账'));
+            row.appendChild(tx); row.appendChild(el('span', 'rvg-a', yuan(g.fen)));
+            box.appendChild(row);
+          });
+        }
         if (A.reply.bad.length) { var bd = el('div', 'imp-soft imp-aig-bad', '没看懂的几行：' + A.reply.bad.map(function (b) { return '「' + cut(b.line, 20) + '」' + b.why; }).join('；')); box.appendChild(bd); }
       },
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
         var go = btn(n ? '改这 ' + n + ' 条的分类' : '还没勾', 'ui-btn primary block', function () {
           if (!n) return;
-          var changes = []; on.forEach(function (x) { A.groups[x.g - 1].ids.forEach(function (id) { changes.push({ id: id, set: { cat: x.cat } }); }); });
+          var changes = [], fresh = [];
+          on.forEach(function (x) { A.groups[x.g - 1].ids.forEach(function (id) { changes.push({ id: id, set: { cat: x.cat } }); }); });
+          onP.forEach(function (g) { if (g.fresh && fresh.indexOf(g.cat) < 0) fresh.push(g.cat); g.ids.forEach(function (id) { changes.push({ id: id, set: { cat: g.cat } }); }); });
           done(); AIG = null;
-          store().aiApply({ of: '*', by: 'aigroup', changes: changes }).then(function (w) {
-            alertMsg('已按 AI 的建议改了 ' + w.changed + ' 条的分类，这几条不再算待确认。\n\n改之前自动备份了；改错了可以在「导入记录」里「AI 按组整理」那一行点「撤销」（你后来又改过的不会动）。', 'AI 按组整理');
+          store().aiApply({ of: '*', by: 'aigroup', changes: changes, newCats: fresh }).then(function (w) {
+            // 1030-RV5：写完还有待确认的，问一句接着一键优化
+            var msg = '已按 AI 的建议改了 ' + w.changed + ' 条的分类，这几条不再算待确认。\n\n改之前自动备份了；改错了可以在「导入记录」里「AI 按组整理」那一行点「撤销」（你后来又改过的不会动）。', left = 0;
+            try { left = store().rvRows().length; } catch (e) {}
+            if (left && typeof window.customConfirm === 'function') window.customConfirm(msg + '\n\n还有 ' + left + ' 条待确认分类，要接着「一键优化分类」吗？', function () { openOptimize(); }, 'AI 按组整理', { okText: '接着一键优化', cancelText: '先不了' });
+            else alertMsg(msg, 'AI 按组整理');
           }, function (e) { alertMsg('没改成：' + (e && (e.code || e.message) || e) + '。账本没有动。', 'AI 按组整理'); });
         }); go.id = 'impAiGrpGo'; go.disabled = !n;
         var cl = btn('关闭', 'ui-btn block', function () { done(); AIG = null; }); cl.id = 'impAiGrpDone';

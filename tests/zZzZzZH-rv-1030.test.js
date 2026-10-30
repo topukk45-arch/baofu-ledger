@@ -179,9 +179,9 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   await openGroups();
   const uIn2 = groups().find(g => /未分类 · 收入/.test(g.querySelector('.rvg-t').textContent));
   uIn2.querySelector('[data-act="ai"]').click();
-  await A.until(() => t.ask(), 8000);
-  ok(/都是没写用途的个人转账/.test(t.ask().msg), '4b 这一组全是一两笔的个人转账：不出 AI 文字，提示去逐条确认');
-  await t.askOk();
+  await A.until(() => sheetOpen(t) && $('impAiGrpText'), 8000);
+  ok(/^未分类 · 收入：1 组 · 2 笔/.test($('uiSheetSub').textContent) && /G1 \| 某虚构\*甲 \| 个人转账 \| 收入 \| 2笔/.test($('impAiGrpText').value), '4b 1030-RV5：一两笔没写用途的个人转账也编 G 号交给 AI');
+  $('impAiGrpClose').click(); await tick();
   await openGroups();
 
   // ===== 6. 分类抽屉「＋ 新建」 =====
