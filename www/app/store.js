@@ -1177,6 +1177,20 @@
             const o={}; Object.keys(IMP_RAW_KEYS).forEach(k=>{ if(typeof x[k]==='string' && x[k].trim()) o[k]=x[k].trim().slice(0, IMP_RAW_KEYS[k]); });
             return Object.keys(o).filter(k=>k!=='app').length ? o : null;
         }
+        // 实测 10-30：几笔合成的一条（src.sum）上每一笔的明细 parts [{ time, fen, cp, desc, no, kind }] 洗一遍：
+        //   时间要像「2026-10-03T12:00」、金额是不小于 0 的整数分，别的几样是字符串（截长）；一笔不对整个不要（明细要和金额对得上，不留半截），超过 IMP_PARTS_MAX 笔也不要
+        const IMP_PARTS_MAX=2000, IMP_PART_KEYS={ cp:64, desc:200, no:64, kind:64 };
+        function impCleanParts(x){
+            if(!Array.isArray(x) || !x.length || x.length>IMP_PARTS_MAX) return null;
+            const out=[];
+            for(const p of x){
+                if(!p || typeof p!=='object' || typeof p.time!=='string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(p.time) || !Number.isInteger(p.fen) || p.fen<0 || p.fen>1e12) return null;
+                const o={ time:p.time.slice(0, 19), fen:p.fen };
+                Object.keys(IMP_PART_KEYS).forEach(k=>{ if(typeof p[k]==='string' && p[k].trim()) o[k]=p[k].trim().slice(0, IMP_PART_KEYS[k]); });
+                out.push(o);
+            }
+            return out;
+        }
         function impArchFields(a){
             const o={};
             if(Array.isArray(a.noSpend) && a.noSpend.length) o.noSpend=cleanNoSpend(a.noSpend);
@@ -1378,6 +1392,7 @@
                 if(typeof x.oc==='string' && x.oc) r.oc=x.oc.slice(0, 32);
                 if(x.rv===1) r.rv=1;   // 1021-T13：待确认分类
                 { const rw=impCleanRaw(x.raw); if(rw) r.raw=rw; }   // 导入简化第 15 版：账单原文
+                if(r.src && r.src.sum){ const pt=impCleanParts(x.parts); if(pt) r.parts=pt; }   // 实测 10-30：几笔合成的一条存每一笔的明细
                 if(x.ob===1 && r.flow===true) r.ob=1;   // 导入简化 2a：大额选了往来、标了期初余额
                 if(x.refundOf) r.refundOf=res(x.refundOf);
                 made.push(r); madeBy[r.id]=r;
@@ -1394,6 +1409,12 @@
                     n[k]= k==='refundOf' ? res(c.set[k]) : c.set[k];
                 });
                 if(c.addFen){ was.money=old.money; n.money=round2(safeNum(old.money)+c.addFen/100); }
+                // 实测 10-30：往合并记录追加的几笔，明细接在后面（原来就没有明细的老记录不接，免得只列一半）；原值记进 was（撤销时放回）
+                if(c.addParts && old.src && old.src.sum && Array.isArray(old.parts)){
+                    const add=impCleanParts(c.addParts), all=add ? old.parts.concat(add) : null;
+                    was.parts=JSON.stringify(old.parts);
+                    if(all && all.length<=IMP_PARTS_MAX) n.parts=all; else delete n.parts;
+                }
                 if(c.kind==='link'){
                     const o=madeBy[n.refundOf];
                     if(o){ was.cat=old.cat; was.skip=old.skip===true ? true : null; was.flow=old.flow===true ? true : null; n.cat=o.cat; setRecMode(n, recMode(o)); }
@@ -3064,7 +3085,7 @@
                 if(Array.isArray(v)) return '['+v.map(canon).join(',')+']';
                 return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+canon(v[k])).join(',')+'}';
             };
-            const o={}; Object.keys(r||{}).forEach(k=>{ if(k!=='id' && k!=='refundOf' && k!=='rv' && k!=='raw' && r[k]!==undefined) o[k]=r[k]; });   // 1021-T13：rv 不算；第 15 版：raw 不算（和 write.js 的 recHash 一样）
+            const o={}; Object.keys(r||{}).forEach(k=>{ if(k!=='id' && k!=='refundOf' && k!=='rv' && k!=='raw' && k!=='parts' && r[k]!==undefined) o[k]=r[k]; });   // 1021-T13：rv 不算；第 15 版：raw 不算；实测 10-30：parts 不算（和 write.js 的 recHash 一样）
             const str=canon(o); let h1=0xdeadbeef, h2=0x41c6ce57;
             for(let i=0;i<str.length;i++){ const ch=str.charCodeAt(i); h1=Math.imul(h1^ch, 2654435761); h2=Math.imul(h2^ch, 1597334677); }
             h1=Math.imul(h1^(h1>>>16), 2246822507) ^ Math.imul(h2^(h2>>>13), 3266489909);
@@ -3299,6 +3320,7 @@
                 if(r.rv===1) rec.rv=1;   // 1021-T13：待确认分类标记照搬
                 if(r.rp===1) rec.rp=1;   // 导入简化 7b：已被账单替换的手记照搬（还是藏着）
                 { const rw=impCleanRaw(r.raw); if(rw) rec.raw=rw; }   // 导入简化第 15 版：账单原文照搬（洗过）
+                if(rec.src && rec.src.sum){ const pt=impCleanParts(r.parts); if(pt) rec.parts=pt; }   // 实测 10-30：合成那几笔的明细照搬（洗过）
                 if(r.ob===1 && rec.flow===true) rec.ob=1;   // 1023-P：期初余额（只在往来的记录上）
                 if(r.id!=null) idMap.set(String(r.id), rec);
                 if(type==='income' && r.refundOf!=null && r.refundOf!=='') pend.push([rec, String(r.refundOf)]);

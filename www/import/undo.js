@@ -28,7 +28,7 @@
   'use strict';
 
   var VERSION = '1017-K';
-  var OBJ_KEYS = ['src', 'aiFlag', 'raw'];   // 第 15 版：账单原文   // chg 里这些字段的原值 / 新值存的是 JSON 文本（1017-G 加 AI 标记）
+  var OBJ_KEYS = ['src', 'aiFlag', 'raw', 'parts'];   // 第 15 版：账单原文；实测 10-30：合成那几笔的明细   // chg 里这些字段的原值 / 新值存的是 JSON 文本（1017-G 加 AI 标记）
 
   function hasher() {
     if (typeof JiwenImportWrite !== 'undefined') return JiwenImportWrite.recHash;   // eslint-disable-line no-undef

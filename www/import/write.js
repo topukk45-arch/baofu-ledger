@@ -12,7 +12,7 @@
 //   合并记录（分分捐按月、收款按天、勾上的零碎扣款）：一条记录，src:{app, sum:'petty'|'receipt'|'suspect'}；
 //         已有同月 / 同天的就把金额加上去
 //   以前导入的退款 + 这批的原单（1016-D）：旧退款的 refundOf 改成新原单
-// 改动 changes：{ id, kind:'merge'|'append'|'link', set:{ 字段: 新值 }, addFen（合并记录追加的金额）, nos:[[来源, 单号]] }；
+// 改动 changes：{ id, kind:'merge'|'append'|'link', set:{ 字段: 新值 }, addFen（合并记录追加的金额）, addParts（追加的那几笔的明细，实测 10-30）, nos:[[来源, 单号]] }；
 //   主页面写入时按记录当时的样子记下原值，进导入记录的 chg：{ id, was:{ 字段: 原值（null = 原来没有）}, nos }，给 ⑦ 撤销用。
 // 单号表：写成记录的 → 记录编号；合并的 → 手记编号；全额退款、你勾掉 / 不要了、定了的跳过状态、按类型规则跳过的 → 忽略；
 //   退款记号（RW 未用 / RU 已用）→ 忽略；等待付款这类以后还会变的状态不登记；待处理的不登记（进待处理池）。
@@ -84,6 +84,14 @@
       put('no', noOf(d.key)[1]); put('kind', r.kind); put('cp', r.cp); put('desc', r.desc, 200); put('status', r.status); put('pm', r.pm); put('note', r.remark, 200);
       return o;
     }
+    // 实测 10-30：几笔合成的一条存每一笔的明细（parts）：时间、金额（分）、对方、商品说明、单号、交易类型；详情里列出来，点一笔看它的原文。
+    //   新建的合并记录带全部；往已有合并记录追加的，追加的这几笔交给主页面接在后面（那条原来没有明细的就不接，免得只列一半）
+    function partOf(d) {
+      var r = rowOf(d), o = { time: d.time, fen: d.fen }, put = function (k, v, n) { v = String(v == null ? '' : v).trim(); if (v) o[k] = v.slice(0, n || 64); };
+      put('cp', r.cp); put('desc', r.desc, 200); put('no', noOf(d.key)[1]); put('kind', r.kind);
+      return o;
+    }
+    function partsOf(mem) { return mem.map(partOf).sort(function (a, b) { return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; }); }
     function base(d) {
       var r = rowOf(d);
       var o = { time: d.time, money: money(d.fen), type: d.type, cat: d.cat || '未分类', remark: remarkOf(d),
@@ -112,11 +120,13 @@
       if (g.appendTo) {
         var c = change(g.appendTo, 'append');
         c.addFen = (c.addFen || 0) + fen;
+        c.addParts = (c.addParts || []).concat(partsOf(mem));
         ref = { id: g.appendTo };
       } else {
         var o = base(mem[0]);
         o.time = last; o.money = money(fen); o.remark = '';
         delete o.raw;     // 几笔合成的一条：没有单独一行原文
+        o.parts = partsOf(mem);   // 实测 10-30：每一笔的明细
         o.bk = 'sum';
         o.src = { app: g.app || mem[0].app, sum: g.kind };
         var sameCp = mem.every(function (d) { return d.cp === mem[0].cp; });
@@ -394,7 +404,7 @@
     return '{' + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ':' + canon(v[k]); }).join(',') + '}';
   }
   function recHash(r) {
-    var o = {}; Object.keys(r || {}).forEach(function (k) { if (k !== 'id' && k !== 'refundOf' && k !== 'rv' && k !== 'raw' && r[k] !== undefined) o[k] = r[k]; });   // 1021-T13：待确认分类标记 rv 不算（去掉标记不算「导入后你改过」）；第 15 版：账单原文 raw 也不算（补上原文不算你改过）
+    var o = {}; Object.keys(r || {}).forEach(function (k) { if (k !== 'id' && k !== 'refundOf' && k !== 'rv' && k !== 'raw' && k !== 'parts' && r[k] !== undefined) o[k] = r[k]; });   // 1021-T13：待确认分类标记 rv 不算（去掉标记不算「导入后你改过」）；第 15 版：账单原文 raw 也不算（补上原文不算你改过）；实测 10-30：合成那几笔的明细 parts 也不算（导入定的、你改不了）
     var str = canon(o), h1 = 0xdeadbeef, h2 = 0x41c6ce57;
     for (var i = 0; i < str.length; i++) { var ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); }
     h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);

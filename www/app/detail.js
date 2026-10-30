@@ -86,6 +86,7 @@
             const v=document.createElement('div'); v.className='detail-src'; v.id='detailSrc';
             v.textContent = rec.src.merged ? `已和${app}账单合并（你记的这条，补上了来源）` : rec.src.sum ? `来自${app}账单（几笔合成的一条）` : `来自${app}账单`;
             f.appendChild(v);
+            if(rec.src.sum) f.appendChild(partsBox(rec));   // 实测 10-30：几笔合成的一条：列出是哪几笔
             // 导入简化第 15 版：账单原文（导入时存的那一行），点了展开
             if(rec.raw && typeof rec.raw==='object'){
                 const b=document.createElement('button'); b.type='button'; b.className='link-btn'; b.id='detailRawBtn'; b.textContent='看账单原文 ›';
@@ -130,6 +131,43 @@
                 box.appendChild(l);
             });
             return box;
+        }
+        // 实测 10-30：几笔合成的一条（零碎扣款、收款按天、分分捐）列出是哪几笔：一行一笔「时间 · 对方 · 金额」，按时间排；
+        //   多于 PARTS_SHOW 笔先列这几笔 +「展开全部 N 笔」；最下面合计（导入后改过这条的金额就写一句）；点一笔就地展开它的原文（单号能复制）。
+        //   早一点导入的没存明细：照实说，不假装有
+        const PARTS_SHOW=10;
+        function partsBox(rec){
+            const w=document.createElement('div'); w.className='detail-parts'; w.id='detailParts';
+            const ps=Array.isArray(rec.parts) ? rec.parts.slice().sort((a, b)=>a.time<b.time ? -1 : a.time>b.time ? 1 : 0) : [];
+            if(!ps.length){ const n=document.createElement('div'); n.className='detail-parts-none'; n.id='detailPartsNone'; n.textContent='这条是早一点导入的，没有存每一笔的明细'; w.appendChild(n); return w; }
+            const yuan=fen=>(fen/100).toFixed(2);
+            const h=document.createElement('div'); h.className='detail-parts-h'; h.textContent=`是这 ${ps.length} 笔合成的（点一笔看原文）`; w.appendChild(h);
+            const ul=document.createElement('div'); ul.className='detail-parts-list'; w.appendChild(ul);
+            const row=p=>{
+                const b=document.createElement('button'); b.type='button'; b.className='detail-part';
+                const t=document.createElement('span'); t.className='detail-part-time'; t.textContent=`${+p.time.slice(5, 7)}月${+p.time.slice(8, 10)}日 ${p.time.slice(11, 16)}`;
+                const n=document.createElement('span'); n.className='detail-part-cp'; n.textContent=p.cp || p.desc || p.kind || '（账单里没写对方）';
+                const a=document.createElement('span'); a.className='detail-part-amt'; a.textContent=yuan(p.fen);
+                b.appendChild(t); b.appendChild(n); b.appendChild(a);
+                let box=null;
+                b.addEventListener('click', ()=>{
+                    if(box){ box.remove(); box=null; b.classList.remove('open'); return; }
+                    box=rawBox({ app:rec.src.app, kind:p.kind, cp:p.cp, desc:p.desc, no:p.no }); box.classList.add('detail-part-raw');
+                    b.after(box); b.classList.add('open');
+                });
+                ul.appendChild(b);
+            };
+            ps.slice(0, PARTS_SHOW).forEach(row);
+            if(ps.length>PARTS_SHOW){
+                const more=document.createElement('button'); more.type='button'; more.className='link-btn detail-parts-more'; more.id='detailPartsMore'; more.textContent=`展开全部 ${ps.length} 笔 ›`;
+                more.addEventListener('click', ()=>{ more.remove(); ps.slice(PARTS_SHOW).forEach(row); });
+                w.appendChild(more);
+            }
+            const tot=ps.reduce((s, p)=>s+p.fen, 0), recFen=Math.round(safeNum(rec.money)*100);
+            const s=document.createElement('div'); s.className='detail-parts-sum'; s.id='detailPartsSum';
+            s.textContent=`合计 ${yuan(tot)}` + (tot!==recFen ? `（这条现在是 ${yuan(recFen)}，导入后改过金额）` : '');
+            w.appendChild(s);
+            return w;
         }
         // 1017-L：AI 标记（「AI 检查导入结果」打的）：详情里一行「AI 觉得可能和 X 月 X 日那笔重复」+ 理由，「知道了，去掉标记」。
         //   标记只有用过开发开关里的 AI 检查才会有，有就显示（不看开关）；去掉标记就是改这一条记录（不算 AI 修改，撤销那次 AI 修改时这一项按「你后来改过」不动）

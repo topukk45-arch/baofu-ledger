@@ -1202,6 +1202,28 @@ async function run(cfg, port, browser) {
           return { bad, ok: !bad.length };
         })));
         await closeAll(page);
+        // 实测 10-30 第二版：几笔合成的一条，详情里列出是哪几笔（样例：照刚导进来的一笔复制成一条 12 笔的零碎扣款，明细虚构）
+        await page.evaluate(() => {
+          const S = window.JiwenStore, d = S.getUserData(), r0 = d.find(x => x.src && x.src.app); if (!r0) return;
+          const parts = []; for (let i = 0; i < 12; i++) parts.push({ time: `2026-10-${String(1 + i).padStart(2, '0')}T06:0${i % 10}`, fen: 1 + i, cp: i % 3 ? '某虚构公益' : '某虚构公益基金会的一个特别长的项目名称', kind: '分分捐', no: '42000000000000000000' + String(900 + i) });
+          const id = S.genId(); S.saveUserData(d.concat([{ id, time: '2026-10-12T06:00', money: 0.78, type: 'expense', cat: '其他', remark: '', src: { app: 'wechat', sum: 'petty' }, batch: r0.batch, parts }]));
+          window.JiwenDetail.openDetail(id); const m = document.getElementById('detailPartsMore'); if (m) m.click();
+          const b = document.querySelector('#detailParts button.detail-part'); if (b) b.click();
+          const p = document.getElementById('detailParts'); if (p) p.scrollIntoView({ block: 'start' });
+        }); await page.waitForTimeout(700);
+        await shot(page, size, '账单详情', '几笔合成的一条（列出是哪几笔）');
+        results.push(Object.assign({ name: 'detail-parts', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], w = document.getElementById('detailParts');
+          if (!w) bad.push('没有列出是哪几笔');
+          else {
+            const rs = [...w.querySelectorAll('button.detail-part')]; if (rs.length !== 12) bad.push('不是 12 笔：' + rs.length);
+            rs.forEach(b => { const r = b.getBoundingClientRect(), n = b.querySelector('.detail-part-cp').getBoundingClientRect(), a = b.querySelector('.detail-part-amt').getBoundingClientRect(); if (r.height < 48) bad.push('一行不到 48 高'); if (n.right > a.left + 0.5) bad.push('对方压着金额'); if (a.right > w.getBoundingClientRect().right + 0.5) bad.push('金额出了框'); });
+            if (!/^合计 0\.78$/.test((document.getElementById('detailPartsSum') || {}).textContent || '')) bad.push('合计不对');
+          }
+          return { bad: [...new Set(bad)], ok: !bad.length };
+        })));
+        await closeAll(page);
+        await page.evaluate(() => { const S = window.JiwenStore; S.saveUserData(S.getUserData().filter(x => !(x.parts && x.money === 0.78))); window.JiwenTabs.refreshAllViews(); });
         await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(400);
         await shot(page, size, '账单页', '刚导入的横幅');
         await page.evaluate(() => { const c = document.getElementById('rvChip'); if (c) c.click(); }); await page.waitForTimeout(600);

@@ -2314,6 +2314,18 @@
         /* 账单原文能长按选字、复制（全 App 默认禁选，这里单独放开）；单号那行右边「复制」 */
         .detail-raw, .detail-raw .detail-raw-t { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
         .detail-raw-l.no { display:flex; align-items:center; gap:8px; }
+        /* 实测 10-30：几笔合成的一条列出是哪几笔：一行一笔「时间 · 对方 · 金额」（48 高），点了下面展开原文 */
+        .detail-parts { margin-top:6px; }
+        .detail-parts-h, .detail-parts-none { font-size:13px; color:var(--c-t1); line-height:1.5; }
+        .detail-parts-list { margin-top:4px; }
+        button.detail-part { display:flex; align-items:center; gap:8px; width:100%; min-height:48px; padding:4px 0; border:0; border-top:1px dashed var(--c-border); background:none;
+            font-family:inherit; text-align:left; color:var(--c-text); cursor:pointer; }
+        .detail-part-time { flex:none; font-size:13px; color:var(--c-t2); font-variant-numeric:tabular-nums; }
+        .detail-part-cp { flex:1 1 auto; min-width:0; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .detail-part-amt { flex:none; font-size:14px; font-weight:500; font-variant-numeric:tabular-nums; }
+        .detail-part-raw { margin:0 0 6px; }
+        .detail-parts-more { margin-top:2px; }
+        .detail-parts-sum { margin-top:4px; padding-top:8px; border-top:1px solid var(--c-border); font-size:14px; font-weight:bold; color:var(--c-text); text-align:right; font-variant-numeric:tabular-nums; }
         .detail-raw-l.no .detail-raw-t { flex:1 1 auto; min-width:0; }
         button.detail-raw-copy { flex:none; position:relative; min-height:32px; padding:0 12px; border:1px solid var(--c-border-mid); border-radius:var(--r-m, 12px); background:var(--c-surface);
             color:var(--c-ink); font-family:inherit; font-size:13px; font-weight:bold; cursor:pointer; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
