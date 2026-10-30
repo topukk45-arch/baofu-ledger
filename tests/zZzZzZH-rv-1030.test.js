@@ -54,7 +54,7 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   groupOf(/^购物/).querySelector('[data-act="ok"]').click(); await t.idle();
   ok($('uiSheetBody') === body0 && sheet.scrollTop === 37 && sheetOpen(t), '1 「这组都没问题」：面板不关、不重开、滚动位置不变');
   ok(!groupOf(/^购物/) && /共 9 条/.test($('uiSheetSub').textContent), '1 确认完的一组拿掉，副标题「共 9 条」');
-  ok(/已确认 购物 3 笔/.test($('uiSnack').textContent) && $('uiSnack').classList.contains('over') && $('rvgUndo'), '1 底部小条「已确认 购物 3 笔 · 撤销」，浮在面板上');
+  ok(/已确认 购物 · 支出 3 笔/.test($('uiSnack').textContent) && $('uiSnack').classList.contains('over') && $('rvgUndo'), '1 底部小条「已确认 购物 3 笔 · 撤销」，浮在面板上');
   ok(rvs().length === 9, '1 这 3 笔去掉了待确认');
   $('rvgUndo').click(); await t.idle();
   ok(rvs().length === 12 && groupOf(/^购物/) && /共 12 条/.test($('uiSheetSub').textContent) && $('uiSheetBody') === body0, '1 撤销：标记回来，那一组回到面板里（面板没重开）');
@@ -66,6 +66,11 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   const amt = it && it.querySelector('.bl-amt');
   ok(amt && amt.classList.contains('out') && /^−\d+\.\d\d$/.test(amt.textContent), '2 支出带 −、正文色（.bl-amt.out）：' + (amt && amt.textContent));
   ok(it && /10月\d+日 \d\d:\d\d/.test(it.querySelector('.bl-time').textContent) && /微信/.test(it.querySelector('.bl-sub').textContent), '2 带日期时间和来源：' + (it && it.querySelector('.bl-sub').textContent));
+
+  // ===== 3. 分组按「分类 + 收支」 =====
+  const uOut = groupOf(/^未分类 · 支出/), uIn = groupOf(/^未分类 · 收入/);
+  ok(uOut && uIn && /未分类 · 支出 5 笔/.test(uOut.querySelector('.rvg-t').textContent) && /未分类 · 收入 2 笔/.test(uIn.querySelector('.rvg-t').textContent), '3 未分类按收支分成两组：支出 5 笔、收入 2 笔');
+  ok(groupOf(/^购物 · 支出 3 笔/) && groupOf(/^吃饭 · 支出 2 笔/), '3 有推荐分类的组也写收支');
 
   // ===== 6. 分类抽屉「＋ 新建」 =====
   if (sheetOpen(t)) { t.w.JiwenSheet.close(); await tick(); }

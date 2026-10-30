@@ -611,18 +611,20 @@
         //   确认完的一组从列表里拿掉、副标题的「共 N 条」跟着减，底部小条「已确认 购物 141 笔 · 撤销」（浮在面板上）；全部确认完才自动关。
         //   RG：这一次打开的状态（哪组展开、勾掉了哪几笔），关掉面板就清掉
         let RG=null;
+        // 1030-RV1：按「分类 + 收支」分组（原来只按分类，未分类里付给某人的和别人转来的混在一组，整组改分类会一起改错）；退款算收入
         function rgGroups(){
-            const by=new Map(); rvList().forEach(r=>{ const c=r.cat||'未分类'; if(!by.has(c)) by.set(c, { key:c, cat:c, rs:[] }); by.get(c).rs.push(r); });
+            const by=new Map(); rvList().forEach(r=>{ const c=r.cat||'未分类', io=r.type==='expense' ? 'expense' : 'income', k=c+'|'+io; if(!by.has(k)) by.set(k, { key:k, cat:c, io, rs:[] }); by.get(k).rs.push(r); });
             return [...by.values()].sort((a, b)=>b.rs.length-a.rs.length);
         }
-        function rgSub(n){ return `按推荐的分类分组 · 共 ${n} 条`; }
+        function rgSub(n){ return `按推荐的分类和收支分组 · 共 ${n} 条`; }
+        function ioName(io){ return io==='expense' ? '支出' : '收入'; }
         function rgGroupEl(g){
             const rs=g.rs, cat=g.cat;
             const cps=new Map(); rs.forEach(r=>{ const n=cpName(r)||'（没有对方）'; cps.set(n, (cps.get(n)||0)+1); });
             const top=[...cps.entries()].sort((a, b)=>b[1]-a[1]).slice(0, 3).map(([n, c])=>`${n} ${c}`).join('、') + (cps.size>3 ? '…' : '');
             const on=rs.filter(r=>!RG.off.has(r.id)), open=RG.open===g.key;
-            const el=document.createElement('div'); el.className='rvg'; el.dataset.cat=cat; el.dataset.key=g.key;
-            el.innerHTML=`<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(cat)} · ${rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${open ? '收起 ▴' : '看每一笔 ▸'}</span></button>`
+            const el=document.createElement('div'); el.className='rvg'; el.dataset.cat=cat; el.dataset.io=g.io; el.dataset.key=g.key;
+            el.innerHTML=`<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(cat)} · ${ioName(g.io)} ${rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${open ? '收起 ▴' : '看每一笔 ▸'}</span></button>`
                 + `<button type="button" class="ui-btn primary rvg-ok" data-act="ok"${on.length ? '' : ' disabled'}>${on.length===rs.length ? '这组都没问题' : `勾上的 ${on.length} 笔没问题`}</button>`;
             if(open){
                 // 1030-RV1：每一笔用账单页同一套（JiwenDetail.rowHtml：支出 − 正文色、收入 + 绿色、日期时间、来源），左边一个看得见的勾选框（48px 点击区）
@@ -665,7 +667,7 @@
             g.rs.forEach(r=>RG.off.delete(r.id));   // 勾掉留下的那几笔回到这组里、重新算勾上
             const n=u.mainN, left=rgGroups().length;
             rgPaint(key);
-            window.JiwenPanel.snack({ over:left>0, text:`已确认 ${g.cat} ${n} 笔`, actions:[{ id:'rvgUndo', text:'撤销', onClick:()=>{ if(!batchRestore(u)) return; if(RG) rgPaint(); } }] });
+            window.JiwenPanel.snack({ over:left>0, text:`已确认 ${g.cat} · ${ioName(g.io)} ${n} 笔`, actions:[{ id:'rvgUndo', text:'撤销', onClick:()=>{ if(!batchRestore(u)) return; if(RG) rgPaint(); } }] });
         }
         function openRvGroups(keep){
             if(!window.JiwenSheet) return;

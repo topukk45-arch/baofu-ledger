@@ -62,7 +62,7 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   const left = rvs().length;
   $('rvGroupBtn').click(); await tick();
   const g = [...t.d.querySelectorAll('.rvg')];
-  ok(sheetOpen(t) && g.length >= 1 && /未分类 · \d+ 笔/.test(g[0].textContent) && /某虚构/.test(g[0].querySelector('.rvg-s').textContent), '3 按推荐的分类分组：「未分类 · N 笔（某某 2、…）」');
+  ok(sheetOpen(t) && g.length >= 1 && /未分类 · 支出 \d+ 笔/.test(g[0].textContent) && /某虚构/.test(g[0].querySelector('.rvg-s').textContent), '3 按推荐的分类和收支分组：「未分类 · 支出 N 笔（某某 2、…）」');
   g[0].querySelector('[data-act="open"]').click(); await tick();
   const cbs = [...t.d.querySelectorAll('.rvg-cb input')];
   ok(cbs.length === left && cbs.every(c => c.checked), '3 点开看每一笔，默认都勾着');
@@ -70,7 +70,7 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   ok(/勾上的 \d+ 笔没问题/.test(t.d.querySelector('.rvg-ok').textContent), '3 勾掉一笔：按钮写「勾上的 N 笔没问题」');
   t.d.querySelector('.rvg-ok').click(); await t.idle();
   // 1030-RV1：在面板里原地确认，不弹框；底部小条「已确认 … · 撤销」
-  ok(rvs().length === 1 && !t.ask() && sheetOpen(t) && /已确认 未分类 \d+ 笔/.test($('uiSnack').textContent) && $('rvgUndo'), '3 确认：只剩勾掉的那 1 笔；面板不关，底部小条能「撤销」');
+  ok(rvs().length === 1 && !t.ask() && sheetOpen(t) && /已确认 未分类 · 支出 \d+ 笔/.test($('uiSnack').textContent) && $('rvgUndo'), '3 确认：只剩勾掉的那 1 笔；面板不关，底部小条能「撤销」');
   $('rvgUndo').click(); await t.idle();
   ok(rvs().length === left, '3 撤销：rv 回来');
   $('rvGroupClose').click(); await tick();
