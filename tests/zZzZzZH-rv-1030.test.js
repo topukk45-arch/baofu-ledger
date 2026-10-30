@@ -145,8 +145,27 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   await A.until(() => t.ask(), 5000);
   await t.askOk(); await tick(120);
   ok(((t.arch().importRules || {}).cat || []).some(r => r.kw === '某虚构乙店' && r.cat === '购物') && yiIds.every(id => rec(id).cat === '购物'), '4 「以后都这样」：存了一条规则');
+  // 1030-RV2：这条规则记在这一次「成组确认」的导入记录里，撤销这一行时一起删
+  const rules = () => (t.arch().importRules || {}).cat || [];
+  const lg3 = (await t.logs()).slice(-1)[0];
+  ok(lg3 && lg3.by === 'rvgroup' && ((lg3.rulesAdded || {}).cat || []).some(r => r.kw === '某虚构乙店' && r.cat === '购物'), '4 规则记进了这一行「成组确认」的导入记录（rulesAdded）');
+  $('rvgUndo').click();
+  await A.until(() => !rules().some(r => r.kw === '某虚构乙店'), 5000); await tick(60);
+  ok(!rules().some(r => r.kw === '某虚构乙店') && yiIds.every(id => rec(id).cat === '未分类' && rec(id).rv === 1), '4 撤销这一行：分类改回去，那条规则也删了');
+  // 原来就有这个词的规则（分类不一样）：改那条，撤销时改回原来的
+  await t.w.JiwenImportStore.rulesSave({ cat: rules().concat([{ kw: '某虚构乙店', cat: '吃饭' }]), type: [] }); await tick();
+  await A.until(() => unc() && unc().querySelectorAll('.rvg-cp').length === 2, 5000);
+  cpRows()[1].click(); await tick();
+  [...t.d.querySelectorAll('#uiPickList .cc')].find(x => x.textContent.trim() === '购物').click();
+  await A.until(() => t.ask(), 5000);
+  await t.askOk(); await tick(120);
+  const lg4 = (await t.logs()).slice(-1)[0];
+  ok(rules().filter(r => r.kw === '某虚构乙店').length === 1 && rules().find(r => r.kw === '某虚构乙店').cat === '购物' && (lg4.rulesChanged || []).some(r => r.kw === '某虚构乙店' && r.from === '吃饭' && r.to === '购物'), '4 原来有「吃饭」的规则：改成「购物」，记进 rulesChanged');
+  $('rvgUndo').click();
+  await A.until(() => (rules().find(r => r.kw === '某虚构乙店') || {}).cat === '吃饭', 5000); await tick(60);
+  ok((rules().find(r => r.kw === '某虚构乙店') || {}).cat === '吃饭' && yiIds.every(id => rec(id).rv === 1), '4 撤销：规则改回「吃饭」');
   // 分类抽屉里取消：回到面板，什么都不改
-  await A.until(() => unc() && unc().querySelectorAll('.rvg-cp').length === 1, 5000);
+  await A.until(() => unc() && unc().querySelectorAll('.rvg-cp').length >= 1, 5000);
   cpRows()[0].click(); await tick();
   $('uiSheetCancel').click(); await tick();
   ok(sheetOpen(t) && unc() && jiaIds.every(id => rec(id).rv === 1), '4 抽屉里取消：回到面板，没改');
@@ -194,6 +213,6 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   t.w.JiwenSheet.close(); await tick();
 
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
-  console.log(`1030-RV1 待确认分类：${pass} 通过，${fail} 失败`);
+  console.log(`1030-RV 待确认分类：${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.log('出错：' + (e && e.stack || e)); console.log(`${pass} 通过，${fail + 1} 失败`); process.exit(1); });

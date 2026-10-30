@@ -2043,6 +2043,35 @@
                 if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ odScheduleSync(); }catch(_){} }
                 return clean || { cat:[], type:[] };
             },
+            // ---- 1030-RV2：存一条分类规则，并记进某一次修改的导入记录（成组确认里按对方改完点「以后都这样」）：
+            //   新加的记进那一行的 rulesAdded.cat，同一个词原来有规则、分类不一样的改那条、记进 rulesChanged；撤销那一行（或连着撤导入）时照导入那套删掉 / 改回。
+            //   规则和导入记录一个事务写；那一行不在了（nolog）就不存
+            async rulesSaveIn(b, rule, archive){
+                const t=impTarget(archive);
+                const log0=await impGetJson(t.e, impLogKey(t.e.id, t.aid)), logs=((log0 && log0.list) || []).slice();
+                const i=logs.findIndex(l=>l.b===b); if(i<0) throw impErr('nolog');
+                const user=t.e.id, store=loadStore(user), a=store.archives[t.name];
+                const kw=String(rule && rule.kw || '').trim().slice(0, 32), c=rule && rule.cat, on=rule && rule.on==='desc' ? 'desc' : '';
+                if(!kw || typeof c!=='string' || !(a.cats||[]).includes(c)) throw impErr('nothing');
+                const nr=on ? { kw, cat:c, on:'desc' } : { kw, cat:c };
+                const r0=a.importRules||{}, cat=(r0.cat||[]).slice(), L=Object.assign({}, logs[i]);
+                const k=cat.findIndex(r=>r.kw===kw && (r.on||'')===on);
+                if(k>=0){
+                    if(cat[k].cat===c) return { same:true };
+                    L.rulesChanged=(L.rulesChanged||[]).concat([Object.assign({ kw, from:cat[k].cat, to:c }, on ? { on:'desc' } : {})]);
+                    cat[k]=nr;
+                } else {
+                    cat.push(nr);
+                    const ra=Object.assign({ cat:[], type:[] }, L.rulesAdded||{}); ra.cat=(ra.cat||[]).concat([nr]); L.rulesAdded=ra;
+                }
+                a.importRules=impCleanRules(Object.assign({}, r0, { cat }), a.cats||[]) || undefined;
+                if(!a.importRules) delete a.importRules;
+                logs[i]=L;
+                const cleanLog=impCleanLog(logs, x=>typeof x==='string' && x ? x : null, a.cats, (a.cps||[]).length, (a.pms||[]).length);
+                await saveStoreDurable(store, user, ()=>[[impLogKey(t.e.id, t.aid), JSON.stringify({ v:1, list:cleanLog })]]);
+                if(t.e.id===JiwenBase.currentUser && t.name===JiwenBase.currentArchive){ try{ odScheduleSync(); }catch(_){} }
+                return { added:k<0, changed:k>=0 };
+            },
             // ---- 1016-N：待处理（第一期 ⑧）----
             // 打开待处理页时读池子，顺便看一遍候选还在不在（import/pending.js 的 check）
             async pendingCheck(archive){

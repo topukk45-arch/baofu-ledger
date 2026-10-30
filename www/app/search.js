@@ -698,7 +698,7 @@
             getUserData().forEach(r=>{ if(isRefund(r) && ids.has(r.refundOf) && !ids.has(r.id)) changes.push({ id:r.id, set:{ cat } }); });   // 挂在上面的退款跟着改
             const S=window.JiwenImportStore, name=cgName(c);
             S.aiApply({ of:'*', by:'rvgroup', changes, newCats:fresh ? [cat] : [] }).then(w=>{
-                rgAskRule(g, c, cat, ()=>{
+                rgAskRule(g, c, cat, w.b, ()=>{
                     back();
                     window.JiwenPanel.snack({ over:!!RG, text:`已改成「${cat}」 ${name} ${c.n} 笔`, actions:[{ id:'rvgUndo', text:'撤销', onClick:()=>rgUndoAi(w.b) }] });
                 });
@@ -714,7 +714,8 @@
         }
         // 改完问一句以后这个对方都这样记吗（存规则照导入那套：对方的按对方，按商品说明归的那几行按商品说明 on:'desc'）；
         //   交易类型是转账、红包的、对方带 * 的（和个人之间的）默认「只改这几笔」
-        function rgAskRule(g, c, cat, next){
+        //   1030-RV2：规则记进这一次「成组确认」的导入记录（rulesSaveIn），撤销这一行、或者连着撤导入时一起删（原来直接存规则表，撤销认不出它）
+        function rgAskRule(g, c, cat, b, next){
             const S=window.JiwenImportStore; let info=null;
             try{ info=S.archiveInfo(); }catch(_){ next(); return; }
             const byDesc=c.by!=='cp', kw=String(byDesc ? (c.desc||'') : (c.cp||'')).trim().slice(0, 32), on=byDesc ? 'desc' : '';
@@ -723,8 +724,7 @@
             const person=/\*/.test(c.cp||'') || g.rs.some(r=>ids.has(r.id) && (/转账|红包/.test(r.oc||'') || (r.raw && /转账|红包/.test(r.raw.kind||''))));
             const save=()=>{
                 const rule=byDesc ? { kw, cat, on:'desc' } : { kw, cat };
-                const rules={ cat:(info.catRules||[]).filter(r=>!(r.kw===kw && (r.on||'')===on)).concat([rule]), type:info.typeRules||[], map:info.catMaps||[], big:info.bigRules||[], sum:info.sumRules||[] };
-                S.rulesSave(rules).then(()=>next(), ()=>next());
+                S.rulesSaveIn(b, rule).then(()=>next(), err=>{ customAlert('规则没存上：' + (err && (err.code || err.message) || err) + '。分类已经改好了。', '以后也这么记？'); next(); });
             };
             const msg=(byDesc ? `以后商品说明里有「${kw}」的账单都记成「${cat}」吗？` : `以后「${kw}」的账单都记成「${cat}」吗？`)
                 + '\n\n选了以后，导入时直接照这个分类（在「管理导入规则」里能改、能删）。'
