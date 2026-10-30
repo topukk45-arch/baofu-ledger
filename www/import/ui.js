@@ -3983,16 +3983,19 @@
     return main.concat(gs.filter(function (g) { return g.special; }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; }));
   }
   function aiStamp() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
-  function openAiGroups() {
+  // 1030-RV4：opt = { ids:[记录 id], label:'未分类 · 支出' }：从成组确认的某一组点进来的只发这一组（不给就是全部待确认分类）
+  function openAiGroups(opt) {
     var J = window.JiwenSheet, AI = window.JiwenImportAI; if (!J || !AI) return;
-    var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e) + '\n\n账本没有改动。关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。', 'AI 按组整理'); return; }
+    opt = opt || {};
+    var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); if (opt.ids) { var only = {}; opt.ids.forEach(function (id) { only[id] = 1; }); rows = rows.filter(function (r) { return only[r.id]; }); } } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e) + '\n\n账本没有改动。关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。', 'AI 按组整理'); return; }
     var all = aiGroupsOf(rows), gs = all.filter(function (g) { return !g.special; }), rest = [];
     all.forEach(function (g) { if (g.special) g.items.forEach(function (x) { rest.push({ time: x.time, fen: x.fen, cp: g.cp, io: g.io }); }); });
     if (!all.length) { alertMsg('没有待确认分类的记录。', 'AI 按组整理'); return; }
-    AIG = { at: aiStamp(), groups: gs, cats: info.cats, off: {} };
+    if (!gs.length) { alertMsg('这 ' + rest.length + ' 笔都是没写用途的个人转账，每个人只有一两笔，AI 也判断不了。建议在「逐条确认」里一笔一笔看。', 'AI 按组整理'); return; }
+    AIG = { at: aiStamp(), groups: gs, cats: info.cats, off: {}, opt: opt };
     var text = AI.groupText({ at: AIG.at, cats: info.cats, groups: gs, rest: rest }, { mask: true });
     AIG.text = text;
-    J.open({ title: 'AI 按组整理', tall: true, sub: gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类' + (rest.length ? '（另有 ' + rest.length + ' 笔个人转账留给你逐条确认）' : ''), onDismiss: function () { AIG = null; },
+    J.open({ title: 'AI 按组整理', tall: true, sub: (opt.label ? opt.label + '：' : '') + gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类' + (rest.length ? '（另有 ' + rest.length + ' 笔个人转账留给你逐条确认）' : ''), onDismiss: function () { AIG = null; },
       body: function (box) {
         box.appendChild(el('div', 'imp-soft', '把下面这段整个复制给 AI（豆包、Kimi、ChatGPT 都行），让它按组挑分类；再把它的回复整段粘贴回来。手机号、长串数字已经打码，只发了每组的对方、商品说明、收支、笔数、金额和时间规律。'));
         pasteCss();
@@ -4019,7 +4022,7 @@
       foot: function (box, done) {
         var col = el('div', 'ui-stack');
         // 重新复制给 AI：回到「AI 按组整理」复制那一页（重新导出一份，导出时间是新的）
-        var recopy = function () { done(); AIG = null; openAiGroups(); };
+        var recopy = function () { var o = A.opt; done(); AIG = null; openAiGroups(o); };
         var go = btn('读这份回复', 'ui-btn primary block', function () {
           var text = document.getElementById('impAiGrpReply').value, msg = document.getElementById('impAiGrpMsg');
           P.update();

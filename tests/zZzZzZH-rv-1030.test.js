@@ -170,6 +170,20 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   $('uiSheetCancel').click(); await tick();
   ok(sheetOpen(t) && unc() && jiaIds.every(id => rec(id).rv === 1), '4 抽屉里取消：回到面板，没改');
 
+  // 1030-RV4：组上的「交给 AI 按组整理」只发这一组（原来发全部待确认分类）
+  unc().querySelector('[data-act="ai"]').click();
+  await A.until(() => sheetOpen(t) && $('impAiGrpText'), 8000);
+  const aiTx = $('impAiGrpText').value, aiGs = aiTx.split('分组：')[1] || '';
+  ok(/^未分类 · 支出：2 组 · 5 笔/.test($('uiSheetSub').textContent) && /G1 \| 某虚构\*甲 \| 个人转账 \| 支出 \| 3笔/.test(aiTx) && /G2 \| 某虚构乙店 \| 某虚构商品 \| 支出 \| 2笔/.test(aiTx) && !/G3/.test(aiGs) && !/收入 \|/.test(aiGs) && !/购物|某虚构超市|某虚构面馆/.test(aiGs), '4b 未分类 · 支出 的「交给 AI」：只发这一组的 5 笔：' + $('uiSheetSub').textContent);
+  $('impAiGrpClose').click(); await tick();
+  await openGroups();
+  const uIn2 = groups().find(g => /未分类 · 收入/.test(g.querySelector('.rvg-t').textContent));
+  uIn2.querySelector('[data-act="ai"]').click();
+  await A.until(() => t.ask(), 8000);
+  ok(/都是没写用途的个人转账/.test(t.ask().msg), '4b 这一组全是一两笔的个人转账：不出 AI 文字，提示去逐条确认');
+  await t.askOk();
+  await openGroups();
+
   // ===== 6. 分类抽屉「＋ 新建」 =====
   if (sheetOpen(t)) { t.w.JiwenSheet.close(); await tick(); }
   const cats = () => t.arch().cats;

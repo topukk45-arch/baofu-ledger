@@ -635,7 +635,7 @@
         function ioName(io){ return io==='expense' ? '支出' : '收入'; }
         function rgGroupEl(g){
             const rs=g.rs, cat=g.cat;
-            const cps=new Map(); rs.forEach(r=>{ const n=cpName(r)||'（没有对方）'; cps.set(n, (cps.get(n)||0)+1); });
+            const cps=new Map(); rs.forEach(r=>{ const n=cpName(r)||'没有对方'; /* 1030-RV4：外面已经套了括号，原来写成「（（没有对方） 6…）」 */ cps.set(n, (cps.get(n)||0)+1); });
             const top=[...cps.entries()].sort((a, b)=>b[1]-a[1]).slice(0, 3).map(([n, c])=>`${n} ${c}`).join('、') + (cps.size>3 ? '…' : '');
             const on=rs.filter(r=>!RG.off.has(r.id)), open=RG.open===g.key;
             const el=document.createElement('div'); el.className='rvg'; el.dataset.cat=cat; el.dataset.io=g.io; el.dataset.key=g.key;
@@ -766,7 +766,8 @@
             const a=e.target.closest('[data-act]'); if(!a) return;
             if(a.dataset.act==='open'){ const was=RG.open; RG.open = was===key ? null : key; if(was && was!==key) rgPaint(was); rgPaint(key); }
             else if(a.dataset.act==='ok') rgConfirm(key);
-            else if(a.dataset.act==='ai'){ RG=null; window.JiwenSheet.close(); loadImportUI().then(ui=>ui.openAiGroups()).catch(err=>customAlert('导入模块没加载上：' + (err && err.message || err), 'AI 按组整理')); }
+            else if(a.dataset.act==='ai'){   // 1030-RV4：只发这一组（原来发全部待确认分类）
+                const g=rgGroups().find(x=>x.key===key), o=g ? { ids:g.rs.map(r=>r.id), label:`${g.cat} · ${ioName(g.io)}` } : null; RG=null; window.JiwenSheet.close(); loadImportUI().then(ui=>ui.openAiGroups(o)).catch(err=>customAlert('导入模块没加载上：' + (err && err.message || err), 'AI 按组整理')); }
         }
         function rgConfirm(key){
             const g=rgGroups().find(x=>x.key===key); if(!g || g.cat==='未分类') return;
