@@ -103,9 +103,19 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   ok($('impAiGrpReply').value === '' && $('impAiGrpMsg').textContent === '' && $('impAiGrpReplyAct').hidden && $('impAiGrpReplyInfo').textContent === '还没粘贴', '3 点了清空：框空了、报错收起');
   $('impAiGrpReply').value = 'AI：好的\n```记问\n记问分组建议 v1 导出 ' + at + '\nG1 | 吃饭 | 甲店是面馆\nG2 | 购物 | 乙店卖日用品\nG3 | 不存在的分类 | x\n```';
   $('impAiGrpRead').click(); await tick();
+  // 1030-E：块默认收起，一屏先看到全部改法
+  const blks = () => [...t.d.querySelectorAll('.imp-aig-blk')];
+  ok($('uiSheetTitle').textContent === 'AI 的分组建议' && blks().length === 2 && !t.d.querySelector('.imp-aig-row') && blks().every(b => !b.classList.contains('open')), '3 实测 10-30（1030-E）：两块「未分类 → 吃饭 / 购物」，默认收起、不列每一组');
+  const b0 = blks().find(b => b.dataset.to === '吃饭');
+  ok(/^未分类 → 吃饭$/.test(b0.querySelector('.imp-aig-bt').textContent) && /^1 组 · 3 笔$/.test(b0.querySelector('.imp-aig-bs').textContent) && /^\d/.test(b0.querySelector('.imp-aig-bamt').textContent), '3 块一行：「未分类 → 吃饭」「1 组 · 3 笔」+ 金额：' + b0.textContent);
+  const openAll = async () => { for (let i = 0; i < 20; i++) { const g = t.d.querySelector('.imp-aig-blk:not(.open) .imp-aig-bgo'); if (!g) break; g.click(); await tick(); } };
+  await openAll();
   const rows = [...t.d.querySelectorAll('.imp-aig-row')];
   const blkOf = r => r.closest('.imp-aig-blk');
-  ok($('uiSheetTitle').textContent === 'AI 的分组建议' && rows.length === 2 && /^某虚构甲店/.test(rows[0].querySelector('.imp-aig-nm').textContent) && /支出 · 3 笔 · AI：甲店是面馆 G1/.test(rows[0].querySelector('.imp-aig-l2').textContent) && /^未分类 → 吃饭$/.test(blkOf(rows[0]).querySelector('.imp-aig-bt').textContent) && rows.every(r => r.querySelector('input').checked) && /没看懂/.test(t.d.querySelector('.imp-aig-bad').textContent), '3 实测 10-30：按「未分类 → 吃饭」分块，块里一行一组（默认勾），没看懂的写在后面');
+  ok(rows.length === 2 && /^某虚构甲店/.test(rows[0].querySelector('.imp-aig-nm').textContent) && rows[0].querySelector('.imp-aig-n').textContent === '3 笔' && !rows[0].querySelector('.imp-aig-why') && /^未分类 → 吃饭$/.test(blkOf(rows[0]).querySelector('.imp-aig-bt').textContent) && rows.every(r => r.querySelector('input').checked) && /没看懂/.test(t.d.querySelector('.imp-aig-bad').textContent), '3 点开：一组一行（对方 · 笔数 · 金额，默认勾），理由先不显示，没看懂的写在后面');
+  rows[0].querySelector('.imp-aig-l1').click(); await tick();
+  ok(t.d.querySelector('.imp-aig-row .imp-aig-why') && t.d.querySelector('.imp-aig-row .imp-aig-why').textContent === 'AI：甲店是面馆' && !/G1/.test(t.d.querySelector('.imp-aig-row').textContent), '3 点一组：展开 AI 的理由（不写组号）');
+  ok(t.d.querySelectorAll('.imp-aig-blk.open').length === 2, '3 重画以后展开的块照旧展开');
   ok($('impAiGrpGo').textContent === '改这 5 条的分类', '3 「改这 5 条的分类」');
   { const ball = () => [...t.d.querySelectorAll('.imp-aig-blk')].find(x => x.dataset.to === '购物').querySelector('.imp-aig-ball');
     ball().click(); await tick();

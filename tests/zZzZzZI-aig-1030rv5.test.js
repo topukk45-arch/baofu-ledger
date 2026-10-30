@@ -52,10 +52,11 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   $('impAiGrpPaste').click(); await tick();
   $('impAiGrpReply').value = '```记问\n记问分组建议 v1 导出 ' + at + '\nG' + gD + ' | 吃饭 | 面馆\nG' + gP + ' | 转账 | 个人A 是给人转钱\n```';
   $('impAiGrpRead').click(); await tick();
+  for (let i = 0; i < 20; i++) { const g = t.d.querySelector('.imp-aig-blk:not(.open) .imp-aig-bgo'); if (!g) break; g.click(); await new Promise(r => setTimeout(r, 40)); }   // 1030-E：块默认收起，先都点开
   const rows = [...t.d.querySelectorAll('.imp-aig-row')], pre = [...t.d.querySelectorAll('.imp-aig-prerow')];
   const preOf = re => pre.find(p => re.test(p.querySelector('.imp-aig-nm').textContent)), bt = p => p && p.closest('.imp-aig-blk').querySelector('.imp-aig-bt').textContent;
   const pRed = preOf(/^发出群红包/), pTo = preOf(/^发给某虚构丙/);
-  ok(rows.length === 4 && pre.length === 2 && pRed && /支出 · 2 笔/.test(pRed.textContent) && bt(pRed) === '未分类 → 红包（新建）' && pTo && /支出 · 1 笔/.test(pTo.textContent) && bt(pTo) === '未分类 → 转账' && pTo.closest('.imp-aig-blk').querySelectorAll('.imp-aig-row').length === 2, '3 读回来：AI 的 2 组 + 按名字定的 2 组（群红包 → 新建「红包」、发给某某 → 转账，和 AI 改成转账的那组在同一块）');
+  ok(rows.length === 4 && pre.length === 2 && pRed && pRed.querySelector('.imp-aig-n').textContent === '2 笔' && bt(pRed) === '未分类 → 红包（新建）' && pTo && pTo.querySelector('.imp-aig-n').textContent === '1 笔' && bt(pTo) === '未分类 → 转账' && pTo.closest('.imp-aig-blk').querySelectorAll('.imp-aig-row').length === 2, '3 读回来：AI 的 2 组 + 按名字定的 2 组（群红包 → 新建「红包」、发给某某 → 转账，和 AI 改成转账的那组在同一块）');
   ok(rows.some(r => /某虚构\*戊/.test(r.textContent)), '5 读回来的卡片上写真名（按组号对回）');
   ok($('impAiGrpGo').textContent === '改这 7 条的分类', '「改这 7 条的分类」：' + $('impAiGrpGo').textContent);
   $('impAiGrpGo').click();

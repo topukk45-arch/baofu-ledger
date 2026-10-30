@@ -3378,15 +3378,20 @@
     + '.imp-paste-info{margin-top:6px;font-size:13px;color:var(--c-text-soft);font-variant-numeric:tabular-nums;}'
     + '.imp-paste-msg{margin-top:6px;font-size:14px;line-height:1.5;color:var(--c-neg);font-weight:bold;}.imp-paste-msg:empty{display:none;}'
     + '.imp-paste-act{margin-top:8px;}.imp-paste-act[hidden]{display:none;}'
-    + '.imp-aig-blk{margin:4px 0 14px;border:1px solid var(--c-border);border-radius:var(--r-l,16px);background:var(--c-surface);padding:0 12px 4px;}'
-    + '.imp-aig-bh{display:flex;align-items:center;gap:10px;min-height:56px;padding:6px 0;border-bottom:1px solid var(--c-border);cursor:pointer;}'
-    + '.imp-aig-bw{flex:1;min-width:0;display:flex;flex-direction:column;}.imp-aig-bt{font-size:16px;line-height:1.4;color:var(--c-text);}'
+    + '.imp-aig-blk{margin:0 0 10px;border:1px solid var(--c-border);border-radius:var(--r-l,16px);background:var(--c-surface);padding:0 10px 0 0;}'
+    + '.imp-aig-bh{display:flex;align-items:stretch;min-height:56px;}.imp-aig-blk.open .imp-aig-bh{border-bottom:1px solid var(--c-border);}'
+    + '.imp-aig-cb{display:flex;align-items:center;justify-content:center;flex:0 0 48px;width:48px;min-height:48px;cursor:pointer;}'
+    + '.imp-aig-cb input{width:22px;height:22px;margin:0;-webkit-appearance:checkbox;appearance:auto;accent-color:var(--c-primary);}'
+    + 'button.imp-aig-bgo{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:56px;padding:6px 0;border:0;background:none;font-family:inherit;text-align:left;color:var(--c-text);cursor:pointer;}'
+    + '.imp-aig-bw{flex:1;min-width:0;display:flex;flex-direction:column;}.imp-aig-bt{font-size:16px;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}'
     + '.imp-aig-from{color:var(--c-t1);}.imp-aig-to{color:var(--c-ink);font-weight:bold;}.imp-aig-bs{font-size:13px;color:var(--c-t1);font-variant-numeric:tabular-nums;}'
-    + '.imp-aig-blk .imp-aig-row{align-items:flex-start;padding:10px 0;border-top:1px dashed var(--c-border);}.imp-aig-blk .imp-aig-bh + .imp-aig-row{border-top:none;}'
-    + '.imp-aig-row .rvg-r{display:flex;flex-direction:column;gap:2px;}.imp-aig-l1{display:flex;align-items:baseline;gap:8px;}'
-    + '.imp-aig-nm{flex:1;min-width:0;font-size:15px;color:var(--c-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.imp-aig-l1 .rvg-a{flex:none;font-size:15px;font-weight:500;}'
-    + '.imp-aig-l2{font-size:13px;line-height:1.5;color:var(--c-t1);}.imp-aig-gno{color:var(--c-t2);font-size:12px;}'
-    + '.imp-aig-bh input,.imp-aig-row input{margin:0;}.imp-aig-row input{margin-top:1px;}'
+    + '.imp-aig-bamt{flex:none;font-size:15px;font-weight:500;font-variant-numeric:tabular-nums;}.imp-aig-bchev{flex:none;color:var(--c-border-mid);font-size:18px;width:14px;text-align:center;}'
+    + '.imp-aig-row{display:flex;flex-wrap:wrap;align-items:stretch;border-top:1px dashed var(--c-border);}.imp-aig-blk .imp-aig-bh + .imp-aig-row{border-top:none;}'
+    + 'button.imp-aig-l1{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:48px;padding:4px 0;border:0;background:none;font-family:inherit;text-align:left;color:var(--c-text);cursor:pointer;}'
+    + '.imp-aig-nm{flex:1;min-width:0;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.imp-aig-n{flex:none;font-size:13px;color:var(--c-t2);}'
+    + '.imp-aig-l1 .rvg-a{flex:none;font-size:15px;font-weight:500;font-variant-numeric:tabular-nums;}'
+    + '.imp-aig-why{flex:0 0 100%;box-sizing:border-box;padding:0 0 10px 48px;font-size:13px;line-height:1.5;color:var(--c-t1);}'
+    + '.imp-aig-more{display:block;margin:0 0 4px 48px;min-height:48px;}.imp-aig-nohead{margin:0 2px 10px;}'
     + '.imp-aig-opt{display:flex;align-items:center;gap:10px;min-height:48px;margin:6px 0;font-size:15px;color:var(--c-text);cursor:pointer;}.imp-aig-opt input{width:22px;height:22px;flex:none;margin:0;-webkit-appearance:checkbox;appearance:auto;accent-color:var(--c-primary);}.imp-aig-opt small{display:block;font-size:13px;color:var(--c-text-soft);}';
   function pasteCss() { impCss(); if (document.getElementById('impPasteStyle')) return; var st = el('style'); st.id = 'impPasteStyle'; st.textContent = PASTE_CSS; document.head.appendChild(st); }
   function pasteFit(ta) {
@@ -4102,6 +4107,7 @@
         col.appendChild(go); col.appendChild(no); box.appendChild(col);
       } });
   }
+  var AIG_SHOW = 10;   // 1030-E：一块展开时先列几组（按金额从大到小）
   function paintAiGroups() {
     var J = window.JiwenSheet, A = AIG; if (!J || !A || !A.reply) return;
     var its = A.reply.items.filter(function (x) { var g = A.groups[x.g - 1]; return g && g.cat !== x.cat; });
@@ -4111,43 +4117,53 @@
     var sub = A.groups.length ? 'AI 改了 ' + its.length + ' 组' + (A.reply.items.length > its.length ? '（提了 ' + A.reply.items.length + ' 组，' + (A.reply.items.length - its.length) + ' 组和现在一样）' : '') + (A.reply.bad.length ? '，没看懂 ' + A.reply.bad.length + ' 行' : '') : '';
     if (A.pre.length) sub += (sub ? '；' : '') + '看名字定的 ' + A.pre.length + ' 组';
     sub += '，归成 ' + Object.keys(kinds).length + ' 种改法';
+    // 实测 10-30（1030-E）：块默认收起，一屏先看到全部改法；点一块展开，一组一行（理由点了才出），组多时先列 AIG_SHOW 组；
+    //   重画时面板不重新滑上来、留在原来滚到的位置
+    var again = !!A.painted; A.painted = true; A.open = A.open || {}; A.why = A.why || {}; A.more = A.more || {};
     J.open({ title: A.groups.length ? 'AI 的分组建议' : '按名字就能定的', tall: true, sub: sub, onDismiss: function () { AIG = null; },
+      instant: again, scroll: again && J.scrollTop ? J.scrollTop() : undefined,
       body: function (box) {
-        // 实测 10-30：按「原分类 → 新分类」分块（原来按 AI 的组号一行一行排，看不出整体改了什么）：块的标题就是这一步改动 + 整块勾选，
-        //   块里一行一组（对方（商品说明）、金额 / 收支 · 笔数 · AI 的理由，组号小字放最后）；看名字定的（群红包、发给某某）也归进对应的块
+        // 按「原分类 → 新分类」分块（1030-C）；看名字定的（群红包、发给某某）也归进对应的块
         pasteCss();
         if (A.reply.nohead) box.appendChild(el('div', 'imp-soft imp-aig-nohead', 'AI 的回复里没有第一行（导出时间），是按这一次导出的组号对上的。这份回复要是别的时候导出的，组号会对不上，就别用。'));
         var blocks = {}, order = [];
-        var put = function (from, to, fresh, it) { var k = from + '\u0001' + to; if (!blocks[k]) { blocks[k] = { from: from, to: to, fresh: false, items: [] }; order.push(k); } if (fresh) blocks[k].fresh = true; blocks[k].items.push(it); };
-        its.forEach(function (x) { var g = A.groups[x.g - 1]; put(g.cat || '未分类', x.cat, false, { g: g, x: x, on: !A.off[x.g], set: function (v) { if (v) delete A.off[x.g]; else A.off[x.g] = 1; } }); });
-        A.pre.forEach(function (g, i) { put(g.cur || '未分类', g.cat, g.fresh, { g: g, pre: i, on: !A.offP[i], set: function (v) { if (v) delete A.offP[i]; else A.offP[i] = 1; } }); });
+        var put = function (from, to, fresh, it) { var k = from + '\u0001' + to; if (!blocks[k]) { blocks[k] = { key: k, from: from, to: to, fresh: false, items: [] }; order.push(k); } if (fresh) blocks[k].fresh = true; blocks[k].items.push(it); };
+        its.forEach(function (x) { var g = A.groups[x.g - 1]; put(g.cat || '未分类', x.cat, false, { id: 'g' + x.g, g: g, x: x, on: !A.off[x.g], set: function (v) { if (v) delete A.off[x.g]; else A.off[x.g] = 1; } }); });
+        A.pre.forEach(function (g, i) { put(g.cur || '未分类', g.cat, g.fresh, { id: 'p' + i, g: g, pre: i, on: !A.offP[i], set: function (v) { if (v) delete A.offP[i]; else A.offP[i] = 1; } }); });
         var units = function (k) { return blocks[k].items.reduce(function (s0, it) { return s0 + it.g.n; }, 0); };
-        order.sort(function (p, q) { return units(q) - units(p); });
+        // 要多看一眼的排前面：新建分类的、从「转账」改出去的（转账里容易混着付给个人的消费）、收入的；其余按笔数
+        var rank = function (k) { var B = blocks[k]; return B.fresh ? 0 : /转账/.test(B.from) ? 1 : B.items.every(function (it) { return it.g.io === 'income'; }) ? 2 : 3; };
+        order.sort(function (p, q) { return rank(p) - rank(q) || units(q) - units(p); });
         order.forEach(function (k) {
-          var B = blocks[k], fen = B.items.reduce(function (s0, it) { return s0 + it.g.fen; }, 0), onN = B.items.filter(function (it) { return it.on; }).length;
-          var blk = el('div', 'imp-aig-blk'); blk.dataset.from = B.from; blk.dataset.to = B.to;
-          var hd = el('label', 'imp-aig-bh'), hc = document.createElement('input'); hc.type = 'checkbox'; hc.className = 'imp-aig-ball';
+          var B = blocks[k], fen = B.items.reduce(function (s0, it) { return s0 + it.g.fen; }, 0), onN = B.items.filter(function (it) { return it.on; }).length, open = !!A.open[k];
+          var blk = el('div', 'imp-aig-blk' + (open ? ' open' : '')); blk.dataset.from = B.from; blk.dataset.to = B.to;
+          var hd = el('div', 'imp-aig-bh');
+          var hl = el('label', 'imp-aig-cb'), hc = document.createElement('input'); hc.type = 'checkbox'; hc.className = 'imp-aig-ball'; hc.setAttribute('aria-label', '这一块都改');
           hc.checked = onN === B.items.length; hc.indeterminate = onN > 0 && onN < B.items.length;
           hc.addEventListener('change', function () { B.items.forEach(function (it) { it.set(hc.checked); }); paintAiGroups(); });
-          hd.appendChild(hc);
+          hl.appendChild(hc); hd.appendChild(hl);
+          var go = btn('', 'imp-aig-bgo', function () { if (A.open[k]) delete A.open[k]; else A.open[k] = 1; paintAiGroups(); }); go.setAttribute('aria-expanded', open ? 'true' : 'false');
           var ht = el('span', 'imp-aig-bt'); ht.appendChild(el('span', 'imp-aig-from', B.from)); ht.appendChild(document.createTextNode(' → ')); ht.appendChild(el('b', 'imp-aig-to', B.to + (B.fresh ? '（新建）' : '')));
-          var hx = el('span', 'imp-aig-bs', B.items.length + ' 组 · ' + units(k) + ' 笔 · 共 ' + yuan(fen) + ' 元');
-          var hw = el('span', 'imp-aig-bw'); hw.appendChild(ht); hw.appendChild(hx); hd.appendChild(hw);
-          blk.appendChild(hd);
-          B.items.forEach(function (it) {
-            var g = it.g, pre = it.pre !== undefined, row = el('label', 'rvg-row imp-aig-row' + (pre ? ' imp-aig-prerow' : '')), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = it.on;
-            if (pre) row.dataset.p = it.pre; else row.dataset.g = g.g;
-            cb.addEventListener('change', function () { it.set(cb.checked); paintAiGroups(); });
-            row.appendChild(cb);
-            var tx = el('span', 'rvg-r'), l1 = el('span', 'imp-aig-l1');
-            var nm = pre ? cut(g.cp, 16) : (cpShow(g.cp) || g.desc || '—') + (g.cp && g.desc && g.by !== 'cp' ? '（' + cut(g.desc, 12) + '）' : '');
-            l1.appendChild(el('span', 'imp-aig-nm', nm)); l1.appendChild(el('span', 'rvg-a', yuan(g.fen))); tx.appendChild(l1);
-            var why = pre ? (g.kind === 'redpack' ? '名字是群红包，没发给 AI' : '名字是「发给…」，没发给 AI') : 'AI：' + (it.x.why || '（没写理由）');
-            var l2 = el('span', 'imp-aig-l2', (g.io === 'income' ? '收入' : '支出') + ' · ' + g.n + ' 笔 · ' + why);
-            if (!pre) l2.appendChild(el('span', 'imp-aig-gno', ' G' + g.g));
-            tx.appendChild(l2);
-            row.appendChild(tx); blk.appendChild(row);
-          });
+          var hx = el('span', 'imp-aig-bs', B.items.length + ' 组 · ' + units(k) + ' 笔' + (onN < B.items.length ? '（勾了 ' + onN + ' 组）' : ''));
+          var hw = el('span', 'imp-aig-bw'); hw.appendChild(ht); hw.appendChild(hx); go.appendChild(hw);
+          go.appendChild(el('span', 'imp-aig-bamt', yuan(fen))); go.appendChild(el('span', 'imp-aig-bchev', open ? '▴' : '›'));
+          hd.appendChild(go); blk.appendChild(hd);
+          if (open) {
+            var list = B.items.slice().sort(function (p, q) { return q.g.fen - p.g.fen; }), all = !!A.more[k], show = all ? list : list.slice(0, AIG_SHOW);
+            show.forEach(function (it) {
+              var g = it.g, pre = it.pre !== undefined, row = el('div', 'imp-aig-row' + (pre ? ' imp-aig-prerow' : '')); row.dataset[pre ? 'p' : 'g'] = pre ? it.pre : g.g;
+              var cl = el('label', 'imp-aig-cb'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = it.on; cb.setAttribute('aria-label', '改这一组');
+              cb.addEventListener('change', function () { it.set(cb.checked); paintAiGroups(); });
+              cl.appendChild(cb); row.appendChild(cl);
+              var nm = pre ? cut(g.cp, 16) : (cpShow(g.cp) || g.desc || '—') + (g.cp && g.desc && g.by !== 'cp' ? '（' + cut(g.desc, 12) + '）' : '');
+              var t = btn('', 'imp-aig-l1', function () { if (A.why[it.id]) delete A.why[it.id]; else A.why[it.id] = 1; paintAiGroups(); });
+              t.appendChild(el('span', 'imp-aig-nm', nm)); t.appendChild(el('span', 'imp-aig-n', (g.io === 'income' ? '收入 ' : '') + g.n + ' 笔')); t.appendChild(el('span', 'rvg-a', yuan(g.fen)));
+              row.appendChild(t);
+              if (A.why[it.id]) row.appendChild(el('div', 'imp-aig-why', pre ? (g.kind === 'redpack' ? '名字是群红包，没发给 AI' : '名字是「发给…」，没发给 AI') : 'AI：' + (it.x.why || '（没写理由）')));
+              blk.appendChild(row);
+            });
+            if (list.length > show.length) blk.appendChild(btn('还有 ' + (list.length - show.length) + ' 组 ›', 'imp-link imp-aig-more', function () { A.more[k] = 1; paintAiGroups(); }));
+          }
           box.appendChild(blk);
         });
         if (A.reply.bad.length) { var bd = el('div', 'imp-soft imp-aig-bad', '没看懂的几行：' + A.reply.bad.map(function (b) { return '「' + cut(b.line, 20) + '」' + b.why; }).join('；')); box.appendChild(bd); }

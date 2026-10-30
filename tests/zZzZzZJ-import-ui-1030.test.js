@@ -167,6 +167,39 @@ const RANGE = { from: '2026-10-01 00:00:00', to: '2026-10-20 23:59:59' };
     ok(/^记问 · 按组整理分类\n/.test($('impAiGrpText').value), '1030-D 导出那段第一行缩短成「记问 · 按组整理分类」');
     ok(!t.errs.length, '4/5 无报错 ' + t.errs.join('|'));
   }
+  // ===== 1030-E：AI 的分组建议块默认收起、要多看一眼的排前面、组多时先列 10 组 =====
+  {
+    const CPS = [], RECS = []; let n = 0;
+    const R = o => Object.assign({ id: 'e' + (++n), time: `2026-10-${String(1 + (n % 20)).padStart(2, '0')}T12:${String(n % 60).padStart(2, '0')}`, money: String(10 + n), type: 'expense', cat: '未分类', remark: '', rv: 1, src: { app: 'wechat' }, batch: 'bmh00002' }, o);
+    for (let i = 1; i <= 12; i++) { CPS.push('某虚构店' + String(i).padStart(2, '0')); RECS.push(R({ cp: CPS.length - 1, money: String(100 * i) })); }
+    CPS.push('某虚构转账人'); RECS.push(R({ cp: CPS.length - 1, cat: '转账' }), R({ cp: CPS.length - 1, cat: '转账' }));
+    CPS.push('某虚构收款店'); RECS.push(R({ cp: CPS.length - 1, type: 'income' }));
+    const t = await A.boot({ html, www: WWW, seed: A.seedOf(RECS, ['未分类', '吃饭', '购物', '转账', '其他'], { cps: CPS }), now: '2026-10-25T10:00:00' });
+    const $ = id => t.d.getElementById(id);
+    t.d.querySelector('.tab-btn[data-tab="ledger"]').click(); await t.idle();
+    $('rvChip').click(); await tick();
+    $('rvAiBtn').click(); await t.until(() => sheetOpen(t) && $('impAiGrpText'), 8000);
+    const tx = $('impAiGrpText').value, at = (/导出 (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.exec(tx) || [])[1];
+    const lines = [...tx.matchAll(/^(G\d+) \| ([^|]+) \|/gm)].map(m => m[1] + ' | ' + (/转账人/.test(m[2]) ? '购物' : /收款店/.test(m[2]) ? '其他' : '吃饭') + ' | 虚构的理由');
+    ok(at && lines.length === 14, '1030-E 导出 14 组：' + lines.length);
+    $('impAiGrpPaste').click(); await tick();
+    $('impAiGrpReply').value = '```记问\n记问分组建议 v1 导出 ' + at + '\n' + lines.join('\n') + '\n```';
+    $('impAiGrpRead').click(); await tick();
+    const blks = () => [...t.d.querySelectorAll('.imp-aig-blk')];
+    ok(blks().map(b => b.dataset.from + '→' + b.dataset.to).join(' / ') === '转账→购物 / 未分类→其他 / 未分类→吃饭', '1030-E 要多看一眼的排前面（从转账改出去的、收入的），其余按笔数：' + blks().map(b => b.dataset.from + '→' + b.dataset.to).join(' / '));
+    ok(!t.d.querySelector('.imp-aig-row') && $('impAiGrpGo').textContent === '改这 15 条的分类', '1030-E 默认都收起，按钮照样算全部勾上的');
+    const eat = () => blks().find(b => b.dataset.to === '吃饭');
+    $('uiSheet').scrollTop = 33;
+    eat().querySelector('.imp-aig-bgo').click(); await tick();
+    const rs = () => [...eat().querySelectorAll('.imp-aig-row')];
+    ok(rs().length === 10 && eat().querySelector('.imp-aig-more').textContent === '还有 2 组 ›' && rs()[0].querySelector('.rvg-a').textContent === '1,200.00' && rs()[9].querySelector('.rvg-a').textContent === '300.00', '1030-E 点开「未分类 → 吃饭」：按金额从大到小先列 10 组 +「还有 2 组 ›」：' + rs().length + ' / ' + rs().map(r => r.querySelector('.rvg-a').textContent).join(','));
+    ok($('uiSheet').scrollTop === 33, '1030-E 点开以后面板留在原来滚到的位置');
+    eat().querySelector('.imp-aig-more').click(); await tick();
+    ok(rs().length === 12 && !eat().querySelector('.imp-aig-more'), '1030-E 点「还有 2 组」：全部列出');
+    eat().querySelector('.imp-aig-ball').click(); await tick();
+    ok($('impAiGrpGo').textContent === '改这 3 条的分类' && /勾了 0 组/.test(eat().querySelector('.imp-aig-bs').textContent), '1030-E 块标题的勾选框整块勾掉：按钮跟着变，块上写「勾了 0 组」');
+    ok(!t.errs.length, '1030-E 无报错 ' + t.errs.join('|'));
+  }
   console.log(`\n${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
 })().catch(e => { console.log('出错：' + (e && e.stack || e)); process.exit(1); });

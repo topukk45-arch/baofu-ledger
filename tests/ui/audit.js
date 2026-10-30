@@ -1239,22 +1239,29 @@ async function run(cfg, port, browser) {
           r.value = '```记问\n记问分组建议 v1 导出 ' + at + '\n' + gs.map((g, i) => g + ' | ' + (i ? '吃饭' : '其他') + ' | 虚构的理由，看名字像吃饭的地方，写长一点看看换行').join('\n') + '\n```';
           const b = document.getElementById('impAiGrpRead'); if (b) b.click();
         }); await page.waitForTimeout(900);
-        await shot(page, size, 'AI 的分组建议', '按原分类 → 新分类分块');
+        await shot(page, size, 'AI 的分组建议', '块默认收起（一屏看全部改法）');
+        await page.evaluate(() => { const g = document.querySelector('.imp-aig-blk .imp-aig-bgo'); if (g) g.click(); }); await page.waitForTimeout(300);
+        await page.evaluate(() => { const r = document.querySelector('.imp-aig-row .imp-aig-l1'); if (r) r.click(); }); await page.waitForTimeout(300);
+        await shot(page, size, 'AI 的分组建议', '点开一块、看一组的理由');
         results.push(Object.assign({ name: 'aig-review', cfg: size, clip: true }, await page.evaluate(() => {
           const bad = [], bs = [...document.querySelectorAll('.imp-aig-blk')];
           if (!bs.length) bad.push('没出分块（AI 回复没读进来）');
           bs.forEach(b => {
-            const h = b.querySelector('.imp-aig-bh'), hc = h.querySelector('input').getBoundingClientRect();
-            if (h.getBoundingClientRect().height < 48) bad.push('块标题不到 48 高');
-            if (hc.width < 18 || getComputedStyle(h.querySelector('input')).appearance === 'none') bad.push('块标题的勾选框看不见');
+            const go = b.querySelector('.imp-aig-bgo').getBoundingClientRect(), cb = b.querySelector('.imp-aig-bh .imp-aig-cb'), inp = cb.querySelector('input');
+            if (go.height < 48) bad.push('块那一行不到 48 高');
+            if (cb.getBoundingClientRect().width < 48 || cb.getBoundingClientRect().height < 48) bad.push('块的勾选框点击区不到 48');
+            if (getComputedStyle(inp).appearance === 'none') bad.push('块的勾选框看不见');
+            const t = b.querySelector('.imp-aig-bt').getBoundingClientRect(), am = b.querySelector('.imp-aig-bamt').getBoundingClientRect();
+            if (t.right > am.left + 0.5) bad.push('块标题压着金额'); if (t.height > 26) bad.push('块标题折成了两行');
             b.querySelectorAll('.imp-aig-row').forEach(r => {
-              const cb = r.querySelector('input'), n = r.querySelector('.imp-aig-nm').getBoundingClientRect(), a = r.querySelector('.rvg-a').getBoundingClientRect();
-              if (getComputedStyle(cb).appearance === 'none' || cb.getBoundingClientRect().width < 18) bad.push('一行的勾选框看不见');
-              if (n.right > a.left + 0.5) bad.push('对方压着金额');
-              if (n.height > 26) bad.push('对方折成了两行');
-              if (r.getBoundingClientRect().height < 48) bad.push('一行不到 48 高');
+              const c = r.querySelector('.imp-aig-cb input'), l = r.querySelector('.imp-aig-l1').getBoundingClientRect(), n = r.querySelector('.imp-aig-nm').getBoundingClientRect(), a = r.querySelector('.rvg-a').getBoundingClientRect();
+              if (getComputedStyle(c).appearance === 'none') bad.push('一行的勾选框看不见');
+              if (l.height < 48) bad.push('一行不到 48 高');
+              if (n.right > a.left + 0.5) bad.push('对方压着金额'); if (n.height > 26) bad.push('对方折成了两行');
             });
           });
+          if (!document.querySelector('.imp-aig-blk.open .imp-aig-row')) bad.push('点开块以后没列出组');
+          if (!document.querySelector('.imp-aig-why')) bad.push('点一组没出理由');
           return { bad: [...new Set(bad)], ok: !bad.length, blocks: bs.length };
         })));
         await closeAll(page);
