@@ -59,6 +59,7 @@
         // 给外面（测试）看现在的条件，拿的是一份副本
         function searchNow(){ return JSON.parse(JSON.stringify(searchState)); }
         function clearState(){ Object.assign(searchState, { keyword:'', min:null, max:null, from:null, to:null, modes:[], rv:false, ios:[], cats:[], srcs:[], batch:null }); }
+        let RG=null;   // 1030-RV1：成组确认开着时的状态，见文件后面「成组确认」
         function toggleIn(arr, v){ const i=arr.indexOf(v); if(i<0) arr.push(v); else arr.splice(i, 1); }
 
         // ===== 1023-G：搜一笔的结果页 =====
@@ -267,6 +268,7 @@
             } else painter.paint(listHtml(asc, {}));
             fitCard();
             paintSheet();
+            if(RG) rgPaint();   // 1030-RV1：成组确认开着时（详情里改了、修改账单存了……），面板里跟着变
         }
         function searchFlush(){ painter.flush(); }
         $('searchEmpty').addEventListener('click', e=>{
@@ -609,8 +611,7 @@
         }
         // 1030-RV1：成组确认在面板里原地更新：展开 / 收起、勾掉一笔、「这组都没问题」都不再关掉面板重开（原来每次都重新滑上来、滚回顶上）。
         //   确认完的一组从列表里拿掉、副标题的「共 N 条」跟着减，底部小条「已确认 购物 141 笔 · 撤销」（浮在面板上）；全部确认完才自动关。
-        //   RG：这一次打开的状态（哪组展开、勾掉了哪几笔），关掉面板就清掉
-        let RG=null;
+        //   RG：这一次打开的状态（哪组展开、勾掉了哪几笔），关掉面板就清掉（定义在文件开头，render 里要用）
         // 1030-RV1：按「分类 + 收支」分组（原来只按分类，未分类里付给某人的和别人转来的混在一组，整组改分类会一起改错）；退款算收入
         function rgGroups(){
             const by=new Map(); rvList().forEach(r=>{ const c=r.cat||'未分类', io=r.type==='expense' ? 'expense' : 'income', k=c+'|'+io; if(!by.has(k)) by.set(k, { key:k, cat:c, io, rs:[] }); by.get(k).rs.push(r); });
@@ -647,11 +648,22 @@
                 const old=els.find(x=>x.dataset.key===only), g=gs.find(x=>x.key===only);
                 if(old){ if(g) old.replaceWith(rgGroupEl(g)); else old.remove(); return; }
             }
+            const sh=document.getElementById('uiSheet'), st=sh ? sh.scrollTop : 0;   // 整张换掉的一瞬间内容变矮，浏览器会把滚动位置夹回顶上：放回去
             RG.box.textContent=''; gs.forEach(g=>RG.box.appendChild(rgGroupEl(g)));
+            if(sh) sh.scrollTop=st;
+        }
+        // 1030-RV1：从面板里点一笔看详情：详情盖在面板上，关了回到面板（面板还开着就原地刷新；被分类抽屉换掉了就照原来滚到的位置放回来，不再滑上来一次）
+        function rgBack(){
+            if(!RG) return;
+            if(RG.box && RG.box.isConnected && window.JiwenSheet.isOpen()) rgPaint();
+            else openRvGroups(true, { instant:true, scroll:RG.scroll });
         }
         function rgClose(){ RG=null; if(window.JiwenSheet.isOpen()) window.JiwenSheet.close(); window.JiwenTabs.refreshAllViews(); render(); }
         function rgClick(e){
             if(!RG) return;
+            // 1030-RV1：点一笔 = 看这笔的详情（能改分类）；原来整行是勾选框的 label，点了悄悄勾掉
+            const row=e.target.closest('.bl-row[data-id]');
+            if(row){ RG.scroll=window.JiwenSheet.scrollTop(); openDetail(row.dataset.id, { onClose:rgBack }); return; }
             const cb=e.target.closest('input[type=checkbox][data-id]'), gEl=e.target.closest('.rvg'); if(!gEl) return;
             const key=gEl.dataset.key;
             if(cb){ if(cb.checked) RG.off.delete(cb.dataset.id); else RG.off.add(cb.dataset.id); rgPaint(key); return; }
@@ -669,11 +681,11 @@
             rgPaint(key);
             window.JiwenPanel.snack({ over:left>0, text:`已确认 ${g.cat} · ${ioName(g.io)} ${n} 笔`, actions:[{ id:'rvgUndo', text:'撤销', onClick:()=>{ if(!batchRestore(u)) return; if(RG) rgPaint(); } }] });
         }
-        function openRvGroups(keep){
+        function openRvGroups(keep, back){
             if(!window.JiwenSheet) return;
             if(!keep || !RG) RG={ off:new Set(), open:null };
             const gs=rgGroups(); if(!gs.length){ RG=null; customAlert('没有待确认分类的记录了。', '成组确认'); render(); return; }
-            window.JiwenSheet.open({ title:'成组确认', tall:true, sub:rgSub(gs.reduce((s, g)=>s+g.rs.length, 0)),
+            window.JiwenSheet.open({ title:'成组确认', tall:true, sub:rgSub(gs.reduce((s, g)=>s+g.rs.length, 0)), instant:!!(back && back.instant), scroll:back && back.scroll,
                 onDismiss:()=>{ RG=null; window.JiwenTabs.refreshAllViews(); render(); },
                 body(box){
                     const w=document.createElement('div'); w.id='rvgList'; box.appendChild(w);

@@ -72,6 +72,32 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   ok(uOut && uIn && /未分类 · 支出 5 笔/.test(uOut.querySelector('.rvg-t').textContent) && /未分类 · 收入 2 笔/.test(uIn.querySelector('.rvg-t').textContent), '3 未分类按收支分成两组：支出 5 笔、收入 2 笔');
   ok(groupOf(/^购物 · 支出 3 笔/) && groupOf(/^吃饭 · 支出 2 笔/), '3 有推荐分类的组也写收支');
 
+  // ===== 5. 点一笔 = 看详情；勾选只在勾选框上 =====
+  const buyG = () => groupOf(/^购物/);
+  let row0 = buyG().querySelector('.rvg-item .bl-row'), id0 = row0.dataset.id;
+  sheet.scrollTop = 61;
+  row0.querySelector('.bl-amt').click(); await tick();
+  ok($('detailMask').style.display === 'flex' && rec(id0).rv === 1, '5 点一笔：打开这笔的详情（没有悄悄勾掉）');
+  ok(sheetOpen(t) && $('uiSheetBody') === body0, '5 面板还在下面，没关');
+  t.w.JiwenDetail.closeDetail(); await tick();
+  ok(sheetOpen(t) && $('uiSheetBody') === body0 && sheet.scrollTop === 61 && buyG().querySelector('.rvg-item'), '5 关掉详情：回到面板同一位置，那一组还展开着');
+  // 详情里改分类（分类抽屉换掉了面板）：关了详情，面板照原来滚到的位置回来、不再滑上来一次
+  buyG().querySelector('.rvg-item .bl-row').click(); await tick();
+  $('detailRvEdit').click(); await tick();
+  [...t.d.querySelectorAll('#uiPickList .cc')].find(x => x.textContent.trim() === '杂项').click(); await t.idle();
+  if (t.ask()) await t.askCancel();
+  await tick();
+  ok(rec(id0).cat === '杂项' && !rec(id0).rv, '5 详情里改成「杂项」：分类改了、标记去掉');
+  t.w.JiwenDetail.closeDetail(); await tick();
+  ok(sheetOpen(t) && $('uiSheet').scrollTop === 61 && $('uiSheetMask').classList.contains('ui-instant') && buyG() && /购物 · 支出 2 笔/.test(buyG().textContent), '5 关了详情：面板回来（不滑上来、原来的位置），购物剩 2 笔');
+  await tick(80);
+  // 勾选框：勾掉一笔，按钮写「勾上的 N 笔没问题」
+  const cb = buyG().querySelector('.rvg-cb input');
+  cb.click(); await tick();
+  ok(/勾上的 1 笔没问题/.test(buyG().querySelector('.rvg-ok').textContent), '5 勾掉一笔：「勾上的 1 笔没问题」');
+  cb.click && buyG().querySelector('.rvg-cb input').click(); await tick();
+  ok(/这组都没问题/.test(buyG().querySelector('.rvg-ok').textContent), '5 再勾上：「这组都没问题」');
+
   // ===== 6. 分类抽屉「＋ 新建」 =====
   if (sheetOpen(t)) { t.w.JiwenSheet.close(); await tick(); }
   const cats = () => t.arch().cats;
