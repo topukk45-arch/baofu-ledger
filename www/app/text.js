@@ -9,7 +9,8 @@
         const TXT_FIELDS={
             billRemark:{ title:'备注', multi:true }, editRemark:{ title:'备注', multi:true }, refundRemark:{ title:'备注（选填）', multi:true },
             tplEditName:{ title:'模板名字（最多 10 字）' }, tplEditRemark:{ title:'备注', multi:true },
-            dayName:{ title:'日子名称（最多 8 字）' }, newCatName:{ title:'新分类名称（最多 8 字）' }, searchKeyword:{ title:'备注关键词' },
+            dayName:{ title:'日子名称（最多 8 字）' }, newCatName:{ title:'新分类名称（最多 8 字）' }, catDrawerNewName:{ title:'新分类名称（最多 8 字）' },   // 1030-RV1：分类抽屉里「＋ 新建」（输入框是抽屉用到时才建的）
+            searchKeyword:{ title:'备注关键词' },
         };
         // 写完以后让原来面板的保存按钮露出来（原来 1010-K5 是点备注时滚）
         const TXT_REVEAL={ billRemark:'addBill', editRemark:'saveEdit' };

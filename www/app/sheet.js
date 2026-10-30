@@ -1,6 +1,6 @@
 (function(){
         const { $, SHEET_MS } = window.JiwenBase;   // 用到前面模块的
-        const { getCats, recentCats } = window.JiwenStore;   // 用到前面模块的
+        const { catAdd, getCats, recentCats } = window.JiwenStore;   // 用到前面模块的
         // ===== 底部浮层的「往下拉关闭」（1017-UI1 从筛选浮层里抽出来，筛选浮层和导入页的选择面板共用）=====
         //   sheetMask：遮罩（带 .open 时才接手势）；sheet：面板（.sheet）；grip：顶部抓手区（鼠标拖拽用）；onDismiss：拉够了要关时调
         //   返回 { reset }：把拖到一半的位移、过渡复位（打开 / 关闭时调）
@@ -185,11 +185,16 @@
                 if(cur.body) cur.body(bodyEl, close);
                 if(cur.foot) cur.foot(footEl, close);
                 mask.style.zIndex=String(zAbove());
+                // 1030-RV1：instant = 从这个面板去了别处（详情、分类抽屉）回来，不再滑上来一次；scroll = 放回原来滚到的位置
+                mask.classList.toggle('ui-instant', !!cur.instant);
                 mask.style.display='flex';
                 drag.reset();
-                sheet.scrollTop=0;
+                sheet.scrollTop=cur.scroll>0 ? cur.scroll : 0;
                 mask.classList.add('open');
+                if(cur.instant){ void sheet.offsetWidth; requestAnimationFrame(()=>requestAnimationFrame(()=>{ if(mask) mask.classList.remove('ui-instant'); })); }
             }
+            // 1030-RV1：面板滚到哪了（回来时交给 open 的 scroll）
+            function scrollTop(){ return sheet ? sheet.scrollTop : 0; }
             // 1020-G：从别的面板里打开（记一笔的统计 / 分类抽屉、详情上的修改……）时要盖在它上面：
             //   比现在开着的面板里最高的那层再高一层（日期选择、文字小面板、提示框、数字键盘这几种「工具层」本来就更高，不算）
             function zAbove(){
@@ -234,9 +239,14 @@
             //   「最近常用」一行 4 个、「全部」按分类管理里的顺序一行 4 个，现在选中的高亮；点一个就选好、关掉，回到原来的面板。
             //   底部「取消 | 管理分类」（左退右进；没给 onManage 的只有「取消」）。
             //   o: { title, type（expense / income / 空）, value, recent（不给就按 recentCats 算）, cats（不给就是全部分类）, onPick(分类), onManage, onCancel }
+            //   1030-RV1：能一键新建分类（o.newCat）：有搜索框时搜不到的名字下面一个「＋ 新建「水果」并选上」；没搜索框时「全部」最后一块「＋ 新建」，点了弹文字小面板输名字。
+            //     名字和已有的重复就直接选已有的。newCat 不给：没给 cats（全部分类）的当场建好再 onPick(名字)；给了 cats 的（导入页：只能从给的几个里选）没有新建；
+            //     'defer'：不建，onPick(名字, { fresh:true })，由调的地方去建（待确认分类成组改：走 aiApply 的 newCats，撤销时没人用就删）；false：没有新建
             const CAT_SEARCH_MIN=12;
+            let catNewInput=null;
             function cats(o){
                 const all=(o.cats||getCats()).slice();
+                const newMode=o.newCat!==undefined ? o.newCat : (o.cats ? false : 'make');
                 const rec=(o.recent||recentCats(o.type)).filter(c=>all.includes(c)).slice(0, 4);
                 const tn=o.type==='expense' ? '支出 · ' : o.type==='income' ? '收入 · ' : '';
                 open({ title:o.title||'选分类', sub:(o.subText ? o.subText+' · ' : '')+(o.countLabel ? `${o.countLabel} ${all.length} 个` : `${tn}共 ${all.length} 个`), onDismiss:o.onCancel,
@@ -256,13 +266,46 @@
                         const recBox=sec('最近常用', rec, 'catDrawerRecent'), allBox=sec('全部', all, 'catDrawerAll');
                         const none=document.createElement('div'); none.className='cat-drawer-none'; none.style.display='none';
                         box.appendChild(recBox); box.appendChild(allBox); box.appendChild(none);
+                        // 1030-RV1：新建一个分类并选上（名字重复的直接选已有的）
+                        const me=cur;
+                        const takeNew=(name)=>{
+                            const n=String(name||'').trim(); if(!n) return;
+                            const had=all.includes(n) || (!o.cats && getCats().includes(n));
+                            if(had){ done(); if(o.onPick) o.onPick(n); return; }
+                            if(newMode==='defer'){
+                                if(Array.from(n).length>8){ none.textContent='分类名最多 8 个字～'; none.style.display=''; return; }
+                                done(); if(o.onPick) o.onPick(n, { fresh:true }); return;
+                            }
+                            const r=catAdd(n);
+                            if(r.err){ none.textContent=r.err; none.style.display=''; return; }
+                            done(); if(o.onPick) o.onPick(r.cat);
+                        };
+                        let newBtn=null;
+                        if(newMode && q){
+                            newBtn=document.createElement('button'); newBtn.type='button'; newBtn.className='ui-btn block cat-drawer-new'; newBtn.id='catDrawerNew'; newBtn.style.display='none';
+                            newBtn.addEventListener('click', ()=>takeNew(q.value));
+                            box.appendChild(newBtn);
+                        } else if(newMode){
+                            const g=allBox.querySelector('.cat-grid4');
+                            const b=document.createElement('button'); b.type='button'; b.className='cc cc-new'; b.id='catDrawerNewCell';
+                            const sp=document.createElement('span'); sp.className='cc-t'; sp.textContent='＋ 新建'; b.appendChild(sp);
+                            b.addEventListener('click', ()=>{
+                                if(!catNewInput){ catNewInput=document.createElement('input'); catNewInput.type='text'; catNewInput.id='catDrawerNewName'; catNewInput.maxLength=8; catNewInput.hidden=true; document.body.appendChild(catNewInput); }
+                                const inp=catNewInput; inp.value='';
+                                inp.onchange=()=>{ inp.onchange=null; if(cur===me) takeNew(inp.value); };
+                                if(window.openTextPanel) window.openTextPanel(inp);
+                            });
+                            g.appendChild(b);
+                        }
                         if(q) q.addEventListener('input', ()=>{
                             const k=q.value.trim().toLowerCase(); let n=0;
                             allBox.querySelectorAll('.cc').forEach(b=>{ const hit=!k || b.textContent.toLowerCase().includes(k); b.style.display=hit?'':'none'; if(hit) n++; });
                             recBox.style.display=k ? 'none' : '';
                             allBox.querySelector('.cat-drawer-h').textContent=k ? `找到 ${n} 个` : '全部';
                             none.textContent=`没有「${q.value.trim()}」`; none.style.display=(k && !n) ? '' : 'none';
+                            if(newBtn){ newBtn.textContent=`＋ 新建「${q.value.trim()}」并选上`; newBtn.style.display=(k && !n) ? '' : 'none'; }
                         });
+                        if(q && newBtn) q.addEventListener('keydown', e=>{ if(e.key==='Enter' && newBtn.style.display!=='none'){ e.preventDefault(); takeNew(q.value); } });
                     },
                     foot(box){
                         const row=document.createElement('div'); row.className='ui-pair';
@@ -339,7 +382,7 @@
                         row.appendChild(c); row.appendChild(m); box.appendChild(row);
                     } });
             }
-            return { open, pick, cats, modes, tpls, close, isOpen, back:dismiss, _sheet:()=>sheet };
+            return { open, pick, cats, modes, tpls, close, isOpen, scrollTop, back:dismiss, _sheet:()=>sheet };
         })();
 
         // ===== 弹窗打开时锁定背景滚动，防止滚动穿透到主页面 =====
@@ -752,6 +795,7 @@
                 ['pointerup', 'pointercancel'].forEach(ev=>snackEl.addEventListener(ev, ()=>{ if(snackEl.classList.contains('show')){ clearTimeout(snackT); snackT=setTimeout(snackHide, snackMs); } }));
             }
             snackEl.textContent='';
+            snackEl.classList.toggle('over', !!o.over);   // 1030-RV1：over = 浮在开着的面板上面（成组确认里「已确认 … · 撤销」）
             const tx=document.createElement('div'); tx.className='snack-tx';
             const t1=document.createElement('span'); t1.className='snack-t'; t1.textContent=o.text||''; tx.appendChild(t1);
             if(o.sub){ const t2=document.createElement('span'); t2.className='snack-s'; t2.textContent=o.sub; tx.appendChild(t2); }
