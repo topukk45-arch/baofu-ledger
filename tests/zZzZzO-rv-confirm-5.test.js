@@ -69,9 +69,11 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   cbs[0].click(); await tick();
   ok(/勾上的 \d+ 笔没问题/.test(t.d.querySelector('.rvg-ok').textContent), '3 勾掉一笔：按钮写「勾上的 N 笔没问题」');
   t.d.querySelector('.rvg-ok').click(); await t.idle();
-  ok(rvs().length === 1 && t.ask() && /已确认 \d+ 条的分类/.test(t.ask().msg) && $('askExtra').textContent === '撤销这次操作', '3 确认：只剩勾掉的那 1 笔；能「撤销这次操作」');
-  $('askExtra').click(); await t.idle(); if (t.ask()) await t.askOk();
+  // 1030-RV1：在面板里原地确认，不弹框；底部小条「已确认 … · 撤销」
+  ok(rvs().length === 1 && !t.ask() && sheetOpen(t) && /已确认 未分类 \d+ 笔/.test($('uiSnack').textContent) && $('rvgUndo'), '3 确认：只剩勾掉的那 1 笔；面板不关，底部小条能「撤销」');
+  $('rvgUndo').click(); await t.idle();
   ok(rvs().length === left, '3 撤销：rv 回来');
+  $('rvGroupClose').click(); await tick();
   // ===== 4. 批量「确认分类（不改）」 =====
   $('batchBar').click(); await tick();
   const opt = [...$('askChoices').querySelectorAll('.cc')].find(x => /确认分类（不改）/.test(x.textContent));

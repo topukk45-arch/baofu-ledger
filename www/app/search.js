@@ -494,6 +494,14 @@
             }, `将修改 ${list.length} 笔`, null, { layout:'list' });   // 1023-M：第一屏先说清楚改几笔，下一步再确认
         }
         function applyBatch(ids, change){
+            const u=batchWrite(ids, change); if(!u) return;
+            batchUndo=u;
+            customConfirm(change.rvOk ? `已确认 ${u.mainN} 条的分类。` : `已处理 ${u.mainN} 条记录。`, null, change.rvOk ? '确认分类' : '批量操作完成',
+                { okText:'好的', extra:{ text:'撤销这次操作', onClick:undoBatch } });
+            askCancel.style.display='none';      // 「好的」「取消」意思一样，只留一个
+        }
+        // 1030-RV1：批量写的那一段单独拿出来（成组确认在面板里原地确认、底部小条撤销，不弹框）：写好、刷新页面，返回撤销要的东西（没改返回 null）
+        function batchWrite(ids, change){
             const idSet=new Set(ids);
             const data=getUserData();
             const prev=[];
@@ -509,7 +517,7 @@
                 data[i]=n;
                 byId.set(n.id, n);
             });
-            if(!prev.length) return;
+            if(!prev.length) return null;
             const mainN=prev.length;
             // 挂在这些原账单上的退款跟着改；旧值一并记下，撤销时一起还原
             data.forEach((r,i)=>{
@@ -518,7 +526,7 @@
                 prev.push({ id:r.id, cat:r.cat, mode:recMode(r), follow:true });
                 const n=Object.assign({}, r); n.cat=o.cat; setRecMode(n, recMode(o)); data[i]=n;
             });
-            if(!saveUserData(data)) return;      // 一次写盘、一次同步；失败已有提示
+            if(!saveUserData(data)) return null;    // 一次写盘、一次同步；失败已有提示
             // 按分类筛选时改了分类：命中的记录全部离开当前分类，列表会瞬间变空，看着像数据没了。
             // 把筛选分类切到新分类，让刚改的这批仍在眼前（1023-F 起分类能多选：新分类不在里面就换成只选它）。
             const prevFilter=searchState.cats.slice();
@@ -526,14 +534,14 @@
                 searchState.cats=[change.cat];
             }
             window.JiwenTabs.refreshAllViews(); render();
-            batchUndo={ prev, prevFilter, archive:JiwenBase.currentArchive };
-            customConfirm(change.rvOk ? `已确认 ${mainN} 条的分类。` : `已处理 ${mainN} 条记录。`, null, change.rvOk ? '确认分类' : '批量操作完成',
-                { okText:'好的', extra:{ text:'撤销这次操作', onClick:undoBatch } });
-            askCancel.style.display='none';      // 「好的」「取消」意思一样，只留一个
+            return { prev, prevFilter, archive:JiwenBase.currentArchive, mainN };
         }
         function undoBatch(){
             const u=batchUndo; batchUndo=null;
-            if(!u || u.archive!==JiwenBase.currentArchive) return;
+            if(batchRestore(u)) customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
+        }
+        function batchRestore(u){
+            if(!u || u.archive!==JiwenBase.currentArchive) return false;
             const map=new Map(u.prev.map(p=>[p.id, p]));
             const data=getUserData();
             data.forEach((r,i)=>{
@@ -544,10 +552,10 @@
                 setRecMode(n, p.mode);
                 data[i]=n;
             });
-            if(!saveUserData(data)) return;
+            if(!saveUserData(data)) return false;
             searchState.cats=u.prevFilter.slice();   // 分类表没变，原筛选值一定还在
             window.JiwenTabs.refreshAllViews(); render();
-            customAlert(`已撤销，${u.prev.filter(p=>!p.follow).length} 条记录恢复原样。`);
+            return true;
         }
         // ===== 导入简化第 5 版：待确认分类的确认 =====
         //   逐条确认：顶上「待确认 3 / 60」，一条一张：对方、商品说明（备注）、推荐的分类和理由（打开时按现在的规则再推一遍，载入导入模块）；
@@ -599,38 +607,75 @@
                     const col=document.createElement('div'); col.className='ui-stack'; col.appendChild(pair); col.appendChild(cl); box.appendChild(col);
                 } });
         }
-        let rvGroupOpen=null, rvGroupOff=null;
+        // 1030-RV1：成组确认在面板里原地更新：展开 / 收起、勾掉一笔、「这组都没问题」都不再关掉面板重开（原来每次都重新滑上来、滚回顶上）。
+        //   确认完的一组从列表里拿掉、副标题的「共 N 条」跟着减，底部小条「已确认 购物 141 笔 · 撤销」（浮在面板上）；全部确认完才自动关。
+        //   RG：这一次打开的状态（哪组展开、勾掉了哪几笔），关掉面板就清掉
+        let RG=null;
+        function rgGroups(){
+            const by=new Map(); rvList().forEach(r=>{ const c=r.cat||'未分类'; if(!by.has(c)) by.set(c, { key:c, cat:c, rs:[] }); by.get(c).rs.push(r); });
+            return [...by.values()].sort((a, b)=>b.rs.length-a.rs.length);
+        }
+        function rgSub(n){ return `按推荐的分类分组 · 共 ${n} 条`; }
+        function rgGroupEl(g){
+            const rs=g.rs, cat=g.cat;
+            const cps=new Map(); rs.forEach(r=>{ const n=cpName(r)||'（没有对方）'; cps.set(n, (cps.get(n)||0)+1); });
+            const top=[...cps.entries()].sort((a, b)=>b[1]-a[1]).slice(0, 3).map(([n, c])=>`${n} ${c}`).join('、') + (cps.size>3 ? '…' : '');
+            const on=rs.filter(r=>!RG.off.has(r.id)), open=RG.open===g.key;
+            const el=document.createElement('div'); el.className='rvg'; el.dataset.cat=cat; el.dataset.key=g.key;
+            el.innerHTML=`<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(cat)} · ${rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${open ? '收起 ▴' : '看每一笔 ▸'}</span></button>`
+                + `<button type="button" class="ui-btn primary rvg-ok" data-act="ok"${on.length ? '' : ' disabled'}>${on.length===rs.length ? '这组都没问题' : `勾上的 ${on.length} 笔没问题`}</button>`;
+            if(open){
+                const ul=document.createElement('div'); ul.className='rvg-list';
+                rs.forEach(r=>{ const row=document.createElement('label'); row.className='rvg-row'; row.innerHTML=`<input type="checkbox"${RG.off.has(r.id) ? '' : ' checked'} data-id="${escapeHtml(r.id)}"><span class="rvg-r">${escapeHtml(String(r.time||'').slice(5, 10))} ${escapeHtml(cpName(r)||r.remark||'—')}</span><span class="rvg-a">${safeNum(r.money).toFixed(2)}</span>`; ul.appendChild(row); });
+                el.appendChild(ul);
+            }
+            return el;
+        }
+        // 画整张（打开、撤销以后）；只换一组（展开、勾选、确认以后），别的组和滚动位置不动
+        function rgPaint(only){
+            if(!RG || !RG.box || !RG.box.isConnected) return;
+            const gs=rgGroups(), n=gs.reduce((s, g)=>s+g.rs.length, 0);
+            if(!gs.length){ rgClose(); return; }
+            const sub=document.getElementById('uiSheetSub'); if(sub) sub.textContent=rgSub(n);
+            const els=[...RG.box.querySelectorAll('.rvg')];
+            if(only!==undefined){
+                const old=els.find(x=>x.dataset.key===only), g=gs.find(x=>x.key===only);
+                if(old){ if(g) old.replaceWith(rgGroupEl(g)); else old.remove(); return; }
+            }
+            RG.box.textContent=''; gs.forEach(g=>RG.box.appendChild(rgGroupEl(g)));
+        }
+        function rgClose(){ RG=null; if(window.JiwenSheet.isOpen()) window.JiwenSheet.close(); window.JiwenTabs.refreshAllViews(); render(); }
+        function rgClick(e){
+            if(!RG) return;
+            const cb=e.target.closest('input[type=checkbox][data-id]'), gEl=e.target.closest('.rvg'); if(!gEl) return;
+            const key=gEl.dataset.key;
+            if(cb){ if(cb.checked) RG.off.delete(cb.dataset.id); else RG.off.add(cb.dataset.id); rgPaint(key); return; }
+            const a=e.target.closest('[data-act]'); if(!a) return;
+            if(a.dataset.act==='open'){ const was=RG.open; RG.open = was===key ? null : key; if(was && was!==key) rgPaint(was); rgPaint(key); }
+            else if(a.dataset.act==='ok') rgConfirm(key);
+        }
+        function rgConfirm(key){
+            const g=rgGroups().find(x=>x.key===key); if(!g) return;
+            const ids=g.rs.filter(r=>!RG.off.has(r.id)).map(r=>r.id); if(!ids.length) return;
+            const u=batchWrite(ids, { rvOk:true }); if(!u) return;
+            if(RG.open===key) RG.open=null;
+            g.rs.forEach(r=>RG.off.delete(r.id));   // 勾掉留下的那几笔回到这组里、重新算勾上
+            const n=u.mainN, left=rgGroups().length;
+            rgPaint(key);
+            window.JiwenPanel.snack({ over:left>0, text:`已确认 ${g.cat} ${n} 笔`, actions:[{ id:'rvgUndo', text:'撤销', onClick:()=>{ if(!batchRestore(u)) return; if(RG) rgPaint(); } }] });
+        }
         function openRvGroups(keep){
             if(!window.JiwenSheet) return;
-            if(!keep){ rvGroupOpen=null; rvGroupOff=new Set(); }
-            const list=rvList(); if(!list.length){ customAlert('没有待确认分类的记录了。', '成组确认'); render(); return; }
-            const by=new Map(); list.forEach(r=>{ const c=r.cat||'未分类'; if(!by.has(c)) by.set(c, []); by.get(c).push(r); });
-            const groups=[...by.entries()].sort((a, b)=>b[1].length-a[1].length);
-            window.JiwenSheet.open({ title:'成组确认', tall:true, sub:`按推荐的分类分组 · 共 ${list.length} 条`,
-                body(box, done){
-                    groups.forEach(([cat, rs])=>{
-                        const cps=new Map(); rs.forEach(r=>{ const n=cpName(r)||'（没有对方）'; cps.set(n, (cps.get(n)||0)+1); });
-                        const top=[...cps.entries()].sort((a, b)=>b[1]-a[1]).slice(0, 3).map(([n, c])=>`${n} ${c}`).join('、') + (cps.size>3 ? '…' : '');
-                        const on=rs.filter(r=>!rvGroupOff.has(r.id));
-                        const g=document.createElement('div'); g.className='rvg'; g.dataset.cat=cat;
-                        g.innerHTML=`<button type="button" class="rvg-head" data-act="open"><span class="rvg-t">${escapeHtml(cat)} · ${rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${rvGroupOpen===cat ? '收起 ▴' : '看每一笔 ▸'}</span></button>`
-                            + `<button type="button" class="ui-btn primary rvg-ok" data-act="ok"${on.length ? '' : ' disabled'}>${on.length===rs.length ? '这组都没问题' : `勾上的 ${on.length} 笔没问题`}</button>`;
-                        if(rvGroupOpen===cat){
-                            const ul=document.createElement('div'); ul.className='rvg-list';
-                            rs.forEach(r=>{ const row=document.createElement('label'); row.className='rvg-row'; row.innerHTML=`<input type="checkbox"${rvGroupOff.has(r.id) ? '' : ' checked'} data-id="${escapeHtml(r.id)}"><span class="rvg-r">${escapeHtml(String(r.time||'').slice(5, 10))} ${escapeHtml(cpName(r)||r.remark||'—')}</span><span class="rvg-a">${safeNum(r.money).toFixed(2)}</span>`; ul.appendChild(row); });
-                            g.appendChild(ul);
-                        }
-                        g.addEventListener('click', e=>{
-                            const cb=e.target.closest('input[type=checkbox]');
-                            if(cb){ if(cb.checked) rvGroupOff.delete(cb.dataset.id); else rvGroupOff.add(cb.dataset.id); openRvGroups(true); return; }
-                            const a=e.target.closest('[data-act]'); if(!a) return;
-                            if(a.dataset.act==='open'){ rvGroupOpen = rvGroupOpen===cat ? null : cat; openRvGroups(true); }
-                            else if(a.dataset.act==='ok'){ const ids=on.map(r=>r.id); done(); applyBatch(ids, { rvOk:true }); }
-                        });
-                        box.appendChild(g);
-                    });
+            if(!keep || !RG) RG={ off:new Set(), open:null };
+            const gs=rgGroups(); if(!gs.length){ RG=null; customAlert('没有待确认分类的记录了。', '成组确认'); render(); return; }
+            window.JiwenSheet.open({ title:'成组确认', tall:true, sub:rgSub(gs.reduce((s, g)=>s+g.rs.length, 0)),
+                onDismiss:()=>{ RG=null; window.JiwenTabs.refreshAllViews(); render(); },
+                body(box){
+                    const w=document.createElement('div'); w.id='rvgList'; box.appendChild(w);
+                    RG.box=w; rgPaint();
+                    w.addEventListener('click', rgClick);
                 },
-                foot(box, done){ const b=document.createElement('button'); b.type='button'; b.id='rvGroupClose'; b.className='ui-btn block'; b.textContent='关闭'; b.addEventListener('click', ()=>done()); box.appendChild(b); } });
+                foot(box, done){ const b=document.createElement('button'); b.type='button'; b.id='rvGroupClose'; b.className='ui-btn block'; b.textContent='关闭'; b.addEventListener('click', ()=>{ done(); RG=null; }); box.appendChild(b); } });
         }
         window.JiwenSearch = { openRvGroups, openRvOne, srcOf, applyBatch, closeSearch, filterMatch, isOpen, openBatchMenu, openSearch, openSheet, render, renderFilterChips, resetSearch, searchFlush, searchNow, undoBatch };   // search 模块对外只有这一个入口
 })();
