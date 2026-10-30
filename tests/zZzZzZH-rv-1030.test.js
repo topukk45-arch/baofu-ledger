@@ -98,6 +98,59 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   cb.click && buyG().querySelector('.rvg-cb input').click(); await tick();
   ok(/这组都没问题/.test(buyG().querySelector('.rvg-ok').textContent), '5 再勾上：「这组都没问题」');
 
+  // ===== 4. 未分类组：按对方一行改分类 =====
+  const unc = () => groupOf(/^未分类 · 支出/);
+  ok(!unc().querySelector('.rvg-ok') && /交给 AI 按组整理/.test(unc().querySelector('[data-act="ai"]').textContent), '4 未分类组：没有「这组都没问题」，主按钮「交给 AI 按组整理 ›」');
+  ok(groupOf(/^购物/).querySelector('.rvg-ok'), '4 有推荐分类的组照旧「这组都没问题」');
+  unc().querySelector('[data-act="open"]').click(); await tick();
+  await A.until(() => unc().querySelectorAll('.rvg-cp').length, 8000);
+  const cpRows = () => [...unc().querySelectorAll('.rvg-cp')];
+  ok(cpRows().length === 2 && /某虚构\*甲/.test(cpRows()[0].textContent) && /3 笔 · 共 \d+\.\d\d 元/.test(cpRows()[0].textContent) && /某虚构乙店/.test(cpRows()[1].textContent) && /2 笔/.test(cpRows()[1].textContent),
+    '4 展开后按对方一行、按笔数从多到少：' + cpRows().map(x => x.textContent).join(' / '));
+  const jiaIds = t.recs().filter(r => r.cp === 1 && r.type === 'expense').map(r => r.id);
+  cpRows()[0].click(); await tick();
+  ok(sheetOpen(t) && $('uiPickList') && /某虚构\*甲/.test($('uiSheetSub').textContent) && /支出/.test($('uiSheetSub').textContent), '4 点一行：分类抽屉，副标题写这个对方、按这组的收支：' + $('uiSheetSub').textContent);
+  [...t.d.querySelectorAll('#uiPickList .cc')].find(x => x.textContent.trim() === '转账').click();
+  await A.until(() => t.ask(), 5000);
+  ok(jiaIds.every(id => rec(id).cat === '转账' && !rec(id).rv), '4 这一行 3 笔都改成「转账」、去掉待确认');
+  ok(t.ask() && /以后「某虚构\*甲」的账单都记成「转账」吗/.test(t.ask().msg) && $('askOk').textContent === '只改这几笔' && $('askExtra').textContent === '以后都这样' && $('askCancel').style.display === 'none',
+    '4 对方带 * / 转账：默认「只改这几笔」（另有「以后都这样」）');
+  await t.askOk(); await tick(80);
+  const lg = (await t.logs()).slice(-1)[0];
+  ok(lg && lg.kind === 'ai' && lg.of === '*' && lg.by === 'rvgroup' && lg.chg.length === 3, '4 走 aiApply：导入记录里一条「成组确认」（kind ai、by rvgroup）');
+  ok(!((t.arch().importRules || {}).cat || []).some(r => r.kw === '某虚构*甲'), '4 「只改这几笔」：不存规则');
+  ok(sheetOpen(t) && unc() && /未分类 · 支出 2 笔/.test(unc().textContent) && /已改成「转账」 某虚构\*甲 3 笔/.test($('uiSnack').textContent), '4 面板回来，未分类剩 2 笔；底部小条「已改成「转账」…」');
+  $('rvgUndo').click();
+  await A.until(() => jiaIds.every(id => rec(id).rv === 1), 5000); await tick(60);
+  ok(jiaIds.every(id => rec(id).cat === '未分类' && rec(id).rv === 1) && /未分类 · 支出 5 笔/.test(unc().textContent), '4 小条「撤销」：改回未分类、待确认放回，面板里跟着变');
+  // 新建分类改一组：走 newCats；「只改这几笔」后撤销：没人用的新分类一起删
+  await A.until(() => unc().querySelectorAll('.rvg-cp').length === 2, 5000);
+  const yiIds = t.recs().filter(r => r.cp === 2).map(r => r.id);
+  cpRows()[1].click(); await tick();
+  $('catDrawerNewCell').click(); await tick();
+  $('txtInput').value = '日用百货'; $('txtOk').click();
+  await A.until(() => t.ask(), 5000);
+  ok(t.arch().cats.includes('日用百货') && yiIds.every(id => rec(id).cat === '日用百货'), '4 抽屉里新建「日用百货」：建好、这一行改成它');
+  ok(/以后「某虚构乙店」的账单都记成「日用百货」吗/.test(t.ask().msg) && $('askOk').textContent === '以后都这样' && $('askCancel').textContent === '只改这几笔', '4 普通商户：「以后都这样 / 只改这几笔」');
+  await t.askCancel(); await tick(80);
+  const lg2 = (await t.logs()).slice(-1)[0];
+  ok(lg2 && lg2.by === 'rvgroup' && (lg2.catsAdded || []).includes('日用百货'), '4 导入记录记下新建的分类（catsAdded）');
+  $('rvgUndo').click();
+  await A.until(() => !t.arch().cats.includes('日用百货'), 5000);
+  ok(!t.arch().cats.includes('日用百货') && yiIds.every(id => rec(id).cat === '未分类' && rec(id).rv === 1), '4 撤销：改回去，没人用的新分类一起删');
+  // 「以后都这样」：存规则
+  await A.until(() => unc().querySelectorAll('.rvg-cp').length === 2, 5000);
+  cpRows()[1].click(); await tick();
+  [...t.d.querySelectorAll('#uiPickList .cc')].find(x => x.textContent.trim() === '购物').click();
+  await A.until(() => t.ask(), 5000);
+  await t.askOk(); await tick(120);
+  ok(((t.arch().importRules || {}).cat || []).some(r => r.kw === '某虚构乙店' && r.cat === '购物') && yiIds.every(id => rec(id).cat === '购物'), '4 「以后都这样」：存了一条规则');
+  // 分类抽屉里取消：回到面板，什么都不改
+  await A.until(() => unc() && unc().querySelectorAll('.rvg-cp').length === 1, 5000);
+  cpRows()[0].click(); await tick();
+  $('uiSheetCancel').click(); await tick();
+  ok(sheetOpen(t) && unc() && jiaIds.every(id => rec(id).rv === 1), '4 抽屉里取消：回到面板，没改');
+
   // ===== 6. 分类抽屉「＋ 新建」 =====
   if (sheetOpen(t)) { t.w.JiwenSheet.close(); await tick(); }
   const cats = () => t.arch().cats;

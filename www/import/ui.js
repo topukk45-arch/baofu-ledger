@@ -3147,6 +3147,9 @@
       if (l.kind === 'ai' && l.by === 'opt') {
         g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · 一键优化分类'));
         g.appendChild(el('div', 'imp-soft', '按现在的规则改了 ' + nChg + ' 条待确认分类的记录'));
+      } else if (l.kind === 'ai' && l.by === 'rvgroup') {
+        g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · 成组确认'));
+        g.appendChild(el('div', 'imp-soft', '在待确认分类里按对方改了 ' + nChg + ' 条记录的分类'));
       } else if (l.kind === 'ai' && l.by === 'aigroup') {
         g.appendChild(el('div', 'imp-line', String(l.at || '').replace('T', ' ') + ' · AI 按组整理'));
         g.appendChild(el('div', 'imp-soft', '按 AI 的建议改了 ' + nChg + ' 条待确认分类的记录'));
@@ -3945,7 +3948,7 @@
     rows.filter(function (r) { return !r.skip; }).forEach(function (r) {
       var cp = cpShow(r.cp || ''), desc = String(r.remark || '').trim().slice(0, 24);
       var k = (!cp || cp.indexOf('*') >= 0 || AIG_PLAT.test(cp)) && desc ? '品：' + desc : (cp ? '方：' + cp : '品：' + (desc || '—'));
-      var g = by[k]; if (!g) { g = by[k] = { cp: k.indexOf('方：') === 0 ? cp : (cp.indexOf('*') >= 0 || AIG_PLAT.test(cp) ? cp : ''), desc: desc, oc: r.oc || '', n: 0, fen: 0, cats: {}, ids: [] }; order.push(k); }
+      var g = by[k]; if (!g) { g = by[k] = { cp: k.indexOf('方：') === 0 ? cp : (cp.indexOf('*') >= 0 || AIG_PLAT.test(cp) ? cp : ''), desc: desc, oc: r.oc || '', by: k.indexOf('方：') === 0 ? 'cp' : 'desc', n: 0, fen: 0, cats: {}, ids: [] }; order.push(k); }
       g.n++; g.fen += r.fen; g.ids.push(r.id); g.cats[r.cat] = (g.cats[r.cat] || 0) + 1;
     });
     return order.map(function (k) { return by[k]; }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; })
@@ -4032,7 +4035,7 @@
         col.appendChild(go); col.appendChild(cl); box.appendChild(col);
       } });
   }
-  var UI = { openAiGroups: openAiGroups, openOptimize: openOptimize, reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  var UI = { aiGroupsOf: aiGroupsOf, openAiGroups: openAiGroups, openOptimize: openOptimize, reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _plainReason: function (r) { return plainReason(r); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

@@ -625,6 +625,7 @@
             const top=[...cps.entries()].sort((a, b)=>b[1]-a[1]).slice(0, 3).map(([n, c])=>`${n} ${c}`).join('、') + (cps.size>3 ? '…' : '');
             const on=rs.filter(r=>!RG.off.has(r.id)), open=RG.open===g.key;
             const el=document.createElement('div'); el.className='rvg'; el.dataset.cat=cat; el.dataset.io=g.io; el.dataset.key=g.key;
+            if(g.cat==='未分类') return rgUncatEl(g, el, top, open);
             el.innerHTML=`<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(cat)} · ${ioName(g.io)} ${rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${open ? '收起 ▴' : '看每一笔 ▸'}</span></button>`
                 + `<button type="button" class="ui-btn primary rvg-ok" data-act="ok"${on.length ? '' : ' disabled'}>${on.length===rs.length ? '这组都没问题' : `勾上的 ${on.length} 笔没问题`}</button>`;
             if(open){
@@ -636,6 +637,86 @@
                 el.appendChild(ul);
             }
             return el;
+        }
+        // 1030-RV1：「未分类」组不给「这组都没问题」（点了等于把几百笔确认成未分类、以后不再提醒）：
+        //   展开后按对方一行（分法照 AI 按组整理：import/ui.js 的 aiGroupsOf，个人 / 平台 / 没对方的按商品说明归；外面已经按收支分开了），
+        //   「单小玲 · 104 笔 · 共 x 元 ›」按笔数从多到少；点一行拉出分类抽屉，选了这一行全改（aiApply，自动备份、导入记录里能撤销）。
+        //   卡片上的主按钮是「交给 AI 按组整理 ›」。分组要导入模块，展开时才载入（载入前写「正在按对方分组…」）
+        function cgName(c){
+            if(c.by==='cp') return c.cp;
+            const d=c.desc && c.desc!=='—' ? c.desc : '';
+            return d ? (c.cp ? `${d}（${c.cp}）` : d) : (c.cp || '（没有对方）');
+        }
+        function rgCpGroups(g){
+            if(!RG.ui || !RG.ui.aiGroupsOf) return null;
+            let cps=[]; try{ cps=window.JiwenStore.loadStore(JiwenBase.currentUser).archives[JiwenBase.currentArchive].cps||[]; }catch(_){}
+            const rows=g.rs.filter(r=>!isRefund(r)).map(r=>({ id:r.id, time:r.time, fen:Math.round(safeNum(r.money)*100), type:r.type, cat:r.cat||'未分类', oc:r.oc||'',
+                remark:(r.remark||'').split('\n')[0].slice(0, 60), cp:Number.isInteger(r.cp) ? (cps[r.cp]||'') : '', skip:false }));   // 退款跟着原单走，不单列（原单改了它一起改）
+            return RG.ui.aiGroupsOf(rows);
+        }
+        function rgUncatEl(g, el, top, open){
+            el.classList.add('rvg-uncat');
+            el.innerHTML=`<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(g.cat)} · ${ioName(g.io)} ${g.rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${open ? '收起 ▴' : '按对方看 ▸'}</span></button>`
+                + `<button type="button" class="ui-btn primary rvg-ai" data-act="ai">交给 AI 按组整理 ›</button>`;
+            if(!open) return el;
+            const ul=document.createElement('div'); ul.className='rvg-list rvg-cps';
+            const cs=rgCpGroups(g);
+            if(!cs){
+                ul.innerHTML='<div class="rvg-wait">正在按对方分组…</div>';
+                if(!RG.loading){ RG.loading=true; loadImportUI().then(ui=>{ if(!RG) return; RG.loading=false; RG.ui=ui; rgPaint(g.key); }).catch(err=>{ if(RG) RG.loading=false; customAlert('导入模块没加载上：' + (err && err.message || err), '成组确认'); }); }
+            } else {
+                RG.cps[g.key]=cs;
+                ul.innerHTML=`<div class="rvg-cps-h">点一行，给这几笔选个分类</div>` + cs.map((c, i)=>`<button type="button" class="rvg-cp" data-cpi="${i}"><span class="rvg-cp-n">${escapeHtml(cgName(c))}</span><span class="rvg-cp-s">${c.n} 笔 · 共 ${(c.fen/100).toFixed(2)} 元</span><span class="rvg-cp-go" aria-hidden="true">›</span></button>`).join('');
+            }
+            el.appendChild(ul);
+            return el;
+        }
+        function rgPickCp(key, i){
+            const g=rgGroups().find(x=>x.key===key), c=RG.cps[key] && RG.cps[key][i]; if(!g || !c) return;
+            RG.scroll=window.JiwenSheet.scrollTop();
+            const back=()=>{ if(RG) openRvGroups(true, { instant:true, scroll:RG.scroll }); };
+            window.JiwenSheet.cats({ title:`这 ${c.n} 笔改成哪个分类`, subText:cgName(c), type:g.io, value:'', newCat:'defer', onCancel:back,
+                onPick:(cat, f)=>rgCpApply(g, c, cat, !!(f && f.fresh), back) });
+        }
+        function rgCpApply(g, c, cat, fresh, back){
+            if(!cat || cat==='未分类'){ back(); return; }
+            const ids=new Set(c.ids), changes=c.ids.map(id=>({ id, set:{ cat } }));
+            getUserData().forEach(r=>{ if(isRefund(r) && ids.has(r.refundOf) && !ids.has(r.id)) changes.push({ id:r.id, set:{ cat } }); });   // 挂在上面的退款跟着改
+            const S=window.JiwenImportStore, name=cgName(c);
+            S.aiApply({ of:'*', by:'rvgroup', changes, newCats:fresh ? [cat] : [] }).then(w=>{
+                rgAskRule(g, c, cat, ()=>{
+                    back();
+                    window.JiwenPanel.snack({ over:!!RG, text:`已改成「${cat}」 ${name} ${c.n} 笔`, actions:[{ id:'rvgUndo', text:'撤销', onClick:()=>rgUndoAi(w.b) }] });
+                });
+            }, err=>{ customAlert('没改成：' + (err && (err.code || err.message) || err) + '。账本没有动。', '成组确认'); back(); });
+        }
+        // 小条上的「撤销」：照导入记录里「撤销」那一套撤这一次（undo.js），自动备份；它后面又有别的改动连着的，去导入记录里撤
+        function rgUndoAi(b){
+            const S=window.JiwenImportStore;
+            S.undoPlan(b).then(p=>{
+                if(!p || !p.ok || (p.chain||[]).length>1){ customAlert('这次改动后面还有别的改动连着，请到「设置 → 导入记录」里「成组确认」那一行撤销。', '撤销'); return; }
+                return S.undo(p).then(()=>{ if(RG) rgPaint(); });
+            }).catch(err=>customAlert('没撤销成：' + (err && (err.code || err.message) || err) + '。账本没有动。', '撤销'));
+        }
+        // 改完问一句以后这个对方都这样记吗（存规则照导入那套：对方的按对方，按商品说明归的那几行按商品说明 on:'desc'）；
+        //   交易类型是转账、红包的、对方带 * 的（和个人之间的）默认「只改这几笔」
+        function rgAskRule(g, c, cat, next){
+            const S=window.JiwenImportStore; let info=null;
+            try{ info=S.archiveInfo(); }catch(_){ next(); return; }
+            const byDesc=c.by!=='cp', kw=String(byDesc ? (c.desc||'') : (c.cp||'')).trim().slice(0, 32), on=byDesc ? 'desc' : '';
+            if(kw.length<2 || kw==='—' || (info.catRules||[]).some(r=>r.kw===kw && r.cat===cat && (r.on||'')===on)){ next(); return; }
+            const ids=new Set(c.ids);
+            const person=/\*/.test(c.cp||'') || g.rs.some(r=>ids.has(r.id) && (/转账|红包/.test(r.oc||'') || (r.raw && /转账|红包/.test(r.raw.kind||''))));
+            const save=()=>{
+                const rule=byDesc ? { kw, cat, on:'desc' } : { kw, cat };
+                const rules={ cat:(info.catRules||[]).filter(r=>!(r.kw===kw && (r.on||'')===on)).concat([rule]), type:info.typeRules||[], map:info.catMaps||[], big:info.bigRules||[], sum:info.sumRules||[] };
+                S.rulesSave(rules).then(()=>next(), ()=>next());
+            };
+            const msg=(byDesc ? `以后商品说明里有「${kw}」的账单都记成「${cat}」吗？` : `以后「${kw}」的账单都记成「${cat}」吗？`)
+                + '\n\n选了以后，导入时直接照这个分类（在「管理导入规则」里能改、能删）。'
+                + (person ? '\n\n这是和个人之间的转账、红包，下次不一定还是这一类，所以默认只改这几笔。' : '');
+            if(!person) customConfirm(msg, save, '以后也这么记？', { okText:'以后都这样', cancelText:'只改这几笔', onCancel:next });
+            else { customConfirm(msg, next, '以后也这么记？', { okText:'只改这几笔', onCancel:next, extra:{ text:'以后都这样', onClick:save } }); askCancel.style.display='none'; }
         }
         // 画整张（打开、撤销以后）；只换一组（展开、勾选、确认以后），别的组和滚动位置不动
         function rgPaint(only){
@@ -667,12 +748,14 @@
             const cb=e.target.closest('input[type=checkbox][data-id]'), gEl=e.target.closest('.rvg'); if(!gEl) return;
             const key=gEl.dataset.key;
             if(cb){ if(cb.checked) RG.off.delete(cb.dataset.id); else RG.off.add(cb.dataset.id); rgPaint(key); return; }
+            const cpb=e.target.closest('.rvg-cp[data-cpi]'); if(cpb){ rgPickCp(key, +cpb.dataset.cpi); return; }
             const a=e.target.closest('[data-act]'); if(!a) return;
             if(a.dataset.act==='open'){ const was=RG.open; RG.open = was===key ? null : key; if(was && was!==key) rgPaint(was); rgPaint(key); }
             else if(a.dataset.act==='ok') rgConfirm(key);
+            else if(a.dataset.act==='ai'){ RG=null; window.JiwenSheet.close(); loadImportUI().then(ui=>ui.openAiGroups()).catch(err=>customAlert('导入模块没加载上：' + (err && err.message || err), 'AI 按组整理')); }
         }
         function rgConfirm(key){
-            const g=rgGroups().find(x=>x.key===key); if(!g) return;
+            const g=rgGroups().find(x=>x.key===key); if(!g || g.cat==='未分类') return;
             const ids=g.rs.filter(r=>!RG.off.has(r.id)).map(r=>r.id); if(!ids.length) return;
             const u=batchWrite(ids, { rvOk:true }); if(!u) return;
             if(RG.open===key) RG.open=null;
@@ -683,7 +766,7 @@
         }
         function openRvGroups(keep, back){
             if(!window.JiwenSheet) return;
-            if(!keep || !RG) RG={ off:new Set(), open:null };
+            if(!keep || !RG) RG={ off:new Set(), open:null, cps:{}, ui:(RG && RG.ui) || null };
             const gs=rgGroups(); if(!gs.length){ RG=null; customAlert('没有待确认分类的记录了。', '成组确认'); render(); return; }
             window.JiwenSheet.open({ title:'成组确认', tall:true, sub:rgSub(gs.reduce((s, g)=>s+g.rs.length, 0)), instant:!!(back && back.instant), scroll:back && back.scroll,
                 onDismiss:()=>{ RG=null; window.JiwenTabs.refreshAllViews(); render(); },

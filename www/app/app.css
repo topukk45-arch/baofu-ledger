@@ -2148,6 +2148,13 @@
         .rvg-item > .bl-row { flex:1 1 auto; min-width:0; border-bottom:none; }
         label.rvg-cb { display:flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; min-height:48px; margin-left:-10px; cursor:pointer; }
         .rvg-cb input { width:22px; height:22px; margin:0; accent-color:var(--c-primary); -webkit-appearance:checkbox; appearance:auto; }
+        /* 1030-RV1：「未分类」组展开后按对方一行：名字 · 笔数 · 合计 ›，整行 54 高能点 */
+        .rvg-ai { width:100%; }
+        .rvg-cps-h, .rvg-wait { font-size:13px; color:var(--c-t1); padding:8px 2px 4px; }
+        button.rvg-cp { display:flex; align-items:center; gap:8px; width:100%; min-height:var(--row-2, 54px); padding:4px 2px; border:0; border-top:1px dashed var(--c-border); background:none; font-family:inherit; text-align:left; color:var(--c-text); cursor:pointer; }
+        .rvg-cp-n { flex:1 1 auto; min-width:0; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .rvg-cp-s { flex:none; font-size:13px; color:var(--c-t1); font-variant-numeric:tabular-nums; }
+        .rvg-cp-go { flex:none; color:var(--c-border-mid); font-size:18px; }
         .rvg-row input { width:22px; height:22px; flex:0 0 22px; } .rvg-r { flex:1; min-width:0; overflow-wrap:anywhere; } .rvg-a { font-variant-numeric:tabular-nums; }
         /* 1023-N：最近搜过：结果页没条件时卡片里 3 条（点了套用、× 删一条、清空），抽屉顶上 5 条（点了套用） */
         .sp-hist { display:flex; flex-direction:column; width:100%; }

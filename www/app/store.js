@@ -1099,7 +1099,7 @@
                 o.rulesAdded=ra;
                 if(x.only===true) o.only=true;      // 1016-Q：只对账（只补了勾选的几笔）
                 // 1017-G：AI 修改（不是导入）：改的是哪一次导入的记录
-                if(x.kind==='ai'){ o.kind='ai'; if(typeof x.of==='string' && IMP_BATCH_RE.test(x.of)) o.of=x.of; if(x.by==='rec') o.by='rec'; if((x.by==='opt' || x.by==='aigroup') && x.of==='*'){ o.of='*'; o.by=x.by; } }   // 第 6 版：一键优化分类 of '*'；第 14 版：AI 按组整理（by aigroup）也是   // 1021-T4：by rec = 按新规则重新分类（照 AI 修改那套记、那套撤）
+                if(x.kind==='ai'){ o.kind='ai'; if(typeof x.of==='string' && IMP_BATCH_RE.test(x.of)) o.of=x.of; if(x.by==='rec') o.by='rec'; if((x.by==='opt' || x.by==='aigroup' || x.by==='rvgroup') && x.of==='*'){ o.of='*'; o.by=x.by; } }   // 1030-RV1：成组确认里按对方改分类（by rvgroup）也是   // 第 6 版：一键优化分类 of '*'；第 14 版：AI 按组整理（by aigroup）也是   // 1021-T4：by rec = 按新规则重新分类（照 AI 修改那套记、那套撤）
                 // 1017-H：这次导入交给 AI 检查时的导出时间（最近 5 次），AI 回复里的导出时间要是其中之一才认
                 if(Array.isArray(x.aiAt)){ const aa=x.aiAt.filter(v=>typeof v==='string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(v)).slice(-5); if(aa.length) o.aiAt=aa; }
                 // 1016-Y：这次改了你已有的哪几条规则（关键词、原来的分类、改成的分类），撤销时改回去
@@ -1873,7 +1873,7 @@
                 if(!changes.length) throw impErr('nothing');
                 const log0=await impGetJson(t.e, impLogKey(t.e.id, t.aid)), logs=((log0 && log0.list) || []).slice();
                 // 导入简化第 6 版：一键优化分类（by 'opt'）不是对着某一次导入做的，of 写 '*'（撤销靠「改过这批碰过的记录」的依赖链）
-                const byOpt=(o.by==='opt' || o.by==='aigroup') && o.of==='*';   // 第 14 版：AI 按组整理（by aigroup）同样写、同样撤
+                const byOpt=(o.by==='opt' || o.by==='aigroup' || o.by==='rvgroup') && o.of==='*';   // 第 14 版：AI 按组整理（by aigroup）同样写、同样撤；1030-RV1：成组确认里按对方改分类（by rvgroup）也是
                 if(!byOpt && !logs.some(l=>l.kind!=='ai' && l.b===o.of)) throw impErr('nolog');
                 const store=loadStore(t.e.id), a=store.archives[t.name], recs=a.records, at=new Map(recs.map((r, i)=>[r.id, i]));
                 const FIELDS=['cat','remark','skip','flow','aiFlag'];
@@ -1910,7 +1910,7 @@
                 const b='a'+Date.now().toString(36);
                 const ofLog=logs.filter(l=>l.kind!=='ai' && l.b===o.of)[0];
                 const byRec=o.by==='rec';   // 1021-T4：按新规则重新推荐分类，写法、备份、撤销都和 AI 修改一样，只是说法不同
-                const saved=await impBkSave(t, 'ai', b, { b, what:(byOpt ? (o.by==='aigroup' ? 'AI 按组整理 ' : '一键优化分类 ') : byRec ? '按新规则重新分类 ' : '按 AI 的建议改 ') + chg.length + ' 条记录' + (ofLog ? '（' + String(ofLog.at||'').replace('T', ' ') + ' 那次导入的）' : '') });
+                const saved=await impBkSave(t, 'ai', b, { b, what:(byOpt ? (o.by==='aigroup' ? 'AI 按组整理 ' : o.by==='rvgroup' ? '成组确认 ' : '一键优化分类 ') : byRec ? '按新规则重新分类 ' : '按 AI 的建议改 ') + chg.length + ' 条记录' + (ofLog ? '（' + String(ofLog.at||'').replace('T', ' ') + ' 那次导入的）' : '') });
                 const d=new Date(), cl=(a.cps||[]).length, pl=(a.pms||[]).length;
                 logs.push({ kind:'ai', of:o.of, b, at:`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`, apps:[], from:'', to:'',
                             add:[], h:[], chg, cpLen:cl, pmLen:pl, cpEnd:cl, pmEnd:pl, catsAdded, rulesAdded:{ cat:[], type:[] } });
