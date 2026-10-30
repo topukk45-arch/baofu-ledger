@@ -69,7 +69,7 @@ const RANGE = { from: '2026-10-01 00:00:00', to: '2026-10-20 23:59:59' };
     raw.querySelector('.detail-raw-copy').click(); await tick(60);
     ok(copied === TX[0].no && $('uiSnack') && /已复制单号/.test($('uiSnack').textContent) && $('uiSnack').classList.contains('over'), '2 点「复制」：复制了单号，底部小条「已复制单号」（浮在详情上）');
     copied = null; raw.querySelector('.detail-raw-all').click(); await tick(60);
-    ok(raw.querySelector('.detail-raw-all').textContent === '复制全文' && copied && /^交易类型：商户消费\n对方：某虚构书店\n/.test(copied) && copied.indexOf('单号：' + TX[0].no) > 0 && !/复制/.test(copied) && /已复制账单原文/.test($('uiSnack').textContent), '2 实测 10-30：「复制全文」把整份原文复制下来（一行一样），小条「已复制账单原文」');
+    ok(raw.querySelector('.detail-raw-all').textContent === '复制全文' && copied && /^时间：2026-10-03 12:00\n金额：支出 36\.00\n交易类型：商户消费\n对方：某虚构书店\n/.test(copied) && copied.indexOf('单号：' + TX[0].no) > 0 && !/复制/.test(copied) && /已复制账单原文/.test($('uiSnack').textContent), '2 实测 10-30：「复制全文」把整份原文复制下来（一行一样，开头是时间、金额），小条「已复制账单原文」：' + JSON.stringify(copied));
     ok(/\.rvg-row input\[type=checkbox\], \.imp-aig-bh input\[type=checkbox\] \{ -webkit-appearance:checkbox; appearance:auto;/.test(CSS), '4 实测 10-30：AI 的分组建议、一键优化里的勾选框看得见（原来被全局 appearance:none 弄成透明）');
     try { t.w.JiwenDetail.closeDetail(); } catch (_) {}
     ok(!t.errs.length, '2/3 无报错 ' + t.errs.join('|'));

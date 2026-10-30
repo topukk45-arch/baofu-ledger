@@ -46,7 +46,7 @@ const bill = (txs, to) => [['微信.csv', B.bill('wechat', txs, { range: { from:
   ok(rows().length === 12 && !$('detailPartsMore'), '2 展开全部：12 笔');
   rows()[2].click();
   const rb = $('detailParts').querySelector('.detail-part-raw');
-  ok(rb && new RegExp('单号：' + PA[2].no).test(rb.textContent) && /交易类型：分分捐/.test(rb.textContent) && rb.querySelector('.detail-raw-copy'), '2 点一笔：展开它的原文，单号能复制');
+  ok(rb && /时间：2026-10-03 06:00/.test(rb.textContent) && /金额：支出 0\.01/.test(rb.textContent) && new RegExp('单号：' + PA[2].no).test(rb.textContent) && /交易类型：分分捐/.test(rb.textContent) && rb.querySelector('.detail-raw-copy'), '2 点一笔：展开它的原文，单号能复制');
   rows()[2].click();
   ok(!$('detailParts').querySelector('.detail-part-raw'), '2 再点收起');
   try { t.w.JiwenDetail.closeDetail(); } catch (_) {}
