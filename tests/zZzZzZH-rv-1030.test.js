@@ -88,8 +88,13 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   if (t.ask()) await t.askCancel();
   await tick();
   ok(rec(id0).cat === '杂项' && !rec(id0).rv, '5 详情里改成「杂项」：分类改了、标记去掉');
+  // ui-instant 只留两帧（按设计拿掉），机器慢时 40 毫秒后已经没了：在面板重新打开那一刻记下来
+  let reopenCls = null;
+  const mo = new t.w.MutationObserver(() => { const m = $('uiSheetMask'); if (reopenCls === null && m.classList.contains('open')) reopenCls = m.className; });
+  mo.observe($('uiSheetMask'), { attributes: true, attributeFilter: ['class'] });
   t.w.JiwenDetail.closeDetail(); await tick();
-  ok(sheetOpen(t) && $('uiSheet').scrollTop === 61 && $('uiSheetMask').classList.contains('ui-instant') && buyG() && /购物 · 支出 · 2 笔/.test(buyG().textContent), '5 关了详情：面板回来（不滑上来、原来的位置），购物剩 2 笔');
+  mo.disconnect();
+  ok(sheetOpen(t) && $('uiSheet').scrollTop === 61 && /\bui-instant\b/.test(reopenCls || '') && buyG() && /购物 · 支出 · 2 笔/.test(buyG().textContent), '5 关了详情：面板回来（不滑上来、原来的位置），购物剩 2 笔');
   await tick(80);
   // 勾选框：勾掉一笔，按钮写「勾上的 N 笔没问题」
   const cb = buyG().querySelector('.rvg-cb input');
