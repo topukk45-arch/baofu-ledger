@@ -70,14 +70,27 @@
         const page=$('pageSearch'), list=$('searchList'), painter=makePainter(list);
         let pageOpen=false, closeT=null;
         // 1024-Y：量条件卡和底部按钮排的高，列表底下按真的高让、卡片贴着按钮排（量不到的老 WebView / jsdom 照旧固定 250）
+        // 1030-RV1：10-30 手机上没条件、卡片里有「最近搜过」+「找到 1873 笔」时，卡片下沿压进了底部「设条件」那一排。
+        //   卡片是按「按钮排的高 + 8」往上放的，压进去只有两种可能：量的时候还没排好版（量到 0）就退回了固定的 84px、之后没再量；
+        //   或者按钮排不在页面最底下（量高对、位置不对）。现在：按钮排按它真的上沿离页面底多远量；量到 0 不退回，下一帧再量（最多 FIT_TRIES 次）；
+        //   页面大小变了（键盘收起、转屏）也重量
+        const FIT_TRIES=20;
+        let fitTry=0, fitRaf=0;
         function fitCard(){
             const card=$('searchCard'), bar=page.querySelector('.sp-bar');
             const ch=card ? card.offsetHeight : 0, bh=bar ? bar.offsetHeight : 0;
-            if(!ch || !bh){ page.classList.remove('sp-fit'); return; }
-            page.style.setProperty('--sp-card-h', ch+'px'); page.style.setProperty('--sp-bar-h', bh+'px');
+            if(!ch || !bh){
+                if(pageOpen && fitTry<FIT_TRIES && window.requestAnimationFrame){ fitTry++; cancelAnimationFrame(fitRaf); fitRaf=requestAnimationFrame(()=>{ if(pageOpen) fitCard(); }); }
+                return;   // 量过一次的照旧用上次量的（不退回固定的 84px）
+            }
+            fitTry=0;
+            const pr=page.getBoundingClientRect(), br=bar.getBoundingClientRect();
+            const lift=Math.max(bh, Math.round(pr.bottom-br.top));   // 按钮排上沿离页面底多远（按真的位置）
+            page.style.setProperty('--sp-card-h', ch+'px'); page.style.setProperty('--sp-bar-h', lift+'px');
             page.classList.add('sp-fit');
         }
-        try{ if(window.ResizeObserver){ const ro=new ResizeObserver(()=>{ if(pageOpen) fitCard(); }); ro.observe($('searchCard')); ro.observe(page.querySelector('.sp-bar')); } }catch(_){}
+        try{ if(window.ResizeObserver){ const ro=new ResizeObserver(()=>{ if(pageOpen) fitCard(); }); ro.observe($('searchCard')); ro.observe(page.querySelector('.sp-bar')); ro.observe(page); } }catch(_){}
+        window.addEventListener('resize', ()=>{ if(pageOpen) fitCard(); });
         function spNoMotion(){ try{ return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(_){ return false; } }
         // 1025-UX：列表往下滑过 24px 收起最近搜过，回到 4px 以内展开（中间留一段，不会来回闪）
         function setFold(on){ page.classList.toggle('sp-folded', !!on); }
@@ -99,6 +112,7 @@
             if(o.rv){ clearState(); searchState.rv=true; }   // 账单页「待确认分类 N 条 ›」：只看待确认分类
             if(o.batch){ clearState(); searchState.batch=o.batch; }   // 4a：导入横幅 / 导入记录的「查看」：只看那一次导入的
             clearTimeout(closeT);
+            fitTry=0;
             pageOpen=true; page.hidden=false;
             page.classList.remove('sp-out'); page.classList.remove('sp-in');
             if(!spNoMotion()){ void page.offsetWidth; page.classList.add('sp-in'); }
