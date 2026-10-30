@@ -64,7 +64,7 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   const g = [...t.d.querySelectorAll('.rvg')];
   ok(sheetOpen(t) && g.length >= 1 && /未分类 · \d+ 笔/.test(g[0].textContent) && /某虚构/.test(g[0].querySelector('.rvg-s').textContent), '3 按推荐的分类分组：「未分类 · N 笔（某某 2、…）」');
   g[0].querySelector('[data-act="open"]').click(); await tick();
-  const cbs = [...t.d.querySelectorAll('.rvg-row input')];
+  const cbs = [...t.d.querySelectorAll('.rvg-cb input')];
   ok(cbs.length === left && cbs.every(c => c.checked), '3 点开看每一笔，默认都勾着');
   cbs[0].click(); await tick();
   ok(/勾上的 \d+ 笔没问题/.test(t.d.querySelector('.rvg-ok').textContent), '3 勾掉一笔：按钮写「勾上的 N 笔没问题」');

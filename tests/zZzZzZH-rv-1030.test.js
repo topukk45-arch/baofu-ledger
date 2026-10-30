@@ -48,7 +48,7 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   const buy = groupOf(/^购物/);
   buy.querySelector('[data-act="open"]').click(); await tick();
   ok($('uiSheetBody') === body0 && sheet.scrollTop === 37, '1 展开：面板没重开（内容区还是原来那个），滚动位置不变');
-  ok(groupOf(/^购物/).querySelectorAll('.rvg-list input[data-id], .rvg-list .rvg-item').length === 3, '1 展开后看得见这组的 3 笔');
+  ok(groupOf(/^购物/).querySelectorAll('.rvg-list .rvg-item').length === 3, '1 展开后看得见这组的 3 笔');
   const sub0 = $('uiSheetSub').textContent;
   ok(/共 12 条/.test(sub0), '1 副标题「共 12 条」：' + sub0);
   groupOf(/^购物/).querySelector('[data-act="ok"]').click(); await t.idle();
@@ -58,6 +58,14 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   ok(rvs().length === 9, '1 这 3 笔去掉了待确认');
   $('rvgUndo').click(); await t.idle();
   ok(rvs().length === 12 && groupOf(/^购物/) && /共 12 条/.test($('uiSheetSub').textContent) && $('uiSheetBody') === body0, '1 撤销：标记回来，那一组回到面板里（面板没重开）');
+
+  // ===== 2. 展开后的每一笔用账单页那一套 =====
+  groupOf(/^购物/).querySelector('[data-act="open"]').click(); await tick();
+  const it = groupOf(/^购物/).querySelector('.rvg-item');
+  ok(it && it.querySelector('.rvg-cb input[type=checkbox]') && it.querySelector('.bl-row[data-id]'), '2 每一笔：左边勾选框 + 账单页那一行（.bl-row）');
+  const amt = it && it.querySelector('.bl-amt');
+  ok(amt && amt.classList.contains('out') && /^−\d+\.\d\d$/.test(amt.textContent), '2 支出带 −、正文色（.bl-amt.out）：' + (amt && amt.textContent));
+  ok(it && /10月\d+日 \d\d:\d\d/.test(it.querySelector('.bl-time').textContent) && /微信/.test(it.querySelector('.bl-sub').textContent), '2 带日期时间和来源：' + (it && it.querySelector('.bl-sub').textContent));
 
   // ===== 6. 分类抽屉「＋ 新建」 =====
   if (sheetOpen(t)) { t.w.JiwenSheet.close(); await tick(); }

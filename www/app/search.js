@@ -1,10 +1,10 @@
 (function(){
         const { $, MODE_HINT, emptyHtml, escapeHtml, isFlow, isSkip, parseRecTime, recMode, round2, safeNum, setRecMode } = window.JiwenBase;   // 用到前面模块的
-        const { getCats, getUserData, isRefund, recentCats, saveUserData, syncRefunds } = window.JiwenStore;   // 用到前面模块的
+        const { getCats, getUserData, isRefund, recentCats, refundedMap, saveUserData, syncRefunds } = window.JiwenStore;   // 用到前面模块的
         const { bindSheetDrag } = window.JiwenPanel;   // 用到前面模块的
         const { askCancel, customAlert, customChoose, customConfirm } = window.JiwenAsk;   // 用到前面模块的
         const { openDtPickerDate } = window.JiwenDate;   // 用到前面模块的
-        const { cal, openDay, openDetail, openWeek, sumFen } = window.JiwenDetail;   // 用到前面模块的
+        const { cal, openDay, openDetail, openWeek, rowHtml, sumFen } = window.JiwenDetail;   // 用到前面模块的
         const { listHtml, makePainter } = window.JiwenLedger;   // 用到前面模块的
         const { askCatRule, openAddModal } = window.JiwenForms;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
@@ -625,8 +625,11 @@
             el.innerHTML=`<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(cat)} · ${rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${open ? '收起 ▴' : '看每一笔 ▸'}</span></button>`
                 + `<button type="button" class="ui-btn primary rvg-ok" data-act="ok"${on.length ? '' : ' disabled'}>${on.length===rs.length ? '这组都没问题' : `勾上的 ${on.length} 笔没问题`}</button>`;
             if(open){
-                const ul=document.createElement('div'); ul.className='rvg-list';
-                rs.forEach(r=>{ const row=document.createElement('label'); row.className='rvg-row'; row.innerHTML=`<input type="checkbox"${RG.off.has(r.id) ? '' : ' checked'} data-id="${escapeHtml(r.id)}"><span class="rvg-r">${escapeHtml(String(r.time||'').slice(5, 10))} ${escapeHtml(cpName(r)||r.remark||'—')}</span><span class="rvg-a">${safeNum(r.money).toFixed(2)}</span>`; ul.appendChild(row); });
+                // 1030-RV1：每一笔用账单页同一套（JiwenDetail.rowHtml：支出 − 正文色、收入 + 绿色、日期时间、来源），左边一个看得见的勾选框（48px 点击区）
+                const ul=document.createElement('div'), rMap=refundedMap(getUserData()); ul.className='rvg-list';
+                rs.forEach(r=>{ const it=document.createElement('div'); it.className='rvg-item'; it.dataset.id=r.id;
+                    it.innerHTML=`<label class="rvg-cb"><input type="checkbox"${RG.off.has(r.id) ? '' : ' checked'} data-id="${escapeHtml(r.id)}" aria-label="勾上这一笔"></label>` + rowHtml(r, rMap, { date:true });
+                    ul.appendChild(it); });
                 el.appendChild(ul);
             }
             return el;

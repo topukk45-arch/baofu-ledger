@@ -2143,6 +2143,11 @@
         .rvg-t { font-weight:bold; font-size:15px; } .rvg-s { flex:1 1 auto; min-width:0; font-size:12.5px; color:var(--c-text-soft); } .rvg-go { font-size:13px; color:var(--c-primary-dark); }
         .rvg-ok { width:100%; }
         .rvg-list { margin-top:8px; } label.rvg-row { display:flex; align-items:center; gap:10px; min-height:48px; border-top:1px dashed var(--c-border); font-size:14px; }
+        /* 1030-RV1：成组确认展开后的每一笔：左边勾选框（48px 点击区、看得见的方框），右边账单页那一行 */
+        .rvg-item { display:flex; align-items:center; gap:2px; border-top:1px dashed var(--c-border); }
+        .rvg-item > .bl-row { flex:1 1 auto; min-width:0; border-bottom:none; }
+        label.rvg-cb { display:flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; min-height:48px; margin-left:-10px; cursor:pointer; }
+        .rvg-cb input { width:22px; height:22px; margin:0; accent-color:var(--c-primary); -webkit-appearance:checkbox; appearance:auto; }
         .rvg-row input { width:22px; height:22px; flex:0 0 22px; } .rvg-r { flex:1; min-width:0; overflow-wrap:anywhere; } .rvg-a { font-variant-numeric:tabular-nums; }
         /* 1023-N：最近搜过：结果页没条件时卡片里 3 条（点了套用、× 删一条、清空），抽屉顶上 5 条（点了套用） */
         .sp-hist { display:flex; flex-direction:column; width:100%; }
