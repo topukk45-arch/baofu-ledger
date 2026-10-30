@@ -6,12 +6,11 @@ APK 由 GitHub 的服务器自动打包，你本地**不需要**装 Android Stud
 
 ## 下载
 
-手机浏览器打开链接直接下载 apk，不用登录、不用解压。几种版本签名一样，可以互相覆盖安装，账本不动。装的是哪一版，看登录页标题下面（或设置页最底下）的版本号，比如 `build 1030-RV5`。
+手机浏览器打开链接直接下载 apk，不用登录、不用解压。几种版本签名一样，可以互相覆盖安装，账本不动。装的是哪一版，看登录页标题下面（或设置页最底下）的版本号，比如 `build 1030-RV5`。以前的体验版（1030-RV1～RV5 等）还留在 Releases 页面里，都已经合进 main。
 
 | 版本 | 是什么 | 下载 |
 |---|---|---|
-| **体验版 1030-RV5**（最新） | 还没合回 main 的改版：待确认分类的成组确认、AI 按组整理新一版 | [jiwen-1030-RV5.apk](https://github.com/topukk45-arch/baofu-ledger/releases/download/1030-RV5/jiwen-1030-RV5.apk) |
-| 最新测试版 | main 上最新一次打包（现在是 1029-D），只有 main 有新提交才更新 | [jiwen-latest.apk](https://github.com/topukk45-arch/baofu-ledger/releases/download/latest-build/jiwen-latest.apk) |
+| **最新测试版**（推荐） | main 上最新一次打包（现在是 1030-RV5：待确认分类的成组确认、AI 按组整理新一版），main 有新提交就更新、链接不变 | [jiwen-latest.apk](https://github.com/topukk45-arch/baofu-ledger/releases/download/latest-build/jiwen-latest.apk) |
 | 正式版 记问 1021 β | 账单导入经过两轮真账单实测 | [jiwen-1021-beta.apk](https://github.com/topukk45-arch/baofu-ledger/releases/download/v1021-beta/jiwen-1021-beta.apk) |
 | 上一个正式版 记问 1016 α | 留着备用 | [jiwen-1016-alpha.apk](https://github.com/topukk45-arch/baofu-ledger/releases/download/v1016-alpha/jiwen-1016-alpha.apk) |
 
