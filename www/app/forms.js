@@ -881,10 +881,24 @@
             let info; try{ info=S.archiveInfo(); }catch(_){ done(); return; }
             const kw=String((info.cps||[])[rec.cp]||'').trim().slice(0, 32);
             if(kw.length<2 || (info.catRules||[]).some(r=>r.kw===kw && r.cat===cat)){ done(); return; }
-            customConfirm(`以后「${kw}」的账单都记成「${cat}」吗？\n\n选了以后，导入时直接照这个分类（在「管理导入规则」里能改、能删）。`, ()=>{
+            const save=()=>{
                 const rules={ cat:(info.catRules||[]).filter(r=>r.kw!==kw).concat([{ kw, cat }]), type:info.typeRules||[], map:info.catMaps||[], big:info.bigRules||[], sum:info.sumRules||[] };
                 S.rulesSave(rules).then(()=>done(), ()=>done());
-            }, '以后也这么记？', { okText:'以后都这样记', cancelText:'只改这一条', onCancel:done });
+            };
+            // 实测 10-30：像个人的（ai.js 的 personLike）不问，只改这一条；问的时候默认「只改这一条」，「以后都这样记」是下面那颗描边按钮，写清影响
+            const ask=AI=>{
+                if(AI && AI.personLike && AI.personLike(kw, rec.oc || (rec.raw && rec.raw.kind), rec.raw && rec.raw.desc)){ done(); return; }
+                const left=getUserData().filter(r=>r.rv===1 && r.id!==rec.id && Number.isInteger(r.cp) && r.cp===rec.cp).length;
+                customConfirm(ruleAskMsg(`「${kw}」的账单`, kw, cat, left), done, '以后也这么记？', { okText:'只改这一条', onCancel:done, alt:{ text:'以后都这样记', onClick:save } });
+            };
+            if(window.JiwenImportAI) ask(window.JiwenImportAI);
+            else loadImportUI().then(()=>ask(window.JiwenImportAI), ()=>ask(null));
+        }
+        // 「以后也这么记？」的话（详情 / 逐条确认里改分类、成组确认里按对方改共用）：写清选了以后会怎样。
+        //   规则只管以后导入的；已经在账本里、还在待确认的同一个对方不跟着改（写几笔，要改去成组确认）
+        function ruleAskMsg(what, kw, cat, left){
+            return `以后${what}都记成「${cat}」吗？\n\n选「以后都这样记」：以后导入时，${what}直接记成「${cat}」（在「管理导入规则」里能改、能删）。`
+                + (left>0 ? `\n\n已经在账本里的不跟着改：这个存档里还有 ${left} 笔「${kw}」的分类在待确认，要改可以在「成组确认」里改。` : '');
         }
         saveEdit.addEventListener('click', () => doSaveEdit(false));
         function doSaveEdit(force){
@@ -969,5 +983,5 @@
             m.querySelectorAll('.cc, .day-switch').forEach(e=>parts.push(e.className));
             return JSON.stringify(parts);
         }
-        window.JiwenForms = { askCatRule, deleteRecord, deleteWithUndo, get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, openRefund, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
+        window.JiwenForms = { askCatRule, ruleAskMsg, deleteRecord, deleteWithUndo, get billCatSel(){ return billCatSel; }, get billTypeSel(){ return billTypeSel; }, closeEditModal, closeRefund, closeTplEditor, get editCatSel(){ return editCatSel; }, get editId(){ return editId; }, get editTypeSel(){ return editTypeSel; }, formSnaps, formState, getModeChips, openAddModal, openRefund, refreshBillCatChipsIfOpen, refreshEditCatChipsIfOpen, refundLineHtml, renderEditCatChips, renderEditTypeChips, resetBillForm, setModeChips, pickBillCat, pickEditCat, syncRecRows, openCatDrawer, openModeSheet };   // forms 模块对外只有这一个入口（get / set 的是会变的变量，读写的时候才去取）
 })();

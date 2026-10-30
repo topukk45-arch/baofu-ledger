@@ -61,6 +61,14 @@
     }
     return false;
   }
+  // 实测 10-30：改了分类要不要问「以后都这样记」：像个人的不问（以后全部照这个记很可能错）。
+  //   personal() 那套，再加上：两三个汉字、没有店 / 公司 / 馆 / 超市这类商户字样的（不看是不是常见姓：馬伍旺、鹏飞这种）
+  function personLike(cp, oc, desc) {
+    if (personal(cp, oc, desc)) return true;
+    var c = String(cp || '').trim(); if (!c || SHOP_RE.test(c)) return false;
+    var han = c.replace(/[\s·.]/g, '');
+    return /^[\u4e00-\u9fff]{2,3}$/.test(han);
+  }
 
   // ---------- 全文 ----------
   function csvCell(v) {
@@ -406,6 +414,6 @@
   }
 
   return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, changesOf: changesOf, HEAD: HEAD, MODE_NAME: MODE_NAME, MODE_OF: MODE_OF, FLAG_OF: FLAG_OF, REMARK_MAX: REMARK_MAX,
-           mask: mask, personal: personal, exportText: exportText, replyHead: replyHead, parseReply: parseReply,
+           mask: mask, personal: personal, personLike: personLike, exportText: exportText, replyHead: replyHead, parseReply: parseReply,
            GROUP_HEAD: GROUP_HEAD, groupHead: groupHead, groupText: groupText, groupLine: groupLine, isGenericDesc: isGenericDesc, namePre: namePre, GENERIC_DESC: GENERIC_DESC, parseGroupReply: parseGroupReply };
 });

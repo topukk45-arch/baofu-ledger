@@ -33,8 +33,8 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   ok(sheetOpen(t) && t.d.getElementById('uiPickList'), '1 「改分类」：拉出分类抽屉');
   [...t.d.querySelectorAll('#uiPickList .cc')].find(x => x.textContent.trim() === '购物').click(); await t.idle();
   ok(t.recs().find(r => r.id === first.id).cat === '购物' && !t.recs().find(r => r.id === first.id).rv, '1 改成购物：分类改了、标记去掉');
-  ok(t.ask() && /以后「某虚构丙店」的账单都记成「购物」吗/.test(t.ask().msg) && $('askOk').textContent === '以后都这样记' && $('askCancel').textContent === '只改这一条', '1 改了分类问一句「以后也这么记？」（以后都这样记 / 只改这一条）');
-  await t.askOk(); await t.idle(); await tick(60);
+  ok(t.ask() && /以后「某虚构丙店」的账单都记成「购物」吗/.test(t.ask().msg) && $('askOk').textContent === '只改这一条' && $('askCancel').textContent === '以后都这样记' && $('askCancel').classList.contains('alt'), '1 改了分类问一句「以后也这么记？」（实测 10-30：主按钮「只改这一条」，「以后都这样记」在下面、描边）');
+  await t.askCancel(); await t.idle(); await tick(60);
   ok(((t.arch().importRules || {}).cat || []).some(r => r.kw === '某虚构丙店' && r.cat === '购物'), '1 「以后都这样记」：存了一条分类规则');
   try { t.w.JiwenDetail.closeDetail(); } catch (_) {}
   // ===== 2. 逐条确认 =====
@@ -54,7 +54,7 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   ok(chip, '2 「改成…」有常用分类小标签');
   const n0 = rvs().length; chip.click(); await t.idle();
   ok(rvs().length === n0 - 1 && t.ask() && /以后「/.test(t.ask().msg), '2 点一个小标签就改，改了问以后也这么记吗');
-  await t.askCancel(); await tick();
+  await t.askOk(); await tick();
   ok(sheetOpen(t) && $('uiSheetTitle').textContent === '待确认 4 / 5', '2 「只改这一条」：接着下一条');
   $('rvOneClose').click(); await tick();
   ok(!sheetOpen(t), '2 「关闭」');
@@ -62,7 +62,7 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   const left = rvs().length;
   $('rvGroupBtn').click(); await tick();
   const g = [...t.d.querySelectorAll('.rvg')];
-  ok(sheetOpen(t) && g.length >= 1 && /未分类 · 支出 \d+ 笔/.test(g[0].textContent) && /某虚构/.test(g[0].querySelector('.rvg-s').textContent), '3 按推荐的分类和收支分组：「未分类 · 支出 N 笔（某某 2、…）」');
+  ok(sheetOpen(t) && g.length >= 1 && /未分类 · 支出 · \d+ 笔/.test(g[0].textContent) && /某虚构/.test(g[0].querySelector('.rvg-s').textContent), '3 按推荐的分类和收支分组：「未分类 · 支出 N 笔（某某 2、…）」');
   // 1030-RV1：「未分类」组没有「这组都没问题」（会把几百笔确认成未分类），主按钮是「交给 AI 按组整理 ›」；按对方改分类、有推荐分类的组的确认见 zZzZzZH
   ok(!g[0].querySelector('.rvg-ok') && /交给 AI 按组整理/.test(g[0].querySelector('.rvg-ai').textContent), '3 未分类组：没有「这组都没问题」，主按钮「交给 AI 按组整理 ›」');
   $('rvGroupClose').click(); await tick();

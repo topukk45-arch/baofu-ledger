@@ -1178,7 +1178,30 @@ async function run(cfg, port, browser) {
           else if (!u || res.firstElementChild !== u && !res.contains(u)) bad.push('完成页没有「撤销这次导入」那一行');
           return { bad, ok: !bad.length };
         })));
+        // 实测 10-30：「这几笔」面板（结果页点「新建」）：标题一行、放不下省略，不压金额
+        await page.evaluate(() => { const g = document.querySelector('#impResTiles .imp-tile-go'); if (g) g.click(); }); await page.waitForTimeout(700);
+        await shot(page, size, '这几笔面板', '结果页点新建');
+        results.push(Object.assign({ name: 'rows-panel', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], rs = [...document.querySelectorAll('#impRows .imp-rs')];
+          if (!rs.length) bad.push('面板没打开');
+          rs.forEach(r => { const t = r.querySelector('.imp-sr-t').getBoundingClientRect(), a = r.querySelector('.imp-sr-amt').getBoundingClientRect(); if (t.right > a.left + 0.5) bad.push('标题压着金额'); if (t.height > 26) bad.push('标题折成了两行'); });
+          return { bad: [...new Set(bad)], ok: !bad.length };
+        })));
+        await page.evaluate(() => { const c = document.getElementById('impRowsClose'); if (c) c.click(); }); await page.waitForTimeout(400);
         await page.evaluate(() => { const b = document.getElementById('impBackToLedger'); if (b) b.click(); }); await page.waitForTimeout(600);
+        // 实测 10-30：账单原文（能选字，单号那行右边「复制」）
+        await page.evaluate(() => { const r = window.JiwenStore.getUserData().find(x => x.raw && x.raw.no); if (r) { window.JiwenDetail.openDetail(r.id); const b = document.getElementById('detailRawBtn'); if (b) b.click(); } }); await page.waitForTimeout(700);
+        await page.evaluate(() => { const d = document.getElementById('detailRaw'); if (d) d.scrollIntoView({ block: 'center' }); }); await page.waitForTimeout(200);
+        await shot(page, size, '账单详情', '账单原文（单号能复制）');
+        results.push(Object.assign({ name: 'detail-raw', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], d = document.getElementById('detailRaw'), c = d && d.querySelector('.detail-raw-copy');
+          if (!d || d.hidden) bad.push('原文没展开');
+          else if (!c) bad.push('单号那行没有「复制」');
+          else { const r = c.getBoundingClientRect(), t = d.querySelector('.detail-raw-l.no .detail-raw-t').getBoundingClientRect(); if (r.width < 48 && r.width + 16 < 48) bad.push('复制按钮点击区不到 48 宽'); if (t.right > r.left + 0.5) bad.push('单号压着「复制」'); if (r.right > d.getBoundingClientRect().right + 0.5) bad.push('「复制」出了框'); }
+          if (d && getComputedStyle(d).userSelect !== 'text') bad.push('原文不能选字：' + getComputedStyle(d).userSelect);
+          return { bad, ok: !bad.length };
+        })));
+        await closeAll(page);
         await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(400);
         await shot(page, size, '账单页', '刚导入的横幅');
         await page.evaluate(() => { const c = document.getElementById('rvChip'); if (c) c.click(); }); await page.waitForTimeout(600);
@@ -1208,6 +1231,20 @@ async function run(cfg, port, browser) {
           return { bad: [...new Set(bad)], ok: !bad.length, items: document.querySelectorAll('#rvgList .rvg-item').length, cps: document.querySelectorAll('#rvgList .rvg-cp').length };
         });
         results.push(Object.assign({ name: 'rv-group-rows', cfg: size, clip: true }, await rvGeo()));
+        // 实测 10-30：两块小标题；每张卡抬头两行，「看每一笔 / 按对方看」在第二行右边、不出卡片、不压摘要；「这组都没问题」不是深色主按钮
+        results.push(Object.assign({ name: 'rv-group-head', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [];
+          if (!document.querySelector('#rvgList .rvg-sec')) bad.push('没有小标题');
+          document.querySelectorAll('#rvgList .rvg').forEach(g => {
+            const c = g.getBoundingClientRect(), t = g.querySelector('.rvg-t').getBoundingClientRect(), go = g.querySelector('.rvg-go').getBoundingClientRect(), sm = g.querySelector('.rvg-s').getBoundingClientRect();
+            if (go.top < t.bottom - 0.5) bad.push('「看每一笔」没在第二行');
+            if (go.right > c.right + 0.5) bad.push('「看每一笔」出了卡片');
+            if (sm.right > go.left + 0.5) bad.push('摘要压着「看每一笔」');
+            if (sm.height > 22) bad.push('摘要折成了两行');
+            const ok = g.querySelector('.rvg-ok'); if (ok && ok.classList.contains('primary')) bad.push('「这组都没问题」还是主按钮');
+          });
+          return { bad: [...new Set(bad)], ok: !bad.length };
+        })));
         await page.evaluate(() => { const g = [...document.querySelectorAll('#rvgList .rvg')].find(x => x.dataset.cat === '未分类'); if (g) g.querySelector('[data-act="open"]').click(); }); await page.waitForSelector('#rvgList .rvg-cp', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(300);
         await shot(page, size, '成组确认', '未分类按对方一行');
         results.push(Object.assign({ name: 'rv-group-cps', cfg: size, clip: true }, await rvGeo()));
@@ -1229,6 +1266,21 @@ async function run(cfg, port, browser) {
           else { const r = b.getBoundingClientRect(), f = document.getElementById('uiSheetFoot').getBoundingClientRect(); if (r.height < 48) bad.push('新建按钮不到 48 高'); if (r.bottom > f.top + 0.5) bad.push('新建按钮被底部按钮排挡住'); if (!/新建「虚构新类」并选上/.test(b.textContent)) bad.push('按钮字不对：' + b.textContent); }
           return { bad, ok: !bad.length };
         })));
+        // 实测 10-30：「以后也这么记？」：主按钮「只改这几笔」在上，「以后都这样记」在下、描边
+        await closeAll(page); await tab(page, 'ledger'); await page.waitForTimeout(200);
+        await page.evaluate(() => { const c = document.getElementById('rvChip'); if (c) c.click(); }); await page.waitForTimeout(600);
+        await page.evaluate(() => { const c = document.getElementById('rvGroupBtn'); if (c) c.click(); }); await page.waitForTimeout(700);
+        await page.evaluate(() => { const g = [...document.querySelectorAll('#rvgList .rvg')].find(x => x.dataset.cat === '未分类'); if (g) g.querySelector('[data-act="open"]').click(); }); await page.waitForSelector('#rvgList .rvg-cp', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(300);
+        await page.evaluate(() => { const b = [...document.querySelectorAll('#rvgList .rvg-cp')].find(x => /店/.test(x.textContent)); if (b) b.click(); }); await page.waitForTimeout(700);
+        await page.evaluate(() => { const c = [...document.querySelectorAll('#uiPickList .cc')].find(x => x.textContent.trim() === '吃饭'); if (c) c.click(); }); await page.waitForSelector('#askMask[style*="flex"]', { timeout: 8000 }).catch(() => {}); await page.waitForTimeout(500);
+        await shot(page, size, '以后也这么记', '只改这几笔在上');
+        results.push(Object.assign({ name: 'rule-ask', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], o = document.getElementById('askOk'), c = document.getElementById('askCancel');
+          if (document.getElementById('askMask').style.display !== 'flex') bad.push('没问「以后也这么记」');
+          else { if (o.textContent !== '只改这几笔' || !o.classList.contains('primary')) bad.push('主按钮不是「只改这几笔」'); if (c.textContent !== '以后都这样记' || !c.classList.contains('alt')) bad.push('下面那颗不是描边的「以后都这样记」'); if (o.getBoundingClientRect().top > c.getBoundingClientRect().top) bad.push('「只改这几笔」没在上面'); }
+          return { bad, ok: !bad.length };
+        })));
+        await page.evaluate(() => { const o = document.getElementById('askOk'); if (o && document.getElementById('askMask').style.display === 'flex') o.click(); }); await page.waitForTimeout(400);
         await closeAll(page); await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
       }
       // 账单页、统计页、设置页：字被切

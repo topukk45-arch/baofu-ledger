@@ -343,6 +343,7 @@
         .ui-btn.primary { background:var(--c-fill); color:var(--c-on-fill);
             border-color:transparent; font-weight:bold; box-shadow:inset 0 0 0 1px var(--c-fill-edge), 0 3px 10px rgba(var(--c-shadow-rgb),0.35); }
         .ui-btn.danger { color:var(--c-neg); }
+        .ui-btn.alt { border-color:var(--c-ink); color:var(--c-ink); font-weight:bold; }   /* 确认框里下面那颗是另一个选择（不是取消）：描边、强调色字 */
         /* 1017-O：危险操作的确认按钮（覆盖、删除、清空、撤销、恢复、批量改）：警示色实心，文案写清做什么 */
         .ui-btn.warn { background:var(--c-neg); color:#fff; border-color:transparent; font-weight:bold; box-shadow:0 3px 10px rgba(171,63,37,0.3); }
         /* 底部面板里的说明文字：左对齐、分段，第一段是结论，后面一条一条写影响 */
@@ -2139,9 +2140,18 @@
         .rvr-sub, .rvr-why { font-size:13px; color:var(--c-text-soft); margin-top:4px; line-height:1.5; } .rvr-rec { margin-top:8px; font-size:15px; }
         .rvr-h { font-size:13px; color:var(--c-text-soft); margin:4px 2px 6px; }
         .rvg { border:1px solid var(--c-border); border-radius:12px; padding:4px 10px 10px; margin-bottom:10px; background:var(--c-surface); }
-        button.rvg-head { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; width:100%; min-height:48px; border:0; background:none; padding:4px 0; font-family:inherit; text-align:left; color:var(--c-text); cursor:pointer; }
-        .rvg-t { font-weight:bold; font-size:15px; } .rvg-s { flex:1 1 auto; min-width:0; font-size:12.5px; color:var(--c-text-soft); } .rvg-go { font-size:13px; color:var(--c-primary-dark); }
-        .rvg-ok { width:100%; }
+        /* 实测 10-30：卡片抬头两行固定排法：第一行「分类 · 收支 · N 笔」，第二行对方摘要（一行省略）+ 右边「看每一笔 / 按对方看」 */
+        button.rvg-head { display:flex; flex-direction:column; align-items:stretch; gap:2px; width:100%; min-height:48px; border:0; background:none; padding:6px 0; font-family:inherit; text-align:left; color:var(--c-text); cursor:pointer; }
+        .rvg-t { font-weight:bold; font-size:15px; }
+        .rvg-l2 { display:flex; align-items:center; gap:8px; min-width:0; }
+        .rvg-s { flex:1 1 auto; min-width:0; font-size:12.5px; color:var(--c-t1); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .rvg-go { flex:none; font-size:13px; color:var(--c-ink); }
+        .rvg-ok { width:100%; margin-top:6px; }
+        /* 「这组都没问题」：描边的次要按钮（主按钮是未分类那组的「交给 AI 按组整理」） */
+        .ui-btn.rvg-ok:not([disabled]) { border-color:var(--c-ink); color:var(--c-ink); font-weight:bold; }
+        .rvg-sec { font-size:13px; font-weight:bold; color:var(--c-t1); margin:14px 2px 8px; }
+        .rvg-sec:first-child { margin-top:2px; }
+        .rvg-warn { font-size:13px; line-height:1.5; color:var(--c-warn); margin:2px 0 4px; }
         .rvg-list { margin-top:8px; } label.rvg-row { display:flex; align-items:center; gap:10px; min-height:48px; border-top:1px dashed var(--c-border); font-size:14px; }
         /* 1030-RV1：成组确认展开后的每一笔：左边勾选框（48px 点击区、看得见的方框），右边账单页那一行 */
         .rvg-item { display:flex; align-items:center; gap:2px; border-top:1px dashed var(--c-border); }
@@ -2149,7 +2159,7 @@
         label.rvg-cb { display:flex; align-items:center; justify-content:center; flex:0 0 48px; width:48px; min-height:48px; margin-left:-10px; cursor:pointer; }
         .rvg-cb input { width:22px; height:22px; margin:0; accent-color:var(--c-primary); -webkit-appearance:checkbox; appearance:auto; }
         /* 1030-RV1：「未分类」组展开后按对方一行：名字 · 笔数 · 合计 ›，整行 54 高能点 */
-        .rvg-ai { width:100%; }
+        .rvg-ai { width:100%; margin-top:6px; }
         .rvg-cps-h, .rvg-wait { font-size:13px; color:var(--c-t1); padding:8px 2px 4px; }
         button.rvg-cp { display:flex; align-items:center; gap:8px; width:100%; min-height:var(--row-2, 54px); padding:4px 2px; border:0; border-top:1px dashed var(--c-border); background:none; font-family:inherit; text-align:left; color:var(--c-text); cursor:pointer; }
         .rvg-cp-n { flex:1 1 auto; min-width:0; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2301,6 +2311,13 @@
         .dw-day-ns .dw-day-n { color:var(--c-pos); }
         /* 导入简化第 15 版：账单详情里的「账单原文」 */
         .detail-raw { white-space:pre-wrap; font-size:13px; color:var(--c-text-soft); line-height:1.6; margin-top:6px; word-break:break-all; }
+        /* 账单原文能长按选字、复制（全 App 默认禁选，这里单独放开）；单号那行右边「复制」 */
+        .detail-raw, .detail-raw .detail-raw-t { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
+        .detail-raw-l.no { display:flex; align-items:center; gap:8px; }
+        .detail-raw-l.no .detail-raw-t { flex:1 1 auto; min-width:0; }
+        button.detail-raw-copy { flex:none; position:relative; min-height:32px; padding:0 12px; border:1px solid var(--c-border-mid); border-radius:var(--r-m, 12px); background:var(--c-surface);
+            color:var(--c-ink); font-family:inherit; font-size:13px; font-weight:bold; cursor:pointer; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+        button.detail-raw-copy::after { content:''; position:absolute; left:-8px; right:-8px; top:50%; height:48px; margin-top:-24px; }   /* 点击区撑到 48 */
         #detailRawBtn { min-height:var(--ui-tap); padding:0; font-size:14px; }
         /* 1024-T 后修：性能记录、导入量度的文字能长按选中复制（「复制全部」在手机上没复制上时的退路） */
         pre.perf-list { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }

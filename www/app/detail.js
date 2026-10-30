@@ -88,10 +88,8 @@
             f.appendChild(v);
             // 导入简化第 15 版：账单原文（导入时存的那一行），点了展开
             if(rec.raw && typeof rec.raw==='object'){
-                const R=rec.raw, parts=[['交易类型', R.kind], ['对方', R.cp], ['商品说明', R.desc], ['状态', R.status], ['支付方式', R.pm], ['备注', R.note], ['单号', R.no]].filter(x=>x[1]);
                 const b=document.createElement('button'); b.type='button'; b.className='link-btn'; b.id='detailRawBtn'; b.textContent='看账单原文 ›';
-                const box=document.createElement('div'); box.className='detail-raw'; box.id='detailRaw'; box.hidden=true;
-                box.textContent=parts.map(x=>x[0]+'：'+x[1]).join('\n');
+                const box=rawBox(rec.raw); box.id='detailRaw'; box.hidden=true;
                 b.addEventListener('click', ()=>{ box.hidden=!box.hidden; b.textContent=box.hidden ? '看账单原文 ›' : '收起账单原文'; });
                 f.appendChild(b); f.appendChild(box);
             }
@@ -111,6 +109,27 @@
                 });
                 f.appendChild(b);
             }
+        }
+        // 账单原文那一块（导入时存的那一行）：能长按选字（全 App 默认不让选，这里放开）；「单号」那行右边「复制」（点击区 48px），复制了底部小条说一声。
+        //   支付宝账单那一栏叫「交易分类」（日用百货、餐饮美食……），微信叫「交易类型」（商户消费、转账……），照来源写
+        function rawBox(R){
+            const box=document.createElement('div'); box.className='detail-raw';
+            const parts=[[R.app==='alipay' ? '交易分类' : '交易类型', R.kind], ['对方', R.cp], ['商品说明', R.desc], ['状态', R.status], ['支付方式', R.pm], ['备注', R.note], ['单号', R.no]].filter(x=>x[1]);
+            parts.forEach(([k, v])=>{
+                const l=document.createElement('div'); l.className='detail-raw-l';
+                const t=document.createElement('span'); t.className='detail-raw-t'; t.textContent=k+'：'+v; l.appendChild(t);
+                if(k==='单号'){
+                    l.classList.add('no');
+                    const c=document.createElement('button'); c.type='button'; c.className='detail-raw-copy'; c.textContent='复制'; c.setAttribute('aria-label', '复制单号');
+                    c.addEventListener('click', ev=>{
+                        ev.stopPropagation();
+                        window.JiwenPanel.copyText(v).then(ok=>window.JiwenPanel.snack({ over:true, text:ok ? '已复制单号' : '没复制上，长按单号选中复制' }));
+                    });
+                    l.appendChild(c);
+                }
+                box.appendChild(l);
+            });
+            return box;
         }
         // 1017-L：AI 标记（「AI 检查导入结果」打的）：详情里一行「AI 觉得可能和 X 月 X 日那笔重复」+ 理由，「知道了，去掉标记」。
         //   标记只有用过开发开关里的 AI 检查才会有，有就显示（不看开关）；去掉标记就是改这一条记录（不算 AI 修改，撤销那次 AI 修改时这一项按「你后来改过」不动）

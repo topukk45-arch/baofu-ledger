@@ -6,7 +6,7 @@
         const { openDtPickerDate } = window.JiwenDate;   // 用到前面模块的
         const { cal, openDay, openDetail, openWeek, rowHtml, sumFen } = window.JiwenDetail;   // 用到前面模块的
         const { listHtml, makePainter } = window.JiwenLedger;   // 用到前面模块的
-        const { askCatRule, openAddModal } = window.JiwenForms;   // 用到前面模块的
+        const { askCatRule, openAddModal, ruleAskMsg } = window.JiwenForms;   // 用到前面模块的
         const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
 
         // ===== 搜索状态：备注 / 金额 / 日期 / 收支 / 统计 / 分类（1023-F 定的口径，1023-G 从账单页搬到搜一笔）=====
@@ -629,10 +629,18 @@
         // 1030-RV1：按「分类 + 收支」分组（原来只按分类，未分类里付给某人的和别人转来的混在一组，整组改分类会一起改错）；退款算收入
         function rgGroups(){
             const by=new Map(); rvList().forEach(r=>{ const c=r.cat||'未分类', io=r.type==='expense' ? 'expense' : 'income', k=c+'|'+io; if(!by.has(k)) by.set(k, { key:k, cat:c, io, rs:[] }); by.get(k).rs.push(r); });
-            return [...by.values()].sort((a, b)=>b.rs.length-a.rs.length);
+            // 实测 10-30：未分类的在前（要你定），有分类的按笔数；「转账」这类排在有分类的最后（里面最容易混着扫个人收钱码的真实消费）
+            const rank=g=>g.cat==='未分类' ? 0 : rgIsTransfer(g) ? 2 : 1;
+            return [...by.values()].sort((a, b)=>rank(a)-rank(b) || b.rs.length-a.rs.length);
         }
+        function rgIsTransfer(g){ return /转账/.test(g.cat); }
         function rgSub(n){ return `按推荐的分类和收支分组 · 共 ${n} 条`; }
         function ioName(io){ return io==='expense' ? '支出' : '收入'; }
+        // 每张卡的抬头（实测 10-30 统一排法）：第一行「分类 · 收支 · N 笔」，第二行对方摘要（一行，放不下省略）+ 右边「看每一笔 / 按对方看」，位置固定
+        function rgHead(g, top, go, open){
+            return `<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(g.cat)} · ${ioName(g.io)} · ${g.rs.length} 笔</span>`
+                + `<span class="rvg-l2"><span class="rvg-s">${escapeHtml(top)}</span><span class="rvg-go">${go}</span></span></button>`;
+        }
         function rgGroupEl(g){
             const rs=g.rs, cat=g.cat;
             const cps=new Map(); rs.forEach(r=>{ const n=cpName(r)||'没有对方'; /* 1030-RV4：外面已经套了括号，原来写成「（（没有对方） 6…）」 */ cps.set(n, (cps.get(n)||0)+1); });
@@ -640,8 +648,10 @@
             const on=rs.filter(r=>!RG.off.has(r.id)), open=RG.open===g.key;
             const el=document.createElement('div'); el.className='rvg'; el.dataset.cat=cat; el.dataset.io=g.io; el.dataset.key=g.key;
             if(g.cat==='未分类') return rgUncatEl(g, el, top, open);
-            el.innerHTML=`<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(cat)} · ${ioName(g.io)} ${rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${open ? '收起 ▴' : '看每一笔 ▸'}</span></button>`
-                + `<button type="button" class="ui-btn primary rvg-ok" data-act="ok"${on.length ? '' : ' disabled'}>${on.length===rs.length ? '这组都没问题' : `勾上的 ${on.length} 笔没问题`}</button>`;
+            // 实测 10-30：「这组都没问题」是描边的次要按钮（原来和「交给 AI 按组整理」一样是深色大按钮，意思却相反）；转账那组多一句提醒
+            el.innerHTML=rgHead(g, top, open ? '收起 ▴' : '看每一笔 ▸', open)
+                + (rgIsTransfer(g) ? '<div class="rvg-warn">转账里可能有付给个人的消费，建议先看每一笔</div>' : '')
+                + `<button type="button" class="ui-btn rvg-ok" data-act="ok"${on.length ? '' : ' disabled'}>${on.length===rs.length ? '这组都没问题' : `勾上的 ${on.length} 笔没问题`}</button>`;
             if(open){
                 // 1030-RV1：每一笔用账单页同一套（JiwenDetail.rowHtml：支出 − 正文色、收入 + 绿色、日期时间、来源），左边一个看得见的勾选框（48px 点击区）
                 const ul=document.createElement('div'), rMap=refundedMap(getUserData()); ul.className='rvg-list';
@@ -670,7 +680,7 @@
         }
         function rgUncatEl(g, el, top, open){
             el.classList.add('rvg-uncat');
-            el.innerHTML=`<button type="button" class="rvg-head" data-act="open" aria-expanded="${open}"><span class="rvg-t">${escapeHtml(g.cat)} · ${ioName(g.io)} ${g.rs.length} 笔</span><span class="rvg-s">（${escapeHtml(top)}）</span><span class="rvg-go">${open ? '收起 ▴' : '按对方看 ▸'}</span></button>`
+            el.innerHTML=rgHead(g, top, open ? '收起 ▴' : '按对方看 ▸', open)
                 + `<button type="button" class="ui-btn primary rvg-ai" data-act="ai">交给 AI 按组整理 ›</button>`;
             if(!open) return el;
             const ul=document.createElement('div'); ul.className='rvg-list rvg-cps';
@@ -720,17 +730,19 @@
             try{ info=S.archiveInfo(); }catch(_){ next(); return; }
             const byDesc=c.by!=='cp', kw=String(byDesc ? (c.desc||'') : (c.cp||'')).trim().slice(0, 32), on=byDesc ? 'desc' : '';
             if(kw.length<2 || kw==='—' || (info.catRules||[]).some(r=>r.kw===kw && r.cat===cat && (r.on||'')===on)){ next(); return; }
-            const ids=new Set(c.ids);
-            const person=/\*/.test(c.cp||'') || g.rs.some(r=>ids.has(r.id) && (/转账|红包/.test(r.oc||'') || (r.raw && /转账|红包/.test(r.raw.kind||''))));
+            const ids=new Set(c.ids), mine=g.rs.filter(r=>ids.has(r.id));
+            // 实测 10-30：和个人之间的（交易类型转账、红包，对方带 *，或对方像个人：ai.js 的 personLike）不问，只改这几笔
+            const AI=window.JiwenImportAI, person=/\*/.test(c.cp||'') || mine.some(r=>/转账|红包/.test(r.oc||'') || (r.raw && /转账|红包/.test(r.raw.kind||'')))
+                || !!(AI && AI.personLike && c.cp && mine.some(r=>AI.personLike(c.cp, r.oc || (r.raw && r.raw.kind), r.raw && r.raw.desc)));
+            if(person){ next(); return; }
             const save=()=>{
                 const rule=byDesc ? { kw, cat, on:'desc' } : { kw, cat };
                 S.rulesSaveIn(b, rule).then(()=>next(), err=>{ customAlert('规则没存上：' + (err && (err.code || err.message) || err) + '。分类已经改好了。', '以后也这么记？'); next(); });
             };
-            const msg=(byDesc ? `以后商品说明里有「${kw}」的账单都记成「${cat}」吗？` : `以后「${kw}」的账单都记成「${cat}」吗？`)
-                + '\n\n选了以后，导入时直接照这个分类（在「管理导入规则」里能改、能删）。'
-                + (person ? '\n\n这是和个人之间的转账、红包，下次不一定还是这一类，所以默认只改这几笔。' : '');
-            if(!person) customConfirm(msg, save, '以后也这么记？', { okText:'以后都这样', cancelText:'只改这几笔', onCancel:next });
-            else { customConfirm(msg, next, '以后也这么记？', { okText:'只改这几笔', onCancel:next, extra:{ text:'以后都这样', onClick:save } }); askCancel.style.display='none'; }
+            // 还在待确认的同一个对方（这几笔以外）：规则不管已经在账本里的，写几笔让人知道
+            const left=getUserData().filter(r=>r.rv===1 && !ids.has(r.id) && (byDesc ? String((r.raw && r.raw.desc)||'').includes(kw) : cpName(r)===kw)).length;
+            customConfirm(ruleAskMsg(byDesc ? `商品说明里有「${kw}」的账单` : `「${kw}」的账单`, kw, cat, left), next, '以后也这么记？',
+                { okText:'只改这几笔', onCancel:next, alt:{ text:'以后都这样记', onClick:save } });
         }
         // 画整张（打开、撤销以后）；只换一组（展开、勾选、确认以后），别的组和滚动位置不动
         function rgPaint(only){
@@ -741,10 +753,17 @@
             const els=[...RG.box.querySelectorAll('.rvg')];
             if(only!==undefined){
                 const old=els.find(x=>x.dataset.key===only), g=gs.find(x=>x.key===only);
-                if(old){ if(g) old.replaceWith(rgGroupEl(g)); else old.remove(); return; }
+                if(old && g){ old.replaceWith(rgGroupEl(g)); return; }   // 一组没了：整张重画（那一块空了要把小标题一起拿掉）
             }
             const sh=document.getElementById('uiSheet'), st=sh ? sh.scrollTop : 0;   // 整张换掉的一瞬间内容变矮，浏览器会把滚动位置夹回顶上：放回去
-            RG.box.textContent=''; gs.forEach(g=>RG.box.appendChild(rgGroupEl(g)));
+            RG.box.textContent='';
+            // 实测 10-30：分两块，块上小标题：「要你定的」放未分类的组，「推荐的分类，看一眼」放有分类的组
+            let sec=null;
+            gs.forEach(g=>{
+                const k=g.cat==='未分类' ? 'todo' : 'look';
+                if(k!==sec){ sec=k; const h=document.createElement('div'); h.className='rvg-sec'; h.dataset.sec=k; h.textContent=k==='todo' ? '要你定的' : '推荐的分类，看一眼'; RG.box.appendChild(h); }
+                RG.box.appendChild(rgGroupEl(g));
+            });
             if(sh) sh.scrollTop=st;
         }
         // 1030-RV1：从面板里点一笔看详情：详情盖在面板上，关了回到面板（面板还开着就原地刷新；被分类抽屉换掉了就照原来滚到的位置放回来，不再滑上来一次）

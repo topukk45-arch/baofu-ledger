@@ -10,6 +10,7 @@
         const askErr=$('askErr');
         let askValidate=null;
         let askOnCancel=null;   // choose 模式取消回调（AI 导出回上一级用）
+        let askAlt=null;        // 实测 10-30：确认框下面那颗按钮另有去处（opts.alt），往下拉 / 返回键照旧算取消
         function showAskErr(msg){
             askErr.textContent=msg;
             askErr.style.display = msg ? 'block' : 'none';
@@ -31,6 +32,7 @@
             renderAskList(null);
             const r=askResolve; askResolve=null; askValidate=null;
             const oc=askOnCancel; askOnCancel=null;
+            askAlt=null; askCancel.classList.remove('alt');
             if(r) r(result);
             // 取消（result 为 null/false）时若设置了回调，回到上一级
             if(oc && (result===null || result===false)) oc();
@@ -49,7 +51,10 @@
                 closeAsk(askChosen);
             } else closeAsk(true);
         });
-        askCancel.addEventListener('click', ()=>closeAsk((askMode==='prompt'||askMode==='choose')?null:false));
+        askCancel.addEventListener('click', ()=>{
+            if(askAlt){ const fn=askAlt; askOnCancel=null; closeAsk(false); fn(); return; }   // opts.alt：点的是另一个选择，不算取消
+            closeAsk((askMode==='prompt'||askMode==='choose')?null:false);
+        });
         // 1017-S：往下拉关闭 = 返回键 = 取消（提示框就是关掉）；和筛选、选分类同一套手势
         bindSheetDrag(askMask, $('askSheet'), $('askGrip'), ()=>{ if(askMask.style.display==='flex') closeAsk(null); });
         // 禁止点击遮罩外部关闭，避免误触丢失输入；仅按钮可关闭
@@ -72,6 +77,9 @@
             askCancel.style.display='';
             askOk.textContent = opts.okText || '确定';
             askCancel.textContent = opts.cancelText || '取消';
+            // opts.alt = { text, onClick }：下面那颗按钮换成另一个选择（描边、强调色字），点了做 onClick；往下拉 / 返回键照旧走 onCancel
+            askAlt=opts.alt && opts.alt.text ? opts.alt.onClick || (()=>{}) : null;
+            if(askAlt){ askCancel.textContent=opts.alt.text; askCancel.classList.add('alt'); }
             askBtnLook(opts);
             const extra=$('askExtra');
             if(opts.extra && opts.extra.text){
@@ -129,7 +137,7 @@
         // 输入框：回调式。validate(value) 返回错误文案则在弹窗内提示且不关闭，返回空则通过
         function customPrompt(msg, defVal, onOk, title, validate, opts){
             opts = opts || {};
-            askMode='prompt';
+            askMode='prompt'; askAlt=null; askCancel.classList.remove('alt');
             askOnCancel=opts.onCancel||null;   // 1016-Z8：点取消时要接着做的事（如压缩包密码不输了）
             askTitle.textContent=title||'请输入';
             // msg 为空则隐藏正文，避免与标题重复
@@ -170,7 +178,7 @@
         //   opts.layout==='list'：选项一行一个、左对齐，多了在框内滑动（批量菜单、选分类用）
         function customChoose(msg, options, onOk, title, onCancel, opts){
             const asList = !!(opts && opts.layout==='list');
-            askMode='choose';
+            askMode='choose'; askAlt=null; askCancel.classList.remove('alt');
             askChosen=null;
             askOnCancel=onCancel||null;   // 取消回调：取消时若设置则调用（用于 AI 导出回上一级）
             askValidate=null;   // 防御性复位：本模式不用校验，避免残留上一个 prompt 的校验函数
@@ -220,7 +228,7 @@
         //   true，再把没转义的备注拼进去，就出事了。
         //   现在把危险路径独立成一个名字里写着 Html 的函数：想用它必须显式写出来，函数名本身就是警告。
         function customAlert(msg, title, align){
-            askMode='alert';
+            askMode='alert'; askAlt=null; askCancel.classList.remove('alt');
             askOnCancel=null;
             askTitle.textContent=title||'提示';
             askMsg.textContent=String(msg);          // 恒为 textContent，无分支、无开关
@@ -238,7 +246,7 @@
         //   凡是用户可控的内容（备注、分类名、存档名…）一律先 escapeHtml，绝不能直接拼进来。
         // 目前仅一处调用：历史数据修复提示，已逐字段转义。
         function customAlertHtml(html, title, align){
-            askMode='alert';
+            askMode='alert'; askAlt=null; askCancel.classList.remove('alt');
             askOnCancel=null;
             askTitle.textContent=title||'提示';
             askMsg.innerHTML=html;

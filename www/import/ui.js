@@ -185,10 +185,10 @@
     '.imp-search{display:block;box-sizing:border-box;width:100%;min-height:48px;padding:0 12px;border:1px solid var(--c-border-mid);border-radius:10px;background:var(--c-bg);color:var(--c-text);font-size:16px;font-family:inherit;}',
     '.imp-search-tip{font-size:12px;color:var(--c-text-soft);margin:6px 2px 10px;line-height:1.5;}',
     '.imp-sr{display:flex;gap:10px;align-items:center;min-height:56px;padding:8px 10px;margin-bottom:8px;border:1px solid var(--c-border);border-radius:10px;background:var(--c-bg);cursor:pointer;}',
-    '.imp-sr .grow{flex:1 1 auto;min-width:0;}.imp-sr-t{font-size:14px;}.imp-sr-t small{color:var(--c-text-soft);font-size:12px;margin-right:4px;}',
-    '.imp-sr-d{font-size:12px;color:var(--c-text-soft);}.imp-sr-to{font-size:12.5px;margin-top:2px;}',
+    '.imp-sr .grow{flex:1 1 auto;min-width:0;}.imp-sr-t{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.imp-sr-t small{color:var(--c-text-soft);font-size:12px;margin-right:4px;}',
+    '.imp-sr-d{font-size:12px;color:var(--c-text-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.imp-sr-to{font-size:12.5px;margin-top:2px;}',
     '.imp-sr-to.pend{color:var(--st-pend);}.imp-sr-to.ok{color:var(--st-ok);}.imp-sr-to.skip{color:var(--st-skip);}',
-    '.imp-sr-amt{font-variant-numeric:tabular-nums;white-space:nowrap;}',
+    '.imp-sr-amt{flex:none;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right;}',
     // 1021-T17：「这几笔」面板、明细按分类一组一行、翻页、能点的四格
     '.imp-sr-amt.neg{color:var(--c-neg);}.imp-sr-amt.pos{color:var(--c-pos);}.imp-rows-note{margin-bottom:8px;line-height:1.5;}',
     '.imp-cg{display:flex;align-items:center;gap:10px;min-height:52px;padding:4px 12px;margin-bottom:8px;border:1px solid var(--c-border);border-radius:10px;background:var(--c-bg);cursor:pointer;}',
@@ -2638,10 +2638,12 @@
         if (!list.length) w.appendChild(el('div', 'imp-soft', '这里现在一笔都没有了（可能刚挪去了别处）。'));
         list.slice(page * ROWS_PAGE, (page + 1) * ROWS_PAGE).forEach(function (d) {
           var r = el('div', 'imp-sr imp-rs'); r.dataset.key = d.key;
-          var g = el('div', 'grow'), t = el('div', 'imp-sr-t'), nm0 = cpShow(d.title || d.cp) || '—';
+          var row0 = (S.parsed.files[d.file] || { rows: [] }).rows[d.row] || {};
+          var g = el('div', 'grow'), t = el('div', 'imp-sr-t'), nm0 = rowName(d, row0);
           t.appendChild(el('small', null, fmtTime(d.time))); t.appendChild(document.createTextNode(nm0)); g.appendChild(t);
-          var skipRow = d.group === 'neutral' || d.mode === 'skip', pm = ((S.parsed.files[d.file] || { rows: [] }).rows[d.row] || {}).pm;
-          var sub = [skipRow ? '不计' : (d.cat || '未分类'), pm, APP[d.app]].filter(function (v) { return v && v !== '/'; });
+          var skipRow = d.group === 'neutral' || d.mode === 'skip', pm = row0.pm;
+          // 实测 10-30：跳过的、勾掉的写为什么跳过（原来写「未分类」，跳过的本来就不该写分类）；不计的写「不计」；待你确认的写「待你确认」
+          var sub = [rowState(d, skipRow), pm, APP[d.app]].filter(function (v) { return v && v !== '/'; });
           g.appendChild(el('div', 'imp-sr-d', sub.join(' · ')));
           r.appendChild(g);
           r.appendChild(el('div', 'imp-sr-amt ' + (skipRow ? '' : d.type === 'expense' ? 'neg' : 'pos'), (skipRow ? '' : d.type === 'expense' ? '−' : '+') + yuan(d.fen)));
@@ -2653,6 +2655,23 @@
         if (pages > 1) box.appendChild(pager(page, pages, function (pg) { again(pg)(); }, 'impRowsPager'));
       },
       foot: function (box, done) { var cl = btn('关闭', 'ui-btn block', function () { done(); }); cl.id = 'impRowsClose'; box.appendChild(cl); } });
+  }
+  // 「这几笔」面板一行的标题：对方 / 商品说明；都没有（账单里写「/」、或只有套话）时写商品说明原文或交易类型，不写「—」
+  function rowName(d, row) {
+    var ok = function (v) { v = cpShow(v); return v && v !== '/' && v !== '—' ? v : ''; };
+    return ok(d.title) || ok(d.cp) || ok(d.desc) || ok(row && row.kind) || '—';
+  }
+  // 第二行开头：跳过 / 勾掉的写原因（route.js / plan.js 定的原因，太长的取一句），不计的写「不计」，待你确认的写「待你确认」，别的写分类
+  var SKIP_SHORT = { imported: '以前导入过', ignored: '以前点过「不要了」', refunded: '已全额退款', refundedpair: '原单已全额退款，两条都跳过',
+    closedpair: '付了又全退回，两条都跳过', origignored: '原单以前跳过了，退款也跳过', fullrefund: '全额退款，等于没发生', dupline: '同一份文件里重复的一行' };
+  function rowState(d, skipRow) {
+    if (d.group === 'skip' || d.group === 'excluded') {
+      if (d.group === 'skip' && SKIP_SHORT[d.why]) return SKIP_SHORT[d.why];
+      return String(d.reason || '').split(/[（(]/)[0].trim() || (d.group === 'excluded' ? '不导入' : '跳过');
+    }
+    if (skipRow) return '不计';
+    if (d.group === 'pending') return '待你确认';
+    return d.cat || '未分类';
   }
   // 翻页那一排：「‹ 上一页 · 第 i / n 页 · 下一页 ›」
   function pager(page, pages, go, id) {
