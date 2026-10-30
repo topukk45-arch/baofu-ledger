@@ -104,9 +104,15 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   $('impAiGrpReply').value = 'AI：好的\n```记问\n记问分组建议 v1 导出 ' + at + '\nG1 | 吃饭 | 甲店是面馆\nG2 | 购物 | 乙店卖日用品\nG3 | 不存在的分类 | x\n```';
   $('impAiGrpRead').click(); await tick();
   const rows = [...t.d.querySelectorAll('.imp-aig-row')];
-  ok($('uiSheetTitle').textContent === 'AI 的分组建议' && rows.length === 2 && /G1 某虚构甲店 · 支出 3 笔：未分类 → 吃饭/.test(rows[0].textContent) && /甲店是面馆/.test(rows[0].textContent) && /没看懂/.test(t.d.querySelector('.imp-aig-bad').textContent), '3 每组一张勾选卡（默认勾），没看懂的写在后面');
+  const blkOf = r => r.closest('.imp-aig-blk');
+  ok($('uiSheetTitle').textContent === 'AI 的分组建议' && rows.length === 2 && /^某虚构甲店/.test(rows[0].querySelector('.imp-aig-nm').textContent) && /支出 · 3 笔 · AI：甲店是面馆 G1/.test(rows[0].querySelector('.imp-aig-l2').textContent) && /^未分类 → 吃饭$/.test(blkOf(rows[0]).querySelector('.imp-aig-bt').textContent) && rows.every(r => r.querySelector('input').checked) && /没看懂/.test(t.d.querySelector('.imp-aig-bad').textContent), '3 实测 10-30：按「未分类 → 吃饭」分块，块里一行一组（默认勾），没看懂的写在后面');
   ok($('impAiGrpGo').textContent === '改这 5 条的分类', '3 「改这 5 条的分类」');
-  rows[1].querySelector('input').click(); await tick();
+  { const ball = () => [...t.d.querySelectorAll('.imp-aig-blk')].find(x => x.dataset.to === '购物').querySelector('.imp-aig-ball');
+    ball().click(); await tick();
+    ok($('impAiGrpGo').textContent === '改这 3 条的分类' && !ball().checked, '3 实测 10-30：块的标题上整块勾掉「未分类 → 购物」：「改这 3 条的分类」');
+    ball().click(); await tick();
+    ok($('impAiGrpGo').textContent === '改这 5 条的分类', '3 再点整块勾回来'); }
+  [...t.d.querySelectorAll('.imp-aig-row')][1].querySelector('input').click(); await tick();
   ok($('impAiGrpGo').textContent === '改这 3 条的分类', '3 勾掉乙店那组：「改这 3 条的分类」');
   $('impAiGrpGo').click();
   await t.until(() => t.ask(), 5000); await t.idle();

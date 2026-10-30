@@ -1230,6 +1230,33 @@ async function run(cfg, port, browser) {
         await shot(page, size, '搜一笔', '待确认分类（逐条 / 成组 / 交给 AI）'); if (meas) await CLIP(page, '待确认分类结果页', '#pageSearch');
         await page.evaluate(() => { const c = document.getElementById('rvAiBtn'); if (c) c.click(); }); await page.waitForTimeout(1200);
         await shot(page, size, 'AI 按组整理', '复制给 AI'); if (meas) await FOOT(page, 'AI 按组整理');
+        // 实测 10-30：读回 AI 的回复（每组都改成「吃饭」，第一组改成「其他」），看「原分类 → 新分类」分块那一页
+        await page.evaluate(() => {
+          const ta = document.getElementById('impAiGrpText'); if (!ta) return;
+          const tx = ta.value, at = (/导出 (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.exec(tx) || [])[1], gs = [...new Set((tx.match(/^G\d+/gm) || []))];
+          const p = document.getElementById('impAiGrpPaste'); if (!at || !gs.length || !p) return; p.click();
+          const r = document.getElementById('impAiGrpReply'); if (!r) return;
+          r.value = '```记问\n记问分组建议 v1 导出 ' + at + '\n' + gs.map((g, i) => g + ' | ' + (i ? '吃饭' : '其他') + ' | 虚构的理由，看名字像吃饭的地方，写长一点看看换行').join('\n') + '\n```';
+          const b = document.getElementById('impAiGrpRead'); if (b) b.click();
+        }); await page.waitForTimeout(900);
+        await shot(page, size, 'AI 的分组建议', '按原分类 → 新分类分块');
+        results.push(Object.assign({ name: 'aig-review', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], bs = [...document.querySelectorAll('.imp-aig-blk')];
+          if (!bs.length) bad.push('没出分块（AI 回复没读进来）');
+          bs.forEach(b => {
+            const h = b.querySelector('.imp-aig-bh'), hc = h.querySelector('input').getBoundingClientRect();
+            if (h.getBoundingClientRect().height < 48) bad.push('块标题不到 48 高');
+            if (hc.width < 18 || getComputedStyle(h.querySelector('input')).appearance === 'none') bad.push('块标题的勾选框看不见');
+            b.querySelectorAll('.imp-aig-row').forEach(r => {
+              const cb = r.querySelector('input'), n = r.querySelector('.imp-aig-nm').getBoundingClientRect(), a = r.querySelector('.rvg-a').getBoundingClientRect();
+              if (getComputedStyle(cb).appearance === 'none' || cb.getBoundingClientRect().width < 18) bad.push('一行的勾选框看不见');
+              if (n.right > a.left + 0.5) bad.push('对方压着金额');
+              if (n.height > 26) bad.push('对方折成了两行');
+              if (r.getBoundingClientRect().height < 48) bad.push('一行不到 48 高');
+            });
+          });
+          return { bad: [...new Set(bad)], ok: !bad.length, blocks: bs.length };
+        })));
         await closeAll(page);
         await page.evaluate(() => { const c = document.getElementById('rvOneBtn'); if (c) c.click(); }); await page.waitForTimeout(800);
         await shot(page, size, '待确认分类', '逐条确认');

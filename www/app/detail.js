@@ -111,7 +111,7 @@
                 f.appendChild(b);
             }
         }
-        // 账单原文那一块（导入时存的那一行）：能长按选字（全 App 默认不让选，这里放开）；「单号」那行右边「复制」（点击区 48px），复制了底部小条说一声。
+        // 账单原文那一块（导入时存的那一行）：能长按选字（全 App 默认不让选，这里放开）；「单号」那行右边「复制」、最下面「复制全文」（点击区 48px），复制了底部小条说一声。
         //   支付宝账单那一栏叫「交易分类」（日用百货、餐饮美食……），微信叫「交易类型」（商户消费、转账……），照来源写
         function rawBox(R){
             const box=document.createElement('div'); box.className='detail-raw';
@@ -130,6 +130,13 @@
                 }
                 box.appendChild(l);
             });
+            // 实测 10-30：整份原文也能一下复制（原来只能复制单号，别的只能长按选）
+            const all=document.createElement('button'); all.type='button'; all.className='detail-raw-copy detail-raw-all'; all.textContent='复制全文';
+            all.addEventListener('click', ev=>{
+                ev.stopPropagation();
+                window.JiwenPanel.copyText(parts.map(x=>x[0]+'：'+x[1]).join('\n')).then(ok=>window.JiwenPanel.snack({ over:true, text:ok ? '已复制账单原文' : '没复制上，长按原文选中复制' }));
+            });
+            box.appendChild(all);
             return box;
         }
         // 实测 10-30：几笔合成的一条（零碎扣款、收款按天、分分捐）列出是哪几笔：一行一笔「时间 · 对方 · 金额」，按时间排；

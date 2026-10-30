@@ -2165,7 +2165,9 @@
         .rvg-cp-n { flex:1 1 auto; min-width:0; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
         .rvg-cp-s { flex:none; font-size:13px; color:var(--c-t1); font-variant-numeric:tabular-nums; }
         .rvg-cp-go { flex:none; color:var(--c-border-mid); font-size:18px; }
-        .rvg-row input { width:22px; height:22px; flex:0 0 22px; } .rvg-r { flex:1; min-width:0; overflow-wrap:anywhere; } .rvg-a { font-variant-numeric:tabular-nums; }
+        .rvg-row input { width:22px; height:22px; flex:0 0 22px; }
+        /* 实测 10-30：.rvg-row 里的勾选框（AI 的分组建议、一键优化）原来被全局 appearance:none 弄成透明的，只剩一块空白 */
+        .rvg-row input[type=checkbox], .imp-aig-bh input[type=checkbox] { -webkit-appearance:checkbox; appearance:auto; accent-color:var(--c-primary); width:22px; height:22px; flex:0 0 22px; } .rvg-r { flex:1; min-width:0; overflow-wrap:anywhere; } .rvg-a { font-variant-numeric:tabular-nums; }
         /* 1023-N：最近搜过：结果页没条件时卡片里 3 条（点了套用、× 删一条、清空），抽屉顶上 5 条（点了套用） */
         .sp-hist { display:flex; flex-direction:column; width:100%; }
         .sp-hist-head { display:flex; align-items:center; min-height:32px; font-size:14px; font-weight:bold; color:var(--c-text); }
@@ -2314,6 +2316,7 @@
         /* 账单原文能长按选字、复制（全 App 默认禁选，这里单独放开）；单号那行右边「复制」 */
         .detail-raw, .detail-raw .detail-raw-t { -webkit-user-select:text; user-select:text; -webkit-touch-callout:default; }
         .detail-raw-l.no { display:flex; align-items:center; gap:8px; }
+        button.detail-raw-all { display:block; margin:10px 0 2px auto; }
         /* 实测 10-30：几笔合成的一条列出是哪几笔：一行一笔「时间 · 对方 · 金额」（48 高），点了下面展开原文 */
         .detail-parts { margin-top:6px; }
         .detail-parts-h, .detail-parts-none { font-size:13px; color:var(--c-t1); line-height:1.5; }

@@ -2,6 +2,7 @@
 //   2 账单原文能长按选字，「单号」那行右边「复制」（复制了底部小条说一声）；支付宝那一栏叫「交易分类」、微信叫「交易类型」
 //   3 「这几笔」面板：跳过的那一行第二行写为什么跳过（不写分类），标题一行放不下省略、金额那一栏不被压；没对方、没商品说明的写交易类型
 //   4 成组确认：分「要你定的」（未分类）/「推荐的分类，看一眼」两块；「这组都没问题」是描边次要按钮；抬头两行固定排法；转账那组排最后、写一句提醒
+//   2b（1030-C）「复制全文」；AI 的分组建议 / 一键优化里的勾选框看得见
 //   5 「以后也这么记？」：主按钮「只改这几笔 / 只改这一条」在上，「以后都这样记」在下、描边；往下拉 / 返回键 = 只改这几笔；像个人的不问
 //   jsdom，账单、记录全是虚构的。
 const fs = require('fs'), path = require('path');
@@ -67,6 +68,9 @@ const RANGE = { from: '2026-10-01 00:00:00', to: '2026-10-20 23:59:59' };
     let copied = null; t.w.document.execCommand = c => { if (c === 'copy') { const ta = [...t.d.querySelectorAll('body > textarea[readonly]')].pop(); copied = ta && ta.value; return true; } return false; };
     raw.querySelector('.detail-raw-copy').click(); await tick(60);
     ok(copied === TX[0].no && $('uiSnack') && /已复制单号/.test($('uiSnack').textContent) && $('uiSnack').classList.contains('over'), '2 点「复制」：复制了单号，底部小条「已复制单号」（浮在详情上）');
+    copied = null; raw.querySelector('.detail-raw-all').click(); await tick(60);
+    ok(raw.querySelector('.detail-raw-all').textContent === '复制全文' && copied && /^交易类型：商户消费\n对方：某虚构书店\n/.test(copied) && copied.indexOf('单号：' + TX[0].no) > 0 && !/复制/.test(copied) && /已复制账单原文/.test($('uiSnack').textContent), '2 实测 10-30：「复制全文」把整份原文复制下来（一行一样），小条「已复制账单原文」');
+    ok(/\.rvg-row input\[type=checkbox\], \.imp-aig-bh input\[type=checkbox\] \{ -webkit-appearance:checkbox; appearance:auto;/.test(CSS), '4 实测 10-30：AI 的分组建议、一键优化里的勾选框看得见（原来被全局 appearance:none 弄成透明）');
     try { t.w.JiwenDetail.closeDetail(); } catch (_) {}
     ok(!t.errs.length, '2/3 无报错 ' + t.errs.join('|'));
   }
