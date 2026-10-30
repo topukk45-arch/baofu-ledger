@@ -47,14 +47,14 @@
 
 原生 JavaScript（不用 React / Vue），约 2.2 万行业务代码，拆成 25 个模块，分 6 层：
 
-```mermaid
-flowchart BT
-  base["0 基础<br/>base · theme"] --> store["1 存储<br/>IndexedDB 分块 · 备份 · 撤销"]
-  store --> panel["2 面板底座<br/>底部面板 · 数字键盘 · 日期 · 月份浮条"]
-  panel --> biz["3 业务<br/>导入入口 · AI 导出"]
-  biz --> pages["4 页面<br/>记一笔 · 详情 · 账单 · 搜一笔 · 统计 · 日子"]
-  pages --> shell["5 外壳<br/>设置 · 页签 · 登录 · 返回键 · 启动"]
-```
+| 层 | 模块 | 管什么 |
+|---|---|---|
+| 5 外壳 | settings · tabs · login · back · boot | 设置、页签切换、登录、返回键层级、启动 |
+| 4 页面 | forms · detail · ledger · search · stats · days · cats | 记一笔、详情、账单、搜一笔、统计、日子、分类管理 |
+| 3 业务 | ai-export · import-entry | 导出给 AI、账单导入入口（按需加载导入模块） |
+| 2 面板底座 | sheet · keypad · text · ask · date · monthstrip | 底部面板、数字键盘、文字输入、提示框、日期选择、月份浮条 |
+| 1 存储 | store | IndexedDB 按月分块、写入队列、备份、撤销 |
+| 0 基础 | base · theme | 工具函数、性能记录、主题配色计算 |
 
 - 每个模块一个 IIFE、对外只有一个 `window.JiwenXxx` 入口；**只许调用下层**，往上的调用只有登记过的三种回调口。
 - 依赖规则写成测试（语法树扫描 + 真起 App 检查全局变量），新代码越层、漏出全局名字，CI 直接拦下。
@@ -64,14 +64,17 @@ flowchart BT
 
 ```mermaid
 flowchart LR
-  F["账单文件<br/>xlsx / csv / 加密 zip"] --> P["parse<br/>解码 · 读 xlsx · 核笔数"]
-  P --> R["route<br/>去重 · 退款配原单 · 转账"]
-  R --> C["classify<br/>多层分类推荐"]
-  C --> M["match<br/>和手记配对"]
-  M --> PL["plan<br/>方案 · 差额核对 · 要人定的"]
-  PL --> W["write<br/>写入清单"]
-  W --> DB[("IndexedDB<br/>一个事务 · 先备份")]
+  F["账单文件"] --> P["parse"] --> R["route"] --> C["classify"] --> M["match"] --> PL["plan"] --> W["write"] --> DB[("IndexedDB")]
 ```
+
+| 步骤 | 做什么 |
+|---|---|
+| parse | 认来源、解码、读 xlsx、解加密 zip、核对笔数 |
+| route | 用单号表去重、退款配原单、转账 / 提现 / 还款单独处理 |
+| classify | 规则 → 从你的历史里学 → 内置词表 → 支付宝分类，逐层推荐 |
+| match | 和手记按时间、金额、对方配对，拿不准的进待处理 |
+| plan | 汇总成方案，每个文件 × 收支的差额核到 0 分，列出要人定的几件 |
+| write | 生成写入清单，主页面一个事务写进 IndexedDB（写之前先备份） |
 
 - 每一步都是**纯函数**（不碰页面、存储、网络），浏览器、Web Worker、Node 测试里用同一份代码；计算在后台线程跑，界面不卡。
 - 笔数和金额**对账到分**：每个文件 × 收支的差额拆开解释，合计必须差 0 分，对不上不让往下走。
