@@ -1076,6 +1076,26 @@ async function run(cfg, port, browser) {
       await page.evaluate(() => { window.JiwenSearch.resetSearch(); document.getElementById('filterFab').click(); }); await page.waitForTimeout(700);
       await page.evaluate(() => window.closeFilterSheet()); await page.waitForTimeout(500);
       await shot(page, size, '搜一笔', '最近搜过');
+      // 1030-RV1：没条件、有最近搜过：条件卡（最近搜过 + 找到 N 笔）下沿不许低于底部按钮排的上沿（10-30 手机上压进了「设条件」那一排）
+      const NOCOND = () => {
+        const bad = [], pg = document.getElementById('pageSearch');
+        if (!pg || getComputedStyle(pg).display === 'none') return { bad: ['结果页没出来'], ok: false };
+        if (!document.querySelector('#searchTags .sp-hist')) bad.push('没出「最近搜过」');
+        const card = document.getElementById('searchCard').getBoundingClientRect(), bar = document.querySelector('.sp-bar').getBoundingClientRect();
+        if (card.bottom > bar.top + 0.5) bad.push('条件卡下沿 ' + Math.round(card.bottom) + ' 低于底部按钮排上沿 ' + Math.round(bar.top));
+        if (card.top < 56) bad.push('条件卡顶到了标题栏');
+        return { bad, ok: !bad.length, card: [Math.round(card.top), Math.round(card.bottom)], bar: Math.round(bar.top) };
+      };
+      results.push(Object.assign({ name: 'search-nocond-hist', cfg: size, clip: true }, await page.evaluate(NOCOND)));
+      // 再记两条（最近搜过列满 3 条）、滑下去收起再滑回来、点「清空条件」以后，各量一次
+      await page.evaluate(() => { const k = Object.keys(localStorage).find(x => x.indexOf('app_search_hist_') === 0); const a = JSON.parse(localStorage.getItem(k) || '[]'); a.push({ q: 'last' }, { q: '7d', ios: ['expense'] }); localStorage.setItem(k, JSON.stringify(a)); window.JiwenSearch.render(); }); await page.waitForTimeout(300);
+      results.push(Object.assign({ name: 'search-nocond-hist3', cfg: size, clip: true }, await page.evaluate(NOCOND)));
+      await page.evaluate(() => { const b = document.getElementById('searchBody'); b.scrollTop = 400; b.dispatchEvent(new Event('scroll')); }); await page.waitForTimeout(300);
+      await page.evaluate(() => { const b = document.getElementById('searchBody'); b.scrollTop = 0; b.dispatchEvent(new Event('scroll')); }); await page.waitForTimeout(300);
+      results.push(Object.assign({ name: 'search-nocond-hist-unfold', cfg: size, clip: true }, await page.evaluate(NOCOND)));
+      // 量丢了（退回固定位置）以后，页面大小一变（键盘收起、转屏）要重新量上
+      await page.evaluate(() => { document.getElementById('pageSearch').classList.remove('sp-fit'); window.dispatchEvent(new Event('resize')); }); await page.waitForTimeout(200);
+      results.push(Object.assign({ name: 'search-nocond-hist-resize', cfg: size, clip: true }, await page.evaluate(NOCOND)));
       await page.evaluate(() => window.JiwenSearch.closeSearch()); await page.waitForTimeout(500);
       // 1023-E：全部日子页、一条日子的详情
       await page.evaluate(() => window.JiwenTabs.backFromDaysPage && document.getElementById('daysManageBtn').click()); await page.waitForTimeout(500);
@@ -1168,6 +1188,47 @@ async function run(cfg, port, browser) {
         await closeAll(page);
         await page.evaluate(() => { const c = document.getElementById('rvOneBtn'); if (c) c.click(); }); await page.waitForTimeout(800);
         await shot(page, size, '待确认分类', '逐条确认');
+        await closeAll(page); await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
+        // 1030-RV1：成组确认（展开前、展开一组、未分类按对方、确认一组后的小条）、分类抽屉里新建
+        await page.evaluate(() => {   // 待确认的：照刚导进来的几笔（带对方）再复制几笔，两笔改成推荐「吃饭」，其余留在未分类
+          const S = window.JiwenStore, d = S.getUserData(), src = d.filter(r => r.rv === 1 && r.type === 'expense' && Number.isInteger(r.cp));
+          const add = []; for (let i = 0; i < 6 && src.length; i++) { const r = src[i % src.length]; add.push(Object.assign({}, r, { id: S.genId(), raw: undefined, time: r.time.slice(0, 14) + String(10 + i).padStart(2, '0') })); }
+          add.slice(0, 2).forEach(r => { r.cat = '吃饭'; }); add.forEach(r => { r.rv = 1; delete r.raw; });
+          S.saveUserData(d.concat(add)); window.JiwenTabs.refreshAllViews();
+        });
+        await page.evaluate(() => { const c = document.getElementById('rvChip'); if (c) c.click(); }); await page.waitForTimeout(600);
+        await page.evaluate(() => { const c = document.getElementById('rvGroupBtn'); if (c) c.click(); }); await page.waitForTimeout(700);
+        await shot(page, size, '成组确认', '展开前'); if (meas) { await FOOT(page, '成组确认'); await CLIP(page, '成组确认', '#uiSheetMask'); }
+        await page.evaluate(() => { const g = [...document.querySelectorAll('#rvgList .rvg')].find(x => x.dataset.cat !== '未分类'); if (g) g.querySelector('[data-act="open"]').click(); }); await page.waitForTimeout(300);
+        await shot(page, size, '成组确认', '展开一组（每一笔用账单页那一套）');
+        const rvGeo = () => page.evaluate(() => {
+          const bad = [];
+          document.querySelectorAll('#rvgList .rvg-item').forEach(it => { const c = it.querySelector('.rvg-cb').getBoundingClientRect(), r = it.querySelector('.bl-row').getBoundingClientRect(); if (c.width < 48 || c.height < 48) bad.push('勾选框点击区不到 48'); if (r.height < 48) bad.push('一笔那一行不到 48 高'); if (c.right > r.left + 0.5) bad.push('勾选框压着那一行'); });
+          document.querySelectorAll('#rvgList .rvg-cp').forEach(b => { const r = b.getBoundingClientRect(); if (r.height < 48) bad.push('按对方那一行不到 48 高'); const n = b.querySelector('.rvg-cp-n'), sx = b.querySelector('.rvg-cp-s').getBoundingClientRect(); if (n.getBoundingClientRect().right > sx.left + 0.5) bad.push('对方名压着笔数'); });
+          return { bad: [...new Set(bad)], ok: !bad.length, items: document.querySelectorAll('#rvgList .rvg-item').length, cps: document.querySelectorAll('#rvgList .rvg-cp').length };
+        });
+        results.push(Object.assign({ name: 'rv-group-rows', cfg: size, clip: true }, await rvGeo()));
+        await page.evaluate(() => { const g = [...document.querySelectorAll('#rvgList .rvg')].find(x => x.dataset.cat === '未分类'); if (g) g.querySelector('[data-act="open"]').click(); }); await page.waitForSelector('#rvgList .rvg-cp', { timeout: 10000 }).catch(() => {}); await page.waitForTimeout(300);
+        await shot(page, size, '成组确认', '未分类按对方一行');
+        results.push(Object.assign({ name: 'rv-group-cps', cfg: size, clip: true }, await rvGeo()));
+        await page.evaluate(() => { const g = [...document.querySelectorAll('#rvgList .rvg')].find(x => x.dataset.cat !== '未分类'); if (g) g.querySelector('[data-act="ok"]').click(); }); await page.waitForTimeout(500);
+        await shot(page, size, '成组确认', '确认一组后（小条能撤销）');
+        results.push(Object.assign({ name: 'rv-group-snack', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], sn = document.getElementById('uiSnack'), cl = document.getElementById('rvGroupClose');
+          if (!sn || !sn.classList.contains('show')) bad.push('没出小条');
+          else { const a = sn.getBoundingClientRect(), b = cl.getBoundingClientRect(); if (a.bottom > b.top + 0.5 && a.top < b.bottom) bad.push('小条压着「关闭」'); const e = document.elementFromPoint((a.left + a.right) / 2, (a.top + a.bottom) / 2); if (!e || !sn.contains(e)) bad.push('小条被面板盖住'); }
+          if (!document.getElementById('uiSheetMask').classList.contains('open')) bad.push('确认一组以后面板关了');
+          return { bad, ok: !bad.length };
+        })));
+        await page.evaluate(() => { const b = document.querySelector('#rvgList .rvg-cp'); if (b) b.click(); }); await page.waitForTimeout(700);
+        await page.evaluate(() => { const q = document.getElementById('catDrawerQ'); if (q) { q.value = '虚构新类'; q.dispatchEvent(new Event('input')); } }); await page.waitForTimeout(200);
+        await shot(page, size, '分类抽屉', '搜不到时新建');
+        results.push(Object.assign({ name: 'cat-drawer-new', cfg: size, clip: true }, await page.evaluate(() => {
+          const bad = [], b = document.getElementById('catDrawerNew');
+          if (!b || b.style.display === 'none') bad.push('搜不到时没出「＋ 新建」');
+          else { const r = b.getBoundingClientRect(), f = document.getElementById('uiSheetFoot').getBoundingClientRect(); if (r.height < 48) bad.push('新建按钮不到 48 高'); if (r.bottom > f.top + 0.5) bad.push('新建按钮被底部按钮排挡住'); if (!/新建「虚构新类」并选上/.test(b.textContent)) bad.push('按钮字不对：' + b.textContent); }
+          return { bad, ok: !bad.length };
+        })));
         await closeAll(page); await tab(page, 'ledger'); await page.evaluate(() => window.scrollTo(0, 0)); await page.waitForTimeout(200);
       }
       // 账单页、统计页、设置页：字被切
