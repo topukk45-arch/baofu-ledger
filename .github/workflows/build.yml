@@ -5,7 +5,8 @@ on:
   # 1021-T26 的启动画面体验版分支 10-23 已快进合进 main，那一段「发布到体验版」删掉了
   push:
     # 1030-RV1 临时：待确认分类这一轮的分支推上去也打包（发到单独的预发布版，见最后一段）。合回 main 之前必须删掉这条分支名
-    branches: [main, claude/gifted-meitner-nhpaqh]
+    # 1030-RV3：接着 1030-RV2 做的分支 claude/blissful-wozniak-iunf82 同样临时加上（合回 main 之前一起删）
+    branches: [main, claude/gifted-meitner-nhpaqh, claude/blissful-wozniak-iunf82]
   workflow_dispatch:
 jobs:
   build:
@@ -131,7 +132,7 @@ jobs:
       #   docs/release/branch-publish 第一行写标签（1030-RV1），标题读 <标签>.title、说明读 <标签>.md；
       #   没有这个文件就不发。只发到这个单独的标签，绝不碰「最新测试版」latest-build 和正式版
       - name: 发布体验版（1030-RV1 临时，只在这一轮的分支上）
-        if: github.event_name == 'push' && github.ref == 'refs/heads/claude/gifted-meitner-nhpaqh'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/claude/gifted-meitner-nhpaqh' || github.ref == 'refs/heads/claude/blissful-wozniak-iunf82')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -270,28 +270,102 @@
   }
 
   // ---------- 导入简化第 14 版：AI 按组整理（原方案三-4）----------
-  //   待确认分类的记录按对方（个人 / 平台按商品说明）分成组，一组一行交给 AI：「G号 | 对方 | 商品说明 | N 笔 | 共 x 元 | 现在的分类」；
+  //   待确认分类的记录按收支 + 对方（平台按商品说明、个人按对方 + 商品说明）分成组，一组一行交给 AI（见下面 groupLine）；
   //   AI 回一行一组「G号 | 改成的分类 | 理由」，放在 ```记问 代码块里、第一行原样抄 groupHead(导出时间)。只能改分类，分类要在名单里。
-  //   d = { at, cats, groups:[{ g, cp, desc, n, fen, cat, oc }] }，opts = { mask }（打码：手机号、长数字、个人对方写「个人」）
+  //   d = { at, cats, groups:[{ g, cp, desc, io, n, fen, cat, items:[{ time, fen }] }], rest:[{ time, cp, io, fen }] }，opts = { mask }
+  //   1030-RV3：对方名原样发（不再把个人换成「个人」，AI 要靠名字判断），mask() 照旧打手机号、长串数字、邮箱；
+  //   每组多给几样统计（均、单笔范围、日期范围、常见时段、常见日类型、疑似月固定扣款），时间都从 time 字符串里截、不用 Date；
+  //   rest 是个人转账、没写用途、只有 1～2 笔的，列在最后、不带 G 号、AI 不用回
   var GROUP_HEAD = '记问分组建议 v1';
+  // 泛化说明：等于没写用途的几种（trim 后整句比）
+  var GENERIC_DESC = ['', '—', '/', '收钱码收款', '转账', '扫二维码付款', '扫码付款'];
+  function isGenericDesc(s) { return GENERIC_DESC.indexOf(String(s == null ? '' : s).trim()) >= 0; }
   function groupHead(at) { return GROUP_HEAD + ' 导出 ' + at; }
+  // 金额（分）→ 最多一位小数、去掉末尾 0：97800 → 978、2610 → 26.1
+  function gYuan(fen) { var v = Math.round(fen / 10) / 10; return String(v); }
+  function tParts(t) {
+    var s = String(t || '');
+    return { day: s.slice(0, 10), ym: s.slice(0, 7), y: +s.slice(0, 4), mo: +s.slice(5, 7), d: +s.slice(8, 10), h: +s.slice(11, 13) || 0, hm: s.slice(11, 16) };
+  }
+  // 星期几（0 = 周日），纯算术（Sakamoto）
+  function wday(y, m, d) { var t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]; if (m < 3) y -= 1; return (y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) + t[m - 1] + d) % 7; }
+  var WNAME = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  function whenText(p) { return p.day + ' ' + p.hm + '(' + WNAME[wday(p.y, p.mo, p.d)] + ')'; }
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  // 常见时段：24 个钟点环形，先试连着的 2 个、再试 3 个，占比过半的窗口里取占比最高的（一样高取开头那个钟点有交易的、再取先出现的：都在 12 点写 12:00~14:00）
+  function hourWindow(ps) {
+    var b = []; for (var i = 0; i < 24; i++) b.push(0);
+    ps.forEach(function (p) { b[((p.h % 24) + 24) % 24]++; });
+    for (var k = 2; k <= 3; k++) {
+      var best = -1, bh = 0;
+      for (var h = 0; h < 24; h++) { var c = 0; for (var j = 0; j < k; j++) c += b[(h + j) % 24]; if (c * 2 > ps.length && (c > best || (c === best && !b[bh] && b[h]))) { best = c; bh = h; } }
+      if (best >= 0) return '多在' + pad2(bh) + ':00~' + pad2((bh + k) % 24) + ':00';
+    }
+    return '分散';
+  }
+  function dayKind(ps) {
+    var wk = 0; ps.forEach(function (p) { var w = wday(p.y, p.mo, p.d); if (w >= 1 && w <= 5) wk++; });
+    if (wk >= ps.length * 0.8) return '多在工作日';
+    if ((ps.length - wk) >= ps.length * 0.55) return '多在周末';
+    return '都有';
+  }
+  // 疑似月固定扣款：落在 3 个以上不同的月、每个月正好 1 笔、日号（28 以后都算 28）最大最小差不超过 6
+  function monthly(ps) {
+    var ms = {}; ps.forEach(function (p) { ms[p.ym] = (ms[p.ym] || 0) + 1; });
+    var keys = Object.keys(ms); if (keys.length < 3 || keys.some(function (k) { return ms[k] !== 1; })) return false;
+    var ds = ps.map(function (p) { return Math.min(p.d, 28); });
+    return Math.max.apply(null, ds) - Math.min.apply(null, ds) <= 6;
+  }
+  // 一组一行（缺的字段整段不写）
+  function groupLine(g, mk) {
+    var cp = mk ? mask(g.cp || '') : (g.cp || ''), ds = mk ? mask(g.desc || '') : (g.desc || '');
+    var io = g.io === 'income' ? '收入' : '支出', items = (g.items || []).slice().sort(function (a, b) { return String(a.time) < String(b.time) ? -1 : String(a.time) > String(b.time) ? 1 : 0; });
+    var ps = items.map(function (x) { return tParts(x.time); }), c = ['G' + g.g, cp || '—', ds || '—', io, g.n + '笔'];
+    if (g.n === 1) { c.push(gYuan(g.fen) + '元'); if (ps[0] && ps[0].day) c.push(whenText(ps[0])); }
+    else {
+      c.push('共' + gYuan(g.fen) + '元'); c.push('均' + gYuan(g.fen / g.n) + '元');
+      if (items.length) {
+        // 按显示出来的比（10.01 和 10.03 都写 10，写成「单笔10~10元」没意思，算固定）
+        var fs = items.map(function (x) { return x.fen; }), lo = Math.min.apply(null, fs), hi = Math.max.apply(null, fs);
+        c.push(gYuan(lo) === gYuan(hi) ? '单笔固定' + gYuan(lo) + '元' : '单笔' + gYuan(lo) + '~' + gYuan(hi) + '元');
+        var a = ps[0], z = ps[ps.length - 1];
+        c.push(a.ym === z.ym ? a.ym : a.ym + '~' + z.ym);
+        if (g.n === 2) c.push(ps.map(function (p) { return p.hm + '(' + WNAME[wday(p.y, p.mo, p.d)] + ')'; }).join('、'));
+        else { c.push(hourWindow(ps)); c.push(dayKind(ps)); if (monthly(ps)) c.push('疑似月固定扣款'); }
+      }
+    }
+    c.push(g.cat || '未分类');
+    return c.join(' | ');
+  }
   function groupText(d, opts) {
-    opts = opts || {}; var mk = opts.mask !== false;
+    opts = opts || {}; var mk = opts.mask !== false, rest = d.rest || [];
     var L = [];
     L.push('记问 · 待确认分类按组整理（导出 ' + d.at + '）');
     L.push('');
-    L.push('下面是我账本里分类还没确认的记录，按交易对方（个人、平台按商品说明）分成了 ' + d.groups.length + ' 组。请按组帮我挑一个分类，只能从「可选的分类」里选；拿不准的组不用写。');
+    L.push('下面是我账本里分类还没确认的记录，按收支和交易对方（平台按商品说明，个人按对方加商品说明）分成了 ' + d.groups.length + ' 组。请按组帮我挑一个分类，只能从「可选的分类」里选；拿不准的组不用写。');
     L.push('回复放在 ```记问 代码块里，第一行原样抄：' + groupHead(d.at));
     L.push('然后一行一组：G号 | 改成的分类 | 理由（一句话）');
     L.push('');
     L.push('可选的分类：' + (d.cats || []).filter(function (c) { return c !== '未分类'; }).join('、'));
     L.push('');
-    L.push('分组（G号 | 对方 | 商品说明 | 笔数 | 金额 | 现在的分类）：');
-    d.groups.forEach(function (g) {
-      var cp = mk && personal(g.cp, g.oc, g.desc) ? '个人' : (mk ? mask(g.cp || '') : (g.cp || ''));
-      var ds = mk ? mask(g.desc || '') : (g.desc || '');
-      L.push('G' + g.g + ' | ' + (cp || '—') + ' | ' + (ds || '—') + ' | ' + g.n + ' 笔 | 共 ' + (g.fen / 100).toFixed(2) + ' 元 | ' + (g.cat || '未分类'));
-    });
+    L.push('字段说明：');
+    L.push('- 每行依次是：G号 | 对方 | 商品说明 | 支出/收入 | 笔数 | 金额 | …… | 现在的分类；缺的字段直接不写');
+    L.push('- 「均」是平均每笔；「单笔」是单笔金额的范围；日期范围写到月');
+    L.push('- 「多在…」是大部分交易落在的时段或日子（工作日 / 周末），「分散」「都有」就是没有明显规律；只有 1～2 笔的直接写了每笔的时间和星期');
+    L.push('- 「疑似月固定扣款」是每月一笔、日子差不多');
+    L.push('- 「个人转账」是给个人转钱、账单里没写用途的，请结合对方名字、金额规律、时段判断（比如每月固定金额可能是房租、家里人）；拿不准就不写');
+    if (rest.length) L.push('- 最后「以下 N 笔为个人转账且没有说明」那几行没有 G 号，不用回');
+    L.push('');
+    L.push('分组：');
+    d.groups.forEach(function (g) { L.push(groupLine(g, mk)); });
+    if (rest.length) {
+      L.push('');
+      L.push('--- 以下 ' + rest.length + ' 笔为个人转账且没有说明，AI 不用处理，建议在 App 里逐条确认 ---');
+      rest.slice().sort(function (a, b) { return String(a.time) < String(b.time) ? -1 : String(a.time) > String(b.time) ? 1 : 0; }).forEach(function (r) {
+        var p = tParts(r.time);
+        L.push(p.day + ' ' + p.hm + ' | ' + ((mk ? mask(r.cp || '') : (r.cp || '')) || '—') + ' | ' + (r.io === 'income' ? '收入' : '支出') + ' | ' + gYuan(r.fen) + '元');
+      });
+    }
     return L.join('\n');
   }
   // ctx = { at, cats, n（几组）}：→ { ok, why, items:[{ g, cat, why }], bad:[{ line, why }] }
@@ -326,5 +400,5 @@
 
   return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, changesOf: changesOf, HEAD: HEAD, MODE_NAME: MODE_NAME, MODE_OF: MODE_OF, FLAG_OF: FLAG_OF, REMARK_MAX: REMARK_MAX,
            mask: mask, personal: personal, exportText: exportText, replyHead: replyHead, parseReply: parseReply,
-           GROUP_HEAD: GROUP_HEAD, groupHead: groupHead, groupText: groupText, parseGroupReply: parseGroupReply };
+           GROUP_HEAD: GROUP_HEAD, groupHead: groupHead, groupText: groupText, groupLine: groupLine, isGenericDesc: isGenericDesc, GENERIC_DESC: GENERIC_DESC, parseGroupReply: parseGroupReply };
 });

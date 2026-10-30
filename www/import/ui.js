@@ -3940,32 +3940,61 @@
       } });
   }
   // ---------- 导入简化第 14 版：AI 按组整理（原方案三-4）----------
-  //   待确认分类的记录（rvRows，不计的不算）按对方归组（个人带 *、平台、没有对方的按商品说明归），拼成一段交给 AI（ai.js 的 groupText，默认打码）；
+  //   待确认分类的记录（rvRows，不计的不算）按组拼成一段交给 AI（ai.js 的 groupText，默认打码）；
   //   AI 回「G号 | 分类 | 理由」（parseGroupReply），每组一张勾选卡（默认勾），「改这 N 条」照 AI 修改那套写（of '*'、by 'aigroup'，自动备份，能撤销，撤销时待确认放回）
+  //   1030-RV3 分法：先按收支分开；商户按对方（商品说明发这组里出现最多的那个，泛化说明不算，一样多取最近一笔的，全是泛化的写「—」）；
+  //   平台（AIG_PLAT）、没有对方的按商品说明；个人（ai.js 的 personal()）按对方 + 商品说明，商品说明是泛化说明的只按对方、写「个人转账」，
+  //   这种只有 1～2 笔的不交给 AI（special，不编 G 号、排在最后，groupText 列进末尾那一段）。每组带 items [{ time, fen }] 给 groupText 算统计
   var AIG = null, AIG_PLAT = /淘宝|天猫|京东|拼多多|抖音|唯品会|美团|饿了么|盒马|闪购|交易猫|闲鱼|快手/;
   function aiGroupsOf(rows) {
-    var by = {}, order = [];
+    var AI = window.JiwenImportAI, by = {}, order = [];
+    var generic = function (s) { return AI && AI.isGenericDesc ? AI.isGenericDesc(s) : !String(s || '').trim(); };
+    var isPerson = function (cp, oc, desc) { return AI && AI.personal ? AI.personal(cp, oc, desc) : cp.indexOf('*') >= 0; };
     rows.filter(function (r) { return !r.skip; }).forEach(function (r) {
-      var cp = cpShow(r.cp || ''), desc = String(r.remark || '').trim().slice(0, 24);
-      var k = (!cp || cp.indexOf('*') >= 0 || AIG_PLAT.test(cp)) && desc ? '品：' + desc : (cp ? '方：' + cp : '品：' + (desc || '—'));
-      var g = by[k]; if (!g) { g = by[k] = { cp: k.indexOf('方：') === 0 ? cp : (cp.indexOf('*') >= 0 || AIG_PLAT.test(cp) ? cp : ''), desc: desc, oc: r.oc || '', by: k.indexOf('方：') === 0 ? 'cp' : 'desc', n: 0, fen: 0, cats: {}, ids: [] }; order.push(k); }
-      g.n++; g.fen += r.fen; g.ids.push(r.id); g.cats[r.cat] = (g.cats[r.cat] || 0) + 1;
+      var cp = cpShow(r.cp || ''), desc = String(r.remark || '').trim().slice(0, 24), io = r.type === 'income' ? 'income' : 'expense', gen = generic(desc);
+      var k, kind;
+      if (isPerson(cp, r.oc, r.remark)) { kind = 'person'; k = gen ? '人：' + cp : '人：' + cp + '｜' + desc; }
+      else if ((!cp || AIG_PLAT.test(cp)) && !gen) { kind = 'desc'; k = '品：' + desc; }
+      else if (cp) { kind = 'cp'; k = '方：' + cp; }
+      else { kind = 'desc'; k = '品：—'; }
+      k = io + '｜' + k;
+      var g = by[k];
+      if (!g) {
+        g = by[k] = { cp: kind === 'desc' && !AIG_PLAT.test(cp) ? '' : cp, desc: kind === 'person' ? (gen ? '个人转账' : desc) : (kind === 'desc' ? (gen ? '—' : desc) : '—'),
+                      io: io, oc: r.oc || '', by: kind === 'cp' || (kind === 'person' && gen) ? 'cp' : 'desc', person: kind === 'person', bare: kind === 'person' && gen,
+                      n: 0, fen: 0, cats: {}, ids: [], items: [], descs: {} };
+        order.push(k);
+      }
+      g.n++; g.fen += r.fen; g.ids.push(r.id); g.cats[r.cat] = (g.cats[r.cat] || 0) + 1; g.items.push({ time: r.time, fen: r.fen });
+      if (kind === 'cp' && !gen) { var dd = g.descs[desc] || (g.descs[desc] = { n: 0, t: '' }); dd.n++; if (String(r.time || '') > dd.t) dd.t = String(r.time || ''); }
     });
-    return order.map(function (k) { return by[k]; }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; })
-      .map(function (g, i) { g.g = i + 1; g.cat = Object.keys(g.cats).sort(function (a, b) { return g.cats[b] - g.cats[a]; })[0]; return g; });
+    var gs = order.map(function (k) { return by[k]; });
+    gs.forEach(function (g) {
+      if (g.by === 'cp' && !g.person) {   // 商户：出现最多的商品说明，一样多取最近一笔的
+        var best = null; Object.keys(g.descs).forEach(function (d) { var x = g.descs[d]; if (!best || x.n > best.n || (x.n === best.n && x.t > best.t)) best = { d: d, n: x.n, t: x.t }; });
+        g.desc = best ? best.d : '—';
+      }
+      delete g.descs;
+      g.special = g.bare && g.n <= 2;
+      g.cat = Object.keys(g.cats).sort(function (a, b) { return g.cats[b] - g.cats[a]; })[0];
+    });
+    var main = gs.filter(function (g) { return !g.special; }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; });
+    main.forEach(function (g, i) { g.g = i + 1; });
+    return main.concat(gs.filter(function (g) { return g.special; }).sort(function (a, b) { return b.n - a.n || b.fen - a.fen; }));
   }
   function aiStamp() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()); }
   function openAiGroups() {
     var J = window.JiwenSheet, AI = window.JiwenImportAI; if (!J || !AI) return;
     var info = null, rows = []; try { info = store().archiveInfo(); rows = store().rvRows(); } catch (e) { alertMsg('读不出账本：' + (e && (e.code || e.message) || e) + '\n\n账本没有改动。关掉 App 重新打开再试；还不行的话，把这段话截图发给开发者。', 'AI 按组整理'); return; }
-    var gs = aiGroupsOf(rows);
-    if (!gs.length) { alertMsg('没有待确认分类的记录。', 'AI 按组整理'); return; }
+    var all = aiGroupsOf(rows), gs = all.filter(function (g) { return !g.special; }), rest = [];
+    all.forEach(function (g) { if (g.special) g.items.forEach(function (x) { rest.push({ time: x.time, fen: x.fen, cp: g.cp, io: g.io }); }); });
+    if (!all.length) { alertMsg('没有待确认分类的记录。', 'AI 按组整理'); return; }
     AIG = { at: aiStamp(), groups: gs, cats: info.cats, off: {} };
-    var text = AI.groupText({ at: AIG.at, cats: info.cats, groups: gs }, { mask: true });
+    var text = AI.groupText({ at: AIG.at, cats: info.cats, groups: gs, rest: rest }, { mask: true });
     AIG.text = text;
-    J.open({ title: 'AI 按组整理', tall: true, sub: gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类', onDismiss: function () { AIG = null; },
+    J.open({ title: 'AI 按组整理', tall: true, sub: gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类' + (rest.length ? '（另有 ' + rest.length + ' 笔个人转账留给你逐条确认）' : ''), onDismiss: function () { AIG = null; },
       body: function (box) {
-        box.appendChild(el('div', 'imp-soft', '把下面这段整个复制给 AI（豆包、Kimi、ChatGPT 都行），让它按组挑分类；再把它的回复整段粘贴回来。对方名、手机号已经打码，只发了每组的对方、商品说明、笔数、金额。'));
+        box.appendChild(el('div', 'imp-soft', '把下面这段整个复制给 AI（豆包、Kimi、ChatGPT 都行），让它按组挑分类；再把它的回复整段粘贴回来。手机号、长串数字已经打码，只发了每组的对方、商品说明、收支、笔数、金额和时间规律。'));
         pasteCss();
         var ta = document.createElement('textarea'); ta.id = 'impAiGrpText'; ta.readOnly = true; ta.value = text; ta.className = 'imp-ai-text imp-paste-ta ro'; box.appendChild(ta);
       },
@@ -4014,7 +4043,7 @@
           var g = A.groups[x.g - 1], row = el('label', 'rvg-row imp-aig-row'), cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !A.off[x.g]; row.dataset.g = x.g;
           cb.addEventListener('change', function () { if (cb.checked) delete A.off[x.g]; else A.off[x.g] = 1; paintAiGroups(); });
           row.appendChild(cb);
-          var tx = el('span', 'rvg-r'); tx.appendChild(document.createTextNode('G' + g.g + ' ' + (cpShow(g.cp) || g.desc || '—') + (g.cp && g.desc ? '（' + cut(g.desc, 12) + '）' : '') + ' · ' + g.n + ' 笔：' + g.cat + ' → ' + x.cat));
+          var tx = el('span', 'rvg-r'); tx.appendChild(document.createTextNode('G' + g.g + ' ' + (cpShow(g.cp) || g.desc || '—') + (g.cp && g.desc && g.by !== 'cp' ? '（' + cut(g.desc, 12) + '）' : '') + ' · ' + (g.io === 'income' ? '收入 ' : '支出 ') + g.n + ' 笔：' + g.cat + ' → ' + x.cat));
           if (x.why) tx.appendChild(el('div', 'imp-soft', 'AI 的理由：' + x.why));
           row.appendChild(tx); row.appendChild(el('span', 'rvg-a', yuan(g.fen)));
           box.appendChild(row);
