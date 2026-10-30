@@ -27,6 +27,16 @@ const RANGE = { from: '2026-10-01 00:00:00', to: '2026-10-20 23:59:59' };
   ok(AI.personLike('馬伍旺', '', '') && AI.personLike('某虚', '', '') && AI.personLike('某*甲', '', '') && AI.personLike('某虚构店主', '转账', ''), '5 像个人：两三个字没有商户字样、带 *、交易类型转账');
   ok(!AI.personLike('某虚构百货店', '商户消费', '') && !AI.personLike('某虚构超市', '', '') && !AI.personLike('某某有限公司', '', '') && !AI.personLike('', '', ''), '5 不像个人：带店 / 超市 / 公司、没有对方');
 
+  // ===== 1030-D：AI 分组回复没有第一行 / 第一行写法不一样 =====
+  {
+    const ctx = { at: '2026-10-30 17:11:38', cats: ['未分类', '吃饭', '购物'], n: 3 };
+    const r1 = AI.parseGroupReply('好的，结果如下：\nG1 | 吃饭 | 面馆\nG3 | 购物 | 超市\n希望有帮助', ctx);
+    ok(r1.ok && r1.nohead === true && r1.items.length === 2 && r1.items[1].g === 3, '1030-D 回复没有第一行：照样按组号读、标 nohead');
+    const r2 = AI.parseGroupReply('```记问\n**记问分组建议 v1 导出 2026-10-30 17:11**\nG2 | 吃饭 | x\n```', ctx);
+    ok(r2.ok && !r2.nohead && r2.items.length === 1, '1030-D 第一行少了秒、加了粗：也认');
+    ok(AI.parseGroupReply('记问分组建议 v1 导出 2026-10-29 17:11:38\nG1 | 吃饭 | x', ctx).why === 'time', '1030-D 第一行的导出时间不是这一次：照旧拒收');
+    ok(AI.parseGroupReply('随便聊聊，没有分组', ctx).why === 'noblock', '1030-D 一行「G号 | …」都没有：noblock');
+  }
   // ===== 2. 账单原文 =====
   {
     const TX = [wx({ time: T(3), cp: '某虚构书店', desc: '虚构的书', fen: 3600 }),
@@ -147,6 +157,14 @@ const RANGE = { from: '2026-10-01 00:00:00', to: '2026-10-20 23:59:59' };
     t.w.customConfirm('虚构的确认', () => {}, '测试'); await tick();
     ok($('askCancel').textContent === '取消' && !$('askCancel').classList.contains('alt'), '5 下一个确认框不带上次的「以后都这样记」');
     await t.askCancel();
+    // 1030-D：没打开过导入页、直接从账单页打开「AI 按组整理」：导入页的样式也装上（原来没装，说明按大字显示、勾选框透明）
+    try { t.w.JiwenSheet.close(); } catch (_) {}
+    ok(!t.d.getElementById('impStyle'), '1030-D （这台没打开过导入页，导入页的样式还没装）');
+    t.d.querySelector('.tab-btn[data-tab="ledger"]').click(); await t.idle();
+    $('rvChip').click(); await tick();
+    $('rvAiBtn').click(); await t.until(() => sheetOpen(t) && $('impAiGrpText'), 8000);
+    ok(t.d.getElementById('impStyle') && /\.imp-soft\{/.test(t.d.getElementById('impStyle').textContent) && $('impAiGrpAlias'), '1030-D 从账单页打开「AI 按组整理」：导入页的样式装上了');
+    ok(/^记问 · 按组整理分类\n/.test($('impAiGrpText').value), '1030-D 导出那段第一行缩短成「记问 · 按组整理分类」');
     ok(!t.errs.length, '4/5 无报错 ' + t.errs.join('|'));
   }
   console.log(`\n${pass} 通过，${fail} 失败`);

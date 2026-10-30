@@ -363,7 +363,7 @@
       return alias[g.cp];
     };
     var L = [];
-    L.push('记问 · 待确认分类按组整理（导出 ' + d.at + '）');
+    L.push('记问 · 按组整理分类');
     L.push('');
     L.push('下面是我账本里分类还没确认的记录，按收支和交易对方（平台按商品说明，个人按对方加商品说明）分成了 ' + d.groups.length + ' 组。请按组帮我挑一个分类，只能从「可选的分类」里选；拿不准的组不用写。');
     L.push('回复放在 ```记问 代码块里，第一行原样抄：' + groupHead(d.at));
@@ -385,20 +385,24 @@
   }
   // ctx = { at, cats, n（几组）}：→ { ok, why, items:[{ g, cat, why }], bad:[{ line, why }] }
   var GROUP_HEAD_RE = /^记问分组建议\s*v1\s*导出\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*$/;
+  // 实测 10-30：AI 常把第一行（导出时间）漏掉或改了写法：第一行写法放宽（「记问分组建议 … 导出时间」，秒可以没有）；
+  //   完全没有第一行时照样按这一次导出的组号读（nohead:true，页面上写一句）；有第一行但时间不是这一次的照旧拒收
+  var GROUP_HEAD_LOOSE = /记问分组建议.*?(\d{4}-\d{2}-\d{2})\s*(\d{2}:\d{2})(:\d{2})?/;
   function parseGroupReply(text, ctx) {
     text = String(text == null ? '' : text).replace(/\r\n?/g, '\n'); ctx = ctx || {};
-    var bs = blocks(text), lines = [];
-    if (bs.length) bs.forEach(function (b) { b.split('\n').forEach(function (l) { l = normLine(l); if (l) lines.push(l); }); });
-    else {   // 没有围栏：从开头那一行往下读「G号 | …」
-      var reading = false;
-      text.split('\n').forEach(function (raw) { var l = normLine(raw).replace(/^[`*]+|[`*]+$/g, '').trim();
-        if (GROUP_HEAD_RE.test(l)) { lines.push(l); reading = true; return; }
-        if (reading && l && /^G\s*\d+\s*\|/i.test(l)) lines.push(l); else if (reading && l) reading = false; });
+    var bs = blocks(text), lines = [], head = null;
+    (bs.length ? bs.join('\n') : text).split('\n').forEach(function (raw) {
+      var l = normLine(raw).replace(/^[`*]+|[`*]+$/g, '').trim(); if (!l) return;
+      var isG = /^G\s*\d+\s*\|/i.test(l), h = !isG && !head && GROUP_HEAD_LOOSE.exec(l);
+      if (h) { head = { day: h[1], hm: h[2], sec: h[3] ? h[3].slice(1) : '' }; return; }
+      if (isG || bs.length) lines.push(l);        // 代码块里不是这种格式的行进「没看懂」；代码块外面只认「G号 | …」
+    });
+    if (!lines.some(function (l) { return /^G\s*\d+\s*\|/i.test(l); })) return { ok: false, why: 'noblock' };
+    if (head) {
+      var want = String(ctx.at || ''), got = head.day + ' ' + head.hm + (head.sec ? ':' + head.sec : '');
+      if (head.sec ? got !== want : got !== want.slice(0, 16)) return { ok: false, why: 'time', got: got, want: want };
     }
-    if (!lines.length) return { ok: false, why: 'noblock' };
-    var hm = GROUP_HEAD_RE.exec((lines[0] || '').replace(/^[`*]+|[`*]+$/g, '').trim());
-    if (!hm) return { ok: false, why: 'nohead', line: lines[0] || '' };
-    if (hm[1] !== ctx.at) return { ok: false, why: 'time', got: hm[1], want: ctx.at };
+    lines.unshift('');      // 下面照原来从第 2 行起读
     var items = [], bad = [], seen = {}, cats = (ctx.cats || []).filter(function (c) { return c !== '未分类'; });
     lines.slice(1).forEach(function (l) {
       var c = cellsOf(l), m = /^G\s*(\d+)$/i.exec(c[0] || '');
@@ -410,7 +414,7 @@
       seen[g] = 1;
       items.push({ g: g, cat: cat, why: [c[2], c[3]].filter(Boolean).join(' | ').slice(0, REMARK_MAX) });
     });
-    return { ok: true, items: items, bad: bad };
+    return { ok: true, items: items, bad: bad, nohead: !head };
   }
 
   return { VERSION: VERSION, AI_MAX_ROWS: AI_MAX_ROWS, changesOf: changesOf, HEAD: HEAD, MODE_NAME: MODE_NAME, MODE_OF: MODE_OF, FLAG_OF: FLAG_OF, REMARK_MAX: REMARK_MAX,

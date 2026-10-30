@@ -83,7 +83,9 @@ const bill = (txs, to) => [['微信.csv', B.bill('wechat', txs, { range: { from:
 
   // ===== ⑤ 老记录没有明细 =====
   await t.importFiles(bill(PA, 12));
-  { const s = t.w.JiwenStore.loadStore(A.ID); const a = s.archives['默认存档']; a.records = a.records.map(r => { const o = Object.assign({}, r); delete o.parts; return o; }); t.w.JiwenStore.saveStore(s, A.ID); await t.idle(); }
+  await t.idle();
+  { const S = t.w.JiwenStore; S.saveUserData(S.getUserData().map(r => { const o = Object.assign({}, r); delete o.parts; return o; })); }
+  await t.until(() => pet() && !pet().parts, 5000); await t.idle();
   t.w.JiwenDetail.openDetail(pet().id); await tick();
   ok($('detailPartsNone') && $('detailPartsNone').textContent === '这条是早一点导入的，没有存每一笔的明细' && !$('detailParts').querySelector('.detail-part'), '5 以前合成的没存明细：照实写一句，不列');
   try { t.w.JiwenDetail.closeDetail(); } catch (_) {}

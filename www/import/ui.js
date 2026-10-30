@@ -232,10 +232,13 @@
     '.imp-cf-bk{font-size:12.5px;color:var(--c-text-soft);padding:8px 10px;border-radius:8px;background:var(--c-surface);border:1px solid var(--c-border);line-height:1.6;}'
   ].join('\n');
 
+  // 导入页的样式：打开导入页时装；实测 10-30 起从账单页直接打开的面板（AI 按组整理、一键优化、成组确认按对方）也装（pasteCss 里调），
+  //   原来没装，「.imp-soft」这类小字说明按正文大字显示、勾选框是透明的
+  function impCss() { if (document.getElementById('impStyle')) return; var st = el('style'); st.id = 'impStyle'; st.textContent = CSS; document.head.appendChild(st); }
   // ---------- 页面骨架 ----------
   function build() {
     if (dom) return dom;
-    var st = el('style'); st.id = 'impStyle'; st.textContent = CSS; document.head.appendChild(st);
+    impCss();
     var page = el('div'); page.id = 'impPage';
     var head = el('div', 'imp-head');
     var back = btn('‹ 取消', 'imp-back', function () { headBack(); }); back.id = 'impBack';
@@ -3384,8 +3387,8 @@
     + '.imp-aig-nm{flex:1;min-width:0;font-size:15px;color:var(--c-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.imp-aig-l1 .rvg-a{flex:none;font-size:15px;font-weight:500;}'
     + '.imp-aig-l2{font-size:13px;line-height:1.5;color:var(--c-t1);}.imp-aig-gno{color:var(--c-t2);font-size:12px;}'
     + '.imp-aig-bh input,.imp-aig-row input{margin:0;}.imp-aig-row input{margin-top:1px;}'
-    + '.imp-aig-opt{display:flex;align-items:center;gap:10px;min-height:48px;margin:6px 0;font-size:15px;color:var(--c-text);}.imp-aig-opt input{width:20px;height:20px;flex:none;}.imp-aig-opt small{display:block;font-size:13px;color:var(--c-text-soft);}';
-  function pasteCss() { if (document.getElementById('impPasteStyle')) return; var st = el('style'); st.id = 'impPasteStyle'; st.textContent = PASTE_CSS; document.head.appendChild(st); }
+    + '.imp-aig-opt{display:flex;align-items:center;gap:10px;min-height:48px;margin:6px 0;font-size:15px;color:var(--c-text);cursor:pointer;}.imp-aig-opt input{width:22px;height:22px;flex:none;margin:0;-webkit-appearance:checkbox;appearance:auto;accent-color:var(--c-primary);}.imp-aig-opt small{display:block;font-size:13px;color:var(--c-text-soft);}';
+  function pasteCss() { impCss(); if (document.getElementById('impPasteStyle')) return; var st = el('style'); st.id = 'impPasteStyle'; st.textContent = PASTE_CSS; document.head.appendChild(st); }
   function pasteFit(ta) {
     var max = Math.max(171, Math.round((window.innerHeight || 700) * 0.36));
     ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, max) + 'px';
@@ -3908,6 +3911,13 @@
     });
     return out;
   }
+  // 实测 10-30：账单页「一键优化」胶囊先在后台算一遍能改几条，0 条就不显示入口（原来点进去才说「没有能改得更准的」）
+  function optCount() {
+    return ensureClassify().then(function (okk) {
+      if (!okk) return 0;
+      try { var rows = store().rvRows(); return rows.length ? optPlan(rows, store().archiveInfo()).length : 0; } catch (e) { return 0; }
+    }, function () { return 0; });
+  }
   function openOptimize() {
     var J = window.JiwenSheet; if (!J) return Promise.resolve();
     return ensureClassify().then(function (okk) {
@@ -4048,7 +4058,7 @@
     var preN = pre.groups.reduce(function (s, g) { return s + g.n; }, 0);
     J.open({ title: 'AI 按组整理', tall: true, sub: (opt.label ? opt.label + '：' : '') + gs.length + ' 组 · ' + gs.reduce(function (s, g) { return s + g.n; }, 0) + ' 笔待确认分类', onDismiss: function () { AIG = null; },
       body: function (box) {
-        box.appendChild(el('div', 'imp-soft', '把下面这段整个复制给 AI（豆包、Kimi、ChatGPT 都行），让它按组挑分类；再把它的回复整段粘贴回来。手机号、长串数字已经打码，只发了每组的对方、商品说明、收支、笔数、金额和时间规律。'));
+        box.appendChild(el('div', 'imp-soft', '把下面这段复制给 AI（豆包、Kimi、ChatGPT 都行），再把它的回复整段粘回来。手机号、长串数字已打码。'));
         if (preN) box.appendChild(el('div', 'imp-soft imp-aig-pre', '另有 ' + preN + ' 笔看名字就知道（' + pre.groups.map(function (g) { return cut(g.cp, 8) + ' → ' + g.cat; }).slice(0, 3).join('、') + (pre.groups.length > 3 ? '…' : '') + '），不发给 AI，读回 AI 的回复时一起列出来。'));
         pasteCss();
         var lb = el('label', 'imp-aig-opt'), ck = document.createElement('input'); ck.type = 'checkbox'; ck.id = 'impAiGrpAlias'; ck.checked = AIG.alias;
@@ -4106,6 +4116,7 @@
         // 实测 10-30：按「原分类 → 新分类」分块（原来按 AI 的组号一行一行排，看不出整体改了什么）：块的标题就是这一步改动 + 整块勾选，
         //   块里一行一组（对方（商品说明）、金额 / 收支 · 笔数 · AI 的理由，组号小字放最后）；看名字定的（群红包、发给某某）也归进对应的块
         pasteCss();
+        if (A.reply.nohead) box.appendChild(el('div', 'imp-soft imp-aig-nohead', 'AI 的回复里没有第一行（导出时间），是按这一次导出的组号对上的。这份回复要是别的时候导出的，组号会对不上，就别用。'));
         var blocks = {}, order = [];
         var put = function (from, to, fresh, it) { var k = from + '\u0001' + to; if (!blocks[k]) { blocks[k] = { from: from, to: to, fresh: false, items: [] }; order.push(k); } if (fresh) blocks[k].fresh = true; blocks[k].items.push(it); };
         its.forEach(function (x) { var g = A.groups[x.g - 1]; put(g.cat || '未分类', x.cat, false, { g: g, x: x, on: !A.off[x.g], set: function (v) { if (v) delete A.off[x.g]; else A.off[x.g] = 1; } }); });
@@ -4161,7 +4172,7 @@
         col.appendChild(go); col.appendChild(cl); box.appendChild(col);
       } });
   }
-  var UI = { aiGroupsOf: aiGroupsOf, openAiGroups: openAiGroups, openOptimize: openOptimize, reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
+  var UI = { aiGroupsOf: aiGroupsOf, openAiGroups: openAiGroups, openOptimize: openOptimize, optCount: optCount, reasonFor: reasonFor, undoFromLedger: undoFromLedger, viewBatchInLedger: viewBatchInLedger, canReturn: canReturn, returnToResult: returnToResult, open: open, openWith: openWith, openLogs: openLogs, openRules: openRules, openPending: openPending, close: close, canBack: canBack, back: back, isOpen: isOpen,
              _state: function () { return S; }, _replan: function () { replan(); }, _goStep: function (k) { goStep(k); }, _plainReason: function (r) { return plainReason(r); }, _lastCopy: null };
   window.JiwenImportUI = UI;
 })();

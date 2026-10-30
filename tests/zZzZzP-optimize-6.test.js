@@ -27,7 +27,8 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
   await t.st().rulesSave({ cat: [{ kw: '某虚构甲店', cat: '吃饭' }, { kw: '某虚构乙店', cat: '购物' }], type: [] }); await t.idle();
   // ===== 1. 入口 =====
   t.d.querySelector('.tab-btn[data-tab="ledger"]').click(); await t.idle();
-  ok($('optCatChip') && /一键优化/.test($('optCatChip').textContent) && $('rvChip').nextSibling === $('optCatChip'), '1 账单页「待确认分类」胶囊旁「一键优化 ›」');
+  await t.until(() => $('optCatChip'), 8000);
+  ok($('optCatChip') && $('optCatChip').textContent === '一键优化 5 条 ›' && $('rvChip').nextSibling === $('optCatChip'), '1 账单页「待确认分类」胶囊旁「一键优化 5 条 ›」（实测 10-30：先在后台算能改几条）：' + ($('optCatChip') && $('optCatChip').textContent));
   ok($('devOptCatBtn') && $('devOptCatBtn').style.display !== 'none', '1 设置里有备用入口');
   $('optCatChip').click();
   await t.until(() => sheetOpen(t) && $('impOptGo'), 5000);
@@ -75,9 +76,12 @@ const sheetOpen = t => t.d.getElementById('uiSheetMask') && t.d.getElementById('
     const t2 = await A.boot({ html, www: WWW, seed: A.seedOf([]), now: '2026-10-21T10:00:00' });
     await t2.importFiles([['微信.csv', B.bill('wechat', [wx({ time: T(7), cp: '某虚构丁店' })], { range: RANGE }).bytes]]);
     t2.d.querySelector('.tab-btn[data-tab="ledger"]').click(); await t2.idle();
-    t2.d.getElementById('optCatChip').click();
+    await new Promise(r => setTimeout(r, 2500)); await t2.idle();
+    ok(t2.d.getElementById('rvChip') && !t2.d.getElementById('optCatChip'), '4 实测 10-30：推不出更准的：账单页不显示「一键优化」入口');
+    t2.d.querySelector('.tab-btn[data-tab="settings"]').click(); await t2.idle();
+    t2.d.getElementById('devOptCatBtn').click();
     await t2.until(() => t2.ask(), 5000);
-    ok(/没有能改得更准的/.test(t2.ask().msg), '4 推不出更准的：写一句');
+    ok(/没有能改得更准的/.test(t2.ask().msg), '4 设置里的备用入口点进去：写一句');
   }
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`导入简化第 6 版：${pass} 通过，${fail} 失败`);

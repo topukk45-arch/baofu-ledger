@@ -91,6 +91,7 @@
         // 1021-T13（实测 10-20）：账单页顶上「待确认分类 N」小胶囊（开发开关开着、有 rv 标记的记录时才有）：点了等于一个筛选，
         //   再用现成的多选、批量改分类慢慢改（改了分类就去掉标记）；开着时写「只看待确认分类 · N ✕」，再点回到全部
         // 1023-G 起点了打开搜一笔的结果页、条件是「待确认分类」（点击在 search.js 里委托绑定）
+        let optSig=null, optN=0, optT=null;   // 一键优化：上次算的是哪一份账本、能改几条
         function renderRvChip(raw){
             let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
             const n=on ? raw.filter(r=>r.rv===1).length : 0;
@@ -103,11 +104,24 @@
             }
             b.textContent = `待确认分类 ${n} 条 ›`;
             // 导入简化第 6 版：旁边「一键优化 ›」：按现在的规则把能推准的一次改掉（先列出来确认，能撤销）
+            // 实测 10-30：先在后台按现在的规则算一遍（要载入导入模块，停 0.8 秒再算），能改的有几条才显示「一键优化 N 条 ›」，0 条不显示；
+            //   待确认的条数、账本条数、分类规则一变就重算（optSig）
+            let rl=0; try{ const a=window.JiwenStore.loadStore(JiwenBase.currentUser).archives[JiwenBase.currentArchive]; rl=JSON.stringify(((a && a.importRules)||{}).cat||[]).length; }catch(_){}
+            const sig=n+'|'+raw.length+'|'+rl;
+            if(sig===optSig){ paintOptChip(b, optN); return; }
+            optSig=sig; optN=0; paintOptChip(b, 0);
+            clearTimeout(optT);
+            optT=setTimeout(()=>{ loadImportUI().then(ui=>ui.optCount ? ui.optCount() : 0).then(k=>{ if(optSig!==sig) return; optN=k||0; const bb=$('rvChip'); if(bb) paintOptChip(bb, optN); }).catch(()=>{}); }, 800);
+        }
+        function paintOptChip(b, k){
+            let o=$('optCatChip');
+            if(!k){ if(o) o.remove(); return; }
             if(!o){
-                o=document.createElement('button'); o.type='button'; o.id='optCatChip'; o.className='rv-chip opt-chip'; o.textContent='一键优化 ›';
+                o=document.createElement('button'); o.type='button'; o.id='optCatChip'; o.className='rv-chip opt-chip';
                 o.addEventListener('click', ()=>{ loadImportUI().then(ui=>ui.openOptimize()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '一键优化分类')); });
-                b.parentNode.insertBefore(o, b.nextSibling);
             }
+            o.textContent=`一键优化 ${k} 条 ›`;
+            if(b.nextSibling!==o) b.parentNode.insertBefore(o, b.nextSibling);
         }
         function renderImpEmptyEntry(n){
             let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
