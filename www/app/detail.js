@@ -2,8 +2,7 @@
         const { $, emptyHtml, escapeHtml, isSkip, pad, parseRecTime, recMode, round2, safeNum } = window.JiwenBase;   // 用到前面模块的
         const { IMP_APPS, balContrib, getUserData, isOpening, isRefund, modeAmtCls, modeTag, refundedMap, refundedTag, refundedTotal, refundsOf, saveUserData, statContrib, syncRefunds } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customConfirm } = window.JiwenAsk;   // 用到前面模块的
-        const { devImportOn } = window.JiwenImportEntry;   // 用到前面模块的
-        const { askCatRule, deleteRecord, openAddModal, openRefund, refundLineHtml } = window.JiwenForms;   // 用到前面模块的
+                const { askCatRule, deleteRecord, openAddModal, openRefund, refundLineHtml } = window.JiwenForms;   // 用到前面模块的
 
         // 清单行 → 只读详情。批量确认还没执行，此时允许改记录会让清单和即将执行的范围对不上，
         // 所以从这里进的详情隐藏「修改」按钮，只看不改。
@@ -94,7 +93,7 @@
                 b.addEventListener('click', ()=>{ box.hidden=!box.hidden; b.textContent=box.hidden ? '看账单原文 ›' : '收起账单原文'; });
                 f.appendChild(b); f.appendChild(box);
             }
-            if(rec.src.merged && devImportOn()){
+            if(rec.src.merged){
                 const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='detailSplit'; b.textContent='拆开'; b.style.marginTop='6px';
                 b.addEventListener('click', ()=>{
                     customConfirm(`把这条和${app}账单拆开：\n\n· 你记的这条改回合并前的样子（你后来改过的不动）\n· 账单另记一条（分类和你记的这条一样）\n\n拆开算进原来那次导入，撤销那次导入时一起撤。`, async ()=>{
@@ -362,12 +361,10 @@
         // 每笔一行：上面备注（没备注写分类）+ 标签，下面小字「分类 · 时间」，右边金额（支出正文色带 −、收入绿色带 +）
         //   opt.date：时间前面带上日期（预算明细这种跨天的列表用）
         // 导入简化 4a：列表第二行小字写来源（文字，不用两家的图标；圆角标签留给往来、不计、期初这些影响统计的）：
-        //   自己记的没对上账单不写；已和账单合并的「已对账」；导入的「微信 / 支付宝」；几笔合成的一条「微信 · 几笔合成」。开发开关开着才写
+        //   自己记的没对上账单不写；已和账单合并的「已对账」；导入的「微信 / 支付宝」；几笔合成的一条「微信 · 几笔合成」（1031-A 起不看开发开关）
         const SRC_APP={ wechat:'微信', alipay:'支付宝' };
         function srcText(r){
             const s=r && r.src; if(!s || typeof s!=='object') return '';
-            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
-            if(!on) return '';
             if(s.merged) return '已对账';
             const a=SRC_APP[s.app]; if(!a) return '';
             return s.sum ? a+' · 几笔合成' : a;

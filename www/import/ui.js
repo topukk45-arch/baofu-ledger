@@ -481,10 +481,12 @@
     var b = dom.body; b.innerHTML = '';
     setHead('导入账单', '‹ 取消');
     var c = el('div', 'imp-card');
-    c.appendChild(el('h4', null, '导入微信 / 支付宝账单（开发中）'));
+    c.appendChild(el('h4', null, '导入微信 / 支付宝账单'));
     c.appendChild(el('div', 'imp-soft', '先在微信或支付宝里导出账单（选「用于个人对账」），邮件里的压缩包可以直接选（会问解压密码），也可以先解压再选里面的 csv / xlsx 文件。可以一次选好几个。写进账本前会先给你看导入方案，导错了能撤销。'));
     // 1016-UI2：开发用的自检挪到说明下面、写成大白话，不和正经选项排在一起
-    if (typeof window.openDevImportCheck === 'function') { var chk = btn('导入功能自己检查一下（出问题时给开发者看）', 'imp-link', function () { window.openDevImportCheck(); }); chk.id = 'impSelfTest'; c.appendChild(chk); }
+    var devOn = false; try { devOn = localStorage.getItem('app_dev_import') === '1'; } catch (_) {}
+    // 1031-A：导入正式放出来以后，自检只在开发开关开着时出现
+    if (devOn && typeof window.openDevImportCheck === 'function') { var chk = btn('导入功能自己检查一下（出问题时给开发者看）', 'imp-link', function () { window.openDevImportCheck(); }); chk.id = 'impSelfTest'; c.appendChild(chk); }
     b.appendChild(c);
     // 两个教程是大卡片，放在下面（拇指够得着）；主按钮「选账单文件」在底部操作栏，最靠下
     var st = el('div', 'ui-stack imp-push'); st.id = 'impPickChoices';

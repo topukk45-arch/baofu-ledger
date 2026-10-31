@@ -2,12 +2,12 @@
         const { $, pad, setTxtNudge, txtNudge } = window.JiwenBase;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
 
-        // ===== 1015-A：账单导入（开发中）=====
+        // ===== 1015-A：账单导入（1031-A 起正式放出来，开发开关只管开发者工具）=====
         // 导入的代码在 import/ 目录下，平时启动一个都不加载；点开入口时才插入 import/import.js（loadImportModule）。
-        // 开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份。
+        // 开发开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份；1031-A 起只管性能记录、导入量度、字往下挪、启动画面等首屏、导入页里的自检。
         const DEV_IMPORT_KEY='app_dev_import';
         const devImportOn=()=>{ try{ return localStorage.getItem(DEV_IMPORT_KEY)==='1'; }catch(_){ return false; } };
-        function renderDevImport(){ $('devImportBtn').style.display = $('devRestoreBtn').style.display = $('devLogsBtn').style.display = $('devRulesBtn').style.display = $('devOptCatBtn').style.display = $('devPerfBtn').style.display = $('devMeasureBtn').style.display = $('devSplashBtn').style.display = $('devNudgeBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()){ splashWaitPaint(); nudgePaint(); } }
+        function renderDevImport(){ $('devPerfBtn').style.display = $('devMeasureBtn').style.display = $('devSplashBtn').style.display = $('devNudgeBtn').style.display = devImportOn() ? '' : 'none'; if(devImportOn()){ splashWaitPaint(); nudgePaint(); } }
         // 1019-X：开发开关里的「启动画面等首屏」（默认开）：真正的开关存在原生层（SharedPreferences，打开 App 时原生那边一开始就要知道），
         //   这里只是读 / 写它；关掉 = 回到 1019-U 之前「系统画出第一帧就收启动画面」，下次打开 App 生效。不在手机上时记在 localStorage 里只为显示
         function splashPlugin(){ const c=window.Capacitor; return c && c.Plugins && c.Plugins.Launch && typeof c.Plugins.Launch.setWait==='function' ? c.Plugins.Launch : null; }
@@ -197,7 +197,6 @@
             impOpenFile(f);
         }
         function impOpenFile(f){
-            if(!devImportOn()){ customAlert('导入功能还在测试中，暂时不能用记问打开账单文件。', '用记问打开'); return; }
             if(f.error){ customAlert(f.error==='too_big' ? '这个文件太大了（超过 8MB），读不了。' : '这个文件读不出来，换个方式选文件试试（导入页里点「选账单文件」）。', '用记问打开'); return; }
             let bytes;
             try{ const bin=atob(f.data||''); bytes=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i); }
@@ -213,17 +212,14 @@
         })();
         // 第二期（1016-Z5）：「设置 → 管理导入规则」：你的分类规则、分类对照、类型规则，能看、改、删、加（导入页那一层里打开）
         $('devRulesBtn').addEventListener('click', () => {
-            if(!devImportOn()) return;
             loadImportUI().then(ui=>ui.openRules()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '管理导入规则'));
         });
         // 导入简化第 6 版：「设置 → 一键优化分类」（备用入口；主入口在账单页「待确认分类」胶囊旁）
         $('devOptCatBtn').addEventListener('click', () => {
-            if(!devImportOn()) return;
             loadImportUI().then(ui=>ui.openOptimize()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '一键优化分类'));
         });
         // 1016-L：「设置 → 导入记录」最近 10 次，每次右侧「撤销」（导入页那一层里打开，返回键照样一层层关）
         $('devLogsBtn').addEventListener('click', () => {
-            if(!devImportOn()) return;
             loadImportUI().then(ui=>ui.openLogs()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入记录'));
         });
         function openDevImportCheck(){ $('devImportMask').style.display='flex'; runDevImportCheck(); }

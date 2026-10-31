@@ -3,7 +3,7 @@
         const { IMPORT_MAX_BYTES, MAX_IMPORT_RECORDS, __ledgerPending, accountById, accountNameError, charLen, charSlice, createAccount, curArchive, getAccounts, getUserData, impArchFields, impExportFields, importArchiveFromText, isAccountId, ledgerDamageNotice, ledgerEvictExcept, ledgerLoad, loadDays, loadStore, nameOf, nameTaken, odClearLink, odGetLink, odMoveLink, odPlugin, odRefreshStatusUI, saveAccounts, saveStoreSafe, setAccountHidden, stampAccountName, storeKey, trackBusy } = window.JiwenStore;   // 用到前面模块的
         const { customAlert, customChoose, customConfirm, customPrompt } = window.JiwenAsk;   // 用到前面模块的
         const { askImportOtherDays, importDaysSuffix, importFixSuffix, openAiExport } = window.JiwenAiExport;   // 用到前面模块的
-        const { devImportOn, loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
+        const { loadImportUI } = window.JiwenImportEntry;   // 用到前面模块的
         const { resetSearch } = window.JiwenSearch;   // 用到前面模块的
         const { refreshArchiveSelect } = window.JiwenSettings;   // 用到前面模块的
         const { enterAccount, refreshAllViews, refreshCatSelectors } = window.JiwenTabs;   // 用到前面模块的
@@ -155,7 +155,7 @@
                         // 1016-R：新账号进去以后问一次「怎么开始？」（开发开关开着才问；只在新建账号这一次，可以跳过）
                         // 是「用记问打开」账单文件进来的，已经在导入了，就不问
                         const viaFile=window.__impOpenedNow; window.__impOpenedNow=false;
-                        if(JiwenBase.currentUser===id && devImportOn() && !viaFile) customConfirm('怎么开始？\n\n可以从零开始一笔笔记，也可以先把微信、支付宝的账单导进来，第一次打开就有几个月的统计可看。', ()=>{
+                        if(JiwenBase.currentUser===id && !viaFile) customConfirm('怎么开始？\n\n可以从零开始一笔笔记，也可以先把微信、支付宝的账单导进来，第一次打开就有几个月的统计可看。', ()=>{
                             loadImportUI().then(ui=>ui.open()).catch(e=>customAlert('导入模块没加载上：' + (e && e.message || e), '导入'));
                         }, '怎么开始', { okText:'导入微信、支付宝账单', cancelText:'从零开始记' });
                     }
