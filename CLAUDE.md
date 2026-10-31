@@ -47,7 +47,7 @@
 - 版本号写在登录页标题下方 `build 1030-C` 这种（月日 + 字母，同一天字母用完接着 `Z1`、`Z2`……，也有 `-RV1` 这种一个系列的写法）；设置页底部是从登录页抄的。改版本号用 `sh tests/tools/bump.sh 新版本号`（登录页和 `index.html` 里所有 `?v=` 一起改）。
 - 推送到 main 自动打包（`.github/workflows/build.yml`，只有推 main 和手动触发才打）→ 跑全部测试 → APK → 发到预发行「最新测试版」（`latest-build` / `jiwen-latest.apk`）。打包机固定 `ubuntu-24.04`；编译失败等 30 秒重新下载依赖再试一次。
 - 体验版（给某条分支单独出包）：临时在 `build.yml` 里加这条分支名和「发体验版预发布」那一段（`docs/release/branch-publish` 写版本号），**合回 main 前必须删掉**。现在没有。
-- 正式版：说明写进 `docs/release/<标签>.md`、标题写进 `docs/release/<标签>.title`，`docs/release/publish` 第一行写要发的标签，推到 main；打包机打完包看这个发行版还没有就发成 Latest（标签打在那次提交上、安装包 `jiwen-<标签去掉 v>.apk`），已经发过的跳过。说明照 `v1010` 的写法分「新功能 / 界面 / 修复 / 兼容」。α / β 这类标题用希腊字母、标签和文件名用英文（`v1021-beta`）。现有：`v1010`、`v1016-alpha`、`v1021-beta`。
+- 正式版：说明写进 `docs/release/<标签>.md`、标题写进 `docs/release/<标签>.title`，`docs/release/publish` 第一行写要发的标签，推到 main；打包机打完包看这个发行版还没有就发成 Latest（标签打在那次提交上、安装包 `jiwen-<标签去掉 v>.apk`），已经发过的跳过。说明照 `v1010` 的写法分「新功能 / 界面 / 修复 / 兼容」。α / β 这类标题用希腊字母、标签和文件名用英文（`v1021-beta`）。现有：`v1010`、`v1016-alpha`、`v1021-beta`、`v1031`（第一个正式放出导入的版本，代码同 1031-B）。
 - 打的是 release 包（`assembleRelease`，1031-B 起；原来是 debug 包，插电脑就能读出账本数据、网页能被电脑上的 Chrome 调试），用 GitHub Secrets 里那把固定 keystore 签名；包名 `com.baofu.ledger` 不改（覆盖安装不丢数据）。电脑上 `chrome://inspect` 连不上 App 是对的，别为了调试改回 debug。
 
 ## 隐私（仓库是公开的）
