@@ -57,7 +57,9 @@ jobs:
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > "$RUNNER_TEMP/baofu.keystore"
 
-      - name: 编译 APK（固定签名，可覆盖升级）
+      # 1031-B：改打 release 包（原来是 debug 包：别人插上电脑就能读出 App 里的账本数据，网页也能被电脑上的 Chrome 连上调试）。
+      #   签名、包名不变，装着 debug 版的手机直接覆盖安装，数据不丢
+      - name: 编译 APK（release 包，固定签名，可覆盖升级）
         env:
           KEYSTORE_FILE: ${{ runner.temp }}/baofu.keystore
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
@@ -68,17 +70,17 @@ jobs:
           chmod +x gradlew
           # 1017：下载依赖偶尔失败（2c7d9af 那次 Maven Central 临时报「找不到」gson、asm 这些明明有的包），
           # 失败了等 30 秒、强制重新查依赖再试一次；第二次还失败才算失败
-          ./gradlew assembleDebug --no-daemon || {
+          ./gradlew assembleRelease --no-daemon || {
             echo "::warning title=编译重试::第一次编译失败，30 秒后重新下载依赖再试一次"
             sleep 30
-            ./gradlew assembleDebug --no-daemon --refresh-dependencies
+            ./gradlew assembleRelease --no-daemon --refresh-dependencies
           }
 
       - name: 上传 APK 产物
         uses: actions/upload-artifact@v6
         with:
           name: baofu-ledger-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
       # 每次 main 打包成功,就把 apk 放进固定的「最新测试版」发行页。
@@ -92,7 +94,7 @@ jobs:
           set -e
           VER=$(grep -oE 'build [0-9]{4}-[A-Z0-9]+' www/index.html | head -1 | cut -d' ' -f2)
           APK="$RUNNER_TEMP/jiwen-latest.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
           WHEN=$(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M')
           NOTES="版本 $VER，打包于 $WHEN（北京时间），对应提交 ${GITHUB_SHA::7}：$(git log -1 --format=%s)
 
@@ -124,5 +126,5 @@ jobs:
           test -f "$NOTES_FILE" || { echo "没有说明文件 $NOTES_FILE"; exit 1; }
           TITLE=$(cat "$TITLE_FILE" 2>/dev/null || echo "$REL")
           APK="$RUNNER_TEMP/jiwen-${REL#v}.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          cp android/app/build/outputs/apk/release/app-release.apk "$APK"
           gh release create "$REL" "$APK" --title "$TITLE" --notes-file "$NOTES_FILE" --latest --target "$GITHUB_SHA"
