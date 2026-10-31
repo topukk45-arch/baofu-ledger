@@ -101,7 +101,7 @@ const RANGE = { from: '2026-10-01 00:00:00', to: '2026-10-20 23:59:59' };
     ok(!t2.d.getElementById('impBanner'), '5 超过 7 天：横幅不显示');
     // 开发开关关掉：横幅、来源小字都没有
     t2.w.localStorage.setItem('app_dev_import', '0'); t2.w.JiwenLedger.renderBill(); await tick(80); t2.w.JiwenLedger.listFlush();
-    ok(!t2.d.getElementById('impBanner') && !t2.d.querySelector('#billList .bl-src'), '5 开发开关关着：没有横幅、没有来源小字');
+    ok(!t2.d.getElementById('impBanner') && !!t2.d.querySelector('#billList .bl-src'), '5 （1031-A）开发开关关着：来源小字照样有（横幅超过 7 天照旧不显示）');
     ok(!t2.errs.length, '5 无报错 ' + t2.errs.join('|') + L.b.slice(0, 0));
   }
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));

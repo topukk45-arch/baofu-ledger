@@ -1,6 +1,6 @@
 // 1016-R 新用户「怎么开始」和空账本小入口（jsdom 跑整个 App）。node zB-import-entries.test.js [index.html]
 // 新建账号进去以后问一次「怎么开始？」（导入微信、支付宝账单 / 从零开始记），选导入打开导入页；只在新建这一次问；
-// 空账本（少于 5 条）上方有「有微信、支付宝账单？可以一次导进来 ›」，记到 5 条消失；开发开关关着时两样都没有。
+// 空账本（少于 5 条）上方有「有微信、支付宝账单？可以一次导进来 ›」，记到 5 条消失；1031-A 起开发开关关着也一样有。
 const fs = require('fs'), path = require('path');
 const A = require('./helpers/app');
 
@@ -55,20 +55,21 @@ async function newAccount(t, name) {
     ok(!t.$('impPage') || t.$('impPage').style.display !== 'block', '1 选「从零开始记」：不打开导入页');
     ok(!t.errs.length, '1 无报错 ' + t.errs.join('|'));
   }
-  // ===== 3. 开发开关关着：不问、没有入口 =====
+  // ===== 3. 开发开关关着（1031-A 起导入正式放出来）：照样问、照样有入口，开关开关都不影响 =====
   {
     const t = await A.boot({ html, www: WWW, seed: {} });
     await newAccount(t, '小兰');
-    ok(!t.ask(), '3 开关关着：新建账号不问');
-    ok(!t.$('impEmptyEntry'), '3 开关关着：空账本没有小入口');
+    ok(t.ask() && /怎么开始/.test(t.ask().msg), '3 （1031-A）开关关着：新建账号照样问');
+    await t.askCancel();
+    ok(!!t.$('impEmptyEntry'), '3 （1031-A）开关关着：空账本照样有小入口');
     // 设置里连点版本号打开开关：入口出现
     t.d.querySelector('.tab-btn[data-tab="settings"]').click();
     // 测试里的时钟每读一次走 1 秒，连点 5 次要先把它停住
     const tap5 = async () => { const dn = t.w.Date.now; let k = 0; t.w.Date.now = () => 1790000000000 + (k++); for (let i = 0; i < 5; i++) t.$('setBuild').click(); t.w.Date.now = dn; await t.until(() => t.ask()); await t.askOk(); };
     await tap5();
-    ok(!!t.$('impEmptyEntry'), '3 打开开关：空账本小入口跟着出现');
+    ok(!!t.$('impEmptyEntry'), '3 （1031-A）打开开关：小入口还在');
     await tap5();
-    ok(!t.$('impEmptyEntry'), '3 关掉开关：小入口消失');
+    ok(!!t.$('impEmptyEntry'), '3 （1031-A）关掉开关：小入口还在');
     ok(!t.errs.length, '3 无报错 ' + t.errs.join('|'));
   }
   console.log(`${pass} 通过，${fail} 失败`);

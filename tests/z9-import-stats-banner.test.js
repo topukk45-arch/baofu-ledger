@@ -48,7 +48,7 @@ const man = (id, mo, d, money, cat) => ({ id, time: `2026-${p2(mo)}-${p2(d)}T08:
   // 开发开关关掉：不显示
   t.w.localStorage.removeItem('app_dev_import');
   t.w.JiwenStats.stepMonth(1); t.w.JiwenStats.stepMonth(-1); await settle();
-  ok(!banner(), '3 开发开关关着：不显示横幅');
+  ok(!!banner(), '3 （1031-A）开发开关关着：照样显示横幅');
   t.w.localStorage.setItem('app_dev_import', '1');
   t.w.JiwenStats.stepMonth(1); t.w.JiwenStats.stepMonth(-1); await settle();
   ok(!!banner(), '3 再打开：显示');

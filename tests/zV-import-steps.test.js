@@ -221,7 +221,7 @@ const MANY = () => [
   {
     const seed = A.seedOf(MANUAL); delete seed.app_dev_import;
     const t = await A.boot({ html, www: WWW, seed });
-    ok(!t.w.JiwenImportUI && !t.d.getElementById('impPage') && !t.d.getElementById('uiSheetMask') && t.d.getElementById('devImportBtn').style.display === 'none', '7 开关关着：导入页、底部面板都不存在，入口藏着');
+    ok(!t.w.JiwenImportUI && !t.d.getElementById('impPage') && !t.d.getElementById('uiSheetMask') && t.d.getElementById('devImportBtn').style.display !== 'none', '7 （1031-A）开关关着：入口在，没点之前导入页、底部面板都不存在');
     ok(!t.log.some(u => String(u).startsWith('import/') || /\/import\//.test(u)), '7 开关关着：一个 import/ 下的文件都没请求（请求：' + t.log.join(',') + '）');
   }
 

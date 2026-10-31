@@ -32,9 +32,9 @@ const man = (id, mo, d, money, o) => Object.assign({ id, time: `2026-${p2(mo)}-$
   ok(!$('devUndoBtn') && !/撤销导入（开发中）/.test(d.body.innerHTML), '1 1016-K 的临时「撤销导入」按钮去掉了');
   {
     const t0 = await A.boot({ html, www: WWW, seed: Object.assign(A.seedOf(RECS), { app_dev_import: '' }) });
-    ok(t0.$('devLogsBtn').style.display === 'none' && t0.$('devImportBtn').style.display === 'none', '1 开发开关关着时看不到导入和导入记录');
-    t0.$('devLogsBtn').click(); await t0.idle(); await new Promise(r => setTimeout(r, 30));
-    ok(!t0.$('impPage') || t0.$('impPage').style.display !== 'block', '1 （防御）开关关着时页面没被打开');
+    ok(t0.$('devLogsBtn').style.display !== 'none' && t0.$('devImportBtn').style.display !== 'none', '1 （1031-A）开发开关关着也看得到导入和导入记录');
+    t0.$('devLogsBtn').click(); await t0.until(() => t0.$('impPage') && t0.$('impPage').style.display === 'block');
+    ok(t0.$('impPage') && t0.$('impPage').style.display === 'block', '1 （1031-A）开关关着点「导入记录」照样打开');
   }
 
   // 空的导入记录

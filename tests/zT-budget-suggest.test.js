@@ -47,7 +47,7 @@ const r = (mo, d, money, cat, o) => Object.assign({ id: 'r' + (++k), time: `2026
   {
     const t3 = await A.boot({ html, www: WWW, seed: Object.assign(A.seedOf(RECS, CATS), { app_dev_import: '' }) });
     t3.d.querySelector('.tab-btn[data-tab="stats"]').click(); t3.d.querySelector('#statTabSeg button[data-v="budget"]').click(); await t3.idle();
-    ok(!t3.$('bgSuggestCard'), '4 开发开关关着：没有预算建议');
+    ok(!!t3.$('bgSuggestCard') && !/开发中/.test(t3.$('bgSuggestCard').textContent), '4 （1031-A）开发开关关着：照样有预算建议，不写「开发中」');
   }
   // 导入结果页「按过去几个月设预算」直接打开建议
   {

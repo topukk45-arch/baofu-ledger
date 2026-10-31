@@ -30,7 +30,7 @@ const MB = 1048576;
   ok(!$('storageUse') && !$('storageUseWarn'), '3 拿不到配额：不显示');
   est.quota = 100 * MB;
   t.w.localStorage.removeItem('app_dev_import'); await reopen();
-  ok(!$('storageUse'), '4 开发开关关着：不显示');
+  ok(!!$('storageUse'), '4 （1031-A）开发开关关着：照样显示');
   const t2 = await A.boot({ html, www: WWW, seed: A.seedOf([]) });
   ok(!t2.$('storageUse'), '3 没有 navigator.storage：不显示');
   ok(!t.errs.length && !t2.errs.length, '无报错 ' + t.errs.concat(t2.errs).join('|'));

@@ -130,7 +130,7 @@ async function bootIn(o) {
   return t;
 }
 const lsSnap = t => { const o = {}; for (let i = 0; i < t.ls.length; i++) { const k = t.ls.key(i); o[k] = t.ls.getItem(k); } return o; };
-const shown = t => t.$('devImportBtn').style.display !== 'none';
+const shown = t => t.$('devPerfBtn').style.display !== 'none';   // 1031-A：开关只管开发者工具，拿「性能记录」看开关
 const tap = (t, n) => { for (let i = 0; i < n; i++) t.$('setBuild').click(); };
 const outText = t => t.$('devImportOut').textContent;
 const importReqs = t => t.log.filter(p => p.startsWith('import/'));
@@ -141,7 +141,8 @@ const importReqs = t => t.log.filter(p => p.startsWith('import/'));
   ok(t.$('mainBox').style.display === 'block', '3 进了账号');
   ok(importReqs(t).length === 0, '3 启动时没去加载 import/ 下的文件（请求：' + t.log.join(',') + '）');
   ok(/^build \d{4}-[A-Z0-9]+(-M\d+)?$/.test(t.$('loginBuild').textContent) && t.$('setBuild').textContent === t.$('loginBuild').textContent, '3 设置页底部的版本号和登录页一样：' + t.$('setBuild').textContent);
-  ok(!shown(t), '3 「导入（开发中）」默认藏着');
+  ok(!shown(t), '3 开发者工具默认藏着');
+  ok(t.$('devImportBtn').style.display !== 'none' && t.$('devImportBtn').textContent.includes('导入微信 / 支付宝账单') && !/开发中/.test(t.$('devImportBtn').textContent), '3 （1031-A）导入入口默认就在、不写「开发中」');
   ok(t.w.JiwenImport === undefined && t.w.JiwenImportCore === undefined, '3 页面里没有导入模块');
   ok(!t.errs.length && !t.jsdomErrs.length, '3 无报错 ' + t.errs.concat(t.jsdomErrs).join('|'));
 }

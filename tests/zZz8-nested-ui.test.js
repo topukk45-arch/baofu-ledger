@@ -74,7 +74,7 @@ const MAN = [{ id: 'm2', time: '2026-10-01T08:30', money: 50, type: 'expense', c
   // ===== 5. 开发开关关着：导入相关的入口、面板一点不露 =====
   {
     w.localStorage.setItem('app_dev_import', '0'); w.JiwenImportEntry.renderDevImport();
-    ok(['devImportBtn', 'devRestoreBtn', 'devLogsBtn', 'devRulesBtn'].every(id => $(id).style.display === 'none'), '5 设置里导入、恢复备份、导入记录、管理导入规则都不显示');
+    ok(['devImportBtn', 'devRestoreBtn', 'devLogsBtn', 'devRulesBtn', 'devOptCatBtn'].every(id => $(id).style.display !== 'none' && !/开发中/.test($(id).textContent)) && ['devPerfBtn', 'devMeasureBtn', 'devNudgeBtn', 'devSplashBtn'].every(id => $(id).style.display === 'none'), '5 （1031-A）开关关着：导入、恢复备份、导入记录、管理导入规则、一键优化照样在、不写「开发中」；开发者工具藏着');
     t.d.querySelector('.tab-btn[data-tab="stats"]').click(); await t.idle();
     ok(!t.d.querySelector('.pend-banner, #pendBanner') || t.d.querySelector('#pendBanner') && t.d.querySelector('#pendBanner').style.display === 'none' || !/待确认/.test(t.d.body.textContent), '5 统计页不显示待处理横幅');
     t.d.querySelector('.tab-btn[data-tab="ledger"]').click(); await t.idle();

@@ -52,9 +52,9 @@ function breakPut(when) { OS.put = function (v, k) { if (when(String(k))) { cons
 function restorePut() { OS.put = origPut; }
 // 读库记账：读出来的值有多少字符、碰到了哪些 imp_ 的值
 function watchReads() {
-  const log = { chars: 0, imp: 0 };
+  const log = { chars: 0, imp: 0, impKeys: [] };
   const add = v => { if (typeof v === 'string') log.chars += v.length; };
-  OS.get = function (k) { const r = origGet.call(this, k); r.addEventListener('success', () => { add(r.result); if (String(k).startsWith('imp_')) log.imp++; }); return r; };
+  OS.get = function (k) { const r = origGet.call(this, k); r.addEventListener('success', () => { add(r.result); if (String(k).startsWith('imp_')) { log.imp++; log.impKeys.push(String(k)); } }); return r; };
   OS.getAll = function (q) { const r = origGetAll.apply(this, arguments); r.addEventListener('success', () => { (r.result || []).forEach(v => { add(v); if (typeof v === 'string' && /"n":"/.test(v.slice(0, 400)) && /"ids":/.test(v.slice(0, 40))) log.imp++; }); }); return r; };
   log.stop = () => { OS.get = origGet; OS.getAll = origGetAll; };
   return log;
@@ -446,13 +446,17 @@ let backupText;
     const w = watchReads(); const t1 = ms();
     const x = await boot(from.dump(), { phone: from.phone, loose: true, html: html2 });
     const el = ms() - t1; w.stop();
-    return { chars: w.chars, imp: w.imp, ms: el, inMain: x.inMain(), n: (x.w.JiwenStore || x.w).getUserData().length };
+    return { chars: w.chars, imp: w.imp, impKeys: w.impKeys, ms: el, inMain: x.inMain(), n: (x.w.JiwenStore || x.w).getUserData().length };
   };
   // 两台「手机」都先迁移好（第一次打开时搬家），再测第二次打开
   const withOrd = await runEnter(t), noOrd = await runEnter(plain);
   ok(withOrd.inMain && withOrd.n === recs.length && noOrd.n === recs.length, '8 两边都进了账号，记录 ' + withOrd.n + ' 条');
   ok(withOrd.chars === noOrd.chars, '8 进入账号读进来的字符数一样：有单号 ' + withOrd.chars + '，没单号 ' + noOrd.chars);
-  ok(withOrd.imp === 0, '8 进入账号一个导入数据都没读');
+  // 1031-A 起导入正式放出来，进账号要画「刚导入」横幅、月初提醒、待处理横幅，只许读导入记录（_i）、待处理（_p）这两小块；
+  //   单号表、备份、备份目录、草稿一块都不许读（原来是「一个 imp_ 都不读」，那时导入藏在开发开关后面）
+  console.log('    进入账号读的导入数据：' + (withOrd.impKeys.join(',') || '无'));
+  const badImp = withOrd.impKeys.filter(k => !/_(i|p)$/.test(k));
+  ok(badImp.length === 0 && withOrd.imp <= 2, '8 进入账号只读导入记录和待处理，单号表、备份、草稿一块没读：' + withOrd.impKeys.join(','));
   console.log('    进入账号耗时：有 12 万单号 ' + withOrd.ms + 'ms，没有 ' + noOrd.ms + 'ms');
   if (process.env.OLD_HTML) {
     const oldHtml = fs.readFileSync(process.env.OLD_HTML, 'utf8');

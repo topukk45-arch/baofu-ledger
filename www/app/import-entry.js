@@ -2,7 +2,8 @@
         const { $, pad, setTxtNudge, txtNudge } = window.JiwenBase;   // 用到前面模块的
         const { customAlert } = window.JiwenAsk;   // 用到前面模块的
 
-        // ===== 1015-A：账单导入（1031-A 起正式放出来，开发开关只管开发者工具）=====
+        // ===== 1015-A：账单导入 =====
+        // 1031-A 起导入正式放出来，开发开关只管开发者工具。
         // 导入的代码在 import/ 目录下，平时启动一个都不加载；点开入口时才插入 import/import.js（loadImportModule）。
         // 开发开关只存在这台手机上（localStorage 的 app_dev_import），不进账本、不进备份、不进云备份；1031-A 起只管性能记录、导入量度、字往下挪、启动画面等首屏、导入页里的自检。
         const DEV_IMPORT_KEY='app_dev_import';
