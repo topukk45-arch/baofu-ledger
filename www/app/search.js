@@ -394,7 +394,7 @@
             if(!mc.children.length) mc.innerHTML=MODE_ORDER.map(m=>`<button type="button" class="sf-btn cc" data-v="${m}">${MODE_NAME[m]}</button>`).join('');
             mc.querySelectorAll('[data-v]').forEach(b=>{ const on=searchState.modes.includes(b.dataset.v); b.classList.toggle('sel', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
             // 待确认分类（开发开关开着、账本里有，或者已经选了）
-            let dev=false; try{ dev=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const dev=true;   // 1031-A：不再看开发开关
             const rvN=dev ? getUserData().filter(r=>r.rv===1).length : 0;
             $('filterRvRow').hidden=!(searchState.rv || rvN);
             $('filterRvVal').textContent = `${rvN} 条`;

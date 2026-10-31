@@ -51,7 +51,7 @@ const RECS = [
   // ===== 4. 开发开关关着：横幅不显示，详情照样显示 =====
   t.w.localStorage.removeItem('app_dev_import');
   t.w.JiwenStats.stepMonth(1); await settle();
-  ok(!banner(), '4 开发开关关着：横幅不显示');
+  ok(!!banner(), '4 （1031-A）开发开关关着：横幅照样显示');
   t.w.JiwenDetail.openDetail('r3');
   ok($('detailAiFlag'), '4 详情照样显示（标记在记录上）');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));

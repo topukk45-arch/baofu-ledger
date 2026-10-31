@@ -23,7 +23,7 @@ const MODULES = [
   { key: 'date', layer: 2, entry: 'JiwenDate', file: 'app/date.js', what: '日期时间选择（日 / 月 / 年三级、左右滑、时分滚轮）', secs: ['自定义时间选择器', '三级下钻：日 → 月 → 年', '网格内左右滑动翻页', '1019-T：时 / 分滚轮'], names: [] },
   { key: 'monthstrip', layer: 2, entry: 'JiwenMonthStrip', file: 'app/monthstrip.js', what: '月份浮条（1023-C，账单页、统计页共用：左右拨、松手才切、停 1.5 秒收起）', secs: [], names: [] },
   { key: 'ai', layer: 3, entry: 'JiwenAiExport', file: 'app/ai-export.js', what: '导出账单给 AI 分析', secs: ['导出账单给 AI 分析'], names: [] },
-  { key: 'impentry', layer: 3, entry: 'JiwenImportEntry', file: 'app/import-entry.js', what: '导入入口（开发开关、loadImportUI、用记问打开、空账本入口、月初提醒、待处理横幅、AI 标记列表的入口）', secs: ['1015-A：账单导入（开发中）'], names: [] },
+  { key: 'impentry', layer: 3, entry: 'JiwenImportEntry', file: 'app/import-entry.js', what: '导入入口（开发开关、loadImportUI、用记问打开、空账本入口、月初提醒、待处理横幅、AI 标记列表的入口）', secs: ['1015-A：账单导入'], names: [] },
   { key: 'forms', layer: 4, entry: 'JiwenForms', file: 'app/forms.js', what: '记一笔、修改账单、退款弹窗、口径选择、常用模板和模板面板', secs: ['悬浮按钮：打开/关闭记账弹窗', '统计选择：计入 / 不计 / 往来', '常用模板（1010-I）', '退款弹窗（1010-J）', '1019-K：模板面板（新建 / 编辑都用它）', '修改弹窗的分类/收支标签（与记账弹窗同款，但打开时预选记录原有值）'], names: ['refundLineHtml', 'formState', 'formSnaps'] },
   { key: 'detail', layer: 4, entry: 'JiwenDetail', file: 'app/detail.js', what: '账单详情（1023-B 从统计页搬来，账单页、统计页共用）、每笔记完后的结余（balanceAfter，1023-B 从账单页搬来）', secs: [], names: [] },
   { key: 'ledger', layer: 4, entry: 'JiwenLedger', file: 'app/ledger.js', what: '账单页：顶上细条、按月的列表（周小计、日卡片、每笔两行、没记账的日子）、月份浮条、分批画（1023-G 起搜索 / 筛选 / 批量搬去 search）', secs: [], names: [] },

@@ -130,12 +130,12 @@
         var bgSuggestOpen=false;   // var：导入结果页的「按过去几个月设预算」可能比这行先用到
         function renderBudgetSuggest(dec){
             let card=$('bgSuggestCard');
-            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const on=true;   // 1031-A：不再看开发开关
             if(!on){ if(card) card.remove(); return; }
             if(!card){ card=document.createElement('div'); card.className='stat-card'; card.id='bgSuggestCard'; $('statPaneBudget').appendChild(card); }
             card.textContent='';
             if(!bgSuggestOpen){
-                const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='bgSuggestBtn'; b.textContent='按过去几个月给预算建议（开发中）';
+                const b=document.createElement('button'); b.type='button'; b.className='mini-btn'; b.id='bgSuggestBtn'; b.textContent='按过去几个月给预算建议';
                 b.addEventListener('click', ()=>{ bgSuggestOpen=true; renderBudgetSuggest(dec); });
                 card.appendChild(b); return;
             }
@@ -539,7 +539,7 @@
         var __pendBannerSeq=0;   // var：统计页可能在这行执行前就渲染
         function renderPendBanner(){
             const my=++__pendBannerSeq, old=$('statPendBanner');
-            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const on=true;   // 1031-A：不再看开发开关
             let t=null;
             if(on){ try{ t=impTarget(); }catch(_){ t=null; } }
             if(!t){ if(old) old.remove(); return; }

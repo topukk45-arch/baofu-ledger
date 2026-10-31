@@ -46,15 +46,14 @@ function plugin(first) {
     await t.askOk();
     ok(!t.errs.length, '1 无报错 ' + t.errs.join('|'));
   }
-  // ===== 2. 开发开关没开：只提示，不进导入 =====
+  // ===== 2. 开发开关没开（1031-A 起导入正式放出来）：照样直接进导入页 =====
   {
     const P = plugin({ name: '微信账单.csv', data: b64 });
     const t = await A.boot({ html, www: WWW, seed: Object.assign(A.seedOf([]), { app_dev_import: '' }), before: w => { w.Capacitor.Plugins.OpenFile = P.api; } });
-    await t.until(() => t.ask(), 5000);
-    ok(t.ask() && /导入功能还在测试中/.test(t.ask().msg), '2 开关没开：提示「导入功能还在测试中」');
-    await t.askOk();
-    ok(!t.$('impPage') || t.$('impPage').style.display !== 'block', '2 不进导入页');
-    ok(!t.log.some(p => p.startsWith('import/')), '2 导入的代码一个都没加载');
+    await t.until(() => t.$('impPage') && t.$('impPage').style.display === 'block' && t.S() && t.S().parsed, 20000);
+    ok(!(t.ask() && /还在测试中/.test(t.ask().msg)), '2 （1031-A）开关没开：不再提示「还在测试中」');
+    ok(t.$('impPage') && t.$('impPage').style.display === 'block', '2 （1031-A）开关没开：照样进导入页');
+    ok(t.S() && t.S().parsed && t.S().parsed.files[0].name === '微信账单.csv', '2 （1031-A）读的是打开的那个文件');
   }
   // ===== 3. 没进账号：先记着，进了账号接着处理 =====
   {

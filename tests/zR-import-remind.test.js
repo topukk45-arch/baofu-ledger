@@ -48,7 +48,7 @@ const ledger = async t => { t.d.querySelector('.tab-btn[data-tab="ledger"]').cli
     await t.importFiles(file('2026-10-20 23:59:59'));
     t.w.localStorage.removeItem('app_dev_import');
     await ledger(t);
-    ok(!t.$('impRemind'), '5 开发开关关着：不提醒');
+    ok(!!t.$('impRemind'), '5 （1031-A）开发开关关着：照样提醒');
   }
   console.log(`${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);

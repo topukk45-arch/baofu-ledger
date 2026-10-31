@@ -798,7 +798,7 @@
             const okText = (me && isRefund(me)) ? '删除这笔退款' : (rs.length ? `删除这条和 ${rs.length} 笔退款` : '删除这条记录');
             // 导入简化 4b：导入的（或已和账单对过账的）记录：分「只删这条」「删掉，以后也不导入」，另给「改成不计」「撤销整批导入」（开发开关开着才有）
             const iapp=me && !isRefund(me) && me.src && EDIT_WARN_APP[me.src.app];
-            let dev=false; try{ dev=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const dev=true;   // 1031-A：不再看开发开关
             if(iapp && dev){
                 const opts=[
                     { value:'one', label:'只删这条', desc:`下次导入这段时间的${iapp}账单，这笔会再导进来` },
@@ -865,7 +865,7 @@
         const IMP_EDIT_WARN_OFF='app_imp_edit_warn_off', EDIT_WARN_APP={ wechat:'微信', alipay:'支付宝' };
         function impEditWarn(old, time, money){
             const s=old && old.src; if(!s || typeof s!=='object' || !EDIT_WARN_APP[s.app]) return '';
-            try{ if(localStorage.getItem('app_dev_import')!=='1' || localStorage.getItem(IMP_EDIT_WARN_OFF)==='1') return ''; }catch(_){ return ''; }
+            try{ if(localStorage.getItem(IMP_EDIT_WARN_OFF)==='1') return ''; }catch(_){ return ''; }
             const moneyChg=round2(safeNum(old.money))!==round2(money), timeChg=String(old.time||'')!==String(time||'');
             if(!moneyChg && !timeChg) return '';
             const what=moneyChg && timeChg ? '金额和时间' : moneyChg ? '金额' : '时间', app=EDIT_WARN_APP[s.app];
@@ -876,7 +876,7 @@
         function askCatRule(rec, cat, done){
             done=done||(()=>{});
             const S=window.JiwenImportStore;
-            let dev=false; try{ dev=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const dev=true;   // 1031-A：不再看开发开关
             if(!dev || !S || !S.archiveInfo || !rec || !rec.src || isRefund(rec) || !Number.isInteger(rec.cp) || !cat || cat==='未分类'){ done(); return; }
             let info; try{ info=S.archiveInfo(); }catch(_){ done(); return; }
             const kw=String((info.cps||[])[rec.cp]||'').trim().slice(0, 32);

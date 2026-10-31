@@ -26,7 +26,7 @@
         var __remindSeq=0;
         function renderImpRemind(){
             const my=++__remindSeq;
-            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const on=true;   // 1031-A：导入正式放出来，不再看开发开关
             const old=$('impRemind');
             let t=null; if(on){ try{ t=impTarget(); }catch(_){ t=null; } }
             const now=new Date(), ym=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
@@ -60,7 +60,7 @@
         var __bannerSeq=0;
         function renderImpBanner(){
             const my=++__bannerSeq;
-            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const on=true;   // 1031-A：导入正式放出来，不再看开发开关
             let t=null; if(on){ try{ t=impTarget(); }catch(_){ t=null; } }
             if(!t){ const x=$('impBanner'); if(x) x.remove(); return; }
             const bk=`app_imp_banner_${JiwenBase.currentUser}__${JiwenBase.currentArchive}`;
@@ -93,7 +93,7 @@
         // 1023-G 起点了打开搜一笔的结果页、条件是「待确认分类」（点击在 search.js 里委托绑定）
         let optSig=null, optN=0, optT=null;   // 一键优化：上次算的是哪一份账本、能改几条
         function renderRvChip(raw){
-            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const on=true;   // 1031-A：导入正式放出来，不再看开发开关
             const n=on ? raw.filter(r=>r.rv===1).length : 0;
             let b=$('rvChip');
             let o=$('optCatChip');
@@ -124,7 +124,7 @@
             if(b.nextSibling!==o) b.parentNode.insertBefore(o, b.nextSibling);
         }
         function renderImpEmptyEntry(n){
-            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const on=true;   // 1031-A：导入正式放出来，不再看开发开关
             let b=$('impEmptyEntry');
             if(!on || n>=IMP_EMPTY_MAX){ if(b) b.remove(); return; }
             if(b) return;

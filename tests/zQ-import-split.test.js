@@ -65,7 +65,7 @@ const M1 = { id: 'm1', time: '2026-10-05T08:30', money: 30, type: 'expense', cat
   await t.importFiles(F);
   t.w.localStorage.removeItem('app_dev_import');
   t.w.JiwenDetail.openDetail('m1');
-  ok($('detailSrc') && /已和微信账单合并/.test($('detailSrc').textContent) && !$('detailSplit'), '6 开发开关关着：只写来源，没有「拆开」');
+  ok($('detailSrc') && /已和微信账单合并/.test($('detailSrc').textContent) && !!$('detailSplit'), '6 （1031-A）开发开关关着：写来源，也有「拆开」');
   t.w.JiwenDetail.openDetail('m2');
   ok(!$('detailSrcField'), '6 没来源的手记：不显示这一行');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));

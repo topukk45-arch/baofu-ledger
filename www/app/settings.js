@@ -119,7 +119,7 @@
             try{ if(JiwenBase.currentUser) renderBill(); }catch(_){}     // 1016-R：空账本的小入口跟着开关出现 / 消失
             renderStorageUse();
             try{ odRefreshStatusUI(); }catch(_){}
-            customAlert(on ? '已打开「导入（开发中）」，入口在上面「存档管理」里。只在这台手机上有效。' : '已关闭「导入（开发中）」。', '开发开关');
+            customAlert(on ? '已打开开发者工具（性能记录、导入量度等），在上面「存档管理」里。只在这台手机上有效。' : '已关闭开发者工具。', '开发开关');
         });
         $('importFile').addEventListener('change', e => {
             const file=e.target.files[0]; if(!file) return;
@@ -557,7 +557,7 @@
         var __storageSeq=0;
         function renderStorageUse(){
             const my=++__storageSeq;
-            let on=false; try{ on=localStorage.getItem('app_dev_import')==='1'; }catch(_){}
+            const on=true;   // 1031-A：不再看开发开关
             const old=$('storageUse'), oldW=$('storageUseWarn');
             if(!on || !navigator.storage || !navigator.storage.estimate){ if(old) old.remove(); if(oldW) oldW.remove(); return; }
             Promise.resolve().then(()=>navigator.storage.estimate()).then(q=>{

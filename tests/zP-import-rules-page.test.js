@@ -55,7 +55,7 @@ const RANGE = { from: '2026-01-01 00:00:00', to: '2026-12-31 23:59:59' };
   ok(r.plan.rows.find(x => x.cp === '某虚构书店').cat === '杂项', '4 下一次导入：照改过的规则归到杂项');
   // 开关关着看不到
   t.w.localStorage.removeItem('app_dev_import'); t.w.eval('JiwenImportEntry.renderDevImport')();
-  ok($('devRulesBtn').style.display === 'none', '5 开发开关关着：看不到入口');
+  ok($('devRulesBtn').style.display !== 'none' && ['devPerfBtn', 'devMeasureBtn', 'devNudgeBtn', 'devSplashBtn'].every(id => $(id).style.display === 'none'), '5 （1031-A）开发开关关着：入口照样在，开发者工具藏着');
   ok(!t.errs.length, '无报错 ' + t.errs.join('|'));
   console.log(`${pass} 通过，${fail} 失败`);
   process.exit(fail ? 1 : 0);
